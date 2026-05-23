@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shop Champion — Live Leaderboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #07090f;
+    color: #e8eaf0;
+    font-family: 'Nunito', sans-serif;
+  }
+
+  /* ── SETUP SCREEN ── */
+  #setup-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 20px;
+  }
+  #setup-box {
+    background: #0f1628; border: 1px solid #1e2a45;
+    border-radius: 20px; padding: 48px;
+    width: 100%; max-width: 440px; text-align: center;
+  }
+  .input {
+    background: #0a0e1a; border: 1px solid #2a3560;
+    border-radius: 8px; color: #e8eaf0;
+    padding: 10px 14px; font-size: 14px; width: 100%;
+    font-family: 'Nunito', sans-serif;
+  }
+  .input:focus { outline: none; border-color: #5af; }
+  .btn {
+    cursor: pointer; border: none; border-radius: 8px;
+    font-weight: 700; transition: all 0.2s; font-family: 'Nunito', sans-serif;
+  }
+
+  /* ── LEADERBOARD SCREEN ── */
+  #leaderboard-screen {
+    display: none;
+    width: 100vw; height: 100vh;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Header bar */
+  #lb-header {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px;
+    background: #0a0e1a;
+    border-bottom: 1px solid #1a2440;
+  }
+  #lb-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 900; letter-spacing: 4px;
+    color: #e8eaf0;
+  }
+  #lb-meta { font-size: 13px; color: #2a3a5a; letter-spacing: 1px; }
+
+  /* Table column header — hidden in multi-col mode, shown per panel */
+  #col-header {
+    flex-shrink: 0;
+    display: none; /* rendered per-panel instead */
+    align-items: center;
+    padding: 0 12px;
+    background: #070b14;
+    border-bottom: 1px solid #111827;
+  }
+  .panel-col-header {
+    display: grid;
+    align-items: center;
+    padding: 0 12px;
+    background: #070b14;
+    border-bottom: 1px solid #111827;
+    flex-shrink: 0;
+  }
+  .col-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: #2a3a5a;
+  }
+
+  /* Rows container — fills remaining space */
+  #rows-wrap {
+    flex: 1;
+    overflow: hidden;
+    display: grid; /* columns set dynamically */
+  }
+
+  /* Column panel inside rows-wrap */
+  .lb-col-panel {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #111827;
+    overflow: hidden;
+  }
+  .lb-col-panel:last-child { border-right: none; }
+
+  /* Each row */
+  .lb-row {
+    display: grid;
+    align-items: center;
+    padding: 0 12px;
+    border-bottom: 1px solid #0d1220;
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+  .lb-row:nth-child(odd)  { background: #090d18; }
+  .lb-row:nth-child(even) { background: #070b14; }
+  .lb-row.top1 { background: #0c1525; }
+  .lb-row.top2 { background: #0b1320; }
+  .lb-row.top3 { background: #0a111e; }
+
+  /* Rank number */
+  .rank-num {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 900; text-align: center;
+    color: #2a3a60;
+  }
+  .lb-row.top1 .rank-num { color: #7ab3ff; }
+  .lb-row.top2 .rank-num { color: #5a8aaa; }
+  .lb-row.top3 .rank-num { color: #4a7a99; }
+
+  /* Avatar circle */
+  .avatar-circle {
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #ccc;
+    border: 2px solid #1a2440;
+    font-family: 'Rajdhani', sans-serif;
+    flex-shrink: 0;
+  }
+
+  /* Name */
+  .cust-name {
+    font-weight: 800; color: #e8eaf0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* Spend */
+  .cust-spend {
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 900; color: #e8eaf0; text-align: right;
+    letter-spacing: 1px;
+  }
+  .lb-row.top1 .cust-spend { color: #a0c8ff; }
+
+  /* Points */
+  .cust-pts { color: #2a4a6a; text-align: right; font-weight: 700; }
+
+  /* Footer */
+  #lb-footer {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 28px;
+    background: #070b14;
+    border-top: 1px solid #0d1220;
+  }
+  #clock { color: #1e2a40; font-size: 12px; letter-spacing: 1px; font-family: 'Rajdhani', sans-serif; }
+  #refresh-wrap { display: flex; align-items: center; gap: 6px; }
+  #refresh-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: #1a3a1a;
+    animation: pulse 2s infinite;
+  }
+  #refresh-dot.live { background: #2a6; }
+  #refresh-dot.err  { background: #a22; animation: none; }
+  #refresh-label { font-size: 12px; color: #1e2a3a; letter-spacing: 1px; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Rank flash on change */
+  @keyframes rankFlash { 0%{background:#1a3a5c44} 100%{background:transparent} }
+  .rank-changed { animation: rankFlash 1.8s ease; }
+
+  /* Loading */
+  #loading-screen {
+    display: none; position: fixed; inset: 0;
+    background: #07090f; z-index: 50;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 20px;
+  }
+  .spinner {
+    width: 44px; height: 44px;
+    border: 3px solid #1e2a45; border-top-color: #5af;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #error-banner {
+    display: none; position: fixed; top: 20px; left: 50%;
+    transform: translateX(-50%);
+    background: #1a0808; border: 1px solid #4a1515;
+    border-radius: 10px; padding: 10px 24px;
+    color: #f88; font-size: 13px; z-index: 100;
+  }
+</style>
+</head>
+<body>
+
+<div id="error-banner"></div>
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div style="color:#5af;font-family:'Rajdhani',sans-serif;font-size:16px;letter-spacing:4px;">LOADING...</div>
+</div>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div id="setup-box">
+    <div style="font-size:48px;margin-bottom:12px;">📺</div>
+    <div style="font-size:26px;font-weight:900;font-family:'Rajdhani',sans-serif;color:#e8eaf0;letter-spacing:3px;margin-bottom:6px;">LIVE DISPLAY</div>
+    <div style="font-size:11px;color:#2a3a5a;letter-spacing:4px;margin-bottom:32px;">SHOP CHAMPION</div>
+
+    <div style="background:#0a0e1a;border-radius:10px;padding:16px;margin-bottom:24px;font-size:13px;color:#4a6a8a;line-height:1.9;text-align:left;">
+      <strong style="color:#7ab3ff;">How to connect:</strong><br>
+      1. On admin, go to <strong style="color:#aaa;">⚙️ Settings → Push to Display</strong><br>
+      2. Copy the <strong style="color:#aaa;">Bin ID</strong> shown<br>
+      3. Paste it below and click Connect
+    </div>
+
+    <label style="display:block;font-size:12px;color:#4a5a7a;margin-bottom:6px;text-align:left;">JSONbin Bin ID</label>
+    <input class="input" id="manual-bin" placeholder="e.g. 64a3f2b8dcd6080a2da350c8" style="margin-bottom:14px;" onkeydown="if(event.key==='Enter')connectManual()" />
+    <button class="btn" onclick="connectManual()" style="background:#1a3a60;color:#7ab3ff;border:1px solid #1a4a80;width:100%;padding:14px;font-size:15px;font-weight:800;margin-bottom:10px;">Connect →</button>
+    <button class="btn" onclick="runDemo()" style="background:#0d1220;color:#2a4a6a;border:1px solid #1a2440;width:100%;padding:10px;font-size:13px;">👁 Preview with Demo Data</button>
+  </div>
+</div>
+
+<!-- LEADERBOARD SCREEN -->
+<div id="leaderboard-screen">
+  <div id="lb-header">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div id="lb-icon" style="font-size:36px;display:flex;align-items:center;">🏆</div>
+      <div id="lb-title">SHOP CHAMPION</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div id="lb-meta">LIVE LEADERBOARD</div>
+      <div id="lb-filter-badge" style="display:none;background:#1a1400;border:1px solid #FFD70055;border-radius:20px;padding:2px 10px;font-size:11px;color:#FFD700;font-family:'Nunito',sans-serif;letter-spacing:0.5px;font-weight:700;white-space:nowrap;"></div>
+    </div>
+  </div>
+
+  <div id="col-header">
+    <span class="col-label" style="text-align:center;">#</span>
+    <span class="col-label">Customer</span>
+    <span class="col-label" style="text-align:right;">Total Spend</span>
+    <span class="col-label" style="text-align:right;">Points</span>
+  </div>
+
+  <div id="rows-wrap"></div>
+
+  <div id="lb-footer">
+    <div id="refresh-wrap">
+      <div id="refresh-dot"></div>
+      <span id="refresh-label">Connecting...</span>
+    </div>
+    <div id="clock"></div>
+  </div>
+</div>
+
+<script>
+// ── helpers ──
+function formatINR(n) { return "₹" + Number(n).toLocaleString("en-IN"); }
+function getInitials(name) { return name.split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2); }
+function avatarColor(name) {
+  const colors = ["#0d2040","#1a1040","#0a2020","#201010","#101010"];
+  return colors[name.charCodeAt(0) % colors.length];
+}
+
+// ── state ──
+let binId = null, pollInterval = null, prevRanks = {}, lastData = null, isDemo = false;
+
+// ── init ──
+window.addEventListener("load", () => {
+  const params = new URLSearchParams(window.location.search);
+  const bin = params.get("bin");
+  if (bin) { binId = bin; startDisplay(); }
+  else { document.getElementById("setup-screen").style.display = "flex"; }
+  startClock();
+});
+
+function connectManual() {
+  const val = document.getElementById("manual-bin").value.trim();
+  if (!val) return;
+  binId = val;
+  startDisplay();
+}
+
+// ── demo ──
+function runDemo() {
+  isDemo = true;
+  const demo = {
+    shopName: "Shop Champion",
+    lastUpdated: new Date().toISOString(),
+    displaySettings: { showCount: 10 },
+    customers: [
+      { id:"SC001", name:"Rahul Sharma",    totalSpend:185000, points:18500, rank:1  },
+      { id:"SC002", name:"Priya Mehta",     totalSpend:92000,  points:9200,  rank:2  },
+      { id:"SC003", name:"Amit Kumar",      totalSpend:74000,  points:7400,  rank:3  },
+      { id:"SC004", name:"Sunita Rao",      totalSpend:48000,  points:4800,  rank:4  },
+      { id:"SC005", name:"Vikram Singh",    totalSpend:31500,  points:3150,  rank:5  },
+      { id:"SC006", name:"Anita Joshi",     totalSpend:22000,  points:2200,  rank:6  },
+      { id:"SC007", name:"Deepak Verma",    totalSpend:17400,  points:1740,  rank:7  },
+      { id:"SC008", name:"Meera Pillai",    totalSpend:12800,  points:1280,  rank:8  },
+      { id:"SC009", name:"Sanjay Gupta",    totalSpend:8600,   points:860,   rank:9  },
+      { id:"SC010", name:"Kavita Nair",     totalSpend:4200,   points:420,   rank:10 },
+      { id:"SC011", name:"Ravi Tiwari",     totalSpend:3800,   points:380,   rank:11 },
+      { id:"SC012", name:"Pooja Bhat",      totalSpend:3500,   points:350,   rank:12 },
+      { id:"SC013", name:"Nikhil Shetty",   totalSpend:3200,   points:320,   rank:13 },
+      { id:"SC014", name:"Rekha Menon",     totalSpend:2900,   points:290,   rank:14 },
+      { id:"SC015", name:"Arjun Reddy",     totalSpend:2600,   points:260,   rank:15 },
+      { id:"SC016", name:"Swati Desai",     totalSpend:2300,   points:230,   rank:16 },
+      { id:"SC017", name:"Manoj Pandey",    totalSpend:2100,   points:210,   rank:17 },
+      { id:"SC018", name:"Nisha Kapoor",    totalSpend:1900,   points:190,   rank:18 },
+      { id:"SC019", name:"Suresh Iyer",     totalSpend:1700,   points:170,   rank:19 },
+      { id:"SC020", name:"Geeta Nambiar",   totalSpend:1500,   points:150,   rank:20 },
+      { id:"SC021", name:"Harish Patel",    totalSpend:1400,   points:140,   rank:21 },
+      { id:"SC022", name:"Divya Shah",      totalSpend:1300,   points:130,   rank:22 },
+      { id:"SC023", name:"Karan Malhotra",  totalSpend:1200,   points:120,   rank:23 },
+      { id:"SC024", name:"Smita Kulkarni",  totalSpend:1100,   points:110,   rank:24 },
+      { id:"SC025", name:"Tarun Chopra",    totalSpend:1000,   points:100,   rank:25 },
+      { id:"SC026", name:"Leela Varma",     totalSpend:900,    points:90,    rank:26 },
+      { id:"SC027", name:"Prakash Jha",     totalSpend:800,    points:80,    rank:27 },
+      { id:"SC028", name:"Usha Trivedi",    totalSpend:700,    points:70,    rank:28 },
+      { id:"SC029", name:"Rohit Ghosh",     totalSpend:600,    points:60,    rank:29 },
+      { id:"SC030", name:"Anjali Mishra",   totalSpend:500,    points:50,    rank:30 },
+    ]
+  };
+  document.getElementById("setup-screen").style.display = "none";
+  document.getElementById("lb-meta").textContent = "DEMO MODE";
+  showLeaderboard(demo);
+  document.getElementById("refresh-dot").className = "";
+  document.getElementById("refresh-label").textContent = "Demo — not live";
+}
+
+// ── display ──
+function startDisplay() {
+  document.getElementById("setup-screen").style.display = "none";
+  document.getElementById("loading-screen").style.display = "flex";
+  fetchData(true);
+  pollInterval = setInterval(() => fetchData(false), 10000);
+}
+
+async function fetchData(initial) {
+  if (isDemo) return;
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`, { headers: { "X-Bin-Meta": "false" } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const payload = data.record || data;
+
+    document.getElementById("loading-screen").style.display = "none";
+    hideError();
+
+    const isNew = !lastData || JSON.stringify(payload) !== JSON.stringify(lastData);
+    lastData = payload;
+
+    if (isNew || initial) {
+      showLeaderboard(payload);
+      document.getElementById("refresh-label").textContent = "Updated " + new Date().toLocaleTimeString();
+    } else {
+      document.getElementById("refresh-label").textContent = "Live · " + new Date().toLocaleTimeString();
+    }
+    document.getElementById("refresh-dot").className = "live";
+  } catch(e) {
+    document.getElementById("loading-screen").style.display = "none";
+    if (initial) {
+      document.getElementById("setup-screen").style.display = "flex";
+      showError("Could not connect — check your Bin ID");
+    } else {
+      showError("Connection error — retrying...");
+      document.getElementById("refresh-dot").className = "err";
+    }
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById("error-banner");
+  el.textContent = "⚠️ " + msg; el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 6000);
+}
+function hideError() { document.getElementById("error-banner").style.display = "none"; }
+
+// ── MAIN RENDER ──
+function showLeaderboard(payload) {
+  const customers = payload.customers || [];
+  if (!customers.length) return;
+
+  const showCount = (payload.displaySettings && payload.displaySettings.showCount) || customers.length;
+
+  // Show leaderboard screen
+  const lbScreen = document.getElementById("leaderboard-screen");
+  lbScreen.style.display = "flex";
+
+  // Rank change detection
+  const rankChanged = new Set();
+  customers.forEach(c => {
+    if (prevRanks[c.id] !== undefined && prevRanks[c.id] !== c.rank) rankChanged.add(c.id);
+    prevRanks[c.id] = c.rank;
+  });
+
+  // Update header
+  const titleEl = document.getElementById("lb-title");
+  if (titleEl && payload.shopName) titleEl.textContent = payload.shopName.toUpperCase();
+  // Update icon if available in localStorage (same browser)
+  try {
+    const as = JSON.parse(localStorage.getItem("sc_app_settings")||"{}");
+    const iconEl = document.getElementById("lb-icon");
+    if (iconEl) {
+      if (as.appIcon) iconEl.innerHTML = `<img src="${as.appIcon}" style="height:100%;max-height:48px;object-fit:contain;border-radius:8px;" />`;
+      else iconEl.innerHTML = "🏆";
+    }
+    if (as.shopName && titleEl) titleEl.textContent = as.shopName.toUpperCase();
+  } catch {}
+
+  if (payload.lastUpdated) {
+    const d = new Date(payload.lastUpdated);
+    const filterLabel = payload.filterLabel || "All Time";
+    const filterMode  = payload.filterMode  || "all";
+    window._lbFilterMode = filterMode;
+    const filterTag   = filterMode !== "all" ? " · 📅 " + filterLabel : "";
+    document.getElementById("lb-meta").textContent = "LIVE · " + d.toLocaleTimeString() + filterTag;
+  }
+
+  // Show / hide filter badge in header
+  const badge = document.getElementById("lb-filter-badge");
+  if (badge) {
+    const fm = payload.filterMode || "all";
+    if (fm !== "all") {
+      badge.textContent = "📅 " + (payload.filterLabel || "");
+      badge.style.display = "inline-block";
+    } else {
+      badge.style.display = "none";
+    }
+  }
+
+  renderTable(customers, showCount, rankChanged);
+}
+
+function renderTable(customers, showCount, rankChanged) {
+  const screenH = window.innerHeight;
+
+  // ── How many columns? (10 customers per column) ──
+  // 1-10  → 1 col | 11-20 → 2 cols | 21-30 → 3 cols | 31-40 → 4 cols | 41+ → 5 cols
+  const total = Math.min(customers.length, showCount);
+  let numCols;
+  if      (total <= 10) numCols = 1;
+  else if (total <= 20) numCols = 2;
+  else if (total <= 30) numCols = 3;
+  else if (total <= 40) numCols = 4;
+  else                  numCols = 5;
+
+  const rowsPerCol = 10; // always show 10 per column
+
+  // ── Chrome heights ──
+  const headerH  = Math.round(screenH * 0.08);
+  const footerH  = Math.round(screenH * 0.04);
+  const colHH    = Math.round(screenH * 0.04);
+  const rowAreaH = screenH - headerH - footerH - colHH;
+  const rowH     = Math.floor(rowAreaH / rowsPerCol);
+
+  // Font sizes
+  const rankFs   = Math.max(10, Math.round(rowH * 0.36));
+  const nameFs   = Math.max(9,  Math.round(rowH * 0.30));
+  const spendFs  = Math.max(9,  Math.round(rowH * 0.28));
+  const ptsFs    = Math.max(8,  Math.round(rowH * 0.20));
+  const avatarSz = Math.max(20, Math.round(rowH * 0.52));
+  const avatarFs = Math.max(8,  Math.round(avatarSz * 0.38));
+
+  // Column grid definition
+  const rankW  = Math.round(rowH * 1.0);
+  const spendW = Math.round(spendFs * (numCols <= 2 ? 8 : numCols === 3 ? 7 : 6));
+  const ptsW   = Math.round(ptsFs   * (numCols <= 2 ? 7 : numCols === 3 ? 6 : 5));
+  const colDef = `${rankW}px 1fr ${spendW}px ${ptsW}px`;
+
+  // ── Header / footer ──
+  document.getElementById("lb-header").style.height = headerH + "px";
+  document.getElementById("lb-title").style.fontSize = Math.max(14, Math.round(headerH * 0.42)) + "px";
+  document.getElementById("lb-meta").style.fontSize  = Math.max(9,  Math.round(headerH * 0.20)) + "px";
+  document.getElementById("col-header").style.display = "none";
+  document.getElementById("lb-footer").style.height = footerH + "px";
+  document.getElementById("clock").style.fontSize          = Math.max(9, Math.round(footerH * 0.28)) + "px";
+  document.getElementById("refresh-label").style.fontSize  = Math.max(9, Math.round(footerH * 0.28)) + "px";
+
+  // ── Build column panels ──
+  const wrap = document.getElementById("rows-wrap");
+  wrap.style.gridTemplateColumns = `repeat(${numCols}, 1fr)`;
+
+  const slice = customers.slice(0, total);
+  const panels = [];
+  for (let i = 0; i < numCols; i++) {
+    panels.push(slice.slice(i * rowsPerCol, (i + 1) * rowsPerCol));
+  }
+
+  const labelFs = Math.max(8, Math.round(colHH * 0.28));
+
+  wrap.innerHTML = panels.map(panel => {
+    // Spend label changes based on filter mode passed in payload
+    const spendColLabel = (window._lbFilterMode && window._lbFilterMode !== "all") ? "Day Spend" : "Total Spend";
+    const miniHeader = `
+      <div class="panel-col-header" style="height:${colHH}px;grid-template-columns:${colDef};">
+        <span class="col-label" style="text-align:center;font-size:${labelFs}px;">#</span>
+        <span class="col-label" style="font-size:${labelFs}px;">Customer</span>
+        <span class="col-label" style="text-align:right;font-size:${labelFs}px;">${spendColLabel}</span>
+        <span class="col-label" style="text-align:right;font-size:${labelFs}px;">Pts</span>
+      </div>`;
+
+    const rows = panel.map(c => {
+      const topCls  = c.rank === 1 ? "top1" : c.rank === 2 ? "top2" : c.rank === 3 ? "top3" : "";
+      const changed = rankChanged && rankChanged.has(c.id) ? "rank-changed" : "";
+      const bg      = avatarColor(c.name);
+      return `
+        <div class="lb-row ${topCls} ${changed}"
+             style="height:${rowH}px;grid-template-columns:${colDef};">
+          <div class="rank-num" style="font-size:${rankFs}px;">${c.rank}</div>
+          <div style="display:flex;align-items:center;gap:${Math.round(rowH*0.15)}px;min-width:0;">
+            <div class="avatar-circle"
+                 style="width:${avatarSz}px;height:${avatarSz}px;font-size:${avatarFs}px;background:${bg};flex-shrink:0;">
+              ${getInitials(c.name)}
+            </div>
+            <div class="cust-name" style="font-size:${nameFs}px;">${c.name}</div>
+          </div>
+          <div class="cust-spend" style="font-size:${spendFs}px;">${formatINR(c.totalSpend)}</div>
+          <div class="cust-pts"   style="font-size:${ptsFs}px;">${(c.points||0).toLocaleString()} pts</div>
+        </div>`;
+    }).join("");
+
+    return `<div class="lb-col-panel">${miniHeader}${rows}</div>`;
+  }).join("");
+}
+
+// Re-render on resize so it stays fitted
+window.addEventListener("resize", () => {
+  if (lastData) renderTable(
+    lastData.customers || [],
+    (lastData.displaySettings && lastData.displaySettings.showCount) || (lastData.customers||[]).length,
+    new Set()
+  );
+});
+
+// ── clock ──
+function startClock() {
+  const el = document.getElementById("clock");
+  function tick() { if (el) el.textContent = new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
+  tick(); setInterval(tick, 1000);
+}
+
+// ── load shop name/icon from localStorage on startup ──
+document.addEventListener("DOMContentLoaded", () => {
+  try {
+    const as = JSON.parse(localStorage.getItem("sc_app_settings")||"{}");
+    if (as.shopName) {
+      const t = document.getElementById("lb-title");
+      if (t) t.textContent = as.shopName.toUpperCase();
+      document.title = as.shopName + " — Live Leaderboard";
+    }
+    if (as.appIcon) {
+      const iconEl = document.getElementById("lb-icon");
+      if (iconEl) iconEl.innerHTML = `<img src="${as.appIcon}" style="height:48px;object-fit:contain;border-radius:8px;" />`;
+    }
+  } catch {}
+});
+</script>
+</body>
+</html>
