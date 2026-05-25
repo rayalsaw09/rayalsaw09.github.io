@@ -1566,6 +1566,7 @@ async function setNewPassword() {
   if(saveTxt) saveTxt.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Saving...`;
 
   const hashed = btoa(authPhone + ":" + p1);
+  const userNum = Date.now();
 
   try {
     // Save to Supabase sc_users
@@ -1578,7 +1579,7 @@ async function setNewPassword() {
           "Content-Type": "application/json",
           "Prefer": "return=minimal"
         },
-        body: JSON.stringify({ phone: authPhone, password_hash: hashed, created_at: new Date().toISOString() })
+        body: JSON.stringify({ phone: authPhone, password_hash: hashed, created_at: new Date().toISOString(), user_number: userNum })
       });
     } else {
       // Update existing password
@@ -1598,6 +1599,7 @@ async function setNewPassword() {
   // Save locally
   localStorage.setItem("sc_user_" + authPhone, hashed);
   localStorage.setItem("sc_auth_phone", authPhone);
+  if (authMode === "new_user") localStorage.setItem("sc_usernum_" + authPhone, userNum);
   onLoginSuccess(authPhone);
 }
 
@@ -1607,6 +1609,16 @@ function onLoginSuccess(phone) {
   if (db && phone) {
     shopId = phone;
     loadFirebaseCustomers();
+  }
+  // Cache user_number for Support ID display
+  if (phone && !localStorage.getItem("sc_usernum_" + phone)) {
+    fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=user_number`, {
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    }).then(r => r.json()).then(d => {
+      if (d && d[0] && d[0].user_number) {
+        localStorage.setItem("sc_usernum_" + phone, d[0].user_number);
+      }
+    }).catch(() => {});
   }
   renderTabs();
   safeRenderTab(currentTab);
@@ -2796,8 +2808,23 @@ function showFirebaseSettings(){
 function renderSettings(){
   const counts=[5,10,15,20,25,50];
   const cBtns=counts.map(n=>`<button onclick="setDisplayCount(${n})" style="cursor:pointer;border-radius:8px;padding:12px 0;border:2px solid ${displaySettings.showCount===n?"#3a6aaa":"#1e2a45"};background:${displaySettings.showCount===n?"#0f1e38":"#0a0e1a"};color:${displaySettings.showCount===n?"#7ab3ff":"#4a5a7a"};font-weight:800;font-size:16px;font-family:'Nunito',sans-serif;">${n}</button>`).join("");
+  const savedPhone = localStorage.getItem("sc_auth_phone") || "";
+  const userNumRaw = savedPhone ? localStorage.getItem("sc_usernum_" + savedPhone) || "" : "";
+  const displayUID = userNumRaw ? "#" + String(userNumRaw).slice(-6) : "—";
   return `<div style="max-width:560px;">
     <h2 style="margin:0 0 24px;font-size:20px;font-weight:800;color:#e8eaf0;font-family:'Rajdhani',sans-serif;">Display Settings</h2>
+
+    <div class="card" style="padding:20px 24px;margin-bottom:20px;background:#0a0f1f;border:1px solid #1a3a60;">
+      <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:10px;">🪪 Your Support ID</div>
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:12px;">If you need help or want to reset your password, contact your ShopChampion admin and tell them your <strong style="color:#e8eaf0;">Support ID</strong>:</div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div style="font-family:monospace;font-size:28px;font-weight:900;color:#7ab3ff;letter-spacing:4px;background:#060c1a;border:2px solid #1a3a60;padding:10px 22px;border-radius:12px;">${displayUID}</div>
+        <div style="flex:1;">
+          <div style="font-size:12px;color:#7a8aaa;">Phone: <strong style="color:#FFD700;font-family:monospace;">+91 ${savedPhone}</strong></div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:4px;">Share your ID or phone with your admin when you call for support.</div>
+        </div>
+      </div>
+    </div>
 
     <div class="card" style="padding:24px;margin-bottom:20px;">
       <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:12px;">🏪 Shop Name & Icon</div>
@@ -4046,21 +4073,17 @@ function updateLicenseUI() {
 
 // Checks whether a main tab (0-6) is accessible in current plan
 function isTabAllowed(i) {
-  // A valid Pro license is required to USE the app at all.
-  // But WHICH features/tabs are active is always controlled by the
-  // admin's FREE_TABS toggle — even for Pro users.
-  if (!(licensePlan === "pro" && licenseStatus === "pro")) {
-    // Free/expired: only explicitly allowed tabs
-    return FREE_TABS.includes(i);
-  }
-  // Pro user: still respect the admin's feature toggles
+  // Pro user — all tabs unlocked
+  if (licensePlan === "pro" && licenseStatus === "pro") return true;
+  // Free/expired — only explicitly allowed free tabs
   return FREE_TABS.includes(i);
 }
 
 // Checks whether a sub-feature (index 7+) is accessible
 // Push to Display=7, Visits=8, WhatsApp=9, Last Visit=10
 function isSubFeatureAllowed(i) {
-  // Always respect admin's FREE_TABS toggles, regardless of plan
+  // Pro users get all sub-features
+  if (licensePlan === "pro" && licenseStatus === "pro") return true;
   return FREE_TABS.includes(i);
 }
 
@@ -4085,8 +4108,16 @@ async function checkLicense() {
     // SUCCESS
     saveLicense(key, row.plan || "pro", "pro");
     document.getElementById("license-screen").style.display = "none";
-    document.getElementById("login-screen").style.display = "flex";
     btnTxt.textContent = "✅ Activate →";
+    // If already logged in — go straight to app
+    const savedPhone = localStorage.getItem("sc_auth_phone");
+    if (savedPhone && localStorage.getItem("sc_user_" + savedPhone)) {
+      authPhone = savedPhone;
+      onLoginSuccess(savedPhone);
+    } else {
+      // Not logged in yet — show login screen
+      document.getElementById("login-screen").style.display = "flex";
+    }
   } catch(e) {
     btnTxt.textContent = "✅ Activate →";
     errEl.textContent = "❌ Network error — check internet and try again";
@@ -4097,7 +4128,13 @@ async function checkLicense() {
 function useFreeMode() {
   saveLicense(null, "free", "free");
   document.getElementById("license-screen").style.display = "none";
-  document.getElementById("login-screen").style.display = "flex";
+  const savedPhone = localStorage.getItem("sc_auth_phone");
+  if (savedPhone && localStorage.getItem("sc_user_" + savedPhone)) {
+    authPhone = savedPhone;
+    onLoginSuccess(savedPhone);
+  } else {
+    document.getElementById("login-screen").style.display = "flex";
+  }
 }
 
 function showRenewPrompt() {
