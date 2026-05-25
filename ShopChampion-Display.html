@@ -4,197 +4,333 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Shop Champion — Live Leaderboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700;900&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700;900&family=Nunito:wght@400;600;700;800;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Nunito', sans-serif; }
 
-  html, body {
-    width: 100%; height: 100%;
-    overflow: hidden;
-    background: #07090f;
-    color: #e8eaf0;
-    font-family: 'Nunito', sans-serif;
+  /* ══════════════════════════════════════════════
+     THEME VARIABLES
+  ══════════════════════════════════════════════ */
+
+  /* THEME 1: Night Blue (default) */
+  body { --bg:        #07090f;
+         --bg-card:   #0a0e1a;
+         --bg-row-odd:#090d18;
+         --bg-row-even:#070b14;
+         --bg-header: #0a0e1a;
+         --bg-footer: #070b14;
+         --bg-colhdr: #070b14;
+         --border:    #111827;
+         --border-hdr:#1a2440;
+         --text:      #e8eaf0;
+         --text-muted:#2a3a5a;
+         --text-col:  #2a3a5a;
+         --rank-def:  #2a3a60;
+         --rank1:     #7ab3ff;
+         --rank2:     #5a8aaa;
+         --rank3:     #4a7a99;
+         --spend1:    #a0c8ff;
+         --pts:       #2a4a6a;
+         --top1-bg:   #0c1525;
+         --top2-bg:   #0b1320;
+         --top3-bg:   #0a111e;
+         --spinner:   #5af;
+         --dot-live:  #22aa66;
+         --dot-err:   #aa2222;
+         --badge-bg:  #1a1400;
+         --badge-brd: #FFD70055;
+         --badge-txt: #FFD700;
+         --accent:    #5af;
   }
+
+  /* THEME 2: Emerald */
+  body.theme-emerald {
+    --bg:        #050f08;
+    --bg-card:   #091510;
+    --bg-row-odd:#081210;
+    --bg-row-even:#060f0d;
+    --bg-header: #081510;
+    --bg-footer: #060f0d;
+    --bg-colhdr: #060f0d;
+    --border:    #0e2018;
+    --border-hdr:#1a3a28;
+    --text:      #c8f0d8;
+    --text-muted:#1a3a28;
+    --text-col:  #2a5a3a;
+    --rank-def:  #1a4a28;
+    --rank1:     #00ff88;
+    --rank2:     #00cc66;
+    --rank3:     #00aa44;
+    --spend1:    #80ffc0;
+    --pts:       #1a5a30;
+    --top1-bg:   #0a2018;
+    --top2-bg:   #081a14;
+    --top3-bg:   #071512;
+    --spinner:   #00ff88;
+    --dot-live:  #00cc66;
+    --dot-err:   #aa2222;
+    --badge-bg:  #0a2010;
+    --badge-brd: #00cc6655;
+    --badge-txt: #00ff88;
+    --accent:    #00ff88;
+  }
+
+  /* THEME 3: Sunset (Purple-Pink) */
+  body.theme-sunset {
+    --bg:        #0e0514;
+    --bg-card:   #160820;
+    --bg-row-odd:#120618;
+    --bg-row-even:#100516;
+    --bg-header: #160820;
+    --bg-footer: #0e0514;
+    --bg-colhdr: #0e0514;
+    --border:    #200830;
+    --border-hdr:#3a1060;
+    --text:      #f0d0ff;
+    --text-muted:#2a1040;
+    --text-col:  #4a1870;
+    --rank-def:  #3a1060;
+    --rank1:     #e060ff;
+    --rank2:     #b040cc;
+    --rank3:     #8030aa;
+    --spend1:    #f0a0ff;
+    --pts:       #4a1878;
+    --top1-bg:   #1e0830;
+    --top2-bg:   #180628;
+    --top3-bg:   #140520;
+    --spinner:   #cc40ff;
+    --dot-live:  #aa22ee;
+    --dot-err:   #cc3333;
+    --badge-bg:  #1a0828;
+    --badge-brd: #cc40ff55;
+    --badge-txt: #e060ff;
+    --accent:    #cc40ff;
+  }
+
+  /* THEME 4: Gold / Warm */
+  body.theme-gold {
+    --bg:        #0d0900;
+    --bg-card:   #160e00;
+    --bg-row-odd:#120c00;
+    --bg-row-even:#0f0a00;
+    --bg-header: #160e00;
+    --bg-footer: #0d0900;
+    --bg-colhdr: #0d0900;
+    --border:    #201400;
+    --border-hdr:#3a2800;
+    --text:      #fff0c0;
+    --text-muted:#2a1e00;
+    --text-col:  #4a3400;
+    --rank-def:  #3a2800;
+    --rank1:     #FFD700;
+    --rank2:     #FFA500;
+    --rank3:     #e07000;
+    --spend1:    #FFE080;
+    --pts:       #4a3800;
+    --top1-bg:   #1e1400;
+    --top2-bg:   #181000;
+    --top3-bg:   #140d00;
+    --spinner:   #FFD700;
+    --dot-live:  #cc9900;
+    --dot-err:   #cc3333;
+    --badge-bg:  #1a1000;
+    --badge-brd: #FFD70055;
+    --badge-txt: #FFD700;
+    --accent:    #FFD700;
+  }
+
+  /* THEME 5: Crimson / Red */
+  body.theme-crimson {
+    --bg:        #0e0505;
+    --bg-card:   #180808;
+    --bg-row-odd:#140606;
+    --bg-row-even:#100505;
+    --bg-header: #180808;
+    --bg-footer: #0e0505;
+    --bg-colhdr: #0e0505;
+    --border:    #220a0a;
+    --border-hdr:#4a1010;
+    --text:      #ffd0d0;
+    --text-muted:#2a0808;
+    --text-col:  #4a1010;
+    --rank-def:  #3a0808;
+    --rank1:     #ff4444;
+    --rank2:     #cc2222;
+    --rank3:     #aa1818;
+    --spend1:    #ff9090;
+    --pts:       #4a1010;
+    --top1-bg:   #200808;
+    --top2-bg:   #1a0606;
+    --top3-bg:   #160505;
+    --spinner:   #ff4444;
+    --dot-live:  #cc2222;
+    --dot-err:   #cc8800;
+    --badge-bg:  #1e0606;
+    --badge-brd: #ff444455;
+    --badge-txt: #ff4444;
+    --accent:    #ff4444;
+  }
+
+  body { background: var(--bg); color: var(--text); }
 
   /* ── SETUP SCREEN ── */
   #setup-screen {
     display: flex; align-items: center; justify-content: center;
     min-height: 100vh; padding: 20px;
+    background: var(--bg);
   }
   #setup-box {
-    background: #0f1628; border: 1px solid #1e2a45;
-    border-radius: 20px; padding: 48px;
-    width: 100%; max-width: 440px; text-align: center;
+    background: var(--bg-card); border: 1px solid var(--border-hdr);
+    border-radius: 20px; padding: 40px 36px;
+    width: 100%; max-width: 460px; text-align: center;
   }
   .input {
-    background: #0a0e1a; border: 1px solid #2a3560;
-    border-radius: 8px; color: #e8eaf0;
+    background: var(--bg); border: 1px solid var(--border-hdr);
+    border-radius: 8px; color: var(--text);
     padding: 10px 14px; font-size: 14px; width: 100%;
     font-family: 'Nunito', sans-serif;
   }
-  .input:focus { outline: none; border-color: #5af; }
+  .input:focus { outline: none; border-color: var(--accent); }
   .btn {
     cursor: pointer; border: none; border-radius: 8px;
     font-weight: 700; transition: all 0.2s; font-family: 'Nunito', sans-serif;
   }
+  /* Theme picker */
+  .theme-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+    margin-bottom: 20px;
+  }
+  .theme-swatch {
+    border-radius: 10px; padding: 10px 4px; cursor: pointer;
+    border: 2px solid transparent; transition: all 0.2s;
+    font-size: 11px; font-weight: 700; text-align: center;
+  }
+  .theme-swatch.active { border-color: #fff; transform: scale(1.08); }
 
   /* ── LEADERBOARD SCREEN ── */
   #leaderboard-screen {
-    display: none;
-    width: 100vw; height: 100vh;
-    flex-direction: column;
-    overflow: hidden;
+    display: none; width: 100vw; height: 100vh;
+    flex-direction: column; overflow: hidden;
+    background: var(--bg);
   }
 
-  /* Header bar */
+  /* Header */
   #lb-header {
     flex-shrink: 0;
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 28px;
-    background: #0a0e1a;
-    border-bottom: 1px solid #1a2440;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-hdr);
   }
   #lb-title {
     font-family: 'Rajdhani', sans-serif;
-    font-weight: 900; letter-spacing: 4px;
-    color: #e8eaf0;
+    font-weight: 900; letter-spacing: 4px; color: var(--text);
   }
-  #lb-meta { font-size: 13px; color: #2a3a5a; letter-spacing: 1px; }
+  #lb-meta { font-size: 13px; color: var(--text-muted); letter-spacing: 1px; }
 
-  /* Table column header — hidden in multi-col mode, shown per panel */
-  #col-header {
-    flex-shrink: 0;
-    display: none; /* rendered per-panel instead */
-    align-items: center;
-    padding: 0 12px;
-    background: #070b14;
-    border-bottom: 1px solid #111827;
-  }
+  /* Column header */
+  #col-header { flex-shrink: 0; display: none; }
   .panel-col-header {
-    display: grid;
-    align-items: center;
+    display: grid; align-items: center;
     padding: 0 12px;
-    background: #070b14;
-    border-bottom: 1px solid #111827;
+    background: var(--bg-colhdr);
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
   .col-label {
     font-size: 11px; font-weight: 700; letter-spacing: 2px;
-    text-transform: uppercase; color: #2a3a5a;
+    text-transform: uppercase; color: var(--text-col);
   }
 
-  /* Rows container — fills remaining space */
-  #rows-wrap {
-    flex: 1;
-    overflow: hidden;
-    display: grid; /* columns set dynamically */
-  }
-
-  /* Column panel inside rows-wrap */
+  /* Rows */
+  #rows-wrap { flex: 1; overflow: hidden; display: grid; }
   .lb-col-panel {
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid #111827;
-    overflow: hidden;
+    display: flex; flex-direction: column;
+    border-right: 1px solid var(--border); overflow: hidden;
   }
   .lb-col-panel:last-child { border-right: none; }
 
-  /* Each row */
   .lb-row {
-    display: grid;
-    align-items: center;
+    display: grid; align-items: center;
     padding: 0 12px;
-    border-bottom: 1px solid #0d1220;
-    transition: background 0.3s;
-    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.3s; flex-shrink: 0;
   }
-  .lb-row:nth-child(odd)  { background: #090d18; }
-  .lb-row:nth-child(even) { background: #070b14; }
-  .lb-row.top1 { background: #0c1525; }
-  .lb-row.top2 { background: #0b1320; }
-  .lb-row.top3 { background: #0a111e; }
+  .lb-row:nth-child(odd)  { background: var(--bg-row-odd); }
+  .lb-row:nth-child(even) { background: var(--bg-row-even); }
+  .lb-row.top1 { background: var(--top1-bg); }
+  .lb-row.top2 { background: var(--top2-bg); }
+  .lb-row.top3 { background: var(--top3-bg); }
 
-  /* Rank number */
   .rank-num {
     font-family: 'Rajdhani', sans-serif;
-    font-weight: 900; text-align: center;
-    color: #2a3a60;
+    font-weight: 900; text-align: center; color: var(--rank-def);
   }
-  .lb-row.top1 .rank-num { color: #7ab3ff; }
-  .lb-row.top2 .rank-num { color: #5a8aaa; }
-  .lb-row.top3 .rank-num { color: #4a7a99; }
+  .lb-row.top1 .rank-num { color: var(--rank1); }
+  .lb-row.top2 .rank-num { color: var(--rank2); }
+  .lb-row.top3 .rank-num { color: var(--rank3); }
 
-  /* Avatar circle */
   .avatar-circle {
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-weight: 700; color: #ccc;
-    border: 2px solid #1a2440;
-    font-family: 'Rajdhani', sans-serif;
-    flex-shrink: 0;
+    border: 2px solid var(--border-hdr);
+    font-family: 'Rajdhani', sans-serif; flex-shrink: 0;
   }
-
-  /* Name */
   .cust-name {
-    font-weight: 800; color: #e8eaf0;
+    font-weight: 800; color: var(--text);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-
-  /* Spend */
   .cust-spend {
     font-family: 'Rajdhani', sans-serif;
-    font-weight: 900; color: #e8eaf0; text-align: right;
-    letter-spacing: 1px;
+    font-weight: 900; color: var(--text); text-align: right; letter-spacing: 1px;
   }
-  .lb-row.top1 .cust-spend { color: #a0c8ff; }
-
-  /* Points */
-  .cust-pts { color: #2a4a6a; text-align: right; font-weight: 700; }
+  .lb-row.top1 .cust-spend { color: var(--spend1); }
+  .cust-pts { color: var(--pts); text-align: right; font-weight: 700; }
 
   /* Footer */
   #lb-footer {
     flex-shrink: 0;
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 28px;
-    background: #070b14;
-    border-top: 1px solid #0d1220;
+    background: var(--bg-footer);
+    border-top: 1px solid var(--border);
   }
-  #clock { color: #1e2a40; font-size: 12px; letter-spacing: 1px; font-family: 'Rajdhani', sans-serif; }
+  #clock { color: var(--text-muted); font-size: 12px; letter-spacing: 1px; font-family: 'Rajdhani', sans-serif; }
   #refresh-wrap { display: flex; align-items: center; gap: 6px; }
   #refresh-dot {
-    width: 6px; height: 6px; border-radius: 50%; background: #1a3a1a;
-    animation: pulse 2s infinite;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--text-muted); animation: pulse 2s infinite;
   }
-  #refresh-dot.live { background: #2a6; }
-  #refresh-dot.err  { background: #a22; animation: none; }
-  #refresh-label { font-size: 12px; color: #1e2a3a; letter-spacing: 1px; }
+  #refresh-dot.live { background: var(--dot-live); }
+  #refresh-dot.err  { background: var(--dot-err); animation: none; }
+  #refresh-label { font-size: 12px; color: var(--text-muted); letter-spacing: 1px; }
 
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-
-  /* Rank flash on change */
-  @keyframes rankFlash { 0%{background:#1a3a5c44} 100%{background:transparent} }
+  @keyframes rankFlash { 0%{filter:brightness(1.8)} 100%{filter:brightness(1)} }
   .rank-changed { animation: rankFlash 1.8s ease; }
 
   /* Loading */
   #loading-screen {
     display: none; position: fixed; inset: 0;
-    background: #07090f; z-index: 50;
+    background: var(--bg); z-index: 50;
     align-items: center; justify-content: center;
     flex-direction: column; gap: 20px;
   }
   .spinner {
     width: 44px; height: 44px;
-    border: 3px solid #1e2a45; border-top-color: #5af;
+    border: 3px solid var(--border-hdr); border-top-color: var(--spinner);
     border-radius: 50%; animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   #error-banner {
-    display: none; position: fixed; top: 20px; left: 50%;
-    transform: translateX(-50%);
+    display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
     background: #1a0808; border: 1px solid #4a1515;
-    border-radius: 10px; padding: 10px 24px;
-    color: #f88; font-size: 13px; z-index: 100;
+    border-radius: 10px; padding: 10px 24px; color: #f88; font-size: 13px; z-index: 100;
   }
 </style>
 </head>
@@ -203,27 +339,52 @@
 <div id="error-banner"></div>
 <div id="loading-screen">
   <div class="spinner"></div>
-  <div style="color:#5af;font-family:'Rajdhani',sans-serif;font-size:16px;letter-spacing:4px;">LOADING...</div>
+  <div style="color:var(--accent);font-family:'Rajdhani',sans-serif;font-size:16px;letter-spacing:4px;">LOADING...</div>
 </div>
 
 <!-- SETUP SCREEN -->
 <div id="setup-screen">
   <div id="setup-box">
-    <div style="font-size:48px;margin-bottom:12px;">📺</div>
-    <div style="font-size:26px;font-weight:900;font-family:'Rajdhani',sans-serif;color:#e8eaf0;letter-spacing:3px;margin-bottom:6px;">LIVE DISPLAY</div>
-    <div style="font-size:11px;color:#2a3a5a;letter-spacing:4px;margin-bottom:32px;">SHOP CHAMPION</div>
+    <div style="font-size:44px;margin-bottom:10px;">📺</div>
+    <div style="font-size:26px;font-weight:900;font-family:'Rajdhani',sans-serif;color:var(--text);letter-spacing:3px;margin-bottom:4px;">LIVE DISPLAY</div>
+    <div style="font-size:11px;color:var(--text-muted);letter-spacing:4px;margin-bottom:24px;">SHOP CHAMPION</div>
 
-    <div style="background:#0a0e1a;border-radius:10px;padding:16px;margin-bottom:24px;font-size:13px;color:#4a6a8a;line-height:1.9;text-align:left;">
-      <strong style="color:#7ab3ff;">How to connect:</strong><br>
-      1. On admin, go to <strong style="color:#aaa;">⚙️ Settings → Push to Display</strong><br>
-      2. Copy the <strong style="color:#aaa;">Bin ID</strong> shown<br>
-      3. Paste it below and click Connect
+    <!-- THEME PICKER -->
+    <div style="font-size:12px;font-weight:700;color:var(--text-col);letter-spacing:2px;text-align:left;margin-bottom:10px;">🎨 CHOOSE THEME</div>
+    <div class="theme-grid">
+      <div class="theme-swatch active" onclick="setTheme('night')"
+           style="background:#0a0e1a;color:#7ab3ff;border-color:#7ab3ff;">
+        🌙<br>Night
+      </div>
+      <div class="theme-swatch" onclick="setTheme('emerald')"
+           style="background:#091510;color:#00ff88;">
+        🌿<br>Emerald
+      </div>
+      <div class="theme-swatch" onclick="setTheme('sunset')"
+           style="background:#160820;color:#e060ff;">
+        🌅<br>Sunset
+      </div>
+      <div class="theme-swatch" onclick="setTheme('gold')"
+           style="background:#160e00;color:#FFD700;">
+        ✨<br>Gold
+      </div>
+      <div class="theme-swatch" onclick="setTheme('crimson')"
+           style="background:#180808;color:#ff4444;">
+        🔴<br>Crimson
+      </div>
     </div>
 
-    <label style="display:block;font-size:12px;color:#4a5a7a;margin-bottom:6px;text-align:left;">JSONbin Bin ID</label>
-    <input class="input" id="manual-bin" placeholder="e.g. 64a3f2b8dcd6080a2da350c8" style="margin-bottom:14px;" onkeydown="if(event.key==='Enter')connectManual()" />
-    <button class="btn" onclick="connectManual()" style="background:#1a3a60;color:#7ab3ff;border:1px solid #1a4a80;width:100%;padding:14px;font-size:15px;font-weight:800;margin-bottom:10px;">Connect →</button>
-    <button class="btn" onclick="runDemo()" style="background:#0d1220;color:#2a4a6a;border:1px solid #1a2440;width:100%;padding:10px;font-size:13px;">👁 Preview with Demo Data</button>
+    <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:20px;font-size:13px;color:var(--text-col);line-height:1.9;text-align:left;">
+      <strong style="color:var(--accent);">How to connect:</strong><br>
+      1. Open <strong style="color:var(--text);">Admin app</strong> and click <strong style="color:var(--text);">⬆ Push to Display</strong><br>
+      2. Enter your <strong style="color:var(--text);">registered phone number</strong> below<br>
+      3. Click Connect — updates instantly, no internet tricks needed
+    </div>
+
+    <label style="display:block;font-size:12px;color:var(--text-col);margin-bottom:6px;text-align:left;">Admin Phone Number (e.g. +919876543210)</label>
+    <input class="input" id="manual-bin" placeholder="+91xxxxxxxxxx" style="margin-bottom:12px;" onkeydown="if(event.key==='Enter')connectManual()" />
+    <button class="btn" onclick="connectManual()" style="background:var(--bg-card);color:var(--accent);border:1px solid var(--accent);width:100%;padding:14px;font-size:15px;font-weight:800;margin-bottom:8px;">🔥 Connect via Firebase →</button>
+    <button class="btn" onclick="runDemo()" style="background:var(--bg);color:var(--text-col);border:1px solid var(--border-hdr);width:100%;padding:10px;font-size:13px;">👁 Preview with Demo Data</button>
   </div>
 </div>
 
@@ -236,19 +397,11 @@
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <div id="lb-meta">LIVE LEADERBOARD</div>
-      <div id="lb-filter-badge" style="display:none;background:#1a1400;border:1px solid #FFD70055;border-radius:20px;padding:2px 10px;font-size:11px;color:#FFD700;font-family:'Nunito',sans-serif;letter-spacing:0.5px;font-weight:700;white-space:nowrap;"></div>
+      <div id="lb-filter-badge" style="display:none;background:var(--badge-bg);border:1px solid var(--badge-brd);border-radius:20px;padding:2px 10px;font-size:11px;color:var(--badge-txt);font-family:'Nunito',sans-serif;letter-spacing:0.5px;font-weight:700;white-space:nowrap;"></div>
     </div>
   </div>
-
-  <div id="col-header">
-    <span class="col-label" style="text-align:center;">#</span>
-    <span class="col-label">Customer</span>
-    <span class="col-label" style="text-align:right;">Total Spend</span>
-    <span class="col-label" style="text-align:right;">Points</span>
-  </div>
-
+  <div id="col-header"></div>
   <div id="rows-wrap"></div>
-
   <div id="lb-footer">
     <div id="refresh-wrap">
       <div id="refresh-dot"></div>
@@ -259,84 +412,172 @@
 </div>
 
 <script>
-// ── helpers ──
-function formatINR(n) { return "₹" + Number(n).toLocaleString("en-IN"); }
-function getInitials(name) { return name.split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2); }
+// ── THEME ──
+const THEMES = {
+  night:   { cls: '',              label: '🌙 Night'   },
+  emerald: { cls: 'theme-emerald', label: '🌿 Emerald'  },
+  sunset:  { cls: 'theme-sunset',  label: '🌅 Sunset'   },
+  gold:    { cls: 'theme-gold',    label: '✨ Gold'     },
+  crimson: { cls: 'theme-crimson', label: '🔴 Crimson'  },
+};
+let currentTheme = localStorage.getItem('sc_display_theme') || 'night';
+
+function setTheme(t) {
+  currentTheme = t;
+  const allCls = Object.values(THEMES).map(x => x.cls).filter(Boolean);
+  document.body.classList.remove(...allCls);
+  if (THEMES[t].cls) document.body.classList.add(THEMES[t].cls);
+  localStorage.setItem('sc_display_theme', t);
+  // Update swatches
+  document.querySelectorAll('.theme-swatch').forEach((el, i) => {
+    const keys = Object.keys(THEMES);
+    el.classList.toggle('active', keys[i] === t);
+  });
+}
+// Apply saved theme on load
+setTheme(currentTheme);
+
+// ── HELPERS ──
+function formatINR(n) { return '₹' + Number(n).toLocaleString('en-IN'); }
+function getInitials(name) { return name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
 function avatarColor(name) {
-  const colors = ["#0d2040","#1a1040","#0a2020","#201010","#101010"];
-  return colors[name.charCodeAt(0) % colors.length];
+  const palettes = {
+    night:   ['#0d2040','#1a1040','#0a2020','#201010','#101020'],
+    emerald: ['#0a2818','#0a2010','#082010','#102808','#0a1808'],
+    sunset:  ['#1a0828','#200830','#18062a','#220a30','#1c0620'],
+    gold:    ['#1a1200','#201000','#180e00','#221400','#1e1000'],
+    crimson: ['#1a0808','#200606','#180606','#220808','#1e0606'],
+  };
+  const cols = palettes[currentTheme] || palettes.night;
+  return cols[name.charCodeAt(0) % cols.length];
 }
 
-// ── state ──
-let binId = null, pollInterval = null, prevRanks = {}, lastData = null, isDemo = false;
+// ── FIREBASE CONFIG ──
+const FB_CFG = {
+  apiKey: "AIzaSyAdNjL9gCptnAbJ6ZVm9BZ61rKfBtwc1Qc",
+  authDomain: "shop-champion.firebaseapp.com",
+  projectId: "shop-champion",
+  storageBucket: "shop-champion.firebasestorage.app",
+  messagingSenderId: "81324128909",
+  appId: "1:81324128909:web:cc023f5c031c505bfe00c4"
+};
+let fbDb = null;
+try {
+  if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
+  else firebase.app();
+  fbDb = firebase.firestore();
+} catch(e) { console.warn("Firebase init failed:", e.message); }
 
-// ── init ──
-window.addEventListener("load", () => {
+// ── STATE ──
+let binId = null, fbShopId = null, pollInterval = null, fbUnsubscribe = null;
+let prevRanks = {}, lastData = null, isDemo = false;
+
+// ── INIT ──
+window.addEventListener('load', () => {
   const params = new URLSearchParams(window.location.search);
-  const bin = params.get("bin");
-  if (bin) { binId = bin; startDisplay(); }
-  else { document.getElementById("setup-screen").style.display = "flex"; }
+  const bin = params.get('bin');
+  const shop = params.get('shop'); // Firebase shop ID param
+  if (shop) { fbShopId = shop; startFirebaseDisplay(); }
+  else if (bin) { binId = bin; startDisplay(); }
+  else { document.getElementById('setup-screen').style.display = 'flex'; }
   startClock();
+  // Pre-fill bin from localStorage if saved
+  const saved = localStorage.getItem('sc_display_binid');
+  if (saved && !bin && !shop) document.getElementById('manual-bin').value = saved;
+  const savedShop = localStorage.getItem('sc_display_shopid');
+  if (savedShop && !bin && !shop) {
+    fbShopId = savedShop;
+    startFirebaseDisplay();
+  }
 });
 
 function connectManual() {
-  const val = document.getElementById("manual-bin").value.trim();
+  const val = document.getElementById('manual-bin').value.trim();
   if (!val) return;
-  binId = val;
-  startDisplay();
+  // If it looks like a phone number (shop ID), use Firebase
+  if (fbDb && val.match(/^[+\d\s\-()]{7,15}$/)) {
+    fbShopId = val;
+    localStorage.setItem('sc_display_shopid', val);
+    startFirebaseDisplay();
+  } else {
+    binId = val;
+    localStorage.setItem('sc_display_binid', val);
+    startDisplay();
+  }
 }
 
-// ── demo ──
+// ── FIREBASE DISPLAY (primary — works from file://) ──
+function startFirebaseDisplay() {
+  if (!fbDb) { startDisplay(); return; } // fallback to JSONbin
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
+  if (fbUnsubscribe) fbUnsubscribe();
+  fbUnsubscribe = fbDb.collection('display').doc(fbShopId || 'leaderboard')
+    .onSnapshot(snap => {
+      document.getElementById('loading-screen').style.display = 'none';
+      if (!snap.exists) {
+        showError('No display data yet — push from admin first.');
+        document.getElementById('setup-screen').style.display = 'flex';
+        return;
+      }
+      const payload = snap.data();
+      const isNew = !lastData || JSON.stringify(payload) !== JSON.stringify(lastData);
+      lastData = payload;
+      if (isNew) {
+        showLeaderboard(payload);
+        document.getElementById('refresh-label').textContent = 'Updated ' + new Date().toLocaleTimeString();
+      } else {
+        document.getElementById('refresh-label').textContent = 'Live · ' + new Date().toLocaleTimeString();
+      }
+      document.getElementById('refresh-dot').className = 'live';
+    }, err => {
+      document.getElementById('loading-screen').style.display = 'none';
+      showError('Firebase error: ' + err.message);
+      document.getElementById('refresh-dot').className = 'err';
+    });
+}
+
+// ── DEMO ──
 function runDemo() {
   isDemo = true;
   const demo = {
-    shopName: "Shop Champion",
+    shopName: 'Shop Champion',
     lastUpdated: new Date().toISOString(),
     displaySettings: { showCount: 10 },
     customers: [
-      { id:"SC001", name:"Rahul Sharma",    totalSpend:185000, points:18500, rank:1  },
-      { id:"SC002", name:"Priya Mehta",     totalSpend:92000,  points:9200,  rank:2  },
-      { id:"SC003", name:"Amit Kumar",      totalSpend:74000,  points:7400,  rank:3  },
-      { id:"SC004", name:"Sunita Rao",      totalSpend:48000,  points:4800,  rank:4  },
-      { id:"SC005", name:"Vikram Singh",    totalSpend:31500,  points:3150,  rank:5  },
-      { id:"SC006", name:"Anita Joshi",     totalSpend:22000,  points:2200,  rank:6  },
-      { id:"SC007", name:"Deepak Verma",    totalSpend:17400,  points:1740,  rank:7  },
-      { id:"SC008", name:"Meera Pillai",    totalSpend:12800,  points:1280,  rank:8  },
-      { id:"SC009", name:"Sanjay Gupta",    totalSpend:8600,   points:860,   rank:9  },
-      { id:"SC010", name:"Kavita Nair",     totalSpend:4200,   points:420,   rank:10 },
-      { id:"SC011", name:"Ravi Tiwari",     totalSpend:3800,   points:380,   rank:11 },
-      { id:"SC012", name:"Pooja Bhat",      totalSpend:3500,   points:350,   rank:12 },
-      { id:"SC013", name:"Nikhil Shetty",   totalSpend:3200,   points:320,   rank:13 },
-      { id:"SC014", name:"Rekha Menon",     totalSpend:2900,   points:290,   rank:14 },
-      { id:"SC015", name:"Arjun Reddy",     totalSpend:2600,   points:260,   rank:15 },
-      { id:"SC016", name:"Swati Desai",     totalSpend:2300,   points:230,   rank:16 },
-      { id:"SC017", name:"Manoj Pandey",    totalSpend:2100,   points:210,   rank:17 },
-      { id:"SC018", name:"Nisha Kapoor",    totalSpend:1900,   points:190,   rank:18 },
-      { id:"SC019", name:"Suresh Iyer",     totalSpend:1700,   points:170,   rank:19 },
-      { id:"SC020", name:"Geeta Nambiar",   totalSpend:1500,   points:150,   rank:20 },
-      { id:"SC021", name:"Harish Patel",    totalSpend:1400,   points:140,   rank:21 },
-      { id:"SC022", name:"Divya Shah",      totalSpend:1300,   points:130,   rank:22 },
-      { id:"SC023", name:"Karan Malhotra",  totalSpend:1200,   points:120,   rank:23 },
-      { id:"SC024", name:"Smita Kulkarni",  totalSpend:1100,   points:110,   rank:24 },
-      { id:"SC025", name:"Tarun Chopra",    totalSpend:1000,   points:100,   rank:25 },
-      { id:"SC026", name:"Leela Varma",     totalSpend:900,    points:90,    rank:26 },
-      { id:"SC027", name:"Prakash Jha",     totalSpend:800,    points:80,    rank:27 },
-      { id:"SC028", name:"Usha Trivedi",    totalSpend:700,    points:70,    rank:28 },
-      { id:"SC029", name:"Rohit Ghosh",     totalSpend:600,    points:60,    rank:29 },
-      { id:"SC030", name:"Anjali Mishra",   totalSpend:500,    points:50,    rank:30 },
+      {id:'SC001',name:'Rahul Sharma',   totalSpend:185000,points:18500,rank:1 },
+      {id:'SC002',name:'Priya Mehta',    totalSpend:92000, points:9200, rank:2 },
+      {id:'SC003',name:'Amit Kumar',     totalSpend:74000, points:7400, rank:3 },
+      {id:'SC004',name:'Sunita Rao',     totalSpend:48000, points:4800, rank:4 },
+      {id:'SC005',name:'Vikram Singh',   totalSpend:31500, points:3150, rank:5 },
+      {id:'SC006',name:'Anita Joshi',    totalSpend:22000, points:2200, rank:6 },
+      {id:'SC007',name:'Deepak Verma',   totalSpend:17400, points:1740, rank:7 },
+      {id:'SC008',name:'Meera Pillai',   totalSpend:12800, points:1280, rank:8 },
+      {id:'SC009',name:'Sanjay Gupta',   totalSpend:8600,  points:860,  rank:9 },
+      {id:'SC010',name:'Kavita Nair',    totalSpend:4200,  points:420,  rank:10},
+      {id:'SC011',name:'Ravi Tiwari',    totalSpend:3800,  points:380,  rank:11},
+      {id:'SC012',name:'Pooja Bhat',     totalSpend:3500,  points:350,  rank:12},
+      {id:'SC013',name:'Nikhil Shetty',  totalSpend:3200,  points:320,  rank:13},
+      {id:'SC014',name:'Rekha Menon',    totalSpend:2900,  points:290,  rank:14},
+      {id:'SC015',name:'Arjun Reddy',    totalSpend:2600,  points:260,  rank:15},
+      {id:'SC016',name:'Swati Desai',    totalSpend:2300,  points:230,  rank:16},
+      {id:'SC017',name:'Manoj Pandey',   totalSpend:2100,  points:210,  rank:17},
+      {id:'SC018',name:'Nisha Kapoor',   totalSpend:1900,  points:190,  rank:18},
+      {id:'SC019',name:'Suresh Iyer',    totalSpend:1700,  points:170,  rank:19},
+      {id:'SC020',name:'Geeta Nambiar',  totalSpend:1500,  points:150,  rank:20},
     ]
   };
-  document.getElementById("setup-screen").style.display = "none";
-  document.getElementById("lb-meta").textContent = "DEMO MODE";
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('lb-meta').textContent = 'DEMO MODE';
   showLeaderboard(demo);
-  document.getElementById("refresh-dot").className = "";
-  document.getElementById("refresh-label").textContent = "Demo — not live";
+  document.getElementById('refresh-dot').className = '';
+  document.getElementById('refresh-label').textContent = 'Demo — not live';
 }
 
-// ── display ──
+// ── DISPLAY ──
 function startDisplay() {
-  document.getElementById("setup-screen").style.display = "none";
-  document.getElementById("loading-screen").style.display = "flex";
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
   fetchData(true);
   pollInterval = setInterval(() => fetchData(false), 10000);
 }
@@ -344,94 +585,76 @@ function startDisplay() {
 async function fetchData(initial) {
   if (isDemo) return;
   try {
-    const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`, { headers: { "X-Bin-Meta": "false" } });
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`, { headers: { 'X-Bin-Meta': 'false' } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const payload = data.record || data;
-
-    document.getElementById("loading-screen").style.display = "none";
+    document.getElementById('loading-screen').style.display = 'none';
     hideError();
-
     const isNew = !lastData || JSON.stringify(payload) !== JSON.stringify(lastData);
     lastData = payload;
-
     if (isNew || initial) {
       showLeaderboard(payload);
-      document.getElementById("refresh-label").textContent = "Updated " + new Date().toLocaleTimeString();
+      document.getElementById('refresh-label').textContent = 'Updated ' + new Date().toLocaleTimeString();
     } else {
-      document.getElementById("refresh-label").textContent = "Live · " + new Date().toLocaleTimeString();
+      document.getElementById('refresh-label').textContent = 'Live · ' + new Date().toLocaleTimeString();
     }
-    document.getElementById("refresh-dot").className = "live";
+    document.getElementById('refresh-dot').className = 'live';
   } catch(e) {
-    document.getElementById("loading-screen").style.display = "none";
+    document.getElementById('loading-screen').style.display = 'none';
     if (initial) {
-      document.getElementById("setup-screen").style.display = "flex";
-      showError("Could not connect — check your Bin ID");
+      document.getElementById('setup-screen').style.display = 'flex';
+      showError('Could not connect — check your Bin ID');
     } else {
-      showError("Connection error — retrying...");
-      document.getElementById("refresh-dot").className = "err";
+      showError('Connection error — retrying...');
+      document.getElementById('refresh-dot').className = 'err';
     }
   }
 }
 
 function showError(msg) {
-  const el = document.getElementById("error-banner");
-  el.textContent = "⚠️ " + msg; el.style.display = "block";
-  setTimeout(() => { el.style.display = "none"; }, 6000);
+  const el = document.getElementById('error-banner');
+  el.textContent = '⚠️ ' + msg; el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 6000);
 }
-function hideError() { document.getElementById("error-banner").style.display = "none"; }
+function hideError() { document.getElementById('error-banner').style.display = 'none'; }
 
-// ── MAIN RENDER ──
+// ── RENDER ──
 function showLeaderboard(payload) {
   const customers = payload.customers || [];
   if (!customers.length) return;
-
   const showCount = (payload.displaySettings && payload.displaySettings.showCount) || customers.length;
+  document.getElementById('leaderboard-screen').style.display = 'flex';
 
-  // Show leaderboard screen
-  const lbScreen = document.getElementById("leaderboard-screen");
-  lbScreen.style.display = "flex";
-
-  // Rank change detection
   const rankChanged = new Set();
   customers.forEach(c => {
     if (prevRanks[c.id] !== undefined && prevRanks[c.id] !== c.rank) rankChanged.add(c.id);
     prevRanks[c.id] = c.rank;
   });
 
-  // Update header
-  const titleEl = document.getElementById("lb-title");
+  const titleEl = document.getElementById('lb-title');
   if (titleEl && payload.shopName) titleEl.textContent = payload.shopName.toUpperCase();
-  // Update icon if available in localStorage (same browser)
+
   try {
-    const as = JSON.parse(localStorage.getItem("sc_app_settings")||"{}");
-    const iconEl = document.getElementById("lb-icon");
+    const as = JSON.parse(localStorage.getItem('sc_app_settings')||'{}');
+    const iconEl = document.getElementById('lb-icon');
     if (iconEl) {
-      if (as.appIcon) iconEl.innerHTML = `<img src="${as.appIcon}" style="height:100%;max-height:48px;object-fit:contain;border-radius:8px;" />`;
-      else iconEl.innerHTML = "🏆";
+      iconEl.innerHTML = as.appIcon ? `<img src="${as.appIcon}" style="height:100%;max-height:48px;object-fit:contain;border-radius:8px;" />` : '🏆';
     }
     if (as.shopName && titleEl) titleEl.textContent = as.shopName.toUpperCase();
   } catch {}
 
   if (payload.lastUpdated) {
     const d = new Date(payload.lastUpdated);
-    const filterLabel = payload.filterLabel || "All Time";
-    const filterMode  = payload.filterMode  || "all";
-    window._lbFilterMode = filterMode;
-    const filterTag   = filterMode !== "all" ? " · 📅 " + filterLabel : "";
-    document.getElementById("lb-meta").textContent = "LIVE · " + d.toLocaleTimeString() + filterTag;
+    window._lbFilterMode = payload.filterMode || 'all';
+    document.getElementById('lb-meta').textContent = 'LIVE · ' + d.toLocaleTimeString();
   }
 
-  // Show / hide filter badge in header
-  const badge = document.getElementById("lb-filter-badge");
+  const badge = document.getElementById('lb-filter-badge');
   if (badge) {
-    const fm = payload.filterMode || "all";
-    if (fm !== "all") {
-      badge.textContent = "📅 " + (payload.filterLabel || "");
-      badge.style.display = "inline-block";
-    } else {
-      badge.style.display = "none";
-    }
+    const fm = payload.filterMode || 'all';
+    if (fm !== 'all') { badge.textContent = '📅 ' + (payload.filterLabel||''); badge.style.display = 'inline-block'; }
+    else { badge.style.display = 'none'; }
   }
 
   renderTable(customers, showCount, rankChanged);
@@ -439,27 +662,16 @@ function showLeaderboard(payload) {
 
 function renderTable(customers, showCount, rankChanged) {
   const screenH = window.innerHeight;
-
-  // ── How many columns? (10 customers per column) ──
-  // 1-10  → 1 col | 11-20 → 2 cols | 21-30 → 3 cols | 31-40 → 4 cols | 41+ → 5 cols
   const total = Math.min(customers.length, showCount);
-  let numCols;
-  if      (total <= 10) numCols = 1;
-  else if (total <= 20) numCols = 2;
-  else if (total <= 30) numCols = 3;
-  else if (total <= 40) numCols = 4;
-  else                  numCols = 5;
+  let numCols = total <= 10 ? 1 : total <= 20 ? 2 : total <= 30 ? 3 : total <= 40 ? 4 : 5;
+  const rowsPerCol = 10;
 
-  const rowsPerCol = 10; // always show 10 per column
-
-  // ── Chrome heights ──
   const headerH  = Math.round(screenH * 0.08);
   const footerH  = Math.round(screenH * 0.04);
   const colHH    = Math.round(screenH * 0.04);
   const rowAreaH = screenH - headerH - footerH - colHH;
   const rowH     = Math.floor(rowAreaH / rowsPerCol);
 
-  // Font sizes
   const rankFs   = Math.max(10, Math.round(rowH * 0.36));
   const nameFs   = Math.max(9,  Math.round(rowH * 0.30));
   const spendFs  = Math.max(9,  Math.round(rowH * 0.28));
@@ -467,36 +679,29 @@ function renderTable(customers, showCount, rankChanged) {
   const avatarSz = Math.max(20, Math.round(rowH * 0.52));
   const avatarFs = Math.max(8,  Math.round(avatarSz * 0.38));
 
-  // Column grid definition
   const rankW  = Math.round(rowH * 1.0);
   const spendW = Math.round(spendFs * (numCols <= 2 ? 8 : numCols === 3 ? 7 : 6));
   const ptsW   = Math.round(ptsFs   * (numCols <= 2 ? 7 : numCols === 3 ? 6 : 5));
   const colDef = `${rankW}px 1fr ${spendW}px ${ptsW}px`;
 
-  // ── Header / footer ──
-  document.getElementById("lb-header").style.height = headerH + "px";
-  document.getElementById("lb-title").style.fontSize = Math.max(14, Math.round(headerH * 0.42)) + "px";
-  document.getElementById("lb-meta").style.fontSize  = Math.max(9,  Math.round(headerH * 0.20)) + "px";
-  document.getElementById("col-header").style.display = "none";
-  document.getElementById("lb-footer").style.height = footerH + "px";
-  document.getElementById("clock").style.fontSize          = Math.max(9, Math.round(footerH * 0.28)) + "px";
-  document.getElementById("refresh-label").style.fontSize  = Math.max(9, Math.round(footerH * 0.28)) + "px";
+  document.getElementById('lb-header').style.height = headerH + 'px';
+  document.getElementById('lb-title').style.fontSize = Math.max(14, Math.round(headerH * 0.42)) + 'px';
+  document.getElementById('lb-meta').style.fontSize  = Math.max(9,  Math.round(headerH * 0.20)) + 'px';
+  document.getElementById('lb-footer').style.height = footerH + 'px';
+  document.getElementById('clock').style.fontSize         = Math.max(9, Math.round(footerH * 0.28)) + 'px';
+  document.getElementById('refresh-label').style.fontSize = Math.max(9, Math.round(footerH * 0.28)) + 'px';
 
-  // ── Build column panels ──
-  const wrap = document.getElementById("rows-wrap");
+  const wrap = document.getElementById('rows-wrap');
   wrap.style.gridTemplateColumns = `repeat(${numCols}, 1fr)`;
 
   const slice = customers.slice(0, total);
   const panels = [];
-  for (let i = 0; i < numCols; i++) {
-    panels.push(slice.slice(i * rowsPerCol, (i + 1) * rowsPerCol));
-  }
+  for (let i = 0; i < numCols; i++) panels.push(slice.slice(i * rowsPerCol, (i+1) * rowsPerCol));
 
   const labelFs = Math.max(8, Math.round(colHH * 0.28));
+  const spendColLabel = (window._lbFilterMode && window._lbFilterMode !== 'all') ? 'Day Spend' : 'Total Spend';
 
   wrap.innerHTML = panels.map(panel => {
-    // Spend label changes based on filter mode passed in payload
-    const spendColLabel = (window._lbFilterMode && window._lbFilterMode !== "all") ? "Day Spend" : "Total Spend";
     const miniHeader = `
       <div class="panel-col-header" style="height:${colHH}px;grid-template-columns:${colDef};">
         <span class="col-label" style="text-align:center;font-size:${labelFs}px;">#</span>
@@ -504,18 +709,15 @@ function renderTable(customers, showCount, rankChanged) {
         <span class="col-label" style="text-align:right;font-size:${labelFs}px;">${spendColLabel}</span>
         <span class="col-label" style="text-align:right;font-size:${labelFs}px;">Pts</span>
       </div>`;
-
     const rows = panel.map(c => {
-      const topCls  = c.rank === 1 ? "top1" : c.rank === 2 ? "top2" : c.rank === 3 ? "top3" : "";
-      const changed = rankChanged && rankChanged.has(c.id) ? "rank-changed" : "";
+      const topCls  = c.rank===1?'top1':c.rank===2?'top2':c.rank===3?'top3':'';
+      const changed = rankChanged && rankChanged.has(c.id) ? 'rank-changed' : '';
       const bg      = avatarColor(c.name);
       return `
-        <div class="lb-row ${topCls} ${changed}"
-             style="height:${rowH}px;grid-template-columns:${colDef};">
+        <div class="lb-row ${topCls} ${changed}" style="height:${rowH}px;grid-template-columns:${colDef};">
           <div class="rank-num" style="font-size:${rankFs}px;">${c.rank}</div>
           <div style="display:flex;align-items:center;gap:${Math.round(rowH*0.15)}px;min-width:0;">
-            <div class="avatar-circle"
-                 style="width:${avatarSz}px;height:${avatarSz}px;font-size:${avatarFs}px;background:${bg};flex-shrink:0;">
+            <div class="avatar-circle" style="width:${avatarSz}px;height:${avatarSz}px;font-size:${avatarFs}px;background:${bg};flex-shrink:0;">
               ${getInitials(c.name)}
             </div>
             <div class="cust-name" style="font-size:${nameFs}px;">${c.name}</div>
@@ -523,14 +725,12 @@ function renderTable(customers, showCount, rankChanged) {
           <div class="cust-spend" style="font-size:${spendFs}px;">${formatINR(c.totalSpend)}</div>
           <div class="cust-pts"   style="font-size:${ptsFs}px;">${(c.points||0).toLocaleString()} pts</div>
         </div>`;
-    }).join("");
-
+    }).join('');
     return `<div class="lb-col-panel">${miniHeader}${rows}</div>`;
-  }).join("");
+  }).join('');
 }
 
-// Re-render on resize so it stays fitted
-window.addEventListener("resize", () => {
+window.addEventListener('resize', () => {
   if (lastData) renderTable(
     lastData.customers || [],
     (lastData.displaySettings && lastData.displaySettings.showCount) || (lastData.customers||[]).length,
@@ -538,24 +738,23 @@ window.addEventListener("resize", () => {
   );
 });
 
-// ── clock ──
+// ── CLOCK ──
 function startClock() {
-  const el = document.getElementById("clock");
-  function tick() { if (el) el.textContent = new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
+  const el = document.getElementById('clock');
+  function tick() { if (el) el.textContent = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
   tick(); setInterval(tick, 1000);
 }
 
-// ── load shop name/icon from localStorage on startup ──
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener('DOMContentLoaded', () => {
   try {
-    const as = JSON.parse(localStorage.getItem("sc_app_settings")||"{}");
+    const as = JSON.parse(localStorage.getItem('sc_app_settings')||'{}');
     if (as.shopName) {
-      const t = document.getElementById("lb-title");
+      const t = document.getElementById('lb-title');
       if (t) t.textContent = as.shopName.toUpperCase();
-      document.title = as.shopName + " — Live Leaderboard";
+      document.title = as.shopName + ' — Live Leaderboard';
     }
     if (as.appIcon) {
-      const iconEl = document.getElementById("lb-icon");
+      const iconEl = document.getElementById('lb-icon');
       if (iconEl) iconEl.innerHTML = `<img src="${as.appIcon}" style="height:48px;object-fit:contain;border-radius:8px;" />`;
     }
   } catch {}

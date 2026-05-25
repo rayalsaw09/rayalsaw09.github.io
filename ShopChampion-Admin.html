@@ -825,6 +825,9 @@ let lbPage = 0;           // current leaderboard page (0-based)
 const LB_PAGE_SIZE = 50; // leaderboard rows per page
 let custPage = 0;         // customers tab: how many loaded so far (multiples of CUST_BATCH)
 const CUST_BATCH = 50;   // customers loaded per scroll batch
+let custSelectMode = false;  // multi-select mode toggle
+let custSelected = new Set(); // selected customer IDs
+let custFilteredIds = [];     // IDs of currently filtered/visible customers (for Select All)
 let fbUnsubscribe = null; // real-time listener handle
 
 // ── Firebase init ──
@@ -1060,11 +1063,28 @@ window.addEventListener("load", () => {
   initFirebase(HARDCODED_FB);
   useLocalOnly = false;
   loadLicense();
-  // Check if already logged in
+  // Check if already logged in — always verify block status online first
   const savedPhone = localStorage.getItem("sc_auth_phone");
   if (savedPhone && localStorage.getItem("sc_user_" + savedPhone)) {
     authPhone = savedPhone;
-    onLoginSuccess(savedPhone);
+    // Check block status before allowing auto-login
+    (async () => {
+      try {
+        const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(savedPhone)}&select=blocked`, {
+          headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+        });
+        const rows = await res.json();
+        if (rows && rows.length > 0 && rows[0].blocked === true) {
+          localStorage.removeItem("sc_auth_phone");
+          document.getElementById("auth-phone").value = savedPhone;
+          const errEl = document.getElementById("auth-phone-err");
+          if (errEl) { errEl.innerHTML = "🚫 Your account has been blocked. Contact the shop owner."; errEl.style.display = "block"; }
+          authShowStep("phone");
+          return;
+        }
+      } catch(e) { /* network error — allow cached login */ }
+      onLoginSuccess(savedPhone);
+    })();
   }
   // Otherwise login screen shows by default
 });
@@ -1140,7 +1160,6 @@ function getAllVoices() {
 function getVoicesForLang(lang) {
   const all = getAllVoices();
   if (lang === "hi") {
-    // Hindi voices: hi, hi-IN, or any Devanagari-supporting voice
     const hi = all.filter(v => v.lang === "hi-IN" || v.lang === "hi" || v.lang.startsWith("hi-"));
     return hi.length ? hi : all; // fallback to all if no Hindi found
   }
@@ -1149,6 +1168,11 @@ function getVoicesForLang(lang) {
     return en.length ? en : all;
   }
   return all;
+}
+
+function hasHindiVoice() {
+  const all = getAllVoices();
+  return all.some(v => v.lang === "hi-IN" || v.lang === "hi" || v.lang.startsWith("hi-"));
 }
 
 function getBestVoice(lang) {
@@ -1170,7 +1194,7 @@ function getBestVoice(lang) {
     const pool   = hiIN.length ? hiIN : hiAny.length ? hiAny : indian;
     // Prefer local (on-device) voices — they sound better
     const local  = pool.filter(v => v.localService);
-    return (local.length ? local[0] : pool[0]) || all[0];
+    return (local.length ? local[0] : pool[0]) || null;
   } else {
     // English: prefer en-IN then en-US/en-GB
     const enIN = all.filter(v => v.lang === "en-IN");
@@ -1181,27 +1205,161 @@ function getBestVoice(lang) {
   }
 }
 
+// ─── HINDI → PHONETIC ENGLISH (full Devanagari character-level engine) ────────
+// Converts ANY Devanagari text to phonetic English that sounds natural
+// when spoken by an English TTS voice (tuned for en-IN accent).
+
+const _DEV_VOWELS = {
+  "अ":"u","आ":"aa","इ":"i","ई":"ee","उ":"oo","ऊ":"oo",
+  "ए":"ay","ऐ":"ai","ओ":"o","औ":"au","ऋ":"ri","अं":"un","अः":"uh"
+};
+const _DEV_MATRAS = {
+  "ा":"aa","ि":"i","ी":"ee","ु":"oo","ू":"oo",
+  "े":"ay","ै":"ai","ो":"o","ौ":"au","ृ":"ri",
+  "ं":"n","ः":"h","ँ":"n","्":""  // halant (virama) = suppress inherent vowel
+};
+const _DEV_CONS = {
+  "क":"k","ख":"kh","ग":"g","घ":"gh","ङ":"ng",
+  "च":"ch","छ":"chh","ज":"j","झ":"jh","ञ":"ny",
+  "ट":"t","ठ":"th","ड":"d","ढ":"dh","ण":"n",
+  "त":"t","थ":"th","द":"d","ध":"dh","न":"n",
+  "प":"p","फ":"ph","ब":"b","भ":"bh","म":"m",
+  "य":"y","र":"r","ल":"l","व":"v",
+  "श":"sh","ष":"sh","स":"s","ह":"h",
+  "क्ष":"ksh","त्र":"tr","ज्ञ":"gya",
+  // Nukta variants (dotted)
+  "क़":"k","ख़":"kh","ग़":"g","ज़":"z","ड़":"r","ढ़":"rh","फ़":"f","य़":"y"
+};
+
+// High-quality whole-phrase overrides for natural TTS pronunciation
+const _HI_PHRASE_OVERRIDES = [
+  ["बधाई हो","badhaaee ho"],
+  ["बहुत बहुत बधाई","bahut bahut badhaaee"],
+  ["धन्यवाद","dhanyavaad"],
+  ["फिर पधारें","phir padhaarein"],
+  ["फिर आइए","phir aaiye"],
+  ["शुक्रिया","shukriyaa"],
+  ["ध्यान दीजिए","dhyaan deejiye"],
+  ["नमस्ते","namaste"],
+  ["स्वागत है","swaagat hai"],
+  ["जी हाँ","ji haan"],
+  ["बिल्कुल","bilkul"],
+  ["लीडरबोर्ड","leaderboard"],
+  ["चैंपियन","champion"],
+  ["रैंक","rank"],
+  ["नंबर","number"],
+  ["विराजमान","viraajmaan"],
+];
+
+function _devanagariToPhonetic(text) {
+  // Step 1: phrase overrides (longest match first)
+  let s = text;
+  for (const [phrase, roman] of _HI_PHRASE_OVERRIDES) {
+    s = s.split(phrase).join(roman);
+  }
+
+  // Step 2: character-level conversion for remaining Devanagari
+  const chars = [...s]; // unicode-safe split
+  let out = "";
+  let i = 0;
+  while (i < chars.length) {
+    const c = chars[i];
+    const next = chars[i+1] || "";
+
+    // Already-latin (from overrides or numbers/punctuation) — pass through
+    if (!/[\u0900-\u097F]/.test(c)) {
+      out += c; i++; continue;
+    }
+
+    // Consonant
+    if (_DEV_CONS[c]) {
+      out += _DEV_CONS[c];
+      // Look at next char
+      if (_DEV_MATRAS[next] !== undefined) {
+        // Virama (halant) = no inherent vowel
+        if (next === "्") { i += 2; continue; }
+        out += _DEV_MATRAS[next];
+        i += 2;
+      } else if (_DEV_CONS[next] || /[\u0900-\u0940\u0966-\u097F]/.test(next) === false) {
+        // End of word or non-Devanagari follows → add inherent 'a'
+        out += "a"; i++;
+      } else {
+        // Another consonant follows → add inherent 'a' between them
+        out += "a"; i++;
+      }
+      continue;
+    }
+
+    // Independent vowel
+    if (_DEV_VOWELS[c]) { out += _DEV_VOWELS[c]; i++; continue; }
+
+    // Matra on its own (shouldn't happen but handle gracefully)
+    if (_DEV_MATRAS[c] !== undefined) { out += _DEV_MATRAS[c]; i++; continue; }
+
+    // Devanagari digit
+    if (c >= "०" && c <= "९") {
+      out += String.fromCharCode(c.charCodeAt(0) - 0x0966 + 0x30);
+      i++; continue;
+    }
+
+    // Unknown Devanagari — skip
+    i++;
+  }
+
+  return out;
+}
+
+// Post-process phonetic output to improve TTS naturalness
+function _polishPhonetic(s) {
+  return s
+    // Reduce awkward double-vowels that TTS stumbles on
+    .replace(/aa+/g,"aa").replace(/ee+/g,"ee").replace(/oo+/g,"oo")
+    // "aa" at end of word → "a" (softer)
+    .replace(/aa\b/g,"a")
+    // "aya" pattern → "aya" (preserve)
+    // "kh" → keep as-is (sounds like back-of-throat k — acceptable)
+    // Remove duplicate consonants except intentional geminates
+    .replace(/([^aeiou])\1(?=[aeiou])/g,"$1")
+    // Clean whitespace
+    .replace(/\s+/g," ").trim();
+}
+
+function hindiToRoman(text) {
+  const phonetic = _devanagariToPhonetic(text);
+  return _polishPhonetic(phonetic);
+}
+
+
 function _doSpeak(text, lang) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
 
-  const utter = new SpeechSynthesisUtterance(text);
+  // If Hindi selected but no Hindi voice → transliterate and speak in English-IN
+  const useHindi = lang === "hi" && hasHindiVoice();
+  const speakText = (lang === "hi" && !useHindi) ? hindiToRoman(text) : text;
+  const speakLang = useHindi ? "hi" : "en";
+
+  const utter = new SpeechSynthesisUtterance(speakText);
 
   // Set lang BEFORE voice so the browser knows the language
-  utter.lang = lang === "hi" ? "hi-IN" : "en-IN";
+  utter.lang = useHindi ? "hi-IN" : "en-IN";
 
-  const voice = getBestVoice(lang);
+  const voice = getBestVoice(speakLang);
   if (voice) {
     utter.voice = voice;
-    utter.lang  = voice.lang; // match utterance lang to actual voice lang
+    utter.lang  = voice.lang;
   }
 
   utter.rate   = voiceSettings.rate   || 1.0;
-  utter.pitch  = voiceSettings.pitch  || 1.0;
+  utter.pitch  = voiceSettings.pitch  || 1.1;
   utter.volume = voiceSettings.volume || 1.0;
 
-  // On some Android browsers, speak() fails silently unless voices are loaded
-  // Retry once after a short delay if needed
+  // For romanised Hindi: slow down, raise pitch slightly — sounds warmer & clearer
+  if (lang === "hi" && !useHindi) {
+    utter.rate  = Math.max(0.82, Math.min(utter.rate  * 0.85, 1.3));
+    utter.pitch = Math.min(utter.pitch * 1.08, 1.8);
+  }
+
   utter.onerror = (e) => {
     console.warn("SpeechSynthesis error:", e.error);
     if (e.error === "not-allowed") notify("⚠️ Please tap the screen first to allow voice.");
@@ -1327,30 +1485,64 @@ function buildPayload() {
 }
 async function pushSync() {
   if(typeof isSubFeatureAllowed==="function"&&!isSubFeatureAllowed(7)){alert("🔒 Push to Display is disabled for your plan. Contact your seller to activate.");return;}
-  if(!syncApiKey){showSyncSetup();return;}
   const btn=document.getElementById("push-btn"),dot=document.getElementById("sync-status-dot"),txt=document.getElementById("sync-status-text");
   btn.disabled=true;btn.textContent="⏳ Pushing...";dot.className="syncing";txt.textContent="Pushing...";txt.style.color="#FFD700";
+
+  // PRIMARY: Push via Firebase Firestore (works from file://, no CORS issues)
   try {
-    let url,method,headers;
-    if(syncBinId){url=`https://api.jsonbin.io/v3/b/${syncBinId}`;method="PUT";headers={"Content-Type":"application/json","X-Master-Key":syncApiKey};}
-    else{url="https://api.jsonbin.io/v3/b";method="POST";headers={"Content-Type":"application/json","X-Master-Key":syncApiKey,"X-Bin-Name":"ShopChampion","X-Bin-Private":"false"};}
-    const res=await fetch(url,{method,headers,body:JSON.stringify(buildPayload())});
-    const data=await res.json();
-    if(!res.ok) throw new Error(data.message||"API error");
-    if(!syncBinId){syncBinId=data.metadata?.id;saveSyncData();showDisplayUrlModal();}
-    else{notify("✅ Leaderboard pushed!");}
-    lastSyncTime=new Date();dot.className="";dot.style.background="#2a2";txt.textContent="Leaderboard synced";txt.style.color="#4f4";
-    document.getElementById("sync-time").textContent="Last push: "+lastSyncTime.toLocaleTimeString();
-  } catch(e){dot.className="error";txt.textContent="Sync failed: "+e.message;txt.style.color="#f66";notify("❌ Push failed: "+e.message);}
+    if (db) {
+      await db.collection("display").doc(shopId||"leaderboard").set(buildPayload());
+      lastSyncTime=new Date();
+      dot.className="";dot.style.background="#2a2";txt.textContent="Leaderboard synced";txt.style.color="#4f4";
+      document.getElementById("sync-time").textContent="Last push: "+lastSyncTime.toLocaleTimeString();
+      notify("✅ Leaderboard pushed!");
+      btn.disabled=false;btn.textContent="⬆ Push to Display";
+      // Also try JSONbin in background if configured (optional)
+      if(syncApiKey) _pushJsonbin().catch(()=>{});
+      return;
+    }
+  } catch(fbErr) {
+    console.warn("Firebase push failed, trying JSONbin:", fbErr.message);
+  }
+
+  // FALLBACK: JSONbin (may fail on file://)
+  if(!syncApiKey){
+    dot.className="error";txt.textContent="Push failed — no Firebase or API key";txt.style.color="#f66";
+    notify("❌ Push failed. Firebase not connected.");
+    btn.disabled=false;btn.textContent="⬆ Push to Display";
+    return;
+  }
+  try { await _pushJsonbin(); notify("✅ Leaderboard pushed!"); }
+  catch(e){dot.className="error";txt.textContent="Sync failed: "+e.message;txt.style.color="#f66";notify("❌ Push failed: "+e.message);}
   btn.disabled=false;btn.textContent="⬆ Push to Display";
 }
+
+async function _pushJsonbin() {
+  let url,method,headers;
+  if(syncBinId){url=`https://api.jsonbin.io/v3/b/${syncBinId}`;method="PUT";headers={"Content-Type":"application/json","X-Master-Key":syncApiKey};}
+  else{url="https://api.jsonbin.io/v3/b";method="POST";headers={"Content-Type":"application/json","X-Master-Key":syncApiKey,"X-Bin-Name":"ShopChampion","X-Bin-Private":"false"};}
+  const res=await fetch(url,{method,headers,body:JSON.stringify(buildPayload())});
+  const data=await res.json();
+  if(!res.ok) throw new Error(data.message||"API error");
+  if(!syncBinId){syncBinId=data.metadata?.id;saveSyncData();showDisplayUrlModal();}
+  const dot=document.getElementById("sync-status-dot"),txt=document.getElementById("sync-status-text");
+  lastSyncTime=new Date();dot.className="";dot.style.background="#2a2";txt.textContent="Leaderboard synced";txt.style.color="#4f4";
+  document.getElementById("sync-time").textContent="Last push: "+lastSyncTime.toLocaleTimeString();
+}
 function showDisplayUrlModal(){
+  const phone = authPhone || localStorage.getItem("sc_auth_phone") || "";
   showWideModal(`${modalHeader("📺 Display Setup")}
-    ${syncBinId?`<div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:10px;padding:16px;margin-bottom:16px;">
-      <div style="font-size:12px;color:#4f4;margin-bottom:8px;font-weight:700;">📋 Your Bin ID — paste into Display file:</div>
-      <div style="background:#050d05;border-radius:6px;padding:10px;font-family:monospace;font-size:15px;color:#FFD700;word-break:break-all;margin-bottom:10px;text-align:center;">${syncBinId}</div>
-      <button class="btn" onclick="navigator.clipboard.writeText('${syncBinId}').then(()=>notify('✅ Copied!'))" style="background:#1a4a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px;font-size:13px;width:100%;">📋 Copy Bin ID</button>
-    </div>`:``}
+    <div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:10px;padding:16px;margin-bottom:16px;">
+      <div style="font-size:12px;color:#4f4;margin-bottom:8px;font-weight:700;">🔥 Firebase Sync (Recommended — works from file://)</div>
+      <div style="font-size:13px;color:#aaa;margin-bottom:8px;">Open the Display file → enter your phone number:</div>
+      <div style="background:#050d05;border-radius:6px;padding:10px;font-family:monospace;font-size:17px;color:#FFD700;word-break:break-all;margin-bottom:10px;text-align:center;">${phone||"Your registered phone"}</div>
+      <button class="btn" onclick="navigator.clipboard.writeText('${phone}').then(()=>notify('✅ Copied!'))" style="background:#1a4a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px;font-size:13px;width:100%;margin-bottom:10px;">📋 Copy Phone Number</button>
+      <div style="font-size:12px;color:#4a6a4a;line-height:1.7;">1. Push data with ⬆ Push to Display button<br>2. Open Display file → enter this phone → Connect</div>
+    </div>
+    ${syncBinId?`<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:12px;margin-bottom:12px;">
+      <div style="font-size:11px;color:#4a5a7a;margin-bottom:4px;">JSONbin fallback Bin ID:</div>
+      <div style="font-family:monospace;font-size:12px;color:#5af;">${syncBinId}</div>
+    </div>`:""}
     <button class="btn" onclick="closeModal()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:10px;width:100%;">Close</button>`);
 }
 function showSyncSetup(){
@@ -1449,37 +1641,51 @@ async function checkPhone() {
   }
 
   authPhone = phone;
-  document.getElementById("check-phone-btn").disabled = true;
-  document.getElementById("check-phone-txt").innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Checking...`;
+  const btn = document.getElementById("check-phone-btn");
+  const txt = document.getElementById("check-phone-txt");
+  btn.disabled = true;
+  txt.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Checking...`;
 
-  // Check if user exists in Supabase sc_users table
-  try {
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=phone`, {
-      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
-    });
-    const rows = await res.json();
+  const resetBtn = () => { btn.disabled = false; txt.textContent = "Continue →"; };
 
-    if (rows && rows.length > 0) {
-      // Existing user — show password step
-      document.getElementById("auth-pass-subtitle").textContent = `Enter password for +91 ${phone}`;
-      authShowStep("password");
-    } else {
-      // New user — go directly to create password (no OTP)
-      authMode = "new_user";
-      const el = document.getElementById("auth-newpass-phone");
-      if(el) el.textContent = phone;
-      authShowStep("newpass");
-    }
-  } catch(e) {
-    // If table doesn't exist yet, treat as new user
+  const goNewUser = () => {
     authMode = "new_user";
     const el = document.getElementById("auth-newpass-phone");
     if(el) el.textContent = phone;
     authShowStep("newpass");
-  }
+  };
 
-  document.getElementById("check-phone-btn").disabled = false;
-  document.getElementById("check-phone-txt").textContent = "Continue →";
+  try {
+    // 6-second timeout so button never hangs forever
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=phone,blocked`, {
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON },
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) { goNewUser(); resetBtn(); return; }
+    const rows = await res.json();
+
+    if (rows && rows.length > 0) {
+      if (rows[0].blocked === true) {
+        errEl.innerHTML = "🚫 Your account has been blocked. Please contact the shop owner.";
+        errEl.style.display = "block";
+        resetBtn(); return;
+      }
+      document.getElementById("auth-pass-subtitle").textContent = `Enter password for +91 ${phone}`;
+      authShowStep("password");
+    } else {
+      goNewUser();
+    }
+  } catch(e) {
+    // Network error / timeout / Supabase down — treat as new user so login never gets stuck
+    goNewUser();
+  } finally {
+    resetBtn();
+  }
 }
 
 // ── Step 2a: Login with password ──
@@ -1494,32 +1700,36 @@ function loginWithPassword() {
     return;
   }
 
-  // Hash password for comparison
-  const hashed = btoa(authPhone + ":" + pass);
-  const stored = localStorage.getItem("sc_user_" + authPhone);
-
-  if (stored && stored === hashed) {
-    // Correct password
-    localStorage.setItem("sc_auth_phone", authPhone);
-    onLoginSuccess(authPhone);
-  } else {
-    // Check against Supabase too
-    verifyPasswordOnline(authPhone, pass);
-  }
+  // Always verify online — checks both password AND block status
+  verifyPasswordOnline(authPhone, pass);
 }
 
 async function verifyPasswordOnline(phone, pass) {
   const errEl = document.getElementById("auth-pass-err");
   try {
     const hashed = btoa(phone + ":" + pass);
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=phone,password_hash`, {
-      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=phone,password_hash,blocked`, {
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON },
+      signal: controller.signal
     });
+    clearTimeout(timer);
     const rows = await res.json();
-    if (rows && rows.length > 0 && rows[0].password_hash === hashed) {
-      localStorage.setItem("sc_auth_phone", phone);
-      localStorage.setItem("sc_user_" + phone, hashed); // cache locally
-      onLoginSuccess(phone);
+    if (rows && rows.length > 0) {
+      if (rows[0].blocked === true) {
+        errEl.innerHTML = "🚫 Your account has been blocked. Please contact the shop owner.";
+        errEl.style.display = "block";
+        return;
+      }
+      if (rows[0].password_hash === hashed) {
+        localStorage.setItem("sc_auth_phone", phone);
+        localStorage.setItem("sc_user_" + phone, hashed); // cache locally
+        onLoginSuccess(phone);
+      } else {
+        errEl.textContent = "❌ Wrong password. Try again or use Forgot Password.";
+        errEl.style.display = "block";
+      }
     } else {
       errEl.textContent = "❌ Wrong password. Try again or use Forgot Password.";
       errEl.style.display = "block";
@@ -1608,7 +1818,7 @@ function onLoginSuccess(phone) {
   document.getElementById("main-app").style.display = "block";
   if (db && phone) {
     shopId = phone;
-    loadFirebaseCustomers();
+    startFirestoreListener();
   }
   // Cache user_number for Support ID display
   if (phone && !localStorage.getItem("sc_usernum_" + phone)) {
@@ -1625,6 +1835,32 @@ function onLoginSuccess(phone) {
   loadLicense();
   updateLicenseUI();
   updateAppHeader();
+  // Periodically check if account has been blocked by seller
+  checkIfBlocked(phone);
+  setInterval(() => checkIfBlocked(phone), 60000);
+}
+
+async function checkIfBlocked(phone) {
+  if (!phone) return;
+  try {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=blocked`, {
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    });
+    const rows = await res.json();
+    if (rows && rows.length > 0 && rows[0].blocked === true) {
+      // User is blocked — force logout
+      localStorage.removeItem("sc_auth_phone");
+      document.getElementById("main-app").style.display = "none";
+      document.getElementById("login-screen").style.display = "flex";
+      authShowStep("phone");
+      document.getElementById("auth-phone").value = phone;
+      const errEl = document.getElementById("auth-phone-err");
+      if (errEl) {
+        errEl.innerHTML = "🚫 Your account has been blocked by the admin. Please contact the shop owner.";
+        errEl.style.display = "block";
+      }
+    }
+  } catch(e) { /* silent — don't kick user out on network error */ }
 }
 
 function doLogin() { /* legacy stub */ }
@@ -1660,25 +1896,62 @@ function doLogout() {
 
 function updateSyncStatus(){
   const dot=document.getElementById("sync-status-dot"),txt=document.getElementById("sync-status-text");
-  if(syncBinId&&syncApiKey){dot.className="";dot.style.background="#2a2";dot.style.boxShadow="0 0 6px #4f4";txt.textContent="Display connected";txt.style.color="#4f4";document.getElementById("sync-time").textContent="Bin: "+syncBinId.slice(0,8)+"...";}
+  if(db){dot.className="";dot.style.background="#2a2";dot.style.boxShadow="0 0 6px #4f4";txt.textContent="Display ready (Firebase)";txt.style.color="#4f4";if(!document.getElementById("sync-time").textContent)document.getElementById("sync-time").textContent="Click Push to Display";}
+  else if(syncBinId&&syncApiKey){dot.className="";dot.style.background="#2a2";dot.style.boxShadow="0 0 6px #4f4";txt.textContent="Display connected";txt.style.color="#4f4";document.getElementById("sync-time").textContent="Bin: "+syncBinId.slice(0,8)+"...";}
   else if(syncApiKey){dot.className="";dot.style.background="#aa4";txt.textContent="Ready to push";txt.style.color="#FFD700";document.getElementById("sync-time").textContent="Click Push to create display";}
   else{dot.className="error";txt.textContent="Sync not configured";txt.style.color="#f88";document.getElementById("sync-time").textContent="Click Display Setup";}
 }
 
 // ─── Safe render: always preserves Purchase form state ──────────
+// IDs of every input/textarea on the Purchase tab (tab 2) that should survive re-renders
+const _TAB2_FIELD_IDS = [
+  "pt-search","pt-sel","pt-amt","pt-bill","pt-notes","pt-date","pt-date-val",
+  "bpt-search","bpt-sel","bpt-amounts","bpt-date","bpt-notes",
+  "bw-search","bw-sel","bw-amt","bw-item","bw-date","bw-due"
+];
+
+function _tab2SaveFields() {
+  const saved = {};
+  _TAB2_FIELD_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) saved[id] = el.value;
+  });
+  return saved;
+}
+
+function _tab2RestoreFields(saved) {
+  _TAB2_FIELD_IDS.forEach(id => {
+    if (saved[id] === undefined || saved[id] === "") return;
+    const el = document.getElementById(id);
+    if (el) el.value = saved[id];
+  });
+}
+
 function safeRenderTab(i) {
   if (i === 2) {
-    // If user is actively typing a search (no customer selected yet), skip the
-    // full DOM re-render so the search input is never interrupted.
-    const searchEl = document.getElementById("pt-search");
-    const isSearching = searchEl && searchEl.value.trim() !== "" && !window._ptState.selId;
-    if (isSearching) {
-      // Data is already updated in memory — just skip the visual re-render.
+    // If the user currently has focus inside the Purchase tab, skip re-render
+    // entirely — data is already updated in memory, DOM is fine as-is.
+    const active = document.activeElement;
+    const tabContent = document.getElementById("tab-content");
+    if (active && tabContent && tabContent.contains(active)) {
       return;
     }
+
+    // Snapshot all field values before re-render
+    const savedFields = _tab2SaveFields();
+
     ptSaveState();
     renderTab(2);
     ptRestoreState();
+
+    // Restore every field that had a value
+    _tab2RestoreFields(savedFields);
+
+    // Re-run preview if amounts were restored
+    if (savedFields["bpt-amounts"]) {
+      try { bptPreview(); } catch(e) {}
+    }
+
     // Restore the static clock badge after re-render
     const disp = document.getElementById("pt-clock-display");
     if (disp && window._ptState.dateMode !== "manual") {
@@ -1692,7 +1965,7 @@ function safeRenderTab(i) {
 }
 // ─── TABS ─────────────────────────────────────────────────────
 function renderTabs(){const TABS=getTabs();document.getElementById("tab-bar").innerHTML=TABS.map((tab,i)=>`<button class="tab-btn${currentTab===i?" active":""}" onclick="switchTab(${i})">${tab}</button>`).join("");}
-function switchTab(i){if(i!==1)custPage=0;currentTab=i;renderTabs();renderTab(i);}
+function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}currentTab=i;renderTabs();renderTab(i);}
 function renderTab(i){
   const el=document.getElementById("tab-content"),s=getSorted();
   if(i===0)el.innerHTML=renderLeaderboard(getSortedFiltered());
@@ -1805,7 +2078,10 @@ function renderLeaderboard(sorted){
         ${allTimeNote}
       </div>
       <div style="text-align:right;font-size:13px;color:${zeroDay?'#2a3a4a':'#5a7aaa'};">🪙 ${c.points>0?c.points.toLocaleString():"—"}</div>
-      <div style="text-align:right;"><button class="btn" onclick="event.stopPropagation();openPurchaseModal('${c.id}')" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;padding:5px 12px;font-size:12px;">+ Purchase</button></div>
+      <div style="text-align:right;display:flex;gap:6px;justify-content:flex-end;">
+        <button class="btn" onclick="event.stopPropagation();openBulkPurchaseModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:5px 10px;font-size:12px;" title="Add multiple purchases at once">+ Bulk</button>
+        <button class="btn" onclick="event.stopPropagation();openPurchaseModal('${c.id}')" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;padding:5px 12px;font-size:12px;">+ Purchase</button>
+      </div>
     </div>`;
   }).join("");
 
@@ -1849,6 +2125,7 @@ function renderCustomers(sorted,q=""){
     (c.phone&&c.phone.includes(ql))||
     c.id.toLowerCase().includes(ql)
   );
+  custFilteredIds = f.map(c=>c.id); // store for Select All
   // Lazy load: show first CUST_BATCH rows, rest loaded on demand
   const visibleCount = Math.min(custPage > 0 ? custPage : CUST_BATCH, f.length);
   const visible = f.slice(0, visibleCount);
@@ -1860,6 +2137,24 @@ function renderCustomers(sorted,q=""){
     const daysSince=lastP?Math.floor((Date.now()-new Date(lastP.date))/86400000):9999;
     const visitColor=daysSince<=7?"#4f4":daysSince<=30?"#FFD700":daysSince<=60?"#f84":"#f66";
     const waMsg=c.phone?`https://wa.me/91${c.phone}?text=${encodeURIComponent(`Hi ${c.name.split(" ")[0]}! 👋\nYou are ranked #${c.rank} at ${appSettings.shopName}.\nYour total spend: ${formatINR(c.totalSpend)} 🏆\nVisit us again to climb the leaderboard!`)}`:"";
+    const isSel = custSelected.has(c.id);
+    const selBg = isSel ? 'background:#1a0d30;' : '';
+    const selBorder = isSel ? 'outline:2px solid #a060ff;outline-offset:-2px;' : '';
+    if(custSelectMode) return `
+    <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer;transition:background 0.15s;${selBg}${selBorder}" onclick="custToggleSelect('${c.id}')">
+      <div style="flex-shrink:0;width:22px;height:22px;border-radius:5px;border:2px solid ${isSel?'#a060ff':'#3a4a6a'};background:${isSel?'#a060ff':'transparent'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;">${isSel?'✓':''}</div>
+      ${avatarEl(c,46)}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:15px;color:#e8eaf0;">${c.name}</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:1px;">${c.phone?`📞 ${c.phone}`:"<em style='color:#2a3a5a;'>No phone</em>"} · <span style="font-family:monospace;font-size:11px;">${c.id}</span></div>
+        <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;align-items:center;">
+          <span style="font-size:12px;color:#FFD700;font-weight:700;">Rank #${c.rank}</span>
+          <span style="font-size:12px;color:#7a8aaa;">🪙 ${c.points.toLocaleString()} pts</span>
+          ${(typeof isSubFeatureAllowed==='undefined'||isSubFeatureAllowed(8))?`<span style="font-size:12px;color:#7a8aaa;">🧾 ${(c.purchases||[]).length} visits</span>`:''}
+        </div>
+      </div>
+      <div style="font-weight:800;color:#FFD700;font-size:15px;">${formatINR(c.totalSpend)}</div>
+    </div>`;
     return `
     <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer;transition:background 0.15s;" onclick="openCustomerPage('${c.id}')" onmouseenter="this.style.background='#151f38'" onmouseleave="this.style.background=''">
       ${avatarEl(c,46)}
@@ -1894,9 +2189,19 @@ function renderCustomers(sorted,q=""){
   return `<div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <h2 style="margin:0;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Customers (${sorted.length})</h2>
-      <div style="display:flex;gap:8px;">
-        <button class="btn" onclick="exportCSV()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:7px 14px;font-size:12px;">⬇ Export CSV</button>
-        <button class="btn" onclick="openAddModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 18px;font-size:13px;">+ Add Customer</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        ${custSelectMode ? `
+          <span style="font-size:12px;color:#aaa;padding:4px 8px;">${custSelected.size} selected</span>
+          <button class="btn" onclick="custSelectAll()" style="background:#1a2a3a;color:#7ab3ff;border:1px solid #2a4060;padding:7px 12px;font-size:12px;">☑ All</button>
+          <button class="btn" onclick="custDeselectAll()" style="background:#1a2a3a;color:#aaa;border:1px solid #2a3560;padding:7px 12px;font-size:12px;">☐ None</button>
+          <button class="btn" onclick="deleteSelectedCustomers()" style="background:#3a1010;color:#f66;border:1px solid #5a1515;padding:7px 14px;font-size:12px;font-weight:700;" ${custSelected.size===0?'disabled':''}>🗑️ Delete (${custSelected.size})</button>
+          <button class="btn" onclick="custToggleSelectMode()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:7px 12px;font-size:12px;">✕ Cancel</button>
+        ` : `
+          <button class="btn" onclick="exportCSV()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:7px 14px;font-size:12px;">⬇ Export CSV</button>
+          <button class="btn" onclick="openBulkAddModal()" style="background:#1a3a5c;color:#7ab3ff;border:1px solid #2a5080;padding:8px 14px;font-size:13px;">👥 Bulk Add</button>
+          <button class="btn" onclick="custToggleSelectMode()" style="background:#3a1a1a;color:#f88;border:1px solid #4a2020;padding:8px 14px;font-size:13px;" title="Select multiple customers to delete">☑ Select</button>
+          <button class="btn" onclick="openAddModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 18px;font-size:13px;">+ Add Customer</button>
+        `}
       </div>
     </div>
     <div style="background:#0a1628;border:1px solid #1a2a45;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#5a8aaa;">
@@ -2014,13 +2319,47 @@ function renderPurchaseTab(sorted){
       }).join("")}
     </div>` : `<div class="card" style="padding:24px;text-align:center;color:#4a5a7a;font-size:13px;">✅ No outstanding borrows</div>`}`;
 
+  const bulkPurchaseForm = `
+    <div class="card" style="padding:24px;">
+      <div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#6aaa8a;line-height:1.8;">
+        💡 Select a customer, then enter all amounts separated by commas:<br>
+        <span style="color:#FFD700;font-family:monospace;">50, 90, 70, 150, 300, 400</span>
+      </div>
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Search Customer</label>
+      <input class="input" id="bpt-search" dir="ltr" placeholder="🔍 Search by name, phone or ID..." oninput="bptFilterCustomers()" style="margin-bottom:8px;text-align:left;" />
+      <div id="bpt-dropdown" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;max-height:200px;overflow-y:auto;margin-bottom:10px;"></div>
+      <div id="bpt-prev" style="display:none;background:#0a0e1a;border-radius:10px;padding:12px;margin-bottom:14px;"></div>
+      <input type="hidden" id="bpt-sel" />
+
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Purchase Amounts (₹) <span style="color:#f66;">*</span></label>
+      <textarea id="bpt-amounts" placeholder="e.g. 50, 90, 70, 150, 300, 400" rows="3"
+        style="width:100%;box-sizing:border-box;background:#080c18;border:1px solid #2a3560;border-radius:10px;color:#e8eaf0;padding:12px;font-size:18px;font-weight:700;font-family:monospace;resize:vertical;margin-bottom:14px;"
+        oninput="bptPreview()"></textarea>
+
+      <div id="bpt-preview" style="margin-bottom:14px;"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+        <div>
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Date</label>
+          <input class="input" type="date" id="bpt-date" value="${new Date().toISOString().slice(0,10)}" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Notes (optional)</label>
+          <input class="input" id="bpt-notes" placeholder="e.g. Notebook import" />
+        </div>
+      </div>
+
+      <button class="btn" id="bpt-sub" onclick="bptSubmit()" style="background:linear-gradient(135deg,#00c853,#1a8a3a);color:#fff;width:100%;padding:14px;font-size:15px;font-weight:800;">⚡ Add All Purchases →</button>
+    </div>`;
+
   return `<div style="max-width:520px;">
     <h2 style="margin:0 0 16px;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">💳 Purchase</h2>
     <div style="display:flex;gap:8px;margin-bottom:18px;">
       ${tabBtn("purchase","🧾 Add Purchase","#FFD700")}
+      ${tabBtn("bulkpurchase","⚡ Bulk Purchase","#4f4")}
       ${tabBtn("borrow",`📦 Borrow${totalOwed>0?" ("+pendingBorrows.length+")":""}`,  "#f84")}
     </div>
-    ${ptView==="purchase" ? purchaseForm : borrowForm}
+    ${ptView==="purchase" ? purchaseForm : ptView==="bulkpurchase" ? bulkPurchaseForm : borrowForm}
   </div>`;
 }
 
@@ -2169,6 +2508,83 @@ function ptClearCustomer(){
 }
 function ptPts(){const a=parseFloat(document.getElementById("pt-amt").value)||0,s=document.getElementById("pt-sel").value,b=document.getElementById("pt-pts");if(a&&s){b.style.display="block";b.innerHTML=`Points: <strong style="color:#FFD700;">+${getPoints(a).toLocaleString()}</strong> pts`;}else b.style.display="none";}
 function ptSubmit(){const s=document.getElementById("pt-sel").value,a=document.getElementById("pt-amt").value;if(!s||!a)return;addPurchase(s,{amount:a,bill:document.getElementById("pt-bill").value,notes:document.getElementById("pt-notes").value,date:document.getElementById("pt-date-val").value||document.getElementById("pt-date").value});document.getElementById("pt-amt").value="";document.getElementById("pt-notes").value="";window._ptState.selId="";window._ptState.selName="";window._ptState.selData=null;window._ptState.amt="";window._ptState.notes="";ptRestoreLiveBadge();const btn=document.getElementById("pt-sub");btn.style.background="linear-gradient(135deg,#1a5a2a,#2a8a3a)";btn.style.color="#4f4";btn.textContent="✅ Added!";setTimeout(()=>{btn.style.background="linear-gradient(135deg,#FFD700,#FFA500)";btn.style.color="#1a0a00";btn.textContent="Add Purchase →";},2000);}
+
+// ─── BULK PURCHASE TAB FUNCTIONS ─────────────────────────────────────────────
+function bptFilterCustomers(){
+  const q=(document.getElementById("bpt-search")?.value||"").toLowerCase().trim();
+  const dd=document.getElementById("bpt-dropdown");
+  if(!q){dd.style.display="none";return;}
+  const matches=getSorted().filter(c=>c.name.toLowerCase().includes(q)||(c.phone&&c.phone.includes(q))||c.id.toLowerCase().includes(q)).slice(0,8);
+  if(!matches.length){dd.style.display="none";return;}
+  dd.style.display="block";
+  dd.innerHTML=matches.map(c=>`<div onclick="bptSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">${avatarEl(c,34)}<div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${c.name}</div><div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span> · ${formatINR(c.totalSpend)}</div></div></div>`).join("");
+}
+
+function bptSelectCustomer(id){
+  const c=getSorted().find(x=>x.id===id);if(!c)return;
+  document.getElementById("bpt-sel").value=id;
+  document.getElementById("bpt-search").value=c.name;
+  document.getElementById("bpt-dropdown").style.display="none";
+  const pr=document.getElementById("bpt-prev");
+  pr.style.display="flex";pr.style.alignItems="center";pr.style.gap="12px";
+  pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} · Rank #${c.rank||"?"} · 🚶 ${(c.purchases||[]).length} visits</div></div><button onclick="bptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+}
+
+function bptClearCustomer(){
+  document.getElementById("bpt-sel").value="";
+  document.getElementById("bpt-search").value="";
+  document.getElementById("bpt-prev").style.display="none";
+  document.getElementById("bpt-dropdown").style.display="none";
+}
+
+function bptPreview(){
+  const raw=document.getElementById("bpt-amounts")?.value||"";
+  const amounts=bpParseAmounts(raw);
+  const el=document.getElementById("bpt-preview");
+  if(!el)return;
+  if(!amounts.length){el.innerHTML="";return;}
+  const total=amounts.reduce((a,b)=>a+b,0);
+  el.innerHTML=`<div style="background:#0a1628;border:1px solid #1e2a45;border-radius:10px;padding:12px 14px;"><div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:12px;color:#7a8aaa;">${amounts.length} purchase${amounts.length!==1?"s":""} detected</span><span style="font-size:15px;font-weight:800;color:#FFD700;">Total: ₹${total.toLocaleString("en-IN")}</span></div><div style="display:flex;flex-wrap:wrap;gap:6px;">${amounts.map(a=>`<span style="background:#1a2540;color:#7ab3ff;border:1px solid #2a3560;border-radius:6px;padding:3px 10px;font-size:13px;font-family:monospace;">₹${a.toLocaleString("en-IN")}</span>`).join("")}</div></div>`;
+}
+
+async function bptSubmit(){
+  const custId=document.getElementById("bpt-sel")?.value;
+  if(!custId){
+    const s=document.getElementById("bpt-search");
+    if(s)s.style.border="2px solid #f66";
+    setTimeout(()=>{const s=document.getElementById("bpt-search");if(s)s.style.border="";},2000);
+    return;
+  }
+  const raw=document.getElementById("bpt-amounts")?.value||"";
+  const amounts=bpParseAmounts(raw);
+  if(!amounts.length){
+    const ta=document.getElementById("bpt-amounts");
+    if(ta)ta.style.border="2px solid #f66";
+    setTimeout(()=>{const ta=document.getElementById("bpt-amounts");if(ta)ta.style.border="";},2000);
+    return;
+  }
+  const date=document.getElementById("bpt-date")?.value||new Date().toISOString().slice(0,10);
+  const notes=document.getElementById("bpt-notes")?.value||"Bulk entry";
+  const c=customers.find(x=>x.id===custId);if(!c)return;
+
+  amounts.forEach(amt=>{
+    const bill="B"+String(Date.now()+Math.random()).replace(".","").slice(-6);
+    c.purchases=[{bill,amount:amt,date,notes},...(c.purchases||[])];
+    c.totalSpend+=amt;
+  });
+
+  const total=amounts.reduce((a,b)=>a+b,0);
+  const btn=document.getElementById("bpt-sub");
+  if(btn){btn.textContent="✅ Added!";btn.style.background="linear-gradient(135deg,#1a5a2a,#2a8a3a)";}
+  document.getElementById("bpt-amounts").value="";
+  document.getElementById("bpt-preview").innerHTML="";
+  bptClearCustomer();
+  notify(`✅ ${amounts.length} purchases added for ${c.name} — ₹${total.toLocaleString("en-IN")}`);
+  setTimeout(()=>{const b=document.getElementById("bpt-sub");if(b){b.textContent="⚡ Add All Purchases →";b.style.background="linear-gradient(135deg,#00c853,#1a8a3a)";}},2000);
+  try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
+  if(useLocalOnly)safeRenderTab(currentTab);
+}
+// ─── END BULK PURCHASE TAB ────────────────────────────────────────────────────
 
 // ─── BORROW FUNCTIONS ──────────────────────────────────────────
 function bwFilterCustomers(){
@@ -2905,7 +3321,9 @@ function renderSettings(){
         </select>
         <div style="font-size:11px;color:#4a5a7a;margin-top:5px;">
           ${voiceSettings.voiceLang==='hi'
-            ? '💡 <strong style="color:#FF9933;">Hindi voices:</strong> need Hindi installed on device. Android: Settings → General Management → Language → Add हिंदी. iOS: Settings → Accessibility → Spoken Content → Voices → Hindi.'
+            ? (hasHindiVoice()
+                ? '✅ <strong style="color:#4f4;">Hindi voice detected!</strong> Announcement will play in हिंदी.'
+                : '⚠️ <strong style="color:#FF9933;">No Hindi voice on this device.</strong> Auto-fallback: Hindi text → romanised → spoken in English-Indian accent. <br><span style="color:#5a8aaa;">To install real Hindi: <b>Android</b> → Settings → General Mgmt → Language → Add हिंदी. <b>iOS</b> → Settings → Accessibility → Spoken Content → Voices → Hindi.</span>')
             : '💡 📱 = on-device voice (faster, works offline) · 🌐 = network voice (higher quality)'}
         </div>
       </div>
@@ -3064,6 +3482,210 @@ async function saveNewCustomer(){
   if(useLocalOnly) safeRenderTab(currentTab);
 }
 
+// ─── BULK ADD CUSTOMERS ──────────────────────────────────────────────────────
+
+function openBulkAddModal() {
+  const modalHtml = `
+    ${modalHeader("👥 Bulk Add Customers")}
+
+    <!-- Tab switcher -->
+    <div style="display:flex;gap:0;margin-bottom:18px;border:1px solid #2a3560;border-radius:10px;overflow:hidden;">
+      <button id="bulk-tab-manual" onclick="bulkSwitchTab('manual')" style="flex:1;padding:9px;background:#1a3a5c;color:#7ab3ff;border:none;cursor:pointer;font-size:13px;font-weight:700;">📝 Manual Entry</button>
+      <button id="bulk-tab-csv" onclick="bulkSwitchTab('csv')" style="flex:1;padding:9px;background:#0f1628;color:#4a5a7a;border:none;border-left:1px solid #2a3560;cursor:pointer;font-size:13px;font-weight:700;">📋 CSV / Paste</button>
+    </div>
+
+    <!-- MANUAL ENTRY PANEL -->
+    <div id="bulk-panel-manual">
+      <div style="font-size:12px;color:#5a8aaa;margin-bottom:10px;">Add up to 50 customers at once. Name is required, Phone and ID are optional.</div>
+      <div style="display:grid;grid-template-columns:2fr 1.3fr 1.3fr 32px;gap:6px;margin-bottom:6px;">
+        <div style="font-size:11px;color:#7a8aaa;font-weight:700;padding:0 4px;">FULL NAME *</div>
+        <div style="font-size:11px;color:#7a8aaa;font-weight:700;padding:0 4px;">PHONE</div>
+        <div style="font-size:11px;color:#7a8aaa;font-weight:700;padding:0 4px;">ID (auto if blank)</div>
+        <div></div>
+      </div>
+      <div id="bulk-rows" style="display:flex;flex-direction:column;gap:5px;max-height:320px;overflow-y:auto;padding-right:2px;"></div>
+      <button onclick="bulkAddRow()" style="margin-top:10px;background:#1a2540;color:#7ab3ff;border:1px solid #2a3560;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px;width:100%;">+ Add Row</button>
+    </div>
+
+    <!-- CSV PANEL -->
+    <div id="bulk-panel-csv" style="display:none;">
+      <div style="font-size:12px;color:#5a8aaa;margin-bottom:10px;">Paste CSV/spreadsheet data below, or upload a CSV file.<br>Expected columns: <strong style="color:#FFD700;">Name, Phone (optional), ID (optional)</strong></div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
+        <button onclick="document.getElementById('bulk-csv-file').click()" style="background:#1a2540;color:#7ab3ff;border:1px solid #2a3560;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:12px;">📁 Upload CSV</button>
+        <input type="file" id="bulk-csv-file" accept=".csv,.txt" style="display:none;" onchange="bulkLoadCSVFile(this)">
+        <button onclick="bulkPasteExample()" style="background:#1a2540;color:#4a8a7a;border:1px solid #2a5040;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:12px;">📌 Load Example</button>
+        <span style="font-size:11px;color:#4a5a7a;">Max 200 rows</span>
+      </div>
+      <textarea id="bulk-csv-input" placeholder="Paste here, e.g.&#10;Rahul Sharma,9876543210,SC001&#10;Priya Patel,9123456780&#10;Amit Kumar" style="width:100%;box-sizing:border-box;height:180px;background:#080c18;border:1px solid #2a3560;border-radius:8px;color:#e8eaf0;padding:10px;font-size:13px;font-family:monospace;resize:vertical;" oninput="bulkCSVPreview()"></textarea>
+      <div id="bulk-csv-preview" style="margin-top:10px;font-size:12px;color:#5aaa8a;"></div>
+    </div>
+
+    <!-- Status area -->
+    <div id="bulk-status" style="min-height:20px;margin-top:10px;font-size:12px;"></div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button onclick="closeModal()" style="flex:1;background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;border-radius:10px;padding:12px;cursor:pointer;font-size:14px;">Cancel</button>
+      <button onclick="bulkSaveAll()" style="flex:2;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:12px;cursor:pointer;font-size:14px;font-weight:800;">✅ Add All Customers →</button>
+    </div>`;
+
+  // Use wide modal
+  document.getElementById("modal-container").innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:600px;">${modalHtml}</div></div>`;
+
+  // Initialise with 5 empty rows
+  for (let i = 0; i < 5; i++) bulkAddRow();
+}
+
+function bulkSwitchTab(tab) {
+  ['manual','csv'].forEach(t => {
+    document.getElementById('bulk-panel-'+t).style.display = t===tab ? '' : 'none';
+    const btn = document.getElementById('bulk-tab-'+t);
+    btn.style.background = t===tab ? '#1a3a5c' : '#0f1628';
+    btn.style.color = t===tab ? '#7ab3ff' : '#4a5a7a';
+  });
+}
+
+function bulkAddRow() {
+  const container = document.getElementById('bulk-rows');
+  if (!container) return;
+  const count = container.children.length;
+  if (count >= 50) { document.getElementById('bulk-status').innerHTML = '<span style="color:#f66;">Maximum 50 rows reached.</span>'; return; }
+  const row = document.createElement('div');
+  row.style.cssText = 'display:grid;grid-template-columns:2fr 1.3fr 1.3fr 32px;gap:6px;align-items:center;';
+  row.innerHTML = `
+    <input class="input" placeholder="Customer name *" style="padding:8px 10px;font-size:13px;margin:0;" oninput="bulkUpdateStatus()" />
+    <input class="input" placeholder="Phone" style="padding:8px 10px;font-size:13px;margin:0;" />
+    <input class="input" placeholder="Auto" style="padding:8px 10px;font-size:13px;margin:0;font-family:monospace;" />
+    <button onclick="this.closest('div').remove();bulkUpdateStatus()" style="background:#3a1a1a;color:#f66;border:1px solid #4a1515;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;padding:0;">✕</button>`;
+  container.appendChild(row);
+  // Scroll to bottom
+  container.scrollTop = container.scrollHeight;
+  bulkUpdateStatus();
+}
+
+function bulkUpdateStatus() {
+  const container = document.getElementById('bulk-rows');
+  if (!container) return;
+  const rows = container.querySelectorAll('div');
+  const filled = [...rows].filter(r => r.querySelector('input')?.value.trim()).length;
+  const statusEl = document.getElementById('bulk-status');
+  if (statusEl) statusEl.innerHTML = filled > 0
+    ? `<span style="color:#5aaa8a;">✔ ${filled} customer${filled>1?'s':''} ready to add</span>`
+    : `<span style="color:#4a5a7a;">Fill in names above to add customers.</span>`;
+}
+
+function bulkPasteExample() {
+  document.getElementById('bulk-csv-input').value =
+    "Rahul Sharma,9876543210,SC001\nPriya Patel,9123456780\nAmit Kumar,,SC003\nSunita Devi,9001122334\nVikas Mehta,9988776655";
+  bulkCSVPreview();
+}
+
+function bulkLoadCSVFile(input) {
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    document.getElementById('bulk-csv-input').value = e.target.result;
+    bulkCSVPreview();
+  };
+  r.readAsText(f);
+}
+
+function bulkCSVPreview() {
+  const raw = document.getElementById('bulk-csv-input')?.value || '';
+  const parsed = bulkParseCSV(raw);
+  const el = document.getElementById('bulk-csv-preview');
+  if (!el) return;
+  if (parsed.length === 0) { el.innerHTML = ''; return; }
+  const valid = parsed.filter(r => r[0]);
+  el.innerHTML = `<span style="color:#5aaa8a;">✔ ${valid.length} valid row${valid.length!==1?'s':''} detected</span>${parsed.length>valid.length?' <span style="color:#f84;">('+( parsed.length-valid.length)+' skipped — no name)</span>':''}`;
+}
+
+function bulkParseCSV(raw) {
+  return raw.split('\n')
+    .map(line => {
+      // Handle quoted fields
+      const cols = []; let cur = '', inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"' ) { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+        else cur += ch;
+      }
+      cols.push(cur.trim());
+      return cols;
+    })
+    .filter(cols => cols.some(c => c)); // remove fully empty lines
+}
+
+async function bulkSaveAll() {
+  const activePanel = document.getElementById('bulk-panel-csv').style.display === 'none' ? 'manual' : 'csv';
+  let entries = [];
+
+  if (activePanel === 'manual') {
+    const rows = document.getElementById('bulk-rows')?.querySelectorAll('div') || [];
+    rows.forEach(row => {
+      const inputs = row.querySelectorAll('input');
+      const name = inputs[0]?.value.trim();
+      if (!name) return;
+      entries.push({ name, phone: inputs[1]?.value.trim()||'', rawId: inputs[2]?.value.trim()||'' });
+    });
+  } else {
+    const raw = document.getElementById('bulk-csv-input')?.value || '';
+    bulkParseCSV(raw).forEach(cols => {
+      const name = (cols[0]||'').trim();
+      if (!name) return;
+      entries.push({ name, phone: (cols[1]||'').trim(), rawId: (cols[2]||'').trim() });
+    });
+  }
+
+  if (entries.length === 0) {
+    document.getElementById('bulk-status').innerHTML = '<span style="color:#f66;">❌ No customers to add. Fill in at least one name.</span>';
+    return;
+  }
+  if (entries.length > 200) {
+    document.getElementById('bulk-status').innerHTML = '<span style="color:#f66;">❌ Maximum 200 customers per bulk add.</span>';
+    return;
+  }
+
+  // Validate & build customer objects
+  const toAdd = []; const skipped = [];
+  entries.forEach(e => {
+    const id = e.rawId ? e.rawId.toUpperCase() : autoId();
+    if (idExists(id, null) || toAdd.some(c => c.id === id)) {
+      skipped.push(`${e.name} (ID ${id} duplicate)`);
+      return;
+    }
+    toAdd.push({ id, name: e.name, phone: e.phone, photo: '', totalSpend: 0, purchases: [], borrows: [] });
+  });
+
+  if (toAdd.length === 0) {
+    document.getElementById('bulk-status').innerHTML = `<span style="color:#f66;">❌ All entries had duplicate IDs. ${skipped.length} skipped.</span>`;
+    return;
+  }
+
+  // Show saving state
+  const saveBtn = document.querySelector('#modal-container button[onclick="bulkSaveAll()"]');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving...'; }
+
+  // Add to local array
+  toAdd.forEach(c => customers.push(c));
+
+  try {
+    await saveCustomers();
+    closeModal();
+    notify(`✅ ${toAdd.length} customer${toAdd.length>1?'s':''} added!${skipped.length?' ⚠️ '+skipped.length+' skipped (duplicate IDs)':''}`);
+    safeRenderTab(currentTab);
+  } catch(e) {
+    notify('⚠️ Saved locally, Firebase error: ' + e.message);
+    closeModal();
+    safeRenderTab(currentTab);
+  }
+}
+
+// ─── END BULK ADD ─────────────────────────────────────────────────────────────
+
+
+
 function openEditModal(id){
   const c=customers.find(x=>x.id===id);if(!c)return;
   tempPhoto=c.photo||"";
@@ -3144,6 +3766,40 @@ async function deleteCustomer(id){
   if(useLocalOnly)safeRenderTab(currentTab);
 }
 
+// ─── MULTI-SELECT DELETE ──────────────────────────────────────
+function custToggleSelectMode(){
+  custSelectMode=!custSelectMode;
+  custSelected.clear();
+  renderTab(1);
+}
+function custToggleSelect(id){
+  if(custSelected.has(id))custSelected.delete(id);
+  else custSelected.add(id);
+  renderTab(1);
+}
+function custSelectAll(){
+  custFilteredIds.forEach(id=>custSelected.add(id));
+  renderTab(1);
+}
+function custDeselectAll(){
+  custSelected.clear();
+  renderTab(1);
+}
+async function deleteSelectedCustomers(){
+  if(custSelected.size===0)return;
+  if(!confirm(`Delete ${custSelected.size} selected customer${custSelected.size>1?"s":""} and all their purchases? This cannot be undone.`))return;
+  const ids=[...custSelected];
+  let errors=0;
+  for(const id of ids){
+    try{await deleteOneCustomer(id);}
+    catch(e){errors++;}
+  }
+  custSelected.clear();
+  custSelectMode=false;
+  notify(errors===0?`🗑 ${ids.length} customer${ids.length>1?"s":""} deleted`:`⚠️ Deleted ${ids.length-errors}, ${errors} error(s)`);
+  safeRenderTab(currentTab);
+}
+
 // ─── PURCHASE ACTIONS ─────────────────────────────────────────
 function openPurchaseModal(id){
   const c=getSorted().find(x=>x.id===id);if(!c)return;
@@ -3162,6 +3818,96 @@ function openPurchaseModal(id){
 }
 function pmPts(){const a=parseFloat(document.getElementById("m-amt").value)||0,b=document.getElementById("m-pts");if(a){b.style.display="block";b.innerHTML=`Points: <strong style="color:#FFD700;">+${getPoints(a).toLocaleString()}</strong>`;}else b.style.display="none";}
 function savePurchaseModal(id){const a=document.getElementById("m-amt").value;if(!a)return;addPurchase(id,{amount:a,bill:document.getElementById("m-bill").value,notes:document.getElementById("m-notes").value,date:document.getElementById("m-date").value});closeModal();}
+
+// ─── BULK PURCHASE MODAL ─────────────────────────────────────────────────────
+function openBulkPurchaseModal(id) {
+  const c = customers.find(x => x.id === id); if (!c) return;
+  const today = new Date().toISOString().slice(0, 10);
+
+  document.getElementById("modal-container").innerHTML = `
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" style="max-width:520px;">
+    ${modalHeader("📦 Bulk Purchase — " + c.name)}
+
+    <div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#6aaa8a;">
+      💡 Enter all purchase amounts separated by <strong style="color:#fff;">commas</strong> — like your notebook:<br>
+      <span style="color:#FFD700;font-family:monospace;">50, 90, 70, 150, 300, 400</span>
+    </div>
+
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Purchase Amounts (₹) <span style="color:#f66;">*</span></label>
+    <textarea id="bp-amounts" placeholder="e.g. 50, 90, 70, 150, 300, 400" rows="4"
+      style="width:100%;box-sizing:border-box;background:#080c18;border:1px solid #2a3560;border-radius:10px;color:#e8eaf0;padding:12px;font-size:18px;font-weight:700;font-family:monospace;resize:vertical;margin-bottom:14px;"
+      oninput="bpPreview()"></textarea>
+
+    <div id="bp-preview" style="margin-bottom:14px;"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div>
+        <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Date</label>
+        <input class="input" type="date" id="bp-date" value="${today}" />
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Notes (optional)</label>
+        <input class="input" id="bp-notes" placeholder="e.g. Notebook import" />
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:4px;">
+      <button onclick="closeModal()" style="flex:1;background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;border-radius:10px;padding:12px;cursor:pointer;font-size:14px;">Cancel</button>
+      <button onclick="saveBulkPurchase('${id}')" style="flex:2;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:12px;cursor:pointer;font-size:15px;font-weight:800;">✅ Add All Purchases →</button>
+    </div>
+  </div></div>`;
+}
+
+function bpPreview() {
+  const raw = document.getElementById("bp-amounts")?.value || "";
+  const amounts = bpParseAmounts(raw);
+  const el = document.getElementById("bp-preview");
+  if (!el) return;
+  if (amounts.length === 0) { el.innerHTML = ""; return; }
+  const total = amounts.reduce((a, b) => a + b, 0);
+  el.innerHTML = `
+    <div style="background:#0a1628;border:1px solid #1e2a45;border-radius:10px;padding:12px 14px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:12px;color:#7a8aaa;">${amounts.length} purchase${amounts.length !== 1 ? "s" : ""} detected</span>
+        <span style="font-size:15px;font-weight:800;color:#FFD700;">Total: ₹${total.toLocaleString("en-IN")}</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${amounts.map(a => `<span style="background:#1a2540;color:#7ab3ff;border:1px solid #2a3560;border-radius:6px;padding:3px 10px;font-size:13px;font-family:monospace;">₹${a.toLocaleString("en-IN")}</span>`).join("")}
+      </div>
+    </div>`;
+}
+
+function bpParseAmounts(raw) {
+  return raw.replace(/[\r]/g, '').split(/[,|\n]+/)
+    .map(s => parseFloat(s.replace(/[^\d.]/g, '')))
+    .filter(n => !isNaN(n) && n > 0);
+}
+
+async function saveBulkPurchase(custId) {
+  const raw = document.getElementById("bp-amounts")?.value || "";
+  const amounts = bpParseAmounts(raw);
+  if (amounts.length === 0) {
+    document.getElementById("bp-preview").innerHTML = '<div style="color:#f66;font-size:13px;">❌ Enter at least one amount.</div>';
+    return;
+  }
+  const date  = document.getElementById("bp-date")?.value  || new Date().toISOString().slice(0, 10);
+  const notes = document.getElementById("bp-notes")?.value || "";
+  const c = customers.find(x => x.id === custId); if (!c) return;
+
+  amounts.forEach(amt => {
+    const bill = "B" + String(Date.now() + Math.random()).replace(".", "").slice(-6);
+    c.purchases = [{ bill, amount: amt, date, notes: notes || "Bulk entry" }, ...(c.purchases || [])];
+    c.totalSpend += amt;
+  });
+
+  const total = amounts.reduce((a, b) => a + b, 0);
+  closeModal();
+  notify(`✅ ${amounts.length} purchases added for ${c.name} — Total ₹${total.toLocaleString("en-IN")}`);
+  try { await saveOneCustomer(c); } catch(e) { notify("⚠️ Firebase error: " + e.message); }
+  if (useLocalOnly) safeRenderTab(currentTab);
+}
+// ─── END BULK PURCHASE ────────────────────────────────────────────────────────
 
 async function addPurchase(custId,{amount,bill,date,notes}){
   const amt=parseFloat(amount);if(!amt||amt<=0)return;
@@ -3585,13 +4331,29 @@ document.addEventListener("click", e => {
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("lang-label").textContent = currentLang.toUpperCase();
 
-  // Check if already logged in
+  // Check if already logged in — always verify block status online first
   const savedPhone = localStorage.getItem("sc_auth_phone");
   if (savedPhone) {
     const hashed = localStorage.getItem("sc_user_" + savedPhone);
     if (hashed) {
       authPhone = savedPhone;
-      onLoginSuccess(savedPhone);
+      (async () => {
+        try {
+          const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(savedPhone)}&select=blocked`, {
+            headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+          });
+          const rows = await res.json();
+          if (rows && rows.length > 0 && rows[0].blocked === true) {
+            localStorage.removeItem("sc_auth_phone");
+            document.getElementById("auth-phone").value = savedPhone;
+            const errEl = document.getElementById("auth-phone-err");
+            if (errEl) { errEl.innerHTML = "🚫 Your account has been blocked. Contact the shop owner."; errEl.style.display = "block"; }
+            authShowStep("phone");
+            return;
+          }
+        } catch(e) { /* network error — allow cached login */ }
+        onLoginSuccess(savedPhone);
+      })();
       return;
     }
   }
@@ -3638,6 +4400,7 @@ function openCustomerPage(id){
       <button onclick="closeCustomerPage()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;font-weight:700;display:flex;align-items:center;gap:6px;">← Back</button>
       <div style="font-size:18px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Customer Profile</div>
       <div style="margin-left:auto;display:flex;gap:8px;">
+        <button class="btn" onclick="closeCustomerPage();openBulkPurchaseModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px 14px;font-size:12px;font-weight:800;">+ Bulk</button>
         <button class="btn" onclick="closeCustomerPage();openPurchaseModal('${c.id}')" style="background:#1a3a60;color:#5af;border:1px solid #1a4a80;padding:8px 14px;font-size:12px;font-weight:800;">+ Purchase</button>
         <button class="btn" onclick="closeCustomerPage();openEditModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #1a4a1a;padding:8px 14px;font-size:12px;font-weight:800;">✏️ Edit</button>
       </div>
