@@ -22,6 +22,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -441,7 +442,7 @@
 <div id="notification"></div>
 
 <!-- FIREBASE SETUP SCREEN -->
-<div id="fb-setup-screen" style="display:none;position:fixed;inset:0;background:#0a0e1a;z-index:2000;align-items:center;justify-content:center;padding:20px;">
+<div id="fb-setup-screen" style="display:none!important;">
   <div style="background:#0f1628;border:1px solid #1e2a45;border-radius:20px;padding:36px;width:100%;max-width:540px;max-height:92vh;overflow-y:auto;">
 
     <!-- Progress bar -->
@@ -692,13 +693,72 @@
 
 <!-- LOGIN -->
 <div id="login-screen">
-  <div style="background:#0f1628;border:1px solid #1e2a45;border-radius:20px;padding:48px;width:360px;text-align:center;">
-    <div id="login-shop-icon" style="font-size:56px;margin-bottom:12px;">🏆</div>
-    <div id="login-shop-name" style="font-size:26px;font-weight:800;background:linear-gradient(90deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">Shop Champion</div>
-    <div style="color:#556;font-size:12px;margin-bottom:32px;letter-spacing:2px;">ADMIN LOGIN</div>
-    <input class="input" type="password" id="login-pass" placeholder="Enter Password (1234)" style="margin-bottom:12px;text-align:center;" onkeydown="if(event.key==='Enter')doLogin()" />
-    <div id="login-err" style="color:#f66;font-size:13px;margin-bottom:10px;display:none;">Wrong password</div>
-    <button class="btn" onclick="doLogin()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:15px;font-weight:800;">Login →</button>
+  <div style="background:#0f1628;border:1px solid #1e2a45;border-radius:20px;padding:32px 28px;width:360px;text-align:center;">
+    <div id="login-shop-icon" style="font-size:52px;margin-bottom:10px;">🏆</div>
+    <div id="login-shop-name" style="font-size:24px;font-weight:800;background:linear-gradient(90deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">Shop Champion</div>
+    <div style="color:#556;font-size:11px;margin-bottom:24px;letter-spacing:2px;">ADMIN LOGIN</div>
+
+    <!-- STEP 1: Enter Mobile -->
+    <div id="auth-step-phone">
+      <div style="font-size:13px;color:#7a8aaa;margin-bottom:14px;">Enter your mobile number</div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <div style="background:#0a0e1a;border:1px solid #2a3560;border-radius:10px;padding:10px 12px;color:#FFD700;font-weight:800;font-size:14px;white-space:nowrap;">🇮🇳 +91</div>
+        <input class="input" type="tel" id="auth-phone" maxlength="10" placeholder="10-digit mobile" style="flex:1;text-align:center;font-size:15px;letter-spacing:1px;" onkeydown="if(event.key==='Enter')checkPhone()"/>
+      </div>
+      <div id="auth-phone-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
+      <button class="btn" onclick="checkPhone()" id="check-phone-btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;">
+        <span id="check-phone-txt">Continue →</span>
+      </button>
+    </div>
+
+    <!-- STEP 2a: Enter Password (existing user) -->
+    <div id="auth-step-password" style="display:none;">
+      <div style="font-size:13px;color:#4f4;margin-bottom:4px;">✅ Already registered!</div>
+      <div style="font-size:13px;color:#7a8aaa;margin-bottom:16px;" id="auth-pass-subtitle">Enter your password</div>
+      <input class="input" type="password" id="auth-pass" placeholder="Enter your password" style="text-align:center;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')loginWithPassword()"/>
+      <div id="auth-pass-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
+      <button class="btn" onclick="loginWithPassword()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:10px;">
+        Login →
+      </button>
+      <button onclick="showForgotPassword()" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;display:block;width:100%;margin-bottom:6px;">🔑 Forgot Password?</button>
+      <button onclick="authGoBack()" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;">← Change number</button>
+    </div>
+
+    <!-- STEP 2b: Create Password (new user) -->
+    <div id="auth-step-newpass" style="display:none;">
+      <div style="font-size:13px;color:#FFD700;font-weight:700;margin-bottom:4px;">🎉 Welcome! Create your password</div>
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:16px;">First verify your mobile with OTP</div>
+      <div id="auth-recaptcha" style="display:flex;justify-content:center;margin-bottom:12px;"></div>
+      <div id="auth-new-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
+      <button class="btn" onclick="sendNewUserOTP()" id="new-otp-btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:8px;">
+        <span id="new-otp-txt">Send OTP to Verify →</span>
+      </button>
+      <button onclick="authGoBack()" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;">← Change number</button>
+    </div>
+
+    <!-- STEP 3: Enter OTP (new user / forgot password) -->
+    <div id="auth-step-otp" style="display:none;">
+      <div style="font-size:13px;color:#7a8aaa;margin-bottom:6px;">OTP sent to</div>
+      <div style="font-size:15px;font-weight:800;color:#FFD700;margin-bottom:16px;" id="auth-otp-sentto">+91 XXXXXXXXXX</div>
+      <input class="input" type="number" id="auth-otp-code" placeholder="Enter 6-digit OTP" style="text-align:center;font-size:20px;letter-spacing:6px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')verifyOTPAndProceed()"/>
+      <div id="auth-otp-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
+      <button class="btn" onclick="verifyOTPAndProceed()" id="verify-btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:8px;">
+        <span id="verify-btn-txt">Verify OTP →</span>
+      </button>
+      <button onclick="authGoBack()" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;">← Back</button>
+    </div>
+
+    <!-- STEP 4: Set new password (after OTP verified) -->
+    <div id="auth-step-setpass" style="display:none;">
+      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:16px;" id="auth-setpass-title">🔐 Create Your Password</div>
+      <input class="input" type="password" id="auth-newpass1" placeholder="Create password (min 4 chars)" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
+      <input class="input" type="password" id="auth-newpass2" placeholder="Confirm password" style="text-align:center;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
+      <div id="auth-setpass-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
+      <button class="btn" onclick="setNewPassword()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;">
+        <span id="setpass-btn-txt">Save Password & Login →</span>
+      </button>
+    </div>
+
   </div>
 </div>
 
@@ -730,7 +790,7 @@
     <!-- Firebase status -->
     <span id="db-status-text" style="font-size:11px;color:#4a5a7a;margin-left:4px;"></span>
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      <button class="btn" onclick="showFirebaseSettings()" style="background:#1a1a0a;border:1px solid #3a3a1a;color:#FFD700;padding:5px 12px;font-size:12px;">🔥 Firebase</button>
+      <button class="btn" onclick="showFirebaseSettings()" style="display:none;">🔥 Firebase</button>
       <button class="btn" onclick="showSyncSetup()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;padding:5px 12px;font-size:12px;">📺 Display Setup</button>
       <button class="btn" id="push-btn" onclick="if(typeof isSubFeatureAllowed==='function'&&!isSubFeatureAllowed(7)){alert('🔒 Push to Display is a Pro feature. Contact your seller to activate.');return;}pushSync();" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:5px 14px;font-size:12px;font-weight:800;">⬆ Push to Display</button>
     </div>
@@ -997,30 +1057,26 @@ async function deleteOneCustomer(id) {
 
 // ── On page load: decide which mode ──
 window.addEventListener("load", () => {
-  const savedCfg = localStorage.getItem("sc_fb_config");
-  if (savedCfg) {
-    try {
-      const cfg = JSON.parse(savedCfg);
-      if (initFirebase(cfg)) {
-        useLocalOnly = false;
-        // Check license before showing login
-        loadLicense();
-        if (!licenseKey && licenseStatus !== "free") {
-          // First time — show license screen
-          document.getElementById("fb-setup-screen").style.display = "none";
-          document.getElementById("license-screen").style.display = "flex";
-          document.getElementById("login-screen").style.display = "none";
-        } else {
-          document.getElementById("fb-setup-screen").style.display = "none";
-          // login-screen stays as default (flex via CSS)
-        }
-        return;
-      }
-    } catch {}
+  // ── Firebase is hardcoded — no setup screen needed ──
+  const HARDCODED_FB = {
+    apiKey: "AIzaSyAdNjL9gCptnAbJ6ZVm9BZ61rKfBtwc1Qc",
+    authDomain: "shop-champion.firebaseapp.com",
+    projectId: "shop-champion",
+    storageBucket: "shop-champion.firebasestorage.app",
+    messagingSenderId: "81324128909",
+    appId: "1:81324128909:web:cc023f5c031c505bfe00c4",
+    measurementId: "G-YCX9WJ4DP5"
+  };
+  initFirebase(HARDCODED_FB);
+  useLocalOnly = false;
+  loadLicense();
+  // Check if already logged in
+  const savedPhone = localStorage.getItem("sc_auth_phone");
+  if (savedPhone && localStorage.getItem("sc_user_" + savedPhone)) {
+    authPhone = savedPhone;
+    onLoginSuccess(savedPhone);
   }
-  // No valid config — show setup screen
-  document.getElementById("fb-setup-screen").style.display = "flex";
-  document.getElementById("login-screen").style.display = "none";
+  // Otherwise login screen shows by default
 });
 
 function getSorted() {
@@ -1349,25 +1405,313 @@ function startConfetti(){
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────
-function doLogin(){
-  const p=document.getElementById("login-pass").value,err=document.getElementById("login-err");
-  if(p===ADMIN_PASS){
-    err.style.display="none";
-    document.getElementById("login-screen").style.display="none";
-    document.getElementById("main-app").style.display="block";
-    if (!useLocalOnly && db) {
-      // Firebase mode — load from Firestore then start live listener
-      updateDbStatus("⏳ Loading from Firebase...", "#FFD700");
-      startFirestoreListener();
-    } else {
-      // Local mode
-      loadLocalCustomers();
-      updateDbStatus("📦 Local storage (demo mode)", "#f84");
-    }
-    renderTabs(); renderTab(0); updateSyncStatus(); updateAppHeader();
-  } else err.style.display="block";
+// ══════════════════════════════════════════════
+// AUTH SYSTEM — Mobile + Password + OTP
+// ══════════════════════════════════════════════
+let authConfirmResult = null;
+let recaptchaVerifier  = null;
+let authMode = ""; // "new_user" | "forgot"
+let authPhone = "";
+
+// ── Helpers ──
+function authShowStep(step) {
+  ["auth-step-phone","auth-step-password","auth-step-newpass","auth-step-otp","auth-step-setpass"]
+    .forEach(id => { const el=document.getElementById(id); if(el) el.style.display="none"; });
+  const el = document.getElementById("auth-step-"+step);
+  if(el) el.style.display = "block";
 }
-function doLogout(){document.getElementById("main-app").style.display="none";document.getElementById("login-screen").style.display="flex";document.getElementById("login-pass").value="";}
+
+function authGoBack() {
+  authShowStep("phone");
+  document.getElementById("auth-phone-err").style.display = "none";
+  document.getElementById("auth-phone").value = "";
+  clearRecaptcha();
+}
+
+function clearRecaptcha() {
+  try { if(recaptchaVerifier){ recaptchaVerifier.clear(); recaptchaVerifier=null; } } catch{}
+  const el = document.getElementById("auth-recaptcha");
+  if(el) el.innerHTML = "";
+}
+
+function initRecaptcha(containerId) {
+  clearRecaptcha();
+  try {
+    recaptchaVerifier = new firebase.auth.RecaptchaVerifier(containerId || "auth-recaptcha", {
+      size: "normal",
+      callback: () => {},
+      "expired-callback": () => { clearRecaptcha(); initRecaptcha(containerId); }
+    });
+    recaptchaVerifier.render();
+  } catch(e) { console.error("Recaptcha:", e); }
+}
+
+// ── Step 1: Check if phone is registered ──
+async function checkPhone() {
+  const phone = (document.getElementById("auth-phone").value || "").trim();
+  const errEl = document.getElementById("auth-phone-err");
+  errEl.style.display = "none";
+
+  if (!phone || phone.length !== 10 || !/^\d{10}$/.test(phone)) {
+    errEl.textContent = "❌ Enter a valid 10-digit mobile number";
+    errEl.style.display = "block";
+    return;
+  }
+
+  authPhone = phone;
+  document.getElementById("check-phone-btn").disabled = true;
+  document.getElementById("check-phone-txt").innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Checking...`;
+
+  // Check if user exists in Supabase sc_users table
+  try {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=phone`, {
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    });
+    const rows = await res.json();
+
+    if (rows && rows.length > 0) {
+      // Existing user — show password step
+      document.getElementById("auth-pass-subtitle").textContent = `Enter password for +91 ${phone}`;
+      authShowStep("password");
+    } else {
+      // New user — show new user OTP step
+      authMode = "new_user";
+      authShowStep("newpass");
+      setTimeout(() => initRecaptcha("auth-recaptcha"), 300);
+    }
+  } catch(e) {
+    // If table doesn't exist yet, treat as new user
+    authMode = "new_user";
+    authShowStep("newpass");
+    setTimeout(() => initRecaptcha("auth-recaptcha"), 300);
+  }
+
+  document.getElementById("check-phone-btn").disabled = false;
+  document.getElementById("check-phone-txt").textContent = "Continue →";
+}
+
+// ── Step 2a: Login with password ──
+function loginWithPassword() {
+  const pass = (document.getElementById("auth-pass").value || "").trim();
+  const errEl = document.getElementById("auth-pass-err");
+  errEl.style.display = "none";
+
+  if (!pass) {
+    errEl.textContent = "❌ Please enter your password";
+    errEl.style.display = "block";
+    return;
+  }
+
+  // Hash password for comparison
+  const hashed = btoa(authPhone + ":" + pass);
+  const stored = localStorage.getItem("sc_user_" + authPhone);
+
+  if (stored && stored === hashed) {
+    // Correct password
+    localStorage.setItem("sc_auth_phone", authPhone);
+    onLoginSuccess(authPhone);
+  } else {
+    // Check against Supabase too
+    verifyPasswordOnline(authPhone, pass);
+  }
+}
+
+async function verifyPasswordOnline(phone, pass) {
+  const errEl = document.getElementById("auth-pass-err");
+  try {
+    const hashed = btoa(phone + ":" + pass);
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=phone,password_hash`, {
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    });
+    const rows = await res.json();
+    if (rows && rows.length > 0 && rows[0].password_hash === hashed) {
+      localStorage.setItem("sc_auth_phone", phone);
+      localStorage.setItem("sc_user_" + phone, hashed); // cache locally
+      onLoginSuccess(phone);
+    } else {
+      errEl.textContent = "❌ Wrong password. Try again or use Forgot Password.";
+      errEl.style.display = "block";
+    }
+  } catch(e) {
+    errEl.textContent = "❌ Error checking password. Try again.";
+    errEl.style.display = "block";
+  }
+}
+
+// ── Step 2b: Send OTP for new user ──
+async function sendNewUserOTP() {
+  const errEl = document.getElementById("auth-new-err");
+  errEl.style.display = "none";
+
+  if (!window.firebase || !firebase.auth) {
+    errEl.textContent = "❌ Firebase not connected. Please connect Firebase first.";
+    errEl.style.display = "block";
+    return;
+  }
+
+  document.getElementById("new-otp-btn").disabled = true;
+  document.getElementById("new-otp-txt").innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Sending...`;
+
+  try {
+    if (!recaptchaVerifier) initRecaptcha("auth-recaptcha");
+    authConfirmResult = await firebase.auth().signInWithPhoneNumber("+91" + authPhone, recaptchaVerifier);
+    document.getElementById("auth-otp-sentto").textContent = "+91 " + authPhone;
+    authShowStep("otp");
+  } catch(e) {
+    errEl.textContent = "❌ " + (e.message || "Failed to send OTP. Try again.");
+    errEl.style.display = "block";
+    document.getElementById("new-otp-btn").disabled = false;
+    document.getElementById("new-otp-txt").textContent = "Send OTP to Verify →";
+    clearRecaptcha();
+    setTimeout(() => initRecaptcha("auth-recaptcha"), 400);
+  }
+}
+
+// ── Forgot password ──
+function showForgotPassword() {
+  authMode = "forgot";
+  authShowStep("newpass");
+  document.getElementById("auth-new-err").style.display = "none";
+  document.getElementById("new-otp-txt").textContent = "Send OTP to Reset Password →";
+  setTimeout(() => initRecaptcha("auth-recaptcha"), 300);
+}
+
+// ── Step 3: Verify OTP ──
+async function verifyOTPAndProceed() {
+  const code = (document.getElementById("auth-otp-code").value || "").trim();
+  const errEl = document.getElementById("auth-otp-err");
+  errEl.style.display = "none";
+
+  if (!code || code.length !== 6) {
+    errEl.textContent = "❌ Enter the 6-digit OTP";
+    errEl.style.display = "block";
+    return;
+  }
+
+  document.getElementById("verify-btn").disabled = true;
+  document.getElementById("verify-btn-txt").innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Verifying...`;
+
+  try {
+    await authConfirmResult.confirm(code);
+    // OTP verified — go to set password
+    if (authMode === "forgot") {
+      document.getElementById("auth-setpass-title").textContent = "🔑 Reset Your Password";
+    } else {
+      document.getElementById("auth-setpass-title").textContent = "🔐 Create Your Password";
+    }
+    authShowStep("setpass");
+  } catch(e) {
+    errEl.textContent = "❌ Wrong OTP. Please try again.";
+    errEl.style.display = "block";
+    document.getElementById("verify-btn").disabled = false;
+    document.getElementById("verify-btn-txt").textContent = "Verify OTP →";
+  }
+}
+
+// ── Step 4: Set new password ──
+async function setNewPassword() {
+  const p1 = (document.getElementById("auth-newpass1").value || "").trim();
+  const p2 = (document.getElementById("auth-newpass2").value || "").trim();
+  const errEl = document.getElementById("auth-setpass-err");
+  errEl.style.display = "none";
+
+  if (!p1 || p1.length < 4) {
+    errEl.textContent = "❌ Password must be at least 4 characters";
+    errEl.style.display = "block";
+    return;
+  }
+  if (p1 !== p2) {
+    errEl.textContent = "❌ Passwords don't match";
+    errEl.style.display = "block";
+    return;
+  }
+
+  document.getElementById("setpass-btn-txt").innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Saving...`;
+
+  const hashed = btoa(authPhone + ":" + p1);
+
+  try {
+    // Save to Supabase sc_users
+    if (authMode === "new_user") {
+      await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users`, {
+        method: "POST",
+        headers: {
+          "apikey": SC_SUPABASE_ANON,
+          "Authorization": "Bearer " + SC_SUPABASE_ANON,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ phone: authPhone, password_hash: hashed, created_at: new Date().toISOString() })
+      });
+    } else {
+      // Update existing password
+      await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(authPhone)}`, {
+        method: "PATCH",
+        headers: {
+          "apikey": SC_SUPABASE_ANON,
+          "Authorization": "Bearer " + SC_SUPABASE_ANON,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ password_hash: hashed })
+      });
+    }
+  } catch(e) { /* save locally even if Supabase fails */ }
+
+  // Save locally
+  localStorage.setItem("sc_user_" + authPhone, hashed);
+  localStorage.setItem("sc_auth_phone", authPhone);
+  onLoginSuccess(authPhone);
+}
+
+function onLoginSuccess(phone) {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("main-app").style.display = "block";
+  if (db && phone) {
+    shopId = phone;
+    loadFirebaseCustomers();
+  }
+  renderTabs();
+  safeRenderTab(currentTab);
+  loadLicense();
+  updateLicenseUI();
+  updateAppHeader();
+}
+
+function doLogin() { /* legacy stub */ }
+
+function doLogout() {
+  try { firebase.auth().signOut(); } catch{}
+  localStorage.removeItem("sc_auth_phone");
+  document.getElementById("main-app").style.display = "none";
+  document.getElementById("login-screen").style.display = "flex";
+  authShowStep("phone");
+  document.getElementById("auth-phone").value = "";
+  clearRecaptcha();
+}
+
+  updateAppHeader();
+}
+
+function doLogin() {
+  // Legacy fallback — redirect to OTP
+  document.getElementById("login-screen").style.display = "flex";
+}
+
+function doLogout() {
+  try { firebase.auth().signOut(); } catch{}
+  localStorage.removeItem("sc_auth_phone");
+  localStorage.removeItem("sc_auth_uid");
+  document.getElementById("main-app").style.display = "none";
+  document.getElementById("login-screen").style.display = "flex";
+  // Reset OTP UI
+  document.getElementById("otp-step-1").style.display = "block";
+  document.getElementById("otp-step-2").style.display = "none";
+  document.getElementById("otp-phone").value = "";
+  document.getElementById("otp-code").value = "";
+  setTimeout(initRecaptcha, 300);
+}
+
 function updateSyncStatus(){
   const dot=document.getElementById("sync-status-dot"),txt=document.getElementById("sync-status-text");
   if(syncBinId&&syncApiKey){dot.className="";dot.style.background="#2a2";dot.style.boxShadow="0 0 6px #4f4";txt.textContent="Display connected";txt.style.color="#4f4";document.getElementById("sync-time").textContent="Bin: "+syncBinId.slice(0,8)+"...";}
@@ -3279,6 +3623,18 @@ document.addEventListener("click", e => {
 // Initialize on DOM load
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("lang-label").textContent = currentLang.toUpperCase();
+
+  // Check if already logged in
+  const savedPhone = localStorage.getItem("sc_auth_phone");
+  if (savedPhone) {
+    const hashed = localStorage.getItem("sc_user_" + savedPhone);
+    if (hashed) {
+      authPhone = savedPhone;
+      onLoginSuccess(savedPhone);
+      return;
+    }
+  }
+  // Not logged in — show login screen (already visible by default)
 });
 
 
@@ -3959,9 +4315,12 @@ async function pmCheckActivation(utr) {
 
     if (row.status === "approved" && row.license_key) {
       clearInterval(pmPollTimer);
-      // Save license
+      // Save license key and apply it
       saveLicense(row.license_key, "pro", "pro");
       try { localStorage.removeItem("sc_pending_payment"); } catch{}
+      // Validate online to confirm expiry etc
+      await validateLicenseOnline();
+      updateLicenseUI();
       // Update UI
       document.getElementById("pm-conf-status").innerHTML = '<span style="color:#4f4;">✅ Activated!</span>';
       document.getElementById("pm-checking-box").style.display = "none";
