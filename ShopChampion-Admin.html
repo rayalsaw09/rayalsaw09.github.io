@@ -809,6 +809,10 @@
 </div>
 
 <script>
+// ─── SUPABASE CONFIG (defined first so all functions can use it) ───
+const SC_SUPABASE_URL  = "https://dgmzfqwglnafghpfnqau.supabase.co";
+const SC_SUPABASE_ANON = "sb_publishable_yxPk_18wrBIPebrJkYn9FQ_91lhKmjE";
+
 // ─── CONSTANTS ───────────────────────────────────────────────
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
@@ -1688,9 +1692,6 @@ function doLogout() {
   authShowStep("phone");
   document.getElementById("auth-phone").value = "";
   clearRecaptcha();
-}
-
-  updateAppHeader();
 }
 
 function doLogin() {
@@ -4024,9 +4025,7 @@ function phInit(){
 // ═══════════════════════════════════════════════════════════════
 // ── LICENSE / SUBSCRIPTION ENGINE ───────────────────────────
 // ═══════════════════════════════════════════════════════════════
-// Supabase project — seller fills these in their copy:
-const SC_SUPABASE_URL  = "https://dgmzfqwglnafghpfnqau.supabase.co";
-const SC_SUPABASE_ANON = "sb_publishable_yxPk_18wrBIPebrJkYn9FQ_91lhKmjE";
+// Supabase project constants (defined at top of script)
 
 // Plans: "pro" = full access, "free" = limited
 // FREE_TABS: loaded dynamically from Supabase settings (fallback = leaderboard only)
