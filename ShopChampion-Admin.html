@@ -724,39 +724,25 @@
       <button onclick="authGoBack()" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;">← Change number</button>
     </div>
 
-    <!-- STEP 2b: Create Password (new user) -->
+    <!-- STEP 2b: Create Password (new user — no OTP) -->
     <div id="auth-step-newpass" style="display:none;">
       <div style="font-size:13px;color:#FFD700;font-weight:700;margin-bottom:4px;">🎉 Welcome! Create your password</div>
-      <div style="font-size:12px;color:#7a8aaa;margin-bottom:16px;">First verify your mobile with OTP</div>
-      <div id="auth-recaptcha" style="display:flex;justify-content:center;margin-bottom:12px;"></div>
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:16px;">New account for +91 <span id="auth-newpass-phone"></span></div>
+      <input class="input" type="password" id="auth-newpass1" placeholder="Create password (min 4 chars)" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
+      <input class="input" type="password" id="auth-newpass2" placeholder="Confirm password" style="text-align:center;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
       <div id="auth-new-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
-      <button class="btn" onclick="sendNewUserOTP()" id="new-otp-btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:8px;">
-        <span id="new-otp-txt">Send OTP to Verify →</span>
+      <button class="btn" onclick="setNewPassword()" id="new-save-btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:8px;">
+        <span id="new-save-txt">Create Account & Login →</span>
       </button>
       <button onclick="authGoBack()" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;">← Change number</button>
     </div>
 
-    <!-- STEP 3: Enter OTP (new user / forgot password) -->
-    <div id="auth-step-otp" style="display:none;">
-      <div style="font-size:13px;color:#7a8aaa;margin-bottom:6px;">OTP sent to</div>
-      <div style="font-size:15px;font-weight:800;color:#FFD700;margin-bottom:16px;" id="auth-otp-sentto">+91 XXXXXXXXXX</div>
-      <input class="input" type="number" id="auth-otp-code" placeholder="Enter 6-digit OTP" style="text-align:center;font-size:20px;letter-spacing:6px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')verifyOTPAndProceed()"/>
-      <div id="auth-otp-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
-      <button class="btn" onclick="verifyOTPAndProceed()" id="verify-btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:8px;">
-        <span id="verify-btn-txt">Verify OTP →</span>
-      </button>
-      <button onclick="authGoBack()" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;">← Back</button>
-    </div>
-
-    <!-- STEP 4: Set new password (after OTP verified) -->
-    <div id="auth-step-setpass" style="display:none;">
-      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:16px;" id="auth-setpass-title">🔐 Create Your Password</div>
-      <input class="input" type="password" id="auth-newpass1" placeholder="Create password (min 4 chars)" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
-      <input class="input" type="password" id="auth-newpass2" placeholder="Confirm password" style="text-align:center;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
-      <div id="auth-setpass-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
-      <button class="btn" onclick="setNewPassword()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;">
-        <span id="setpass-btn-txt">Save Password & Login →</span>
-      </button>
+    <!-- STEP 3: Forgot password info -->
+    <div id="auth-step-forgot" style="display:none;">
+      <div style="font-size:36px;margin-bottom:12px;">🔑</div>
+      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:10px;">Forgot Password?</div>
+      <div style="font-size:12px;color:#7a8aaa;line-height:1.8;margin-bottom:20px;">Contact your ShopChampion admin to reset your password.<br><br>They can reset it for you from the <strong style="color:#e8eaf0;">Seller Panel → Users</strong> section.</div>
+      <button onclick="authGoBack()" style="background:linear-gradient(135deg,#1e2a45,#2a3560);border:none;color:#e8eaf0;font-size:13px;font-weight:700;cursor:pointer;border-radius:8px;padding:10px 20px;width:100%;">← Back to Login</button>
     </div>
 
   </div>
@@ -1419,7 +1405,7 @@ let authPhone = "";
 
 // ── Helpers ──
 function authShowStep(step) {
-  ["auth-step-phone","auth-step-password","auth-step-newpass","auth-step-otp","auth-step-setpass"]
+  ["auth-step-phone","auth-step-password","auth-step-newpass","auth-step-otp","auth-step-setpass","auth-step-forgot"]
     .forEach(id => { const el=document.getElementById(id); if(el) el.style.display="none"; });
   const el = document.getElementById("auth-step-"+step);
   if(el) el.style.display = "block";
@@ -1478,16 +1464,18 @@ async function checkPhone() {
       document.getElementById("auth-pass-subtitle").textContent = `Enter password for +91 ${phone}`;
       authShowStep("password");
     } else {
-      // New user — show new user OTP step
+      // New user — go directly to create password (no OTP)
       authMode = "new_user";
+      const el = document.getElementById("auth-newpass-phone");
+      if(el) el.textContent = phone;
       authShowStep("newpass");
-      setTimeout(() => initRecaptcha("auth-recaptcha"), 300);
     }
   } catch(e) {
     // If table doesn't exist yet, treat as new user
     authMode = "new_user";
+    const el = document.getElementById("auth-newpass-phone");
+    if(el) el.textContent = phone;
     authShowStep("newpass");
-    setTimeout(() => initRecaptcha("auth-recaptcha"), 300);
   }
 
   document.getElementById("check-phone-btn").disabled = false;
@@ -1542,81 +1530,23 @@ async function verifyPasswordOnline(phone, pass) {
   }
 }
 
-// ── Step 2b: Send OTP for new user ──
-async function sendNewUserOTP() {
-  const errEl = document.getElementById("auth-new-err");
-  errEl.style.display = "none";
-
-  if (!window.firebase || !firebase.auth) {
-    errEl.textContent = "❌ Firebase not connected. Please connect Firebase first.";
-    errEl.style.display = "block";
-    return;
-  }
-
-  document.getElementById("new-otp-btn").disabled = true;
-  document.getElementById("new-otp-txt").innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Sending...`;
-
-  try {
-    if (!recaptchaVerifier) initRecaptcha("auth-recaptcha");
-    authConfirmResult = await firebase.auth().signInWithPhoneNumber("+91" + authPhone, recaptchaVerifier);
-    document.getElementById("auth-otp-sentto").textContent = "+91 " + authPhone;
-    authShowStep("otp");
-  } catch(e) {
-    errEl.textContent = "❌ " + (e.message || "Failed to send OTP. Try again.");
-    errEl.style.display = "block";
-    document.getElementById("new-otp-btn").disabled = false;
-    document.getElementById("new-otp-txt").textContent = "Send OTP to Verify →";
-    clearRecaptcha();
-    setTimeout(() => initRecaptcha("auth-recaptcha"), 400);
-  }
-}
+// ── Step 2b: Send OTP for new user — REMOVED (no OTP) ──
+// New users go directly to password creation in setNewPassword()
 
 // ── Forgot password ──
 function showForgotPassword() {
-  authMode = "forgot";
-  authShowStep("newpass");
-  document.getElementById("auth-new-err").style.display = "none";
-  document.getElementById("new-otp-txt").textContent = "Send OTP to Reset Password →";
-  setTimeout(() => initRecaptcha("auth-recaptcha"), 300);
+  authShowStep("forgot");
 }
 
-// ── Step 3: Verify OTP ──
-async function verifyOTPAndProceed() {
-  const code = (document.getElementById("auth-otp-code").value || "").trim();
-  const errEl = document.getElementById("auth-otp-err");
-  errEl.style.display = "none";
+// ── Step 3: Verify OTP — REMOVED (no OTP flow) ──
+// Kept as stub to avoid any legacy calls
+function verifyOTPAndProceed() {}
 
-  if (!code || code.length !== 6) {
-    errEl.textContent = "❌ Enter the 6-digit OTP";
-    errEl.style.display = "block";
-    return;
-  }
-
-  document.getElementById("verify-btn").disabled = true;
-  document.getElementById("verify-btn-txt").innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Verifying...`;
-
-  try {
-    await authConfirmResult.confirm(code);
-    // OTP verified — go to set password
-    if (authMode === "forgot") {
-      document.getElementById("auth-setpass-title").textContent = "🔑 Reset Your Password";
-    } else {
-      document.getElementById("auth-setpass-title").textContent = "🔐 Create Your Password";
-    }
-    authShowStep("setpass");
-  } catch(e) {
-    errEl.textContent = "❌ Wrong OTP. Please try again.";
-    errEl.style.display = "block";
-    document.getElementById("verify-btn").disabled = false;
-    document.getElementById("verify-btn-txt").textContent = "Verify OTP →";
-  }
-}
-
-// ── Step 4: Set new password ──
+// ── Step 4 (now Step 3): Set new password ──
 async function setNewPassword() {
   const p1 = (document.getElementById("auth-newpass1").value || "").trim();
   const p2 = (document.getElementById("auth-newpass2").value || "").trim();
-  const errEl = document.getElementById("auth-setpass-err");
+  const errEl = document.getElementById("auth-new-err");
   errEl.style.display = "none";
 
   if (!p1 || p1.length < 4) {
@@ -1630,7 +1560,10 @@ async function setNewPassword() {
     return;
   }
 
-  document.getElementById("setpass-btn-txt").innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Saving...`;
+  const saveBtn = document.getElementById("new-save-btn");
+  const saveTxt = document.getElementById("new-save-txt");
+  if(saveBtn) saveBtn.disabled = true;
+  if(saveTxt) saveTxt.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Saving...`;
 
   const hashed = btoa(authPhone + ":" + p1);
 
