@@ -1,12 +1,12 @@
 {
-  "name": "ShopChampion Display",
-  "short_name": "SC Display",
-  "description": "Live leaderboard display screen for ShopChampion",
-  "start_url": "/ShopChampion-Display.html",
+  "name": "ShopChampion Seller",
+  "short_name": "SC Seller",
+  "description": "Seller management panel for ShopChampion",
+  "start_url": "/ShopChampion-SellerPanel.html",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
-  "orientation": "landscape",
+  "orientation": "portrait",
   "background_color": "#0a0e1a",
   "theme_color": "#FFD700",
   "icons": [
