@@ -429,7 +429,7 @@
   .inline-edit { background: #0a0e1a; border: 1px solid #FFD700; border-radius: 4px; color: #e8eaf0; padding: 3px 6px; font-size: 13px; font-family: 'Nunito', sans-serif; min-width: 60px; }
 
   /* Sync banner */
-  #sync-banner { background: linear-gradient(135deg, #0a1f0a, #0d2a10); border-bottom: 1px solid #1a4a1a; padding: 10px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  #sync-banner { background: linear-gradient(135deg, #0a1f0a, #0d2a10); border-bottom: 1px solid #1a4a1a; padding: 10px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; position: sticky; top: 0; z-index: 100; }
   #sync-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #2a2; flex-shrink: 0; box-shadow: 0 0 6px #4f4; animation: pulse-green 2s infinite; }
   @keyframes pulse-green { 0%,100%{opacity:1} 50%{opacity:0.4} }
   #sync-status-dot.syncing { background: #aa4; box-shadow: 0 0 6px #FFD700; }
@@ -510,6 +510,30 @@
   body.day-theme #more-menu { background: #fff; border-color: #d0d4e8; }
   body.day-theme .more-menu-btn { background: #f0f2fa; border-color: #d0d4e8; color: #556; }
   body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD700; color: #856000; }
+
+  /* Leaderboard mobile — collapse 5-col grid to 3-col */
+  @media (max-width: 600px) {
+    .lb-row-grid {
+      grid-template-columns: 40px 1fr auto !important;
+    }
+    .lb-row-grid .lb-col-points { display: none !important; }
+    .lb-row-grid .lb-col-actions { display: none !important; }
+    .lb-hdr-grid {
+      grid-template-columns: 40px 1fr auto !important;
+    }
+    .lb-hdr-grid .lb-col-points { display: none !important; }
+    .lb-hdr-grid .lb-col-actions { display: none !important; }
+
+    /* Customer sub-info — hide phone/ID on mobile, show only visits */
+    .lb-sub-info { display: none !important; }
+    .lb-visits { display: inline !important; }
+
+    /* Make purchase buttons in lb full width on mobile */
+    .lb-action-btns { display: none !important; }
+
+    /* Sync banner — make Display/Push buttons smaller on mobile */
+    #sync-banner button { font-size: 11px !important; padding: 4px 8px !important; }
+  }
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -1090,7 +1114,11 @@ function ptRestoreState() {
     const c  = window._ptState.selData;
     if (pr && c) {
       pr.style.cssText="display:flex;align-items:center;gap:12px;background:#0a0e1a;border-radius:10px;padding:12px;margin-bottom:14px;";
-      pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} &middot; Rank #${c.rank||"?"} &middot; &#x1F6B6; ${(c.purchases||[]).length} visits</div></div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
+      const _lp1=[...(c.purchases||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+      const _lv1=_lp1?timeSince(_lp1.date):"Never";
+      const _dd1=_lp1?Math.floor((Date.now()-new Date(_lp1.date))/86400000):9999;
+      const _vc1=_dd1<=7?"#4f4":_dd1<=30?"#FFD700":_dd1<=60?"#f84":"#f66";
+      pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)} &middot; Rank #${c.rank||"?"} &middot; 🧾 ${(c.purchases||[]).length} visits</div><div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc1};font-weight:700;">${_lv1}</span></div></div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
     }
   }
   // Restore date mode - only restore manual picker if it was open
@@ -2790,7 +2818,11 @@ function ptSelectCustomer(id){
   document.getElementById("pt-dropdown").style.display="none";
   const pr=document.getElementById("pt-prev");
   pr.style.display="flex";pr.style.alignItems="center";pr.style.gap="12px";
-  pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} · Rank #${c.rank} · 🚶 ${(c.purchases||[]).length} visits</div></div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  const _lp2=[...(c.purchases||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+  const _lv2=_lp2?timeSince(_lp2.date):"Never";
+  const _dd2=_lp2?Math.floor((Date.now()-new Date(_lp2.date))/86400000):9999;
+  const _vc2=_dd2<=7?"#4f4":_dd2<=30?"#FFD700":_dd2<=60?"#f84":"#f66";
+  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)} · Rank #${c.rank} · 🧾 ${(c.purchases||[]).length} visits</div><div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div></div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
   ptPts();
 }
 
@@ -2823,7 +2855,11 @@ function bptSelectCustomer(id){
   document.getElementById("bpt-dropdown").style.display="none";
   const pr=document.getElementById("bpt-prev");
   pr.style.display="flex";pr.style.alignItems="center";pr.style.gap="12px";
-  pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} · Rank #${c.rank||"?"} · 🚶 ${(c.purchases||[]).length} visits</div></div><button onclick="bptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  const _lp3=[...(c.purchases||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+  const _lv3=_lp3?timeSince(_lp3.date):"Never";
+  const _dd3=_lp3?Math.floor((Date.now()-new Date(_lp3.date))/86400000):9999;
+  const _vc3=_dd3<=7?"#4f4":_dd3<=30?"#FFD700":_dd3<=60?"#f84":"#f66";
+  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)} · Rank #${c.rank||"?"} · 🧾 ${(c.purchases||[]).length} visits</div><div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc3};font-weight:700;">${_lv3}</span></div></div><button onclick="bptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
 }
 
 function bptClearCustomer(){
