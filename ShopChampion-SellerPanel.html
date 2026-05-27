@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ShopChampion — Seller Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#0a0e1a;color:#e8eaf0;font-family:'Nunito',sans-serif;min-height:100vh;}
+  .card{background:#0f1628;border:1px solid #1e2a45;border-radius:16px;padding:24px;}
+  .input{width:100%;background:#0a0e1a;border:1px solid #2a3560;border-radius:10px;padding:10px 14px;color:#e8eaf0;font-family:'Nunito',sans-serif;font-size:14px;outline:none;}
+  .input:focus{border-color:#FFD700;}
+  .btn{border:none;border-radius:10px;padding:10px 20px;cursor:pointer;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;transition:opacity .15s;}
+  .btn:hover{opacity:.85;}
+  select.input{cursor:pointer;}
+  table{width:100%;border-collapse:collapse;}
+  th{text-align:left;font-size:11px;color:#4a5a7a;padding:8px 12px;border-bottom:1px solid #1e2a45;text-transform:uppercase;letter-spacing:1px;}
+  td{padding:10px 12px;border-bottom:1px solid #1a2038;font-size:13px;vertical-align:middle;}
+  tr:hover td{background:#151f38;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;}
+  .badge-pro{background:#1a3a1a;color:#4f4;border:1px solid #2a4a2a;}
+  .badge-free{background:#1a1a3a;color:#88f;border:1px solid #2a2a5a;}
+  .badge-off{background:#3a0a0a;color:#f66;border:1px solid #4a1515;}
+  .badge-expired{background:#2a1a00;color:#f84;border:1px solid #4a3a00;}
+  .badge-nokey{background:#1a1a2a;color:#556;border:1px solid #2a2a3a;}
+  .tag{font-family:monospace;font-size:12px;color:#FFD700;background:#1a1a05;border:1px solid #3a3a15;padding:2px 8px;border-radius:6px;cursor:pointer;letter-spacing:1px;}
+  #setup-overlay{display:flex;position:fixed;inset:0;background:#0a0e1a;z-index:999;align-items:center;justify-content:center;padding:20px;}
+  .section-title{font-size:18px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;margin-bottom:16px;}
+  .stat{background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:16px 20px;text-align:center;}
+  .stat-num{font-size:28px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;}
+  .stat-label{font-size:11px;color:#4a5a7a;margin-top:2px;}
+
+  /* Modal overlay */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:center;justify-content:center;padding:16px;}
+  .modal-box{background:#0f1628;border:1px solid #1e2a45;border-radius:20px;padding:28px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;}
+
+  /* Payment history table */
+  .ph-row{background:#0a0e1a;border:1px solid #1a2038;border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .ph-amount{font-size:17px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;min-width:80px;}
+  .ph-date{font-size:11px;color:#4a5a7a;}
+  .ph-utr{font-family:monospace;font-size:11px;color:#7ab3ff;}
+  .ph-plan{font-size:11px;}
+
+  /* Subscription reset pill */
+  .reset-sub-btn{background:#1a1a05;color:#FFD700;border:1px solid #3a3a15;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;}
+  .reset-sub-btn:hover{background:#2a2a0a;}
+
+  /* Merged user row */
+  .user-key-row{transition:background .15s;}
+  .user-key-row:hover td{background:#151f38;}
+
+  /* Search bar row */
+  .search-bar-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  .search-bar-row .input{max-width:200px;padding:8px 12px;font-size:13px;}
+
+  /* Tab strip for Users section */
+  .tab-strip{display:flex;gap:2px;background:#060a14;border:1px solid #1a2040;border-radius:12px;padding:3px;margin-bottom:16px;width:fit-content;}
+  .tab-btn{padding:7px 18px;border-radius:9px;font-size:12px;font-weight:800;border:none;cursor:pointer;font-family:'Nunito',sans-serif;background:transparent;color:#4a5a7a;transition:all .15s;}
+  .tab-btn.active{background:#FFD700;color:#1a0a00;}
+
+  /* Subscription indicator */
+  .sub-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:800;}
+  .sub-active{background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;}
+  .sub-expired{background:#2a1a00;color:#f84;border:1px solid #4a3a00;}
+  .sub-none{background:#1a1a2a;color:#556;border:1px solid #2a2a4a;}
+  .sub-off{background:#3a0a0a;color:#f66;border:1px solid #4a1515;}
+</style>
+</head>
+<body>
+
+<!-- FIRST TIME SETUP -->
+<div id="setup-overlay">
+  <div style="background:#0f1628;border:1px solid #1e2a45;border-radius:20px;padding:36px;width:100%;max-width:420px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:40px;margin-bottom:8px;">🏪</div>
+      <div style="font-size:22px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">ShopChampion Seller Panel</div>
+      <div style="font-size:12px;color:#7a8aaa;margin-top:5px;">Set a password to protect this panel</div>
+    </div>
+    <div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:10px;padding:12px;margin-bottom:20px;font-size:12px;color:#4f4;">
+      ✅ Supabase already connected to your project
+    </div>
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:4px;">Choose a Seller Password</label>
+    <input id="setup-pass" class="input" type="password" placeholder="Choose a strong password" style="margin-bottom:16px;"/>
+    <div id="setup-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
+    <button class="btn" onclick="saveSetup()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:15px;">Open Seller Panel →</button>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="login-overlay" style="display:none;position:fixed;inset:0;background:#0a0e1a;z-index:998;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#0f1628;border:1px solid #1e2a45;border-radius:20px;padding:36px;width:100%;max-width:360px;text-align:center;">
+    <div style="font-size:40px;margin-bottom:10px;">🏪</div>
+    <div style="font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;margin-bottom:20px;">Seller Panel Login</div>
+    <input id="login-pass" class="input" type="password" placeholder="Seller password" style="margin-bottom:10px;text-align:center;" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <div id="login-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;">Wrong password</div>
+    <button class="btn" onclick="doLogin()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:15px;">Login →</button>
+  </div>
+</div>
+
+<!-- MAIN PANEL -->
+<div id="main-panel" style="display:none;max-width:1200px;margin:0 auto;padding:24px 16px;">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;flex-wrap:wrap;">
+    <div style="font-size:32px;">🏪</div>
+    <div>
+      <div style="font-size:22px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">ShopChampion Seller Panel</div>
+      <div style="font-size:11px;color:#4a5a7a;letter-spacing:1px;">LICENSE & USER MANAGEMENT</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:10px;">
+      <button class="btn" onclick="refreshAll()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;">🔄 Refresh</button>
+      <button class="btn" onclick="resetSettings()" style="background:#1a0a0a;border:1px solid #4a1515;color:#f66;font-size:12px;">⚙ Reset Setup</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px;" id="stats-row">
+    <div class="stat"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Total Users</div></div>
+    <div class="stat"><div class="stat-num" id="stat-active" style="color:#4f4;">—</div><div class="stat-label">Active Pro</div></div>
+    <div class="stat"><div class="stat-num" id="stat-inactive" style="color:#f66;">—</div><div class="stat-label">No License</div></div>
+    <div class="stat"><div class="stat-num" id="stat-expired" style="color:#f84;">—</div><div class="stat-label">Expired</div></div>
+    <div class="stat"><div class="stat-num" id="stat-pending" style="color:#fa0;">—</div><div class="stat-label">Pending Pay</div></div>
+  </div>
+
+  <!-- Create Key -->
+  <div class="card" style="margin-bottom:24px;">
+    <div class="section-title">➕ Create New License Key</div>
+    <div style="background:#0a0e1a;border:1px solid #2a3560;border-radius:10px;padding:14px;margin-bottom:14px;">
+      <label style="font-size:11px;color:#4a5a7a;display:block;margin-bottom:6px;">📞 Customer Phone Number <span style="color:#FFD700;">*</span> — <span style="color:#4a5a7a;">One license per customer</span></label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="new-phone" class="input" placeholder="e.g. 9876543210" maxlength="10" style="max-width:200px;font-family:monospace;letter-spacing:1px;" oninput="checkExistingLicense()"/>
+        <div id="phone-check-status" style="font-size:12px;color:#4a5a7a;min-height:18px;"></div>
+      </div>
+      <div id="existing-key-warning" style="display:none;margin-top:12px;background:#1a1a05;border:1px solid #4a4a15;border-radius:8px;padding:12px;">
+        <div style="font-size:12px;color:#FFD700;font-weight:700;margin-bottom:6px;">⚠️ This customer already has a license key!</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+          <span id="existing-key-val" style="font-family:monospace;font-size:14px;color:#FFD700;letter-spacing:2px;font-weight:800;"></span>
+          <span id="existing-key-status" style="font-size:11px;"></span>
+        </div>
+        <div style="font-size:11px;color:#7a8aaa;margin-bottom:10px;">Instead of creating a new key, you can activate or extend their existing one:</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn" onclick="activateExistingKey()" style="background:linear-gradient(135deg,#1a4a1a,#0a2a0a);color:#4f4;border:1px solid #2a5a2a;padding:8px 16px;font-size:12px;">✅ Activate Key</button>
+          <button class="btn" onclick="extendExistingKey()" style="background:#1a2540;color:#5af;border:1px solid #1a3a60;padding:8px 16px;font-size:12px;">📅 Extend Expiry</button>
+          <button class="btn" onclick="copyExistingKey()" style="background:#1a1a05;color:#FFD700;border:1px solid #3a3a15;padding:8px 16px;font-size:12px;">📋 Copy Key</button>
+        </div>
+      </div>
+    </div>
+    <div id="new-key-fields">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px;">
+        <div>
+          <label style="font-size:11px;color:#4a5a7a;display:block;margin-bottom:4px;">Customer Name</label>
+          <input id="new-name" class="input" placeholder="Raj Shop, Mumbai"/>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#4a5a7a;display:block;margin-bottom:4px;">Plan</label>
+          <select id="new-plan" class="input">
+            <option value="pro">Pro (Full Access)</option>
+            <option value="free">Free (Limited)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#4a5a7a;display:block;margin-bottom:4px;">Expires On (leave blank = never)</label>
+          <input id="new-expires" class="input" type="date"/>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#4a5a7a;display:block;margin-bottom:4px;">Notes</label>
+          <input id="new-notes" class="input" placeholder="Monthly ₹499, paid Jan"/>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <button class="btn" onclick="createKey()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:11px 24px;font-size:14px;">🔑 Generate & Save Key</button>
+        <div id="create-status" style="font-size:13px;color:#4f4;"></div>
+      </div>
+    </div>
+    <div id="new-key-result" style="display:none;margin-top:16px;background:#0a1a0a;border:1px solid #2a4a2a;border-radius:12px;padding:16px;">
+      <div style="font-size:12px;color:#4f4;margin-bottom:8px;font-weight:700;">✅ Key created — share this with your customer:</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <div id="new-key-display" style="font-family:monospace;font-size:18px;color:#FFD700;letter-spacing:3px;font-weight:800;flex:1;"></div>
+        <button class="btn" onclick="copyNewKey()" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px 16px;">📋 Copy</button>
+      </div>
+      <div style="font-size:11px;color:#4a5a7a;margin-top:8px;">Send this key to the customer. They paste it in the app on first launch.</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       MERGED USERS + LICENSE TABLE
+  ═══════════════════════════════════════════ -->
+  <div class="card" style="margin-bottom:24px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap;">
+      <div class="section-title" style="margin-bottom:0;">👥 Users & Subscriptions
+        <span id="users-count-badge" style="background:#1a2540;color:#7a8aaa;font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px;margin-left:8px;vertical-align:middle;"></span>
+      </div>
+      <button class="btn" onclick="loadMergedUsers()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;font-size:12px;padding:7px 14px;margin-left:auto;">🔄 Refresh</button>
+    </div>
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:14px;">All registered users with their subscription status. Click any user to see their payment history. You can reset their subscription from here.</div>
+
+    <!-- Search + filter row -->
+    <div class="search-bar-row">
+      <input id="search-merged" class="input" placeholder="🔍 Name, phone, User ID, key..." style="max-width:260px;" oninput="filterMerged()"/>
+      <select id="filter-sub-status" class="input" style="max-width:160px;" onchange="filterMerged()">
+        <option value="">All Statuses</option>
+        <option value="active">✅ Active Pro</option>
+        <option value="expired">⏰ Expired</option>
+        <option value="disabled">⛔ Disabled</option>
+        <option value="nokey">🔑 No License</option>
+      </select>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table id="merged-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>User</th>
+            <th>Phone</th>
+            <th>User ID</th>
+            <th>License Key</th>
+            <th>Subscription</th>
+            <th>Expires</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="merged-tbody">
+          <tr><td colspan="8" style="text-align:center;color:#4a5a7a;padding:32px;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       PAYMENT REQUESTS
+  ═══════════════════════════════════════════ -->
+  <div style="margin-top:20px;background:#0d1117;border:1px solid #1e2a45;border-radius:14px;padding:20px;" id="payments-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:10px;">
+      <div class="section-title" style="margin-bottom:0;">💳 Payment Requests
+        <span id="pending-badge" style="display:none;background:#f84;color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:20px;margin-left:8px;vertical-align:middle;"></span>
+      </div>
+      <button class="btn" onclick="loadPayments()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;font-size:12px;padding:7px 14px;">🔄 Refresh</button>
+    </div>
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:16px;">Customers who paid via UPI and submitted their UTR. Verify payment in your UPI app → click Approve → their subscription activates instantly.</div>
+    <div id="payments-list">
+      <div style="text-align:center;color:#4a5a7a;padding:28px;font-size:13px;">Loading payment requests...</div>
+    </div>
+  </div>
+
+  <!-- Plan Features Config -->
+  <div style="margin-top:20px;background:#0d1117;border:1px solid #1e2a45;border-radius:14px;padding:20px;">
+    <div class="section-title">🎛️ Plan Features — Free vs Pro</div>
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:4px;">Toggle which features free customers can access. Changes sync <strong style="color:#FFD700;">instantly</strong> to all customer apps.</div>
+    <div id="feat-sync-status" style="font-size:12px;color:#4a5a7a;margin-bottom:16px;min-height:18px;"></div>
+    <div id="feature-toggles" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;"></div>
+  </div>
+
+  <!-- Voice Announcement Config -->
+  <div style="margin-top:20px;background:#0d1117;border:1px solid #1e3a1e;border-radius:14px;padding:20px;">
+    <div class="section-title">🔊 Voice Announcement Settings</div>
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:12px;">Configure the voice announcement played after every purchase. Use <code style="color:#FFD700;">{name}</code>, <code style="color:#FFD700;">{amount}</code>, <code style="color:#FFD700;">{rank}</code> as placeholders.</div>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:6px;">🎁 Preset Templates</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;" id="voice-presets">
+        <button onclick="applyVoicePreset(0)" style="padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;border:1px solid #1a3a1a;background:#0a1a0a;color:#4f4;cursor:pointer;">🎉 Celebratory</button>
+        <button onclick="applyVoicePreset(1)" style="padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;border:1px solid #1a3a1a;background:#0a1a0a;color:#4f4;cursor:pointer;">💎 Premium</button>
+        <button onclick="applyVoicePreset(2)" style="padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;border:1px solid #1a3a1a;background:#0a1a0a;color:#4f4;cursor:pointer;">🏆 Champion</button>
+        <button onclick="applyVoicePreset(3)" style="padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;border:1px solid #1a3a1a;background:#0a1a0a;color:#4f4;cursor:pointer;">✨ Friendly</button>
+        <button onclick="applyVoicePreset(4)" style="padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;border:1px solid #1a3a1a;background:#0a1a0a;color:#4f4;cursor:pointer;">🌟 Royal</button>
+        <button onclick="applyVoicePreset(5)" style="padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;border:1px solid #3a1a00;background:#1a0800;color:#FF9933;cursor:pointer;">🎉 उत्सव</button>
+        <button onclick="applyVoicePreset(6)" style="padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;border:1px solid #3a1a00;background:#1a0800;color:#FF9933;cursor:pointer;">💎 प्रीमियम</button>
+        <button onclick="applyVoicePreset(7)" style="padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;border:1px solid #3a1a00;background:#1a0800;color:#FF9933;cursor:pointer;">🏆 चैंपियन</button>
+        <button onclick="applyVoicePreset(8)" style="padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;border:1px solid #3a1a00;background:#1a0800;color:#FF9933;cursor:pointer;">✨ दोस्ताना</button>
+        <button onclick="applyVoicePreset(9)" style="padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;border:1px solid #3a1a00;background:#1a0800;color:#FF9933;cursor:pointer;">🌟 शाही</button>
+      </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:5px;">📝 Current Template</label>
+      <textarea id="sp-voice-tmpl" rows="3" style="width:100%;background:#060a14;border:1px solid #1e2a45;border-radius:8px;color:#e8eaf0;font-size:13px;padding:10px;resize:vertical;font-family:monospace;box-sizing:border-box;" placeholder="e.g. {name} purchased {amount}. Rank: {rank}!"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:10px;">
+      <button onclick="spSaveVoiceTemplate()" style="flex:2;padding:10px;border-radius:8px;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:13px;border:none;cursor:pointer;">💾 Save Template</button>
+      <button onclick="spPreviewVoice()" style="flex:1;padding:10px;border-radius:8px;background:#0a1a2a;color:#5af;border:1px solid #1a3a60;font-size:13px;cursor:pointer;">▶ Preview</button>
+      <button onclick="if(window.speechSynthesis)window.speechSynthesis.cancel()" style="flex:1;padding:10px;border-radius:8px;background:#1a0a0a;color:#f66;border:1px solid #4a1515;font-size:13px;cursor:pointer;">⏹ Stop</button>
+    </div>
+    <div id="sp-voice-status" style="min-height:16px;font-size:12px;color:#4a5a7a;"></div>
+  </div>
+
+  <div style="margin-top:20px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:16px;font-size:12px;color:#4a5a7a;line-height:1.9;">
+    <div style="color:#FFD700;font-weight:700;margin-bottom:6px;">📌 How to paste your Supabase credentials into the customer app:</div>
+    <div>Open <strong style="color:#e8eaf0;">ShopChampion-Admin.html</strong> in a text editor → find <code style="color:#FFD700;">SC_SUPABASE_URL</code> and <code style="color:#FFD700;">SC_SUPABASE_ANON</code> near the top of the &lt;script&gt; → replace with your Supabase URL and anon key → save → distribute that file to customers.</div>
+    <div style="margin-top:6px;">🔑 <strong style="color:#e8eaf0;">Service Role Key</strong> (used here in Seller Panel) → Supabase Dashboard → Project Settings → API → <strong style="color:#FFD700;">service_role</strong>. Keep it secret — never put it in the customer app file.</div>
+    <div style="margin-top:6px;">⚡ <strong style="color:#e8eaf0;">Disable</strong> a customer instantly by clicking the red button — their app locks within seconds on next load.</div>
+    <div>⚡ <strong style="color:#e8eaf0;">Re-enable</strong> when they pay — app unlocks immediately.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PAYMENT HISTORY MODAL
+═══════════════════════════════════════════ -->
+<div id="payment-history-modal" class="modal-overlay">
+  <div class="modal-box">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;">
+      <div>
+        <div style="font-size:18px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;" id="ph-modal-name">User</div>
+        <div style="font-size:12px;color:#4a5a7a;" id="ph-modal-phone"></div>
+      </div>
+      <button onclick="closePaymentHistory()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;">✕ Close</button>
+    </div>
+
+    <!-- Subscription status card -->
+    <div id="ph-sub-card" style="background:#0a0e1a;border:1px solid #2a3560;border-radius:12px;padding:14px;margin-bottom:18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:11px;color:#4a5a7a;margin-bottom:4px;">CURRENT SUBSCRIPTION</div>
+          <div id="ph-sub-status-display" style="font-size:15px;font-weight:800;"></div>
+          <div id="ph-key-display" style="font-family:monospace;font-size:12px;color:#7ab3ff;margin-top:4px;"></div>
+          <div id="ph-expires-display" style="font-size:11px;color:#4a5a7a;margin-top:2px;"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" id="ph-sub-actions"></div>
+      </div>
+    </div>
+
+    <!-- Search bar for payment history -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+      <div style="font-size:13px;font-weight:700;color:#e8eaf0;">💳 Payment History</div>
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+        <input id="ph-search-amount" class="input" placeholder="₹ Amount..." style="max-width:120px;padding:7px 10px;font-size:12px;" oninput="filterPaymentHistory()"/>
+        <input id="ph-search-date" class="input" type="date" style="max-width:150px;padding:7px 10px;font-size:12px;" oninput="filterPaymentHistory()"/>
+        <button onclick="clearPhSearch()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;border-radius:8px;padding:7px 10px;font-size:11px;cursor:pointer;">✕ Clear</button>
+      </div>
+    </div>
+
+    <div id="ph-history-list" style="max-height:340px;overflow-y:auto;">
+      <div style="text-align:center;color:#4a5a7a;padding:24px;">Loading...</div>
+    </div>
+
+    <div id="ph-summary" style="background:#0a0e1a;border:1px solid #1a2038;border-radius:10px;padding:12px;margin-top:14px;display:none;">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        <div><div style="font-size:10px;color:#4a5a7a;">TOTAL PAID</div><div id="ph-total-paid" style="font-size:16px;font-weight:800;color:#4f4;font-family:'Rajdhani',sans-serif;"></div></div>
+        <div><div style="font-size:10px;color:#4a5a7a;">PAYMENTS</div><div id="ph-payment-count" style="font-size:16px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;"></div></div>
+        <div><div style="font-size:10px;color:#4a5a7a;">LAST PAYMENT</div><div id="ph-last-payment" style="font-size:13px;font-weight:700;color:#7a8aaa;"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE USER MODAL -->
+<div id="delete-user-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width:380px;">
+    <div style="font-size:20px;text-align:center;margin-bottom:6px;">⚠️</div>
+    <div style="font-size:16px;font-weight:800;color:#f66;text-align:center;margin-bottom:6px;">Delete User Account</div>
+    <div style="font-size:13px;color:#7a8aaa;text-align:center;margin-bottom:6px;">You are about to delete:</div>
+    <div id="del-user-phone" style="font-size:15px;font-weight:800;color:#FFD700;text-align:center;margin-bottom:4px;font-family:monospace;letter-spacing:1px;"></div>
+    <div id="del-user-name" style="font-size:12px;color:#7a8aaa;text-align:center;margin-bottom:16px;"></div>
+    <div style="background:#1a0808;border:1px solid #3a1515;border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#f84;line-height:1.7;">
+      🗑 This will <strong>permanently delete</strong> their account.<br>
+      They will need to <strong>re-register from scratch</strong> when they next open the app.
+    </div>
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Enter your Seller Password to confirm:</label>
+    <input id="del-confirm-pass" class="input" type="password" placeholder="Seller password" style="margin-bottom:8px;" onkeydown="if(event.key==='Enter')confirmDeleteUser()"/>
+    <div id="del-pass-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;">❌ Wrong password</div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn" onclick="closeDeleteModal()" style="flex:1;background:#1a2540;border:1px solid #2a3560;color:#aaa;">Cancel</button>
+      <button class="btn" onclick="confirmDeleteUser()" style="flex:1;background:linear-gradient(135deg,#6a0000,#3a0000);color:#f88;border:1px solid #4a1515;">🗑 Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESET PASSWORD MODAL -->
+<div id="reset-pass-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width:380px;">
+    <div style="font-size:20px;text-align:center;margin-bottom:6px;">🔑</div>
+    <div style="font-size:16px;font-weight:800;color:#5af;text-align:center;margin-bottom:6px;">Reset User Password</div>
+    <div id="reset-user-phone-label" style="font-size:14px;font-weight:800;color:#FFD700;text-align:center;margin-bottom:4px;font-family:monospace;letter-spacing:1px;"></div>
+    <div id="reset-user-name-label" style="font-size:12px;color:#7a8aaa;text-align:center;margin-bottom:16px;"></div>
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:4px;">New Password for User</label>
+    <input id="reset-new-pass1" class="input" type="password" placeholder="New password (min 4 chars)" style="margin-bottom:8px;"/>
+    <input id="reset-new-pass2" class="input" type="password" placeholder="Confirm new password" style="margin-bottom:8px;" onkeydown="if(event.key==='Enter')confirmResetPassword()"/>
+    <div id="reset-pass-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
+    <div style="background:#0a1a2a;border:1px solid #1a3a60;border-radius:10px;padding:11px;margin-bottom:16px;font-size:12px;color:#7a8aaa;line-height:1.7;">
+      📋 After resetting, <strong style="color:#e8eaf0;">tell the user their new password</strong> so they can log in. They can change it in the app later.
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn" onclick="closeResetModal()" style="flex:1;background:#1a2540;border:1px solid #2a3560;color:#aaa;">Cancel</button>
+      <button class="btn" onclick="confirmResetPassword()" style="flex:1;background:linear-gradient(135deg,#0a3a6a,#0a1a3a);color:#5af;border:1px solid #1a4a8a;">🔑 Reset Password</button>
+    </div>
+  </div>
+</div>
+
+<script src="/config.js"></script>
+<script>
+// ── Config (credentials loaded from /config.js) ──
+let SB_URL = SC_SUPABASE_URL;
+let SB_ANON = SC_SUPABASE_ANON;
+let SB_SERVICE_KEY = "";
+let SELLER_PASS = ""; // stored as SHA-256 hex, never plain text
+
+// ── Seller password hashing (Web Crypto SHA-256) ──
+async function hashSellerPass(pass) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("sc_seller:" + pass));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+let allKeys = [];
+let allUsers = [];
+let allPayments = [];
+let mergedData = [];
+let _newKey = "";
+
+// Payment history modal state
+let currentPhUser = null;
+let allPhPayments = [];
+
+// Delete / reset state
+let pendingDeletePhone = null;
+let pendingResetPhone = null;
+
+function loadConfig() {
+  try {
+    const c = JSON.parse(localStorage.getItem("sc_seller_cfg") || "{}");
+    SELLER_PASS    = c.pass        || "";
+    SB_SERVICE_KEY = c.serviceKey  || "";
+  } catch { SELLER_PASS = ""; SB_SERVICE_KEY = ""; }
+}
+
+function saveSetup() {
+  const pass = document.getElementById("setup-pass").value;
+  const err  = document.getElementById("setup-err");
+  err.style.display = "none";
+  if (!pass || pass.length < 4) {
+    err.textContent = "❌ Please set a password (min 4 characters)";
+    err.style.display = "block";
+    return;
+  }
+  hashSellerPass(pass).then(hashed => {
+    SELLER_PASS = hashed;
+    localStorage.setItem("sc_seller_cfg", JSON.stringify({pass: hashed}));
+    document.getElementById("setup-overlay").style.display = "none";
+    openMain();
+  });
+}
+
+function doLogin() {
+  const p = document.getElementById("login-pass").value;
+  hashSellerPass(p).then(hashed => {
+    if (hashed === SELLER_PASS) {
+      document.getElementById("login-overlay").style.display = "none";
+      openMain();
+    } else {
+      document.getElementById("login-err").style.display = "block";
+    }
+  });
+}
+
+function openMain() {
+  document.getElementById("main-panel").style.display = "block";
+  refreshAll();
+  loadFreeTabsFromSupabase();
+  spInitVoicePanel();
+}
+
+function resetSettings() {
+  if (confirm("Reset seller settings? You will need to enter your service key and password again.")) {
+    localStorage.removeItem("sc_seller_cfg");
+    location.reload();
+  }
+}
+
+function refreshAll() {
+  loadKeys();
+  loadUsers();
+  loadPayments();
+}
+
+// ── Supabase helpers ──
+async function sbFetch(path, opts = {}) {
+  const isWrite = opts.method && opts.method !== "GET";
+  // Always use anon key — RLS is disabled so anon key has full access
+  const authKey = SB_ANON;
+  const res = await fetch(SB_URL + path, {
+    ...opts,
+    headers: {
+      "apikey":        authKey,
+      "Authorization": "Bearer " + authKey,
+      "Content-Type":  "application/json",
+      "Prefer":        opts.prefer || "",
+      ...(opts.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    if (errText.includes("42501") || errText.includes("row-level security")) {
+      throw new Error("RLS Policy Error — run in Supabase SQL Editor:\nALTER TABLE licenses DISABLE ROW LEVEL SECURITY;\nOR reset setup and enter your service_role key.");
+    }
+    throw new Error(errText);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+function genKey() {
+  const seg = () => Math.random().toString(36).substr(2,4).toUpperCase();
+  return `SC-${seg()}-${seg()}-${seg()}`;
+}
+
+// ── Load Keys ──
+async function loadKeys() {
+  try {
+    allKeys = await sbFetch("/rest/v1/licenses?select=*&order=created_at.desc") || [];
+    mergeBuildTable();
+  } catch(e) {
+    console.error("Keys load error:", e);
+  }
+}
+
+// ── Load Users ──
+async function loadUsers() {
+  try {
+    allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || [];
+    mergeBuildTable();
+  } catch(e) {
+    console.error("Users load error:", e);
+  }
+}
+
+// ── Merge Users + Keys ──
+function mergeBuildTable() {
+  const now = new Date();
+  // Build phone → key map (one key per phone — latest active wins)
+  const keyByPhone = {};
+  allKeys.forEach(k => {
+    if (k.customer_phone) {
+      // If multiple keys for same phone, prefer active ones
+      const existing = keyByPhone[k.customer_phone];
+      if (!existing || (!existing.active && k.active)) {
+        keyByPhone[k.customer_phone] = k;
+      }
+    }
+  });
+
+  // Build merged rows: one row per user, with their key attached
+  const usedPhones = new Set();
+  mergedData = allUsers.map((u, idx) => {
+    usedPhones.add(u.phone);
+    const key = keyByPhone[u.phone] || null;
+    const subStatus = getSubStatus(key, now);
+    return { type: "user", user: u, key, subStatus, idx };
+  });
+
+  // Keys without any registered user — only add if phone not already in a user row
+  allKeys.forEach(k => {
+    const phone = k.customer_phone || null;
+    if (phone && usedPhones.has(phone)) return; // already covered by user row
+    if (phone) usedPhones.add(phone); // prevent duplicates from multiple orphan keys
+    // Avoid adding the same phone twice from orphan keys
+    const alreadyAdded = mergedData.some(r => r.type === "key_only" && (r.key?.customer_phone === phone || r.key?.key === k.key));
+    if (alreadyAdded) return;
+    mergedData.push({ type: "key_only", user: null, key: k, subStatus: getSubStatus(k, now), idx: mergedData.length });
+  });
+
+  updateStats();
+  renderMergedTable(mergedData);
+
+  const badge = document.getElementById("users-count-badge");
+  if (badge) badge.textContent = mergedData.length + " entries";
+}
+
+function getSubStatus(key, now) {
+  if (!key) return "nokey";
+  if (!key.active) return "disabled";
+  if (key.expires_at && new Date(key.expires_at) <= now) return "expired";
+  return "active";
+}
+
+function updateStats() {
+  const now = new Date();
+  const active   = mergedData.filter(r => r.subStatus === "active").length;
+  const expired  = mergedData.filter(r => r.subStatus === "expired").length;
+  const nokey    = mergedData.filter(r => r.subStatus === "nokey" || r.subStatus === "disabled").length;
+  const pending  = allPayments.filter(p => p.status === "pending").length;
+  document.getElementById("stat-total").textContent    = mergedData.length;
+  document.getElementById("stat-active").textContent   = active;
+  document.getElementById("stat-inactive").textContent = nokey;
+  document.getElementById("stat-expired").textContent  = expired;
+  document.getElementById("stat-pending").textContent  = pending;
+}
+
+function filterMerged() {
+  const q = (document.getElementById("search-merged").value || "").toLowerCase();
+  const statusFilter = document.getElementById("filter-sub-status").value;
+  const filtered = mergedData.filter(r => {
+    const phone   = (r.user?.phone || r.key?.customer_phone || "").toLowerCase();
+    const name    = (r.user?.name || r.user?.shop_name || r.key?.customer_name || "").toLowerCase();
+    const keyStr  = (r.key?.key || "").toLowerCase();
+    const uid     = String(r.user?.user_number || "");
+    const matchQ = !q || phone.includes(q) || name.includes(q) || keyStr.includes(q) || uid.includes(q);
+    const matchS = !statusFilter || r.subStatus === statusFilter;
+    return matchQ && matchS;
+  });
+  renderMergedTable(filtered);
+}
+
+function renderMergedTable(rows) {
+  const now = new Date();
+  if (!rows.length) {
+    document.getElementById("merged-tbody").innerHTML = `<tr><td colspan="8" style="text-align:center;color:#4a5a7a;padding:32px;">No entries found</td></tr>`;
+    return;
+  }
+
+  document.getElementById("merged-tbody").innerHTML = rows.map((r, i) => {
+    const phone   = r.user?.phone || r.key?.customer_phone || "";
+    const name    = r.user?.name || r.user?.shop_name || r.key?.customer_name || (r.user ? "(no name)" : "Unknown");
+    const userNum = r.user?.user_number ? String(r.user.user_number).slice(-6) : null;
+    const key     = r.key;
+
+    // Subscription pill
+    let subPill = "";
+    if (r.subStatus === "active") {
+      subPill = `<span class="sub-pill sub-active">✅ Pro Active</span>`;
+    } else if (r.subStatus === "expired") {
+      subPill = `<span class="sub-pill sub-expired">⏰ Expired</span>`;
+    } else if (r.subStatus === "disabled") {
+      subPill = `<span class="sub-pill sub-off">⛔ Disabled</span>`;
+    } else {
+      subPill = `<span class="sub-pill sub-none">🔑 No License</span>`;
+    }
+
+    // Key display
+    let keyCell = `<span style="color:#2a3a5a;font-size:12px;">—</span>`;
+    if (key) {
+      keyCell = `<span class="tag" onclick="copyKey('${key.key}')" title="Click to copy">${key.key}</span>`;
+    }
+
+    // Expiry
+    let expiryCell = `<span style="color:#4a5a7a;">—</span>`;
+    if (key && key.expires_at) {
+      const isExp = new Date(key.expires_at) <= now;
+      expiryCell = `<span style="color:${isExp?'#f84':'#7a8aaa'};font-size:12px;">${new Date(key.expires_at).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</span>`;
+    } else if (key) {
+      expiryCell = `<span style="color:#4a5a7a;font-size:12px;">Never</span>`;
+    }
+
+    // Actions
+    const safePhone = escHtml(phone);
+    const safeName  = escHtml(name);
+    let actions = `<div style="display:flex;gap:5px;flex-wrap:wrap;">`;
+    // Payment history (only if phone exists)
+    if (phone) {
+      actions += `<button class="btn" onclick="openPaymentHistory('${safePhone}','${safeName}')" style="background:#1a2540;color:#7ab3ff;border:1px solid #1a3a60;padding:5px 10px;font-size:11px;">💳 History</button>`;
+    }
+    // Toggle key
+    if (key) {
+      if (key.active) {
+        actions += `<button class="btn" onclick="toggleKey('${key.id}',false)" style="background:#3a0a0a;color:#f66;border:1px solid #4a1515;padding:5px 10px;font-size:11px;">⛔ Disable</button>`;
+      } else {
+        actions += `<button class="btn" onclick="toggleKey('${key.id}',true)" style="background:#1a3a1a;color:#4f4;border:1px solid #2a4a2a;padding:5px 10px;font-size:11px;">✅ Enable</button>`;
+      }
+      actions += `<button class="btn" onclick="editExpiry('${key.id}','${key.expires_at||''}')" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:5px 10px;font-size:11px;">📅</button>`;
+    }
+    // Block/Unblock button (for users with a registered account)
+    if (r.user) {
+      const isBlocked = r.user.blocked === true;
+      if (isBlocked) {
+        actions += `<button class="btn" onclick="toggleBlock('${safePhone}', false)" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:5px 10px;font-size:11px;" title="Unblock User">🔓 Unblock</button>`;
+      } else {
+        actions += `<button class="btn" onclick="toggleBlock('${safePhone}', true)" style="background:#2a1a0a;color:#f84;border:1px solid #4a3a15;padding:5px 10px;font-size:11px;" title="Block User">🚫 Block</button>`;
+      }
+      actions += `<button class="btn" onclick="openResetModal('${safePhone}','${safeName}')" style="background:#0a1a2a;color:#5af;border:1px solid #1a3a60;padding:5px 10px;font-size:11px;" title="Reset Password">🔑</button>`;
+    }
+    // Delete: removes user account AND/OR license key
+    const keyId = key ? key.id : "";
+    actions += `<button class="btn" onclick="openDeleteModal('${safePhone}','${safeName}','${keyId}')" style="background:#1a0808;color:#f66;border:1px solid #4a1515;padding:5px 10px;font-size:11px;" title="Delete User">🗑</button>`;
+    actions += `</div>`;
+
+    return `<tr class="user-key-row">
+      <td style="color:#4a5a7a;font-size:11px;">${i+1}</td>
+      <td><strong style="font-size:13px;">${escHtml(name)}</strong>${r.user?.blocked?'<br><span style="font-size:10px;background:#3a1a00;color:#f84;padding:1px 7px;border-radius:8px;font-weight:800;">🚫 BLOCKED</span>':''}${r.type==="key_only"?'<br><span style="font-size:10px;color:#3a4a6a;">key only</span>':''}</td>
+      <td><span style="font-family:monospace;font-size:12px;color:#7ab3ff;">${phone?'📞 '+escHtml(phone):'<span style="color:#2a3a5a;">—</span>'}</span></td>
+      <td>${userNum?`<span style="font-family:monospace;font-size:13px;color:#7ab3ff;font-weight:800;background:#0a1a2a;border:1px solid #1a3a60;padding:2px 8px;border-radius:7px;">#${userNum}</span>`:`<span style="color:#2a3a5a;font-size:11px;">—</span>`}</td>
+      <td>${keyCell}</td>
+      <td>${subPill}</td>
+      <td>${expiryCell}</td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join("");
+}
+
+// ── Key actions ──
+async function toggleKey(id, active) {
+  try {
+    await sbFetch(`/rest/v1/licenses?id=eq.${id}`, {
+      method: "PATCH", prefer: "return=minimal",
+      body: JSON.stringify({ active })
+    });
+    loadKeys();
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+async function editExpiry(id, current) {
+  const val = prompt("Enter new expiry date (YYYY-MM-DD), or leave blank for never:", current ? current.slice(0,10) : "");
+  if (val === null) return;
+  try {
+    await sbFetch(`/rest/v1/licenses?id=eq.${id}`, {
+      method: "PATCH", prefer: "return=minimal",
+      body: JSON.stringify({ expires_at: val ? new Date(val + "T23:59:59").toISOString() : null })
+    });
+    loadKeys();
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+async function deleteKey(id) {
+  if (!confirm("Permanently delete this key? The customer will lose access.")) return;
+  try {
+    await sbFetch(`/rest/v1/licenses?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" });
+    loadKeys();
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+function copyKey(key) {
+  navigator.clipboard.writeText(key).then(() => alert("✅ Copied: " + key));
+}
+
+// ── Create Key ──
+async function createKey() {
+  const phone   = document.getElementById("new-phone").value.trim();
+  const name    = document.getElementById("new-name").value.trim();
+  const plan    = document.getElementById("new-plan").value;
+  const expires = document.getElementById("new-expires").value;
+  const notes   = document.getElementById("new-notes").value.trim();
+  const status  = document.getElementById("create-status");
+  if (!name) { status.textContent = "❌ Customer name required"; status.style.color = "#f66"; return; }
+  const key = genKey();
+  status.textContent = "⏳ Saving..."; status.style.color = "#FFD700";
+  try {
+    await sbFetch("/rest/v1/licenses", {
+      method: "POST", prefer: "return=minimal",
+      body: JSON.stringify({
+        key, customer_name: name, customer_phone: phone || null,
+        plan, active: true,
+        expires_at: expires ? new Date(expires + "T23:59:59").toISOString() : null,
+        notes
+      })
+    });
+    _newKey = key;
+    document.getElementById("new-key-display").textContent = key;
+    document.getElementById("new-key-result").style.display = "block";
+    document.getElementById("new-name").value = "";
+    document.getElementById("new-notes").value = "";
+    document.getElementById("new-expires").value = "";
+    document.getElementById("new-phone").value = "";
+    document.getElementById("existing-key-warning").style.display = "none";
+    document.getElementById("phone-check-status").textContent = "";
+    status.textContent = "✅ Key created!"; status.style.color = "#4f4";
+    loadKeys();
+  } catch(e) {
+    status.textContent = "❌ Error: " + e.message; status.style.color = "#f66";
+  }
+}
+
+function copyNewKey() {
+  navigator.clipboard.writeText(_newKey).then(() => {
+    const btn = event.target;
+    btn.textContent = "✅ Copied!";
+    setTimeout(() => btn.textContent = "📋 Copy", 2000);
+  });
+}
+
+// ── Phone check for existing license ──
+let _existingKeyData = null;
+let _phoneCheckTimer = null;
+
+function checkExistingLicense() {
+  const phone = document.getElementById("new-phone").value.trim();
+  const statusEl = document.getElementById("phone-check-status");
+  const warningEl = document.getElementById("existing-key-warning");
+  const fieldsEl = document.getElementById("new-key-fields");
+  clearTimeout(_phoneCheckTimer);
+  _existingKeyData = null;
+  warningEl.style.display = "none";
+  if (!phone || phone.length < 5) {
+    statusEl.textContent = "";
+    fieldsEl.style.display = "block";
+    return;
+  }
+  statusEl.innerHTML = `<span style="color:#FFD700;">⏳ Checking...</span>`;
+  _phoneCheckTimer = setTimeout(async () => {
+    try {
+      const results = await sbFetch(`/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(phone)}&select=*&order=created_at.desc`);
+      if (results && results.length > 0) {
+        _existingKeyData = results[0];
+        const now = new Date();
+        const isExpired = _existingKeyData.expires_at && new Date(_existingKeyData.expires_at) <= now;
+        const isActive  = _existingKeyData.active && !isExpired;
+        statusEl.innerHTML = `<span style="color:#f84;">⚠️ Already has a key</span>`;
+        document.getElementById("existing-key-val").textContent = _existingKeyData.key;
+        document.getElementById("existing-key-status").innerHTML = isActive
+          ? `<span style="background:#1a3a1a;color:#4f4;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:800;">✅ Active</span>`
+          : isExpired
+            ? `<span style="background:#2a1a00;color:#f84;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:800;">⏰ Expired</span>`
+            : `<span style="background:#3a0a0a;color:#f66;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:800;">⛔ Disabled</span>`;
+        warningEl.style.display = "block";
+        fieldsEl.style.display = "none";
+      } else {
+        statusEl.innerHTML = `<span style="color:#4f4;">✅ No existing key — ready to create</span>`;
+        warningEl.style.display = "none";
+        fieldsEl.style.display = "block";
+      }
+    } catch(e) {
+      statusEl.textContent = "";
+      fieldsEl.style.display = "block";
+    }
+  }, 500);
+}
+
+async function activateExistingKey() {
+  if (!_existingKeyData) return;
+  try {
+    await sbFetch(`/rest/v1/licenses?id=eq.${_existingKeyData.id}`, {
+      method: "PATCH", prefer: "return=minimal",
+      body: JSON.stringify({ active: true })
+    });
+    alert(`✅ Key ${_existingKeyData.key} activated!\nCustomer's app will unlock within seconds.`);
+    document.getElementById("new-phone").value = "";
+    document.getElementById("existing-key-warning").style.display = "none";
+    document.getElementById("phone-check-status").textContent = "";
+    document.getElementById("new-key-fields").style.display = "block";
+    loadKeys();
+  } catch(e) { alert("❌ Error: " + e.message); }
+}
+
+async function extendExistingKey() {
+  if (!_existingKeyData) return;
+  const val = prompt("Enter new expiry date (YYYY-MM-DD), or leave blank for never:", _existingKeyData.expires_at ? _existingKeyData.expires_at.slice(0,10) : "");
+  if (val === null) return;
+  try {
+    await sbFetch(`/rest/v1/licenses?id=eq.${_existingKeyData.id}`, {
+      method: "PATCH", prefer: "return=minimal",
+      body: JSON.stringify({ active: true, expires_at: val ? new Date(val + "T23:59:59").toISOString() : null })
+    });
+    alert(`✅ Expiry updated & key activated for ${_existingKeyData.key}`);
+    document.getElementById("new-phone").value = "";
+    document.getElementById("existing-key-warning").style.display = "none";
+    document.getElementById("phone-check-status").textContent = "";
+    document.getElementById("new-key-fields").style.display = "block";
+    loadKeys();
+  } catch(e) { alert("❌ Error: " + e.message); }
+}
+
+function copyExistingKey() {
+  if (!_existingKeyData) return;
+  navigator.clipboard.writeText(_existingKeyData.key).then(() => alert("📋 Copied: " + _existingKeyData.key));
+}
+
+// ══════════════════════════════════════════════
+// PAYMENT HISTORY MODAL
+// ══════════════════════════════════════════════
+async function openPaymentHistory(phone, name) {
+  currentPhUser = { phone, name };
+  allPhPayments = [];
+
+  document.getElementById("ph-modal-name").textContent = name || phone;
+  document.getElementById("ph-modal-phone").textContent = phone ? "📞 +91 " + phone : "";
+  document.getElementById("ph-search-amount").value = "";
+  document.getElementById("ph-search-date").value = "";
+  document.getElementById("ph-summary").style.display = "none";
+  document.getElementById("ph-history-list").innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:24px;">Loading...</div>`;
+  document.getElementById("payment-history-modal").style.display = "flex";
+
+  // Subscription info
+  const now = new Date();
+  const key = allKeys.find(k => k.customer_phone === phone) || null;
+  renderPhSubCard(key, now, phone);
+
+  // Load payment history
+  try {
+    // Try by phone number first (customer_phone column)
+    let data = [];
+    try {
+      data = await sbFetch(`/rest/v1/sc_payments?customer_phone=eq.${encodeURIComponent(phone)}&select=*&order=submitted_at.desc`) || [];
+    } catch(e) {
+      // fallback: try customer_name
+    }
+    // Also try matching by license key if we have one
+    if (key && data.length === 0) {
+      try {
+        const byKey = await sbFetch(`/rest/v1/sc_payments?license_key=eq.${encodeURIComponent(key.key)}&select=*&order=submitted_at.desc`) || [];
+        data = [...data, ...byKey];
+      } catch(e2) {}
+    }
+    allPhPayments = data;
+    renderPhHistory(allPhPayments);
+  } catch(e) {
+    document.getElementById("ph-history-list").innerHTML = `<div style="color:#f66;text-align:center;padding:20px;font-size:13px;">❌ ${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderPhSubCard(key, now, phone) {
+  const subCard = document.getElementById("ph-sub-card");
+  const statusEl = document.getElementById("ph-sub-status-display");
+  const keyEl    = document.getElementById("ph-key-display");
+  const expEl    = document.getElementById("ph-expires-display");
+  const actEl    = document.getElementById("ph-sub-actions");
+
+  if (!key) {
+    statusEl.innerHTML = `<span class="sub-pill sub-none">🔑 No License Key</span>`;
+    keyEl.textContent = "";
+    expEl.textContent = "";
+    actEl.innerHTML = `<button onclick="closePaymentHistory()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:7px 16px;font-size:12px;">➕ Create Key</button>`;
+    return;
+  }
+
+  const isExpired = key.expires_at && new Date(key.expires_at) <= now;
+  const isActive  = key.active && !isExpired;
+  const isDisabled = !key.active;
+
+  if (isActive) {
+    statusEl.innerHTML = `<span class="sub-pill sub-active">✅ Pro Active</span>`;
+  } else if (isExpired) {
+    statusEl.innerHTML = `<span class="sub-pill sub-expired">⏰ Subscription Expired</span>`;
+  } else {
+    statusEl.innerHTML = `<span class="sub-pill sub-off">⛔ Subscription Disabled</span>`;
+  }
+
+  keyEl.textContent = key.key ? `Key: ${key.key}` : "";
+  if (key.expires_at) {
+    const expDate = new Date(key.expires_at).toLocaleDateString("en-IN",{day:"2-digit",month:"long",year:"numeric"});
+    expEl.textContent = isExpired ? `⏰ Expired on ${expDate}` : `Expires ${expDate}`;
+    expEl.style.color = isExpired ? "#f84" : "#4a5a7a";
+  } else {
+    expEl.textContent = "No expiry date set";
+  }
+
+  // Actions
+  let html = "";
+  if (isActive) {
+    html += `<button onclick="toggleKeyFromModal('${key.id}',false)" class="reset-sub-btn" style="background:#3a0a0a;color:#f66;border-color:#4a1515;">⛔ Disable Sub</button>`;
+  } else {
+    html += `<button onclick="toggleKeyFromModal('${key.id}',true)" class="reset-sub-btn" style="background:#1a3a1a;color:#4f4;border-color:#2a5a2a;">✅ Enable Sub</button>`;
+  }
+  html += `<button onclick="extendKeyFromModal('${key.id}','${key.expires_at||''}')" class="reset-sub-btn">📅 Change Expiry</button>`;
+  actEl.innerHTML = html;
+}
+
+async function toggleKeyFromModal(id, active) {
+  try {
+    await sbFetch(`/rest/v1/licenses?id=eq.${id}`, {
+      method: "PATCH", prefer: "return=minimal",
+      body: JSON.stringify({ active })
+    });
+    await loadKeys();
+    // Refresh modal sub card
+    const phone = currentPhUser?.phone;
+    const key = allKeys.find(k => k.customer_phone === phone) || null;
+    renderPhSubCard(key, new Date(), phone);
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+async function extendKeyFromModal(id, current) {
+  const val = prompt("Enter new expiry date (YYYY-MM-DD), or leave blank for never:", current ? current.slice(0,10) : "");
+  if (val === null) return;
+  try {
+    await sbFetch(`/rest/v1/licenses?id=eq.${id}`, {
+      method: "PATCH", prefer: "return=minimal",
+      body: JSON.stringify({ expires_at: val ? new Date(val + "T23:59:59").toISOString() : null })
+    });
+    await loadKeys();
+    const phone = currentPhUser?.phone;
+    const key = allKeys.find(k => k.customer_phone === phone) || null;
+    renderPhSubCard(key, new Date(), phone);
+  } catch(e) { alert("Error: " + e.message); }
+}
+
+function filterPaymentHistory() {
+  const amtQ  = (document.getElementById("ph-search-amount").value || "").trim();
+  const dateQ = document.getElementById("ph-search-date").value;
+
+  let filtered = [...allPhPayments];
+  if (amtQ) {
+    filtered = filtered.filter(p => {
+      const amt = String(p.amount || "");
+      return amt.includes(amtQ);
+    });
+  }
+  if (dateQ) {
+    filtered = filtered.filter(p => {
+      if (!p.submitted_at) return false;
+      const d = new Date(p.submitted_at).toISOString().slice(0,10);
+      return d === dateQ;
+    });
+  }
+  renderPhHistory(filtered);
+}
+
+function clearPhSearch() {
+  document.getElementById("ph-search-amount").value = "";
+  document.getElementById("ph-search-date").value = "";
+  renderPhHistory(allPhPayments);
+}
+
+function renderPhHistory(payments) {
+  const el = document.getElementById("ph-history-list");
+  const summaryEl = document.getElementById("ph-summary");
+
+  if (!payments || payments.length === 0) {
+    el.innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:28px;font-size:13px;">No payment records found.<br><span style="font-size:11px;">Payments appear here after a customer submits a UTR.</span></div>`;
+    summaryEl.style.display = "none";
+    return;
+  }
+
+  const totalPaid = payments.filter(p => p.status === "approved").reduce((s,p) => s + (p.amount||0), 0);
+  const approvedCount = payments.filter(p => p.status === "approved").length;
+  const lastPayment = payments[0];
+
+  el.innerHTML = payments.map(p => {
+    const isPending  = p.status === "pending";
+    const isApproved = p.status === "approved";
+    const date = p.submitted_at
+      ? new Date(p.submitted_at).toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})
+      : "—";
+
+    const statusBadge = isPending
+      ? `<span style="background:#3a2a00;color:#f84;border:1px solid #f84;font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;">⏳ Pending</span>`
+      : isApproved
+      ? `<span style="background:#0a1a0a;color:#4f4;border:1px solid #4f4;font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;">✅ Approved</span>`
+      : `<span style="background:#1a0a0a;color:#f66;border:1px solid #f66;font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;">❌ Rejected</span>`;
+
+    return `<div class="ph-row">
+      <div class="ph-amount">₹${(p.amount||0).toLocaleString("en-IN")}</div>
+      <div style="flex:1;min-width:120px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:3px;">
+          ${statusBadge}
+          <span style="font-size:11px;color:#7a8aaa;background:#1a2030;padding:2px 8px;border-radius:6px;">${escHtml(p.plan||"monthly")}</span>
+        </div>
+        <div class="ph-utr">UTR: ${escHtml(p.utr_number||"—")}</div>
+        <div class="ph-date">${date}</div>
+        ${p.license_key ? `<div style="font-size:10px;color:#4f4;margin-top:2px;">Key: <span style="font-family:monospace;">${escHtml(p.license_key)}</span></div>` : ""}
+      </div>
+      <div>
+        ${isPending ? `
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <button onclick="approvePaymentFromHistory('${p.id}')" style="background:linear-gradient(135deg,#1a4a1a,#0a2a0a);color:#4f4;border:1px solid #4f4;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;">✅ Approve</button>
+          <button onclick="rejectPayment('${p.id}')" style="background:#1a0a0a;color:#f66;border:1px solid #f44;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;">✕ Reject</button>
+        </div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  // Summary
+  if (allPhPayments.length > 0) {
+    summaryEl.style.display = "block";
+    document.getElementById("ph-total-paid").textContent = `₹${totalPaid.toLocaleString("en-IN")}`;
+    document.getElementById("ph-payment-count").textContent = `${approvedCount} approved`;
+    document.getElementById("ph-last-payment").textContent = lastPayment.submitted_at
+      ? new Date(lastPayment.submitted_at).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})
+      : "—";
+  }
+}
+
+function closePaymentHistory() {
+  document.getElementById("payment-history-modal").style.display = "none";
+  currentPhUser = null;
+  allPhPayments = [];
+}
+
+// ══════════════════════════════════════════════
+// PAYMENT REQUESTS SECTION
+// ══════════════════════════════════════════════
+async function loadPayments() {
+  const listEl = document.getElementById("payments-list");
+  const badge  = document.getElementById("pending-badge");
+  listEl.innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:28px;font-size:13px;">Loading...</div>`;
+  try {
+    const data = await sbFetch("/rest/v1/sc_payments?select=*&order=submitted_at.desc");
+    allPayments = data || [];
+    renderPayments(allPayments);
+    const pendingCount = allPayments.filter(p => p.status === "pending").length;
+    badge.textContent = pendingCount + " pending";
+    badge.style.display = pendingCount > 0 ? "inline" : "none";
+    updateStats();
+  } catch(e) {
+    listEl.innerHTML = `<div style="color:#f66;text-align:center;padding:20px;font-size:13px;">❌ ${escHtml(e.message)}<br><span style="color:#4a5a7a;font-size:11px;">Make sure the sc_payments table exists in Supabase.<br>Also run: ALTER TABLE sc_payments ADD COLUMN IF NOT EXISTS user_number TEXT; ALTER TABLE sc_payments ADD COLUMN IF NOT EXISTS customer_phone TEXT;</span></div>`;
+  }
+}
+
+function renderPayments(payments) {
+  const listEl = document.getElementById("payments-list");
+  const pending = (payments || []).filter(p => p.status === "pending");
+  if (!pending.length) {
+    listEl.innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:32px;font-size:13px;">✅ No pending payment requests.</div>`;
+    return;
+  }
+  listEl.innerHTML = pending.map(p => {
+    const date = p.submitted_at ? new Date(p.submitted_at).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "—";
+    return `<div style="background:#0a0e1a;border:1px solid #3a2a10;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:160px;">
+          <div style="font-size:14px;font-weight:800;color:#e8eaf0;margin-bottom:4px;">${escHtml(p.customer_name||"Unknown")}</div>
+          <div style="font-size:12px;color:#7a8aaa;margin-bottom:3px;">💰 ₹${(p.amount||0).toLocaleString("en-IN")} · ${(p.plan||"monthly").charAt(0).toUpperCase()+(p.plan||"monthly").slice(1)} Plan</div>
+          <div style="font-size:12px;color:#7a8aaa;margin-bottom:3px;">UTR: <span style="font-family:monospace;color:#FFD700;font-weight:700;">${escHtml(p.utr_number||"—")}</span></div>
+          <div style="font-size:11px;color:#4a5a7a;">🕐 ${date}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+          <span style="background:#3a2a00;color:#f84;border:1px solid #f84;font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;">⏳ Pending</span>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;">
+            <button onclick="approvePayment('${p.id}')" style="background:linear-gradient(135deg,#1a4a1a,#0a2a0a);color:#4f4;border:1px solid #4f4;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;">✅ Approve</button>
+            <button onclick="rejectPayment('${p.id}')" style="background:#1a0a0a;color:#f66;border:1px solid #f44;border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;">✕ Reject</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ─── SHARED APPROVE HELPER ────────────────────────────────────
+// Matches the paying user to an existing license using:
+//   1. user_number (most reliable — set when admin submits payment)
+//   2. customer_phone
+//   3. customer_name (last resort)
+// If a match is found → PATCH that row to Pro Active
+// If no match → create a new license key linked to their phone/user_number
+async function _doApprove(payment) {
+  const phone      = payment.customer_phone || null;
+  const userNum    = payment.user_number    || null;
+  const name       = payment.customer_name  || "";
+  const expiry     = new Date();
+  expiry.setMonth(expiry.getMonth() + 1);
+
+  // Ensure we have fresh user + key data before matching
+  if (!allUsers.length) allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || [];
+  if (!allKeys.length)  { const k = await sbFetch("/rest/v1/licenses?select=*&order=created_at.desc"); if(k) allKeys = k; }
+
+  // --- Find existing license: user_number first, then phone, then name ---
+  let matchPhone = phone;
+  let existing = null;
+
+  if (userNum) {
+    const userRow = allUsers.find(u => String(u.user_number) === String(userNum));
+    if (userRow?.phone) {
+      matchPhone = userRow.phone;
+      existing = allKeys.find(k => k.customer_phone === userRow.phone);
+    }
+  }
+  if (!existing && matchPhone) {
+    existing = allKeys.find(k => k.customer_phone === matchPhone);
+  }
+  if (!existing && name) {
+    existing = allKeys.find(k => (k.customer_name || "").toLowerCase() === name.toLowerCase());
+  }
+
+  let usedKey = null;
+
+  if (existing) {
+    // PATCH existing row → activate + extend expiry
+    const patchRes = await fetch(`${SB_URL}/rest/v1/licenses?id=eq.${existing.id}`, {
+      method: "PATCH",
+      headers: { "apikey": SB_ANON, "Authorization": "Bearer " + SB_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+      body: JSON.stringify({
+        active: true, plan: "pro",
+        expires_at: expiry.toISOString(),
+        customer_phone: phone || existing.customer_phone,
+        notes: (existing.notes || "") + " | Pro UTR " + payment.utr_number
+      })
+    });
+    if (!patchRes.ok) throw new Error(await patchRes.text());
+    usedKey = existing.key;
+  } else {
+    // No existing license — create one linked to their phone + user_number
+    const seg = () => Math.random().toString(36).substring(2,6).toUpperCase();
+    const newKey = `SC-${seg()}-${seg()}-${seg()}`;
+    const licRes = await fetch(`${SB_URL}/rest/v1/licenses`, {
+      method: "POST",
+      headers: { "apikey": SB_ANON, "Authorization": "Bearer " + SB_ANON, "Content-Type": "application/json", "Prefer": "return=representation" },
+      body: JSON.stringify({
+        key: newKey, customer_name: name, plan: "pro",
+        active: true, expires_at: expiry.toISOString(),
+        notes: "Auto — UTR " + payment.utr_number,
+        customer_phone: phone || null
+      })
+    });
+    if (!licRes.ok) throw new Error(await licRes.text());
+    usedKey = newKey;
+  }
+
+  // Mark payment as approved
+  const payRes = await fetch(`${SB_URL}/rest/v1/sc_payments?id=eq.${payment.id}`, {
+    method: "PATCH",
+    headers: { "apikey": SB_ANON, "Authorization": "Bearer " + SB_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+    body: JSON.stringify({ status: "approved", license_key: usedKey })
+  });
+  if (!payRes.ok) throw new Error(await payRes.text());
+
+  return usedKey;
+}
+
+async function approvePayment(paymentId) {
+  const payment = allPayments.find(p => p.id === paymentId);
+  if (!payment) return;
+  if (!confirm(`Approve payment from "${payment.customer_name}"?\n\nAmount: ₹${(payment.amount||0).toLocaleString("en-IN")}\nUTR: ${payment.utr_number}\n\nOK = activate/extend their Pro subscription`)) return;
+  try {
+    const usedKey = await _doApprove(payment);
+    alert(`✅ Approved!\n\nSubscription activated as Pro.\nCustomer's app updates within 15 seconds.`);
+    loadPayments();
+    loadKeys();
+  } catch(e) { alert("❌ Error approving: " + e.message); }
+}
+
+async function approvePaymentFromHistory(paymentId) {
+  const payment = allPayments.find(p => p.id === paymentId) || allPhPayments.find(p => p.id === paymentId);
+  if (!payment) return;
+  if (!confirm(`Approve payment?\n\nAmount: ₹${(payment.amount||0).toLocaleString("en-IN")}\nUTR: ${payment.utr_number}\n\nOK = activate/extend their Pro subscription`)) return;
+  try {
+    const usedKey = await _doApprove(payment);
+    alert(`✅ Approved!\n\nSubscription activated as Pro.\nCustomer's app updates within 15 seconds.`);
+    loadPayments();
+    await loadKeys();
+    if (currentPhUser) await openPaymentHistory(currentPhUser.phone, currentPhUser.name);
+  } catch(e) { alert("❌ Error approving: " + e.message); }
+}
+
+async function rejectPayment(paymentId) {
+  if (!confirm("Reject this payment request?")) return;
+  try {
+    const authKey = SB_SERVICE_KEY || SB_ANON;
+    const res = await fetch(`${SB_URL}/rest/v1/sc_payments?id=eq.${paymentId}`, {
+      method: "PATCH",
+      headers: { "apikey": SB_ANON, "Authorization": "Bearer " + SB_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+      body: JSON.stringify({ status: "rejected" })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    loadPayments();
+    // Refresh modal if open
+    if (currentPhUser) {
+      const phone = currentPhUser.phone;
+      const updated = await sbFetch(`/rest/v1/sc_payments?customer_phone=eq.${encodeURIComponent(phone)}&select=*&order=submitted_at.desc`) || [];
+      allPhPayments = updated;
+      renderPhHistory(allPhPayments);
+    }
+  } catch(e) { alert("❌ Error: " + e.message); }
+}
+
+// Auto-refresh payments every 30 seconds
+setInterval(() => { if (document.getElementById("payments-list")) loadPayments(); }, 30000);
+
+// ══════════════════════════════════════════════
+// DELETE USER
+// ══════════════════════════════════════════════
+let pendingDeleteKeyId = null;
+
+function openDeleteModal(phone, name, keyId) {
+  pendingDeletePhone = phone || null;
+  pendingDeleteKeyId = keyId || null;
+  document.getElementById("del-user-phone").textContent = phone ? "+91 " + phone : name;
+  document.getElementById("del-user-name").textContent = name || "";
+  document.getElementById("del-confirm-pass").value = "";
+  document.getElementById("del-pass-err").style.display = "none";
+  // Update warning text based on what will be deleted
+  const hasUser = !!phone;
+  const hasKey  = !!keyId;
+  let warnText = "";
+  if (hasUser && hasKey) warnText = "🗑 This will permanently delete their <strong>user account</strong> AND <strong>license key</strong>.<br>They will need to re-register and get a new key.";
+  else if (hasUser)       warnText = "🗑 This will permanently delete their <strong>user account</strong>.<br>They will need to re-register from scratch.";
+  else if (hasKey)        warnText = "🗑 This will permanently delete their <strong>license key</strong>.<br>They will lose access immediately.";
+  document.querySelector("#delete-user-modal .modal-box div[style*='1a0808']").innerHTML = warnText;
+  document.getElementById("delete-user-modal").style.display = "flex";
+}
+
+function closeDeleteModal() {
+  document.getElementById("delete-user-modal").style.display = "none";
+  pendingDeletePhone = null;
+  pendingDeleteKeyId = null;
+}
+
+async function confirmDeleteUser() {
+  const enteredPass = document.getElementById("del-confirm-pass").value;
+  const errEl = document.getElementById("del-pass-err");
+  errEl.style.display = "none";
+  const hashedEntry = await hashSellerPass(enteredPass);
+  if (hashedEntry !== SELLER_PASS) {
+    errEl.style.display = "block";
+    document.getElementById("del-confirm-pass").value = "";
+    return;
+  }
+  const phone = pendingDeletePhone;
+  const keyId = pendingDeleteKeyId;
+  if (!phone && !keyId) return;
+  closeDeleteModal();
+  try {
+    let msg = "";
+    if (phone) {
+      await sbFetch(`/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}`, { method: "DELETE", prefer: "return=minimal" });
+      msg += `✅ User account (+91 ${phone}) deleted.\n`;
+    }
+    if (keyId) {
+      await sbFetch(`/rest/v1/licenses?id=eq.${keyId}`, { method: "DELETE", prefer: "return=minimal" });
+      msg += `✅ License key deleted.\n`;
+    }
+    alert(msg.trim());
+    loadKeys();
+    loadUsers();
+  } catch(e) { alert("❌ Error: " + e.message); }
+}
+
+// ══════════════════════════════════════════════
+// RESET PASSWORD
+// ══════════════════════════════════════════════
+// Must match Admin app: SHA-256(phone + ":" + pass + ":sc2026")
+async function hashPass(phone, pass) {
+  const raw = phone + ":" + pass + ":sc2026";
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function openResetModal(phone, name) {
+  pendingResetPhone = phone;
+  document.getElementById("reset-user-phone-label").textContent = "+91 " + phone;
+  document.getElementById("reset-user-name-label").textContent = name || "";
+  document.getElementById("reset-new-pass1").value = "";
+  document.getElementById("reset-new-pass2").value = "";
+  document.getElementById("reset-pass-err").style.display = "none";
+  document.getElementById("reset-pass-modal").style.display = "flex";
+}
+
+function closeResetModal() {
+  document.getElementById("reset-pass-modal").style.display = "none";
+  pendingResetPhone = null;
+}
+
+async function confirmResetPassword() {
+  const pass1  = document.getElementById("reset-new-pass1").value;
+  const pass2  = document.getElementById("reset-new-pass2").value;
+  const errEl  = document.getElementById("reset-pass-err");
+  errEl.style.display = "none";
+  if (!pass1 || pass1.length < 4) {
+    errEl.textContent = "❌ Password must be at least 4 characters";
+    errEl.style.display = "block"; return;
+  }
+  if (pass1 !== pass2) {
+    errEl.textContent = "❌ Passwords do not match";
+    errEl.style.display = "block"; return;
+  }
+  if (!pendingResetPhone) return;
+  const phone = pendingResetPhone;
+  closeResetModal();
+  try {
+    const hashed = await hashPass(phone, pass1);
+    await sbFetch(`/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}`, {
+      method: "PATCH", prefer: "return=minimal",
+      body: JSON.stringify({ password_hash: hashed })
+    });
+    // Show password once in a dismissible in-panel modal — not a browser alert
+    const modal = document.createElement("div");
+    modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:9999;";
+    modal.innerHTML = `
+      <div style="background:#0d1b2a;border:1px solid #1e3a5f;border-radius:14px;padding:28px 24px;max-width:340px;width:90%;text-align:center;">
+        <div style="font-size:28px;margin-bottom:10px;">🔑</div>
+        <div style="font-size:15px;font-weight:700;color:#e8eaf0;margin-bottom:8px;">Password Reset</div>
+        <div style="font-size:13px;color:#7a8aaa;margin-bottom:14px;">Tell <strong style="color:#e8eaf0;">+91 ${phone}</strong> their new temporary password:</div>
+        <div style="background:#0a0e1a;border:1px solid #FFD700;border-radius:8px;padding:12px;font-size:20px;font-weight:800;color:#FFD700;letter-spacing:2px;margin-bottom:16px;">${pass1}</div>
+        <div style="font-size:11px;color:#7a8aaa;margin-bottom:18px;">They can change it inside the app after logging in.</div>
+        <button onclick="this.closest('[style]').remove()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:800;cursor:pointer;">✓ Got it</button>
+      </div>`;
+    document.body.appendChild(modal);
+  } catch(e) { alert("❌ Error resetting password: " + e.message); }
+}
+
+// ══════════════════════════════════════════════
+// BLOCK / UNBLOCK USER
+// ══════════════════════════════════════════════
+async function toggleBlock(phone, block) {
+  const action = block ? "BLOCK" : "UNBLOCK";
+  const msg = block
+    ? `🚫 Block +91 ${phone}?\n\nThey will be immediately locked out of the app.\nTheir data stays safe — you can unblock anytime.`
+    : `🔓 Unblock +91 ${phone}?\n\nThey will be able to log in and use the app again immediately.`;
+  if (!confirm(msg)) return;
+  try {
+    await sbFetch(`/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}`, {
+      method: "PATCH", prefer: "return=minimal",
+      body: JSON.stringify({ blocked: block })
+    });
+    await loadUsers();
+    alert(block
+      ? `✅ User +91 ${phone} is now BLOCKED.\nThey will see a "Your account has been blocked" message when they try to log in.`
+      : `✅ User +91 ${phone} is now UNBLOCKED.\nThey can log in and use the app normally.`
+    );
+  } catch(e) { alert("❌ Error: " + e.message + "\n\nMake sure the 'blocked' column exists in sc_users table.\nRun in Supabase SQL Editor:\nALTER TABLE sc_users ADD COLUMN IF NOT EXISTS blocked BOOLEAN DEFAULT FALSE;"); }
+}
+
+
+// ══════════════════════════════════════════════
+const FEATURES = [
+  { index: 0, name: "🏆 Leaderboard",      desc: "View customer rankings" },
+  { index: 1, name: "👥 Customers",        desc: "Add & manage customers" },
+  { index: 2, name: "💳 Purchase",         desc: "Log purchases & points" },
+  { index: 3, name: "📊 Analytics",        desc: "Sales charts & insights" },
+  { index: 4, name: "⚖️ Compare",          desc: "Compare time periods" },
+  { index: 5, name: "🎉 Festivals",        desc: "Spin wheel & events" },
+  { index: 6, name: "⚙️ Settings",         desc: "Shop settings & config" },
+  { index: 7, name: "📢 Push to Display",  desc: "Send promos to display screen" },
+  { index: 8, name: "👣 Visits",           desc: "Track customer visit counts" },
+  { index: 9, name: "💬 WhatsApp",         desc: "Send WhatsApp messages" },
+  { index: 10, name: "🕐 Last Visit",      desc: "Show last visit date" },
+];
+let freeTabs = [0];
+let featSaving = false;
+
+async function loadFreeTabsFromSupabase() {
+  try {
+    const data = await sbFetch("/rest/v1/sc_settings?key=eq.free_tabs&select=value");
+    if (data && data.length > 0) freeTabs = JSON.parse(data[0].value);
+  } catch(e) {}
+  renderFeatureToggles();
+}
+
+async function saveFreeTabsToSupabase() {
+  if (featSaving) return;
+  featSaving = true;
+  const statusEl = document.getElementById("feat-sync-status");
+  if (statusEl) statusEl.innerHTML = `<span style="color:#FFD700;">⏳ Saving...</span>`;
+  try {
+    await sbFetch("/rest/v1/sc_settings", {
+      method: "POST", prefer: "resolution=merge-duplicates",
+      headers: { "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify({ key: "free_tabs", value: JSON.stringify(freeTabs) })
+    });
+    if (statusEl) statusEl.innerHTML = `<span style="color:#4f4;">✅ Synced to all customer apps instantly!</span>`;
+    setTimeout(() => { if (statusEl) statusEl.innerHTML = `<span style="color:#4a5a7a;">✅ Last saved: ${new Date().toLocaleTimeString()}</span>`; }, 2500);
+  } catch(e) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:#f66;">❌ Sync failed: ${e.message}</span>`;
+  }
+  featSaving = false;
+}
+
+function renderFeatureToggles() {
+  const container = document.getElementById("feature-toggles");
+  if (!container) return;
+  container.innerHTML = FEATURES.map(f => {
+    const isFree = freeTabs.includes(f.index);
+    return `<div onclick="toggleFeature(${f.index})" style="cursor:pointer;background:${isFree?'#0a1a0a':'#0d1117'};border:1px solid ${isFree?'#2a6a2a':'#1e2a45'};border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;user-select:none;" id="feat-card-${f.index}">
+      <div style="width:38px;height:22px;background:${isFree?'#22c55e':'#1e2a45'};border-radius:11px;position:relative;flex-shrink:0;">
+        <div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:3px;left:${isFree?'19px':'3px'};transition:left 0.2s;"></div>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:${isFree?'#e8eaf0':'#7a8aaa'};">${f.name}</div>
+        <div style="font-size:11px;color:${isFree?'#4f4':'#4a5a7a'};">${isFree?'✅ Free':'🔒 Pro only'} — ${f.desc}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function toggleFeature(index) {
+  if (freeTabs.includes(index)) freeTabs = freeTabs.filter(i => i !== index);
+  else { freeTabs.push(index); freeTabs.sort((a,b) => a-b); }
+  renderFeatureToggles();
+  saveFreeTabsToSupabase();
+}
+
+// ══════════════════════════════════════════════
+// VOICE TEMPLATE
+// ══════════════════════════════════════════════
+const VOICE_PRESETS = [
+  { text:"Congratulations {name}! You just purchased {amount} worth of amazing stuff! You are now ranked number {rank} on our leaderboard. Thank you for shopping with us!" },
+  { text:"Welcome back, {name}. Your purchase of {amount} has been recorded. You hold position {rank} on our leaderboard. We appreciate your loyalty." },
+  { text:"Attention everyone! {name} just made a power purchase of {amount} and is Champion number {rank} on our leaderboard! Keep shopping and climb higher!" },
+  { text:"Hey {name}! Great choice today — {amount} well spent! You are at rank {rank} right now. Come back soon!" },
+  { text:"Dear {name}, it is our honour to announce your purchase of {amount}. You stand at rank {rank} on the leaderboard. Thank you for your patronage!" },
+  { text:"बधाई हो {name} जी! आपने {amount} की शानदार खरीदारी की! लीडरबोर्ड पर आपकी रैंक है नंबर {rank}! धन्यवाद, फिर पधारें!" },
+  { text:"स्वागत है {name} जी! आपकी {amount} की खरीदारी दर्ज हो गई है। आप लीडरबोर्ड पर {rank} नंबर पर हैं। आपकी वफादारी का शुक्रिया!" },
+  { text:"ध्यान दीजिए! {name} ने {amount} की जबरदस्त खरीदारी की और वो लीडरबोर्ड पर नंबर {rank} चैंपियन बन गए! और ऊपर चढ़ते रहो!" },
+  { text:"अरे {name} भाई! क्या बढ़िया चुनाव किया! {amount} बिल्कुल सही खर्च हुए। अभी आप रैंक {rank} पर हैं। जल्दी वापस आना!" },
+  { text:"{name} जी, आपकी {amount} की खरीदारी का हम सम्मान करते हैं। आप गर्व से लीडरबोर्ड पर {rank}वें स्थान पर विराजमान हैं। धन्यवाद!" },
+];
+
+function spGetVoiceSettings() { try { return JSON.parse(localStorage.getItem("sc_voice_settings")||"{}"); } catch { return {}; } }
+function spSaveVoiceSettings(obj) { try { localStorage.setItem("sc_voice_settings", JSON.stringify(obj)); } catch {} }
+
+function spInitVoicePanel() {
+  const vs = spGetVoiceSettings();
+  const el = document.getElementById("sp-voice-tmpl");
+  if (el) el.value = vs.template || VOICE_PRESETS[0].text;
+}
+
+function applyVoicePreset(i) {
+  const el = document.getElementById("sp-voice-tmpl");
+  if (el && VOICE_PRESETS[i]) el.value = VOICE_PRESETS[i].text;
+}
+
+function spSaveVoiceTemplate() {
+  const el = document.getElementById("sp-voice-tmpl");
+  if (!el) return;
+  const vs = spGetVoiceSettings();
+  vs.template = el.value.trim() || VOICE_PRESETS[0].text;
+  spSaveVoiceSettings(vs);
+  const st = document.getElementById("sp-voice-status");
+  if (st) { st.innerHTML = '<span style="color:#4f4;">✅ Template saved!</span>'; setTimeout(()=>{ st.innerHTML=''; },2500); }
+}
+
+function spPreviewVoice() {
+  const el = document.getElementById("sp-voice-tmpl");
+  const tmpl = el ? el.value : VOICE_PRESETS[0].text;
+  if (!window.speechSynthesis) { alert("Your browser does not support Speech Synthesis."); return; }
+  window.speechSynthesis.cancel();
+  const text = tmpl.replace(/{name}/gi,"Rahul Kumar").replace(/{amount}/gi,"₹1,500").replace(/{rank}/gi,"3");
+  const utter = new SpeechSynthesisUtterance(text);
+  const vs = spGetVoiceSettings();
+  utter.rate = vs.rate || 1; utter.pitch = vs.pitch || 1; utter.volume = vs.volume || 1;
+  window.speechSynthesis.speak(utter);
+}
+
+// ── Helpers ──
+function escHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+// ── Init ──
+loadConfig();
+if (!SELLER_PASS) {
+  document.getElementById("setup-overlay").style.display = "flex";
+} else {
+  document.getElementById("setup-overlay").style.display = "none";
+  document.getElementById("login-overlay").style.display = "flex";
+}
+</script>
+</body>
+</html>

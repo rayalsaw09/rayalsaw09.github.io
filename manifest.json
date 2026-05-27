@@ -1,24 +1,26 @@
 {
-  "name": "ShopChampion",
+  "name": "ShopChampion Pro",
   "short_name": "ShopChampion",
-  "description": "Loyalty & leaderboard app for your shop",
+  "description": "Loyalty points & leaderboard app for your shop",
   "start_url": "/ShopChampion-Admin.html",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#0a0e1a",
   "theme_color": "#FFD700",
-  "orientation": "portrait",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "categories": ["business", "shopping"],
+  "lang": "en"
 }

@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700;900&family=Nunito:wght@400;600;700;800;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="/config.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Nunito', sans-serif; }
@@ -174,6 +175,39 @@
     --accent:    #ff4444;
   }
 
+
+  /* THEME: Day (Light) */
+  body.theme-day {
+    --bg:        #f0f4ff;
+    --bg-card:   #ffffff;
+    --bg-row-odd:#f7f9ff;
+    --bg-row-even:#eef2fb;
+    --bg-header: #1a2a6c;
+    --bg-footer: #e8edf8;
+    --bg-colhdr: #dde3f4;
+    --border:    #c8d0e8;
+    --border-hdr:#3a5abf;
+    --text:      #1a1f3c;
+    --text-muted:#8899bb;
+    --text-col:  #667aaa;
+    --rank-def:  #c0cadf;
+    --rank1:     #2255cc;
+    --rank2:     #4477dd;
+    --rank3:     #5588ee;
+    --spend1:    #113399;
+    --pts:       #a8b8d8;
+    --top1-bg:   #e8eeff;
+    --top2-bg:   #eef2ff;
+    --top3-bg:   #f4f6ff;
+    --spinner:   #2255cc;
+    --dot-live:  #22aa66;
+    --dot-err:   #cc2222;
+    --badge-bg:  #fff8e0;
+    --badge-brd: #FFD70088;
+    --badge-txt: #aa7700;
+    --accent:    #2255cc;
+  }
+
   body { background: var(--bg); color: var(--text); }
 
   /* ── SETUP SCREEN ── */
@@ -332,6 +366,33 @@
     background: #1a0808; border: 1px solid #4a1515;
     border-radius: 10px; padding: 10px 24px; color: #f88; font-size: 13px; z-index: 100;
   }
+
+  /* ── DISCONNECT BUTTON ── */
+  #disconnect-btn {
+    position: fixed; bottom: 52px; right: 14px; z-index: 200;
+    background: rgba(10,14,26,0.82); border: 1px solid var(--border-hdr);
+    color: var(--text-muted); border-radius: 8px;
+    padding: 6px 13px; font-size: 11px; font-weight: 700;
+    cursor: pointer; letter-spacing: 1px; font-family: 'Nunito', sans-serif;
+    backdrop-filter: blur(6px); transition: all 0.2s; display: none;
+  }
+  #disconnect-btn:hover { color: #f88; border-color: #f88; background: rgba(26,8,8,0.9); }
+
+  /* ── WAITING STATE ── */
+  #waiting-overlay {
+    display: none; position: absolute; inset: 0;
+    align-items: center; justify-content: center; flex-direction: column;
+    gap: 16px; background: var(--bg);
+  }
+  #waiting-overlay .w-icon { font-size: 52px; }
+  #waiting-overlay .w-title {
+    font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 900;
+    letter-spacing: 3px; color: var(--accent);
+  }
+  #waiting-overlay .w-sub {
+    font-size: 13px; color: var(--text-muted); text-align: center;
+    max-width: 320px; line-height: 1.7;
+  }
 </style>
 </head>
 <body>
@@ -355,6 +416,10 @@
       <div class="theme-swatch active" onclick="setTheme('night')"
            style="background:#0a0e1a;color:#7ab3ff;border-color:#7ab3ff;">
         🌙<br>Night
+      </div>
+      <div class="theme-swatch" onclick="setTheme('day')"
+           style="background:#f0f4ff;color:#2255cc;">
+        ☀️<br>Day
       </div>
       <div class="theme-swatch" onclick="setTheme('emerald')"
            style="background:#091510;color:#00ff88;">
@@ -388,8 +453,17 @@
   </div>
 </div>
 
+<!-- DISCONNECT BUTTON (fixed overlay, visible when leaderboard is showing) -->
+<button id="disconnect-btn" onclick="disconnectAndReset()" title="Disconnect & change number">⏏ Disconnect</button>
+
 <!-- LEADERBOARD SCREEN -->
-<div id="leaderboard-screen">
+<div id="leaderboard-screen" style="position:relative;">
+  <!-- WAITING OVERLAY (shown when connected but no data yet) -->
+  <div id="waiting-overlay">
+    <div class="w-icon">📺</div>
+    <div class="w-title">CONNECTED</div>
+    <div class="w-sub">Waiting for Admin to push data.<br>Open the <strong style="color:var(--text);">Admin app</strong> and click <strong style="color:var(--text);">⬆ Push to Display</strong>.<br><br><span id="waiting-phone" style="color:var(--accent);font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;letter-spacing:2px;"></span></div>
+  </div>
   <div id="lb-header">
     <div style="display:flex;align-items:center;gap:14px;">
       <div id="lb-icon" style="font-size:36px;display:flex;align-items:center;">🏆</div>
@@ -407,7 +481,13 @@
       <div id="refresh-dot"></div>
       <span id="refresh-label">Connecting...</span>
     </div>
-    <div id="clock"></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div id="day-night-toggle" title="Toggle Day / Night" onclick="toggleDayNight()" style="display:flex;align-items:center;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:3px 4px;cursor:pointer;gap:2px;user-select:none;">
+        <div id="dnt-day" style="padding:3px 10px;border-radius:16px;font-size:12px;font-weight:700;transition:background 0.2s,color 0.2s;">☀️ Day</div>
+        <div id="dnt-night" style="padding:3px 10px;border-radius:16px;font-size:12px;font-weight:700;transition:background 0.2s,color 0.2s;">🌙 Night</div>
+      </div>
+      <div id="clock"></div>
+    </div>
   </div>
 </div>
 
@@ -415,6 +495,7 @@
 // ── THEME ──
 const THEMES = {
   night:   { cls: '',              label: '🌙 Night'   },
+  day:     { cls: 'theme-day',     label: '☀️ Day'     },
   emerald: { cls: 'theme-emerald', label: '🌿 Emerald'  },
   sunset:  { cls: 'theme-sunset',  label: '🌅 Sunset'   },
   gold:    { cls: 'theme-gold',    label: '✨ Gold'     },
@@ -433,7 +514,24 @@ function setTheme(t) {
     const keys = Object.keys(THEMES);
     el.classList.toggle('active', keys[i] === t);
   });
+  // Update day/night toggle buttons
+  const isDay = (t === 'day');
+  const dayBtn = document.getElementById('dnt-day');
+  const nightBtn = document.getElementById('dnt-night');
+  if (dayBtn) {
+    dayBtn.style.background = isDay ? '#FFD700' : 'transparent';
+    dayBtn.style.color = isDay ? '#1a0a00' : 'rgba(255,255,255,0.5)';
+  }
+  if (nightBtn) {
+    nightBtn.style.background = !isDay ? 'rgba(90,170,255,0.25)' : 'transparent';
+    nightBtn.style.color = !isDay ? '#7ab3ff' : 'rgba(255,255,255,0.5)';
+  }
 }
+
+function toggleDayNight() {
+  setTheme(currentTheme === 'day' ? 'night' : 'day');
+}
+
 // Apply saved theme on load
 setTheme(currentTheme);
 
@@ -452,18 +550,10 @@ function avatarColor(name) {
   return cols[name.charCodeAt(0) % cols.length];
 }
 
-// ── FIREBASE CONFIG ──
-const FB_CFG = {
-  apiKey: "AIzaSyAdNjL9gCptnAbJ6ZVm9BZ61rKfBtwc1Qc",
-  authDomain: "shop-champion.firebaseapp.com",
-  projectId: "shop-champion",
-  storageBucket: "shop-champion.firebasestorage.app",
-  messagingSenderId: "81324128909",
-  appId: "1:81324128909:web:cc023f5c031c505bfe00c4"
-};
+// ── FIREBASE CONFIG (loaded from /config.js) ──
 let fbDb = null;
 try {
-  if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
+  if (!firebase.apps.length) firebase.initializeApp(SC_FIREBASE_CONFIG);
   else firebase.app();
   fbDb = firebase.firestore();
 } catch(e) { console.warn("Firebase init failed:", e.message); }
@@ -473,6 +563,35 @@ let binId = null, fbShopId = null, pollInterval = null, fbUnsubscribe = null;
 let prevRanks = {}, lastData = null, isDemo = false;
 
 // ── INIT ──
+// ── DISCONNECT / LOGOUT ──
+function disconnectAndReset() {
+  if (!confirm('Disconnect and return to setup screen?\n\nYou can connect to a different Admin app by entering a new phone number.')) return;
+
+  // Stop all listeners & polls
+  if (fbUnsubscribe) { fbUnsubscribe(); fbUnsubscribe = null; }
+  if (pollInterval)  { clearInterval(pollInterval); pollInterval = null; }
+
+  // Clear saved connection data
+  localStorage.removeItem('sc_display_shopid');
+  localStorage.removeItem('sc_display_binid');
+
+  // Reset state
+  binId = null; fbShopId = null; lastData = null; prevRanks = {}; isDemo = false;
+
+  // Hide leaderboard, disconnect button, waiting overlay; show setup
+  document.getElementById('leaderboard-screen').style.display = 'none';
+  document.getElementById('disconnect-btn').style.display = 'none';
+  document.getElementById('waiting-overlay').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('error-banner').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+  document.getElementById('manual-bin').value = '';
+
+  // Reset status indicators
+  document.getElementById('refresh-dot').className = '';
+  document.getElementById('refresh-label').textContent = 'Connecting...';
+}
+
 window.addEventListener('load', () => {
   const params = new URLSearchParams(window.location.search);
   const bin = params.get('bin');
@@ -486,22 +605,24 @@ window.addEventListener('load', () => {
   if (saved && !bin && !shop) document.getElementById('manual-bin').value = saved;
   const savedShop = localStorage.getItem('sc_display_shopid');
   if (savedShop && !bin && !shop) {
-    fbShopId = savedShop;
+    fbShopId = savedShop.replace(/[\s\-()]/g, '');
     startFirebaseDisplay();
   }
 });
 
 function connectManual() {
-  const val = document.getElementById('manual-bin').value.trim();
-  if (!val) return;
+  const raw = document.getElementById('manual-bin').value.trim();
+  if (!raw) return;
+  // Normalize phone: strip spaces, dashes, parens for Firebase doc ID
+  const normalized = raw.replace(/[\s\-()]/g, '');
   // If it looks like a phone number (shop ID), use Firebase
-  if (fbDb && val.match(/^[+\d\s\-()]{7,15}$/)) {
-    fbShopId = val;
-    localStorage.setItem('sc_display_shopid', val);
+  if (fbDb && normalized.match(/^[+\d]{7,16}$/)) {
+    fbShopId = normalized;
+    localStorage.setItem('sc_display_shopid', normalized);
     startFirebaseDisplay();
   } else {
-    binId = val;
-    localStorage.setItem('sc_display_binid', val);
+    binId = raw;
+    localStorage.setItem('sc_display_binid', raw);
     startDisplay();
   }
 }
@@ -509,17 +630,38 @@ function connectManual() {
 // ── FIREBASE DISPLAY (primary — works from file://) ──
 function startFirebaseDisplay() {
   if (!fbDb) { startDisplay(); return; } // fallback to JSONbin
+  // Re-read global app settings so shop name & icon reflect the current account immediately
+  try {
+    const as = JSON.parse(localStorage.getItem('sc_app_settings')||'{}');
+    const titleEl = document.getElementById('lb-title');
+    const iconEl  = document.getElementById('lb-icon');
+    if (as.shopName && titleEl) { titleEl.textContent = as.shopName.toUpperCase(); document.title = as.shopName + ' — Live Leaderboard'; }
+    if (iconEl) iconEl.innerHTML = as.appIcon ? `<img src="${as.appIcon}" style="height:100%;max-height:48px;object-fit:contain;border-radius:8px;" />` : '🏆';
+  } catch {}
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('loading-screen').style.display = 'flex';
   if (fbUnsubscribe) fbUnsubscribe();
   fbUnsubscribe = fbDb.collection('users').doc(fbShopId || 'unknown').collection('display').doc('leaderboard')
     .onSnapshot(snap => {
       document.getElementById('loading-screen').style.display = 'none';
+      document.getElementById('leaderboard-screen').style.display = 'flex';
+      document.getElementById('disconnect-btn').style.display = 'block';
       if (!snap.exists) {
-        showError('No display data yet — push from admin first.');
-        document.getElementById('setup-screen').style.display = 'flex';
+        // Show waiting overlay inside leaderboard screen
+        const wo = document.getElementById('waiting-overlay');
+        if (wo) {
+          wo.style.display = 'flex';
+          const wp = document.getElementById('waiting-phone');
+          if (wp) wp.textContent = fbShopId || '';
+        }
+        document.getElementById('refresh-dot').className = '';
+        document.getElementById('refresh-label').textContent = 'Waiting for first push…';
+        hideError();
         return;
       }
+      // Data arrived – hide waiting overlay
+      const wo = document.getElementById('waiting-overlay');
+      if (wo) wo.style.display = 'none';
       const payload = snap.data();
       const isNew = !lastData || JSON.stringify(payload) !== JSON.stringify(lastData);
       lastData = payload;
@@ -572,12 +714,22 @@ function runDemo() {
   showLeaderboard(demo);
   document.getElementById('refresh-dot').className = '';
   document.getElementById('refresh-label').textContent = 'Demo — not live';
+  document.getElementById('disconnect-btn').style.display = 'block';
 }
 
 // ── DISPLAY ──
 function startDisplay() {
+  // Re-read global app settings so shop name & icon are up to date
+  try {
+    const as = JSON.parse(localStorage.getItem('sc_app_settings')||'{}');
+    const titleEl = document.getElementById('lb-title');
+    const iconEl  = document.getElementById('lb-icon');
+    if (as.shopName && titleEl) { titleEl.textContent = as.shopName.toUpperCase(); document.title = as.shopName + ' — Live Leaderboard'; }
+    if (iconEl) iconEl.innerHTML = as.appIcon ? `<img src="${as.appIcon}" style="height:100%;max-height:48px;object-fit:contain;border-radius:8px;" />` : '🏆';
+  } catch {}
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('loading-screen').style.display = 'flex';
+  document.getElementById('disconnect-btn').style.display = 'block';
   fetchData(true);
   pollInterval = setInterval(() => fetchData(false), 10000);
 }
@@ -590,6 +742,7 @@ async function fetchData(initial) {
     const data = await res.json();
     const payload = data.record || data;
     document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('disconnect-btn').style.display = 'block';
     hideError();
     const isNew = !lastData || JSON.stringify(payload) !== JSON.stringify(lastData);
     lastData = payload;
@@ -612,10 +765,10 @@ async function fetchData(initial) {
   }
 }
 
-function showError(msg) {
+function showError(msg, persist) {
   const el = document.getElementById('error-banner');
   el.textContent = '⚠️ ' + msg; el.style.display = 'block';
-  setTimeout(() => { el.style.display = 'none'; }, 6000);
+  if (!persist) setTimeout(() => { el.style.display = 'none'; }, 6000);
 }
 function hideError() { document.getElementById('error-banner').style.display = 'none'; }
 
@@ -635,14 +788,13 @@ function showLeaderboard(payload) {
   const titleEl = document.getElementById('lb-title');
   if (titleEl && payload.shopName) titleEl.textContent = payload.shopName.toUpperCase();
 
-  try {
-    const as = JSON.parse(localStorage.getItem('sc_app_settings')||'{}');
-    const iconEl = document.getElementById('lb-icon');
-    if (iconEl) {
-      iconEl.innerHTML = as.appIcon ? `<img src="${as.appIcon}" style="height:100%;max-height:48px;object-fit:contain;border-radius:8px;" />` : '🏆';
-    }
-    if (as.shopName && titleEl) titleEl.textContent = as.shopName.toUpperCase();
-  } catch {}
+  const iconEl = document.getElementById('lb-icon');
+  if (iconEl) {
+    // Use appIcon from the Firebase payload (works across all devices)
+    const icon = payload.appIcon || '';
+    iconEl.innerHTML = icon ? `<img src="${icon}" style="height:100%;max-height:48px;object-fit:contain;border-radius:8px;" />` : '🏆';
+  }
+  if (payload.shopName) document.title = payload.shopName + ' — Live Leaderboard';
 
   if (payload.lastUpdated) {
     const d = new Date(payload.lastUpdated);

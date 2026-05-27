@@ -18,6 +18,7 @@
     });
   }
 </script>
+<script src="/config.js"></script>
 <!-- Firebase v9 compat (CDN) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -717,7 +718,7 @@
       <div style="font-size:13px;color:#7a8aaa;margin-bottom:16px;" id="auth-pass-subtitle">Enter your password</div>
       <input class="input" type="password" id="auth-pass" placeholder="Enter your password" style="text-align:center;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')loginWithPassword()"/>
       <div id="auth-pass-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
-      <button class="btn" onclick="loginWithPassword()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:10px;">
+      <button id="login-pass-btn" class="btn" onclick="loginWithPassword()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:10px;">
         Login →
       </button>
       <button onclick="showForgotPassword()" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;display:block;width:100%;margin-bottom:6px;">🔑 Forgot Password?</button>
@@ -778,7 +779,7 @@
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
       <button class="btn" onclick="showFirebaseSettings()" style="display:none;">🔥 Firebase</button>
       <button class="btn" onclick="showSyncSetup()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;padding:5px 12px;font-size:12px;">📺 Display Setup</button>
-      <button class="btn" id="push-btn" onclick="if(typeof isSubFeatureAllowed==='function'&&!isSubFeatureAllowed(7)){alert('🔒 Push to Display is a Pro feature. Contact your seller to activate.');return;}pushSync();" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:5px 14px;font-size:12px;font-weight:800;">⬆ Push to Display</button>
+      <button class="btn" id="push-btn" onclick="pushSync();" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:5px 14px;font-size:12px;font-weight:800;">⬆ Push to Display</button>
     </div>
   </div>
 
@@ -796,8 +797,15 @@
 
 <script>
 // ─── SUPABASE CONFIG (defined first so all functions can use it) ───
-const SC_SUPABASE_URL  = "https://dgmzfqwglnafghpfnqau.supabase.co";
-const SC_SUPABASE_ANON = "sb_publishable_yxPk_18wrBIPebrJkYn9FQ_91lhKmjE";
+// ── Secure password hashing (Web Crypto SHA-256) ──
+// Replaces insecure btoa encoding. Phone number acts as a unique per-user salt.
+async function scHashPassword(phone, password) {
+  const raw = phone + ":" + password + ":sc2026";
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// SC_SUPABASE_URL and SC_SUPABASE_ANON loaded from /config.js
 
 // ─── CONSTANTS ───────────────────────────────────────────────
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
@@ -816,6 +824,19 @@ function avatarColor(name) {
   return ["#1a3a5c","#2d1b4e","#1a3a2a","#3a1a1a","#2a2a1a"][name.charCodeAt(0)%5];
 }
 function idExists(id, excludeId) { return customers.some(c=>c.id===id && c.id!==excludeId); }
+
+// ─── DELETED ID TRACKING ─────────────────────────────────────────────────────
+// Keeps a per-account set of IDs that were once used, so they cannot be reused
+// until the record is permanently purged or the admin explicitly resets the list.
+function deletedIdsKey() { return storageKey("deleted_ids"); }
+function getDeletedIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(deletedIdsKey())||"[]")); } catch { return new Set(); }
+}
+function addDeletedId(id) {
+  const s = getDeletedIds(); s.add(id);
+  try { localStorage.setItem(deletedIdsKey(), JSON.stringify([...s])); } catch {}
+}
+function isDeletedId(id) { return getDeletedIds().has(id); }
 
 // ─── FIREBASE / STORAGE LAYER ────────────────────────────────
 let db = null, storage = null, useLocalOnly = false;
@@ -1053,6 +1074,7 @@ async function saveOneCustomer(c) {
 }
 
 async function deleteOneCustomer(id) {
+  addDeletedId(id); // prevent this ID from being reused
   customers = customers.filter(c => c.id !== id);
   if (useLocalOnly) { saveCustomers(); return; }
   await userCol().doc(id).delete();
@@ -1060,17 +1082,8 @@ async function deleteOneCustomer(id) {
 
 // ── On page load: decide which mode ──
 window.addEventListener("load", () => {
-  // ── Firebase is hardcoded — no setup screen needed ──
-  const HARDCODED_FB = {
-    apiKey: "AIzaSyAdNjL9gCptnAbJ6ZVm9BZ61rKfBtwc1Qc",
-    authDomain: "shop-champion.firebaseapp.com",
-    projectId: "shop-champion",
-    storageBucket: "shop-champion.firebasestorage.app",
-    messagingSenderId: "81324128909",
-    appId: "1:81324128909:web:cc023f5c031c505bfe00c4",
-    measurementId: "G-YCX9WJ4DP5"
-  };
-  initFirebase(HARDCODED_FB);
+  // Firebase config loaded from /config.js
+  initFirebase(SC_FIREBASE_CONFIG);
   useLocalOnly = false;
   loadLicense();
   // Check if already logged in — always verify block status online first
@@ -1110,7 +1123,11 @@ function saveDisplaySettings() { try { localStorage.setItem(storageKey("display_
 
 let appSettings = {shopName:"Shop Champion", appIcon:""};
 try { const as=localStorage.getItem(storageKey("app_settings")); if(as) appSettings={...appSettings,...JSON.parse(as)}; } catch {}
-function saveAppSettings() { try { localStorage.setItem(storageKey("app_settings"),JSON.stringify(appSettings)); } catch {} }
+function saveAppSettings() {
+  try { localStorage.setItem(storageKey("app_settings"),JSON.stringify(appSettings)); } catch {}
+  // Also write to global key so the Display screen always reflects the current account's settings
+  try { localStorage.setItem("sc_app_settings", JSON.stringify(appSettings)); } catch {}
+}
 
 // ─── VOICE ANNOUNCEMENT SETTINGS ─────────────────────────────
 // ─── VOICE ANNOUNCEMENT ENGINE ───────────────────────────────
@@ -1486,15 +1503,15 @@ function buildPayload() {
       : "All Time";
   return {
     shopName: appSettings.shopName,
+    appIcon: appSettings.appIcon || "",
     lastUpdated:new Date().toISOString(),
     filterMode: lbFilter.mode,
     filterLabel: filterDesc,
-    displaySettings:{layout:"row",showCount:displaySettings.showCount},
-    customers:sorted.slice(0,displaySettings.showCount).map(c=>({id:c.id,name:c.name,totalSpend:c.totalSpend,points:c.points,rank:c.rank,photo:c.photo||""}))
+    displaySettings:{layout:"row",showCount: (typeof displaySettings.showCount === "number" ? displaySettings.showCount : (displaySettings.topN || 10))},
+    customers:sorted.slice(0, (typeof displaySettings.showCount === "number" ? displaySettings.showCount : (displaySettings.topN || 10))).map(c=>({id:c.id,name:c.name,totalSpend:c.totalSpend,points:c.points,rank:c.rank,photo:c.photo||""}))
   };
 }
 async function pushSync() {
-  if(typeof isSubFeatureAllowed==="function"&&!isSubFeatureAllowed(7)){alert("🔒 Push to Display is disabled for your plan. Contact your seller to activate.");return;}
   const btn=document.getElementById("push-btn"),dot=document.getElementById("sync-status-dot"),txt=document.getElementById("sync-status-text");
   btn.disabled=true;btn.textContent="⏳ Pushing...";dot.className="syncing";txt.textContent="Pushing...";txt.style.color="#FFD700";
 
@@ -1530,7 +1547,7 @@ async function pushSync() {
 async function _pushJsonbin() {
   let url,method,headers;
   if(syncBinId){url=`https://api.jsonbin.io/v3/b/${syncBinId}`;method="PUT";headers={"Content-Type":"application/json","X-Master-Key":syncApiKey};}
-  else{url="https://api.jsonbin.io/v3/b";method="POST";headers={"Content-Type":"application/json","X-Master-Key":syncApiKey,"X-Bin-Name":"ShopChampion","X-Bin-Private":"false"};}
+  else{url="https://api.jsonbin.io/v3/b";method="POST";headers={"Content-Type":"application/json","X-Master-Key":syncApiKey,"X-Bin-Name":"ShopChampion","X-Bin-Private":"true"};}
   const res=await fetch(url,{method,headers,body:JSON.stringify(buildPayload())});
   const data=await res.json();
   if(!res.ok) throw new Error(data.message||"API error");
@@ -1706,10 +1723,78 @@ async function checkPhone() {
 }
 
 // ── Step 2a: Login with password ──
+// ── Brute-force login protection ──────────────────────────────
+const SC_MAX_ATTEMPTS  = 5;          // max wrong passwords
+const SC_LOCKOUT_MS    = 15 * 60 * 1000; // 15 minutes in ms
+
+function bfKey(phone) { return "sc_bf_" + phone; }
+
+function getBfState(phone) {
+  try {
+    const raw = localStorage.getItem(bfKey(phone));
+    return raw ? JSON.parse(raw) : { attempts: 0, lockedUntil: 0 };
+  } catch { return { attempts: 0, lockedUntil: 0 }; }
+}
+
+function saveBfState(phone, state) {
+  try { localStorage.setItem(bfKey(phone), JSON.stringify(state)); } catch {}
+}
+
+function resetBfState(phone) {
+  try { localStorage.removeItem(bfKey(phone)); } catch {}
+}
+
+function isLockedOut(phone) {
+  const s = getBfState(phone);
+  if (s.lockedUntil && Date.now() < s.lockedUntil) return s.lockedUntil;
+  return false;
+}
+
+function recordFailedAttempt(phone) {
+  const s = getBfState(phone);
+  s.attempts = (s.attempts || 0) + 1;
+  if (s.attempts >= SC_MAX_ATTEMPTS) {
+    s.lockedUntil = Date.now() + SC_LOCKOUT_MS;
+    s.attempts = 0; // reset counter so next lockout is fresh
+  }
+  saveBfState(phone, s);
+  return s;
+}
+
+function showLockoutMessage(phone, errEl) {
+  const until = isLockedOut(phone);
+  if (!until) return false;
+  const secsLeft = Math.ceil((until - Date.now()) / 1000);
+  const mins = Math.floor(secsLeft / 60);
+  const secs = secsLeft % 60;
+  errEl.innerHTML = `🔒 Too many wrong attempts. Try again in <strong>${mins}m ${secs}s</strong>.`;
+  errEl.style.display = "block";
+  // Disable the login button and update the countdown every second
+  const btn = document.getElementById("login-pass-btn");
+  if (btn) btn.disabled = true;
+  if (window._bfTimer) clearInterval(window._bfTimer);
+  window._bfTimer = setInterval(() => {
+    const remaining = isLockedOut(phone);
+    if (!remaining) {
+      clearInterval(window._bfTimer);
+      errEl.style.display = "none";
+      if (btn) btn.disabled = false;
+      return;
+    }
+    const s2 = Math.ceil((remaining - Date.now()) / 1000);
+    const m2 = Math.floor(s2 / 60), ss2 = s2 % 60;
+    errEl.innerHTML = `🔒 Too many wrong attempts. Try again in <strong>${m2}m ${ss2}s</strong>.`;
+  }, 1000);
+  return true;
+}
+
 function loginWithPassword() {
   const pass = (document.getElementById("auth-pass").value || "").trim();
   const errEl = document.getElementById("auth-pass-err");
   errEl.style.display = "none";
+
+  // ── Lockout check ──
+  if (showLockoutMessage(authPhone, errEl)) return;
 
   if (!pass) {
     errEl.textContent = "❌ Please enter your password";
@@ -1724,7 +1809,7 @@ function loginWithPassword() {
 async function verifyPasswordOnline(phone, pass) {
   const errEl = document.getElementById("auth-pass-err");
   try {
-    const hashed = btoa(phone + ":" + pass);
+    const hashed = await scHashPassword(phone, pass);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 6000);
     const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=phone,password_hash,blocked`, {
@@ -1740,14 +1825,20 @@ async function verifyPasswordOnline(phone, pass) {
         return;
       }
       if (rows[0].password_hash === hashed) {
+        resetBfState(phone); // clear failed attempts on success
         localStorage.setItem("sc_auth_phone", phone);
         localStorage.setItem("sc_user_" + phone, hashed); // cache locally
         onLoginSuccess(phone);
       } else {
-        errEl.textContent = "❌ Wrong password. Try again or use Forgot Password.";
+        const bfState = recordFailedAttempt(phone);
+        const attemptsLeft = SC_MAX_ATTEMPTS - (bfState.attempts || 0);
+        if (showLockoutMessage(phone, errEl)) return;
+        errEl.textContent = `❌ Wrong password. ${attemptsLeft > 0 ? attemptsLeft + " attempt(s) left before lockout." : "Try again or use Forgot Password."}`;
         errEl.style.display = "block";
       }
     } else {
+      recordFailedAttempt(phone);
+      if (showLockoutMessage(phone, errEl)) return;
       errEl.textContent = "❌ Wrong password. Try again or use Forgot Password.";
       errEl.style.display = "block";
     }
@@ -1792,7 +1883,7 @@ async function setNewPassword() {
   if(saveBtn) saveBtn.disabled = true;
   if(saveTxt) saveTxt.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Saving...`;
 
-  const hashed = btoa(authPhone + ":" + p1);
+  const hashed = await scHashPassword(authPhone, p1);
   const userNum = Date.now();
 
   try {
@@ -1836,14 +1927,14 @@ function onLoginSuccess(phone) {
 
   // ── Reload all per-account settings now that authPhone is set ──
   try { const ds=localStorage.getItem(storageKey("display_settings")); if(ds) displaySettings={...displaySettings,...JSON.parse(ds)}; } catch {}
-  try { const as=localStorage.getItem(storageKey("app_settings"));     if(as) appSettings={...appSettings,...JSON.parse(as)};         } catch {}
+  try { const as=localStorage.getItem(storageKey("app_settings"));     if(as) { appSettings={...appSettings,...JSON.parse(as)}; localStorage.setItem("sc_app_settings", JSON.stringify(appSettings)); } } catch {}
   try { const vs=localStorage.getItem(storageKey("voice_settings"));   if(vs) voiceSettings={...voiceSettings,...JSON.parse(vs)};     } catch {}
   try { const sd=localStorage.getItem(storageKey("sync_data"));        if(sd){const p=JSON.parse(sd);syncBinId=p.binId;syncApiKey=p.apiKey;} } catch {}
   try { const th=localStorage.getItem(storageKey("theme"));            if(th) { currentTheme=th; applyTheme(th); } } catch {}
   try { const lg=localStorage.getItem(storageKey("lang"));             if(lg) currentLang=lg; } catch {}
-  // ── Firebase config ──
-  const fbCfg = localStorage.getItem(storageKey("fb_config"));
-  if (fbCfg && !db) { try { initFirebaseFromConfig(JSON.parse(fbCfg)); } catch {} }
+  // ── Firebase config — always use config.js values, save to localStorage for UI ──
+  try { localStorage.setItem(storageKey("fb_config"), JSON.stringify(SC_FIREBASE_CONFIG)); } catch {}
+  if (!db) { try { initFirebase(SC_FIREBASE_CONFIG); } catch {} }
 
   if (db && phone) {
     shopId = phone;
@@ -1917,7 +2008,7 @@ function doLogout() {
   // Reset in-memory state so next account starts clean
   customers = [];
   syncBinId = ""; syncApiKey = "";
-  displaySettings = { shopName:"", tagline:"", theme:"dark", showRank:true, showSpend:true, topN:10 };
+  displaySettings = { showCount:10 }; // reset to safe default with correct key
   appSettings = { shopName:"ShopChampion", currency:"₹", pointsPerRupee:1, redeemRate:100, welcomeBonus:0 };
   voiceSettings = { enabled:false, voiceLang:"en", voiceName:"", template:"", templateHi:"", rate:1, pitch:1, volume:1 };
   document.getElementById("main-app").style.display = "none";
@@ -1964,12 +2055,19 @@ function _tab2RestoreFields(saved) {
 }
 
 function safeRenderTab(i) {
+  // If the user has focus inside any input/textarea in the tab, skip re-render
+  // to prevent auto-resetting fields like the shop name input.
+  const active = document.activeElement;
+  const tabContent = document.getElementById("tab-content");
+  const userIsTyping = active && tabContent && tabContent.contains(active) &&
+    (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+  if (i === 6 && userIsTyping) {
+    return; // Don't re-render settings tab while user is editing any field
+  }
   if (i === 2) {
     // If the user currently has focus inside the Purchase tab, skip re-render
     // entirely — data is already updated in memory, DOM is fine as-is.
-    const active = document.activeElement;
-    const tabContent = document.getElementById("tab-content");
-    if (active && tabContent && tabContent.contains(active)) {
+    if (userIsTyping) {
       return;
     }
 
@@ -3388,7 +3486,7 @@ function renderSettings(){
 
     <div class="card" style="padding:24px;">
       <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:12px;">📺 Sync & Display</div>
-      ${syncBinId?`<div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:8px;padding:12px;margin-bottom:14px;"><div style="font-size:12px;color:#4f4;font-weight:700;margin-bottom:6px;">✅ Display connected</div><div style="font-family:monospace;font-size:12px;color:#aaa;">Bin: ${syncBinId}</div></div><div style="display:flex;gap:10px;"><button class="btn" onclick="if(typeof isSubFeatureAllowed==='function'&&!isSubFeatureAllowed(7)){alert('🔒 Push to Display is disabled for your plan. Contact your seller to activate.');return;}pushSync();" style="background:#1a3a1a;color:#4f4;border:1px solid #2a4a2a;flex:1;padding:10px;font-size:13px;">⬆ Push</button><button class="btn" onclick="showDisplayUrlModal();" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;flex:1;padding:10px;font-size:13px;">📋 Bin ID</button></div>`:`<div style="background:#1a0a0a;border:1px solid #4a1515;border-radius:8px;padding:12px;margin-bottom:14px;color:#f88;font-size:13px;">⚠️ No display connected.</div><button class="btn" onclick="showSyncSetup();" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;width:100%;padding:10px;font-size:13px;">📺 Set Up Display Sync</button>`}
+      ${syncBinId?`<div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:8px;padding:12px;margin-bottom:14px;"><div style="font-size:12px;color:#4f4;font-weight:700;margin-bottom:6px;">✅ Display connected</div><div style="font-family:monospace;font-size:12px;color:#aaa;">Bin: ${syncBinId}</div></div><div style="display:flex;gap:10px;"><button class="btn" onclick="pushSync();" style="background:#1a3a1a;color:#4f4;border:1px solid #2a4a2a;flex:1;padding:10px;font-size:13px;">⬆ Push</button><button class="btn" onclick="showDisplayUrlModal();" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;flex:1;padding:10px;font-size:13px;">📋 Bin ID</button></div>`:`<div style="background:#1a0a0a;border:1px solid #4a1515;border-radius:8px;padding:12px;margin-bottom:14px;color:#f88;font-size:13px;">⚠️ No display connected.</div><button class="btn" onclick="showSyncSetup();" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;width:100%;padding:10px;font-size:13px;">📺 Set Up Display Sync</button>`}
     </div>
   </div>`;
 
@@ -3431,7 +3529,6 @@ function saveShopName(){
   appSettings.shopName=val;
   saveAppSettings();
   updateAppHeader();
-  renderTab(6);
   notify("✅ Shop name updated!");
 }
 
@@ -3509,6 +3606,7 @@ async function saveNewCustomer(){
   let rawId=document.getElementById("m-id")?.value.trim();
   const id=rawId?rawId.toUpperCase():autoId();
   if(idExists(id,null)){notify("❌ ID already exists — try another or click 🎲 Auto");return;}
+  if(rawId && isDeletedId(id)){notify("❌ This ID was used by a deleted customer and cannot be reused. Please choose a different ID or click 🎲 Auto");return;}
   const phone=document.getElementById("m-phone")?.value.trim()||"";
   const newC={id,name,phone,photo:tempPhoto||"",totalSpend:0,purchases:[]};
   customers.push(newC);
@@ -3689,6 +3787,10 @@ async function bulkSaveAll() {
     const id = e.rawId ? e.rawId.toUpperCase() : autoId();
     if (idExists(id, null) || toAdd.some(c => c.id === id)) {
       skipped.push(`${e.name} (ID ${id} duplicate)`);
+      return;
+    }
+    if (e.rawId && isDeletedId(id)) {
+      skipped.push(`${e.name} (ID ${id} was previously deleted — cannot reuse)`);
       return;
     }
     toAdd.push({ id, name: e.name, phone: e.phone, photo: '', totalSpend: 0, purchases: [], borrows: [] });
@@ -4803,7 +4905,7 @@ async function loadFreeTabs() {
   try { renderTabs(); safeRenderTab(currentTab); } catch {}
   // Show/hide push-to-display button based on feature toggle
   const pushBtn = document.getElementById("push-btn");
-  if (pushBtn) pushBtn.style.display = isSubFeatureAllowed(7) ? "" : "none";
+  if (pushBtn) pushBtn.style.display = ""; // Push to Display always available
 }
 
 // Poll every 30s so changes in Seller Panel reflect live
