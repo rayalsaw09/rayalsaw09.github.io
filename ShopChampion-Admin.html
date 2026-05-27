@@ -511,6 +511,24 @@
   body.day-theme .more-menu-btn { background: #f0f2fa; border-color: #d0d4e8; color: #556; }
   body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD700; color: #856000; }
 
+  /* PWA Install Banner */
+  #pwa-install-banner {
+    display: none;
+    position: fixed;
+    bottom: 70px;
+    left: 12px; right: 12px;
+    background: linear-gradient(135deg, #1a3a1a, #0d2a10);
+    border: 1px solid #FFD700;
+    border-radius: 14px;
+    padding: 14px 16px;
+    z-index: 900;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 4px 24px #0008;
+  }
+  #pwa-install-banner.show { display: flex; }
+  body.day-theme #pwa-install-banner { background: linear-gradient(135deg, #fffbe6, #fff8d6); }
+
   /* Leaderboard mobile — collapse 5-col grid to 3-col */
   @media (max-width: 600px) {
     .lb-row-grid {
@@ -919,6 +937,17 @@
 
 <div id="modal-container"></div>
 
+<!-- PWA Install Banner -->
+<div id="pwa-install-banner">
+  <span style="font-size:26px;">📲</span>
+  <div style="flex:1;min-width:0;">
+    <div style="font-size:13px;font-weight:800;color:#FFD700;">Install ShopChampion</div>
+    <div style="font-size:11px;color:#4f4;margin-top:2px;">Add to home screen for the best experience</div>
+  </div>
+  <button id="pwa-install-btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">Install ✓</button>
+  <button onclick="document.getElementById('pwa-install-banner').classList.remove('show');localStorage.setItem('pwa_dismissed','1');" style="background:none;border:none;color:#4a6a4a;cursor:pointer;font-size:18px;padding:0 4px;">×</button>
+</div>
+
 <!-- Customer Detail Full Page -->
 <div id="customer-page" style="display:none;position:fixed;inset:0;background:#0a0e1a;z-index:500;overflow-y:auto;">
   <div id="customer-page-inner" style="max-width:700px;margin:0 auto;padding:20px;"></div>
@@ -1213,6 +1242,46 @@ async function deleteOneCustomer(id) {
   await userCol().doc(id).delete();
 }
 
+
+
+// ── PWA Install Prompt ─────────────────────────────────────────
+let _deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  // Show banner if not dismissed before
+  if (!localStorage.getItem('pwa_dismissed') && !localStorage.getItem('pwa_installed')) {
+    setTimeout(() => {
+      document.getElementById('pwa-install-banner').classList.add('show');
+    }, 3000);
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) {
+    btn.addEventListener('click', async () => {
+      if (_deferredInstallPrompt) {
+        _deferredInstallPrompt.prompt();
+        const { outcome } = await _deferredInstallPrompt.userChoice;
+        if (outcome === 'accepted') {
+          localStorage.setItem('pwa_installed', '1');
+          document.getElementById('pwa-install-banner').classList.remove('show');
+        }
+        _deferredInstallPrompt = null;
+      } else {
+        // Fallback instructions
+        alert('To install:\n\n1. Tap the 3-dot menu in Chrome\n2. Tap "Add to Home Screen"\n3. Tap "Add"');
+      }
+    });
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  localStorage.setItem('pwa_installed', '1');
+  document.getElementById('pwa-install-banner').classList.remove('show');
+});
 
 // ── Mobile Bottom Nav ──────────────────────────────────────────
 const MOBILE_MAIN_TABS = [0, 1, 2, 3]; // leaderboard, customers, purchase, analytics
