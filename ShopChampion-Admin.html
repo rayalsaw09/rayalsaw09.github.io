@@ -434,6 +434,83 @@
   @keyframes pulse-green { 0%,100%{opacity:1} 50%{opacity:0.4} }
   #sync-status-dot.syncing { background: #aa4; box-shadow: 0 0 6px #FFD700; }
   #sync-status-dot.error { background: #a22; box-shadow: 0 0 6px #f44; animation: none; }
+
+  /* ═══════════════════════════════════════════
+     MOBILE FRIENDLY — responsive overrides
+     ═══════════════════════════════════════════ */
+
+  #bottom-nav { display: none; }
+  #more-menu { display: none; }
+
+  @media (max-width: 600px) {
+    #main-header { padding: 10px 12px !important; gap: 10px !important; }
+    #header-shop-name { font-size: 16px !important; }
+    #header-admin-badge { display: none !important; }
+    #header-logout-btn { padding: 5px 10px !important; font-size: 11px !important; }
+    #header-theme-btn { padding: 5px 8px !important; font-size: 13px !important; }
+    #header-lang-btn { padding: 5px 8px !important; font-size: 11px !important; }
+    #sync-banner { flex-wrap: wrap !important; gap: 6px !important; padding: 8px 12px !important; }
+    #sync-banner-actions { width: 100% !important; justify-content: flex-end !important; }
+    #tab-bar { display: none !important; }
+    #bottom-nav {
+      display: flex !important;
+      position: fixed !important;
+      bottom: 0; left: 0; right: 0;
+      background: #0d1220;
+      border-top: 1px solid #1e2a45;
+      z-index: 800;
+      padding: 4px 0 env(safe-area-inset-bottom, 4px);
+    }
+    .bnav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      background: none;
+      border: none;
+      color: #556;
+      cursor: pointer;
+      padding: 6px 2px;
+      font-family: 'Nunito', sans-serif;
+      transition: color 0.2s;
+      min-width: 0;
+    }
+    .bnav-btn.active { color: #FFD700; }
+    .bnav-btn .bnav-icon { font-size: 20px; line-height: 1; }
+    .bnav-btn .bnav-label { font-size: 9px; font-weight: 700; letter-spacing: 0.3px; white-space: nowrap; }
+    #more-menu {
+      position: fixed;
+      bottom: 60px; left: 0; right: 0;
+      background: #0f1628;
+      border-top: 1px solid #1e2a45;
+      border-radius: 16px 16px 0 0;
+      z-index: 799;
+      padding: 12px 8px 8px;
+    }
+    #more-menu.open { display: grid !important; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .more-menu-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      background: #1a2540; border: 1px solid #2a3560; border-radius: 12px;
+      padding: 12px 8px; color: #aaa; cursor: pointer; font-family: 'Nunito', sans-serif;
+    }
+    .more-menu-btn.active { background: #1a1a00; border-color: #FFD700; color: #FFD700; }
+    .more-menu-btn .mm-icon { font-size: 22px; }
+    .more-menu-btn .mm-label { font-size: 11px; font-weight: 700; }
+    #tab-content { padding: 12px 12px 80px !important; }
+    #customer-page-inner { padding: 12px 12px 80px !important; }
+    .btn { min-height: 36px; }
+    .input { font-size: 16px !important; }
+  }
+
+  body.day-theme #bottom-nav { background: #f0f2fa; border-color: #d0d4e8; }
+  body.day-theme .bnav-btn { color: #9aa; }
+  body.day-theme .bnav-btn.active { color: #1a56db; }
+  body.day-theme #more-menu { background: #fff; border-color: #d0d4e8; }
+  body.day-theme .more-menu-btn { background: #f0f2fa; border-color: #d0d4e8; color: #556; }
+  body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD700; color: #856000; }
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
@@ -752,18 +829,18 @@
 <!-- MAIN APP -->
 <div id="main-app">
   <!-- Header -->
-  <div style="background:linear-gradient(135deg,#0a0e1a,#101828);border-bottom:1px solid #1e2a45;padding:16px 20px;display:flex;align-items:center;gap:16px;">
+  <div id="main-header" style="background:linear-gradient(135deg,#0a0e1a,#101828);border-bottom:1px solid #1e2a45;padding:16px 20px;display:flex;align-items:center;gap:16px;">
     <div id="header-shop-icon" style="font-size:28px;">🏆</div>
     <div>
       <div id="header-shop-name" style="font-size:20px;font-weight:800;background:linear-gradient(90deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">Shop Champion</div>
       <div style="font-size:11px;color:#556;letter-spacing:2px;text-transform:uppercase;">Admin Panel</div>
     </div>
     <div style="margin-left:auto;display:flex;gap:10px;align-items:center;">
-      <span style="background:#1a2540;border:1px solid #2a3560;border-radius:8px;padding:4px 12px;font-size:12px;color:#aaa;">👤 Admin</span>
-      <button class="btn" onclick="doLogout()" style="background:#1a0a0a;border:1px solid #4a1515;color:#f66;padding:6px 14px;font-size:12px;">Logout</button>
-      <button class="btn" id="theme-btn" onclick="toggleTheme()" title="Toggle Day/Night Theme" style="background:#1a2540;border:1px solid #2a3560;color:#FFD700;padding:6px 12px;font-size:15px;">🌙</button>
+      <span id="header-admin-badge" style="background:#1a2540;border:1px solid #2a3560;border-radius:8px;padding:4px 12px;font-size:12px;color:#aaa;">👤 Admin</span>
+      <button id="header-logout-btn" class="btn" onclick="doLogout()" style="background:#1a0a0a;border:1px solid #4a1515;color:#f66;padding:6px 14px;font-size:12px;">Logout</button>
+      <button class="btn" id="header-theme-btn" onclick="toggleTheme()" title="Toggle Day/Night Theme" style="background:#1a2540;border:1px solid #2a3560;color:#FFD700;padding:6px 12px;font-size:15px;">🌙</button>
       <div style="position:relative;">
-        <button class="btn" id="lang-btn" onclick="toggleLangMenu()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;padding:6px 12px;font-size:12px;font-weight:700;">🌐 <span id="lang-label">EN</span> ▾</button>
+        <button class="btn" id="header-lang-btn" onclick="toggleLangMenu()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;padding:6px 12px;font-size:12px;font-weight:700;">🌐 <span id="lang-label">EN</span> ▾</button>
         <div id="lang-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--bg-card);border:1px solid var(--border-main);border-radius:12px;padding:8px;z-index:9999;min-width:160px;box-shadow:0 8px 32px #0008;"></div>
       </div>
     </div>
@@ -776,16 +853,44 @@
     <span style="font-size:12px;color:#556;" id="sync-time"></span>
     <!-- Firebase status -->
     <span id="db-status-text" style="font-size:11px;color:#4a5a7a;margin-left:4px;"></span>
-    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <div id="sync-banner-actions" style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
       <button class="btn" onclick="showFirebaseSettings()" style="display:none;">🔥 Firebase</button>
       <button class="btn" onclick="showSyncSetup()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;padding:5px 12px;font-size:12px;">📺 Display Setup</button>
       <button class="btn" id="push-btn" onclick="pushSync();" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:5px 14px;font-size:12px;font-weight:800;">⬆ Push to Display</button>
     </div>
   </div>
 
-  <!-- Tabs -->
+  <!-- Tabs (desktop horizontal scroll) -->
   <div id="tab-bar" style="background:#0d1220;border-bottom:1px solid #1e2a45;overflow-x:auto;display:flex;padding:6px 12px;gap:4px;"></div>
   <div id="tab-content" style="padding:20px;max-width:1200px;margin:0 auto;"></div>
+
+  <!-- More menu overlay (mobile) -->
+  <div id="more-menu" onclick="event.stopPropagation()"></div>
+  <div id="more-menu-backdrop" style="display:none;position:fixed;inset:0;z-index:798;" onclick="closeMoreMenu()"></div>
+
+  <!-- Bottom Nav (mobile only) -->
+  <nav id="bottom-nav">
+    <button class="bnav-btn" id="bnav-0" onclick="mobileTab(0)">
+      <span class="bnav-icon">🏆</span>
+      <span class="bnav-label">Board</span>
+    </button>
+    <button class="bnav-btn" id="bnav-1" onclick="mobileTab(1)">
+      <span class="bnav-icon">👥</span>
+      <span class="bnav-label">Customers</span>
+    </button>
+    <button class="bnav-btn" id="bnav-2" onclick="mobileTab(2)">
+      <span class="bnav-icon">💳</span>
+      <span class="bnav-label">Purchase</span>
+    </button>
+    <button class="bnav-btn" id="bnav-3" onclick="mobileTab(3)">
+      <span class="bnav-icon">📊</span>
+      <span class="bnav-label">Analytics</span>
+    </button>
+    <button class="bnav-btn" id="bnav-more" onclick="toggleMoreMenu()">
+      <span class="bnav-icon">⋯</span>
+      <span class="bnav-label">More</span>
+    </button>
+  </nav>
 </div>
 
 <div id="modal-container"></div>
@@ -1079,6 +1184,63 @@ async function deleteOneCustomer(id) {
   if (useLocalOnly) { saveCustomers(); return; }
   await userCol().doc(id).delete();
 }
+
+
+// ── Mobile Bottom Nav ──────────────────────────────────────────
+const MOBILE_MAIN_TABS = [0, 1, 2, 3]; // leaderboard, customers, purchase, analytics
+const MOBILE_MORE_TABS = [4, 5, 6];    // compare, festivals, settings
+
+function mobileTab(i) {
+  closeMoreMenu();
+  switchTab(i);
+  updateBottomNav(i);
+}
+
+function updateBottomNav(activeIdx) {
+  MOBILE_MAIN_TABS.forEach(i => {
+    const btn = document.getElementById('bnav-' + i);
+    if (btn) btn.classList.toggle('active', i === activeIdx);
+  });
+  const moreBtn = document.getElementById('bnav-more');
+  if (moreBtn) moreBtn.classList.toggle('active', MOBILE_MORE_TABS.includes(activeIdx));
+}
+
+function toggleMoreMenu() {
+  const menu = document.getElementById('more-menu');
+  const backdrop = document.getElementById('more-menu-backdrop');
+  const isOpen = menu.classList.contains('open');
+  if (isOpen) {
+    closeMoreMenu();
+  } else {
+    // Build more menu items
+    const TABS = getTabs();
+    menu.innerHTML = MOBILE_MORE_TABS.map(i => `
+      <button class="more-menu-btn${currentTab === i ? ' active' : ''}" onclick="mobileTab(${i});closeMoreMenu()">
+        <span class="mm-icon">${TABS_ICON[i]}</span>
+        <span class="mm-label">${TABS_BASE[i].charAt(0).toUpperCase() + TABS_BASE[i].slice(1)}</span>
+      </button>
+    `).join('');
+    menu.classList.add('open');
+    backdrop.style.display = 'block';
+  }
+}
+
+function closeMoreMenu() {
+  const menu = document.getElementById('more-menu');
+  const backdrop = document.getElementById('more-menu-backdrop');
+  if (menu) menu.classList.remove('open');
+  if (backdrop) backdrop.style.display = 'none';
+}
+
+// Override switchTab to also update bottom nav
+const _origSwitchTab = switchTab;
+switchTab = function(i) {
+  _origSwitchTab(i);
+  updateBottomNav(i);
+};
+
+// Init bottom nav state on load
+document.addEventListener('DOMContentLoaded', () => updateBottomNav(0));
 
 // ── On page load: decide which mode ──
 window.addEventListener("load", () => {
