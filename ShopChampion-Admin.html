@@ -2611,30 +2611,23 @@ function renderLeaderboard(sorted){
   customers.forEach(c=>(c.purchases||[]).forEach(p=>{const y=parseInt((p.date||"").slice(0,4));if(y>=2000&&y<=2100)lbYears.add(y);}));
   const lbYearBtns = [...lbYears].sort((a,b)=>b-a).map(y=>`<button onclick="setLbYear(${y})" style="cursor:pointer;border-radius:8px;padding:5px 11px;border:2px solid ${lbFilter.mode==='year'&&lbFilter.year===y?'#c084fc':'#1e2a45'};background:${lbFilter.mode==='year'&&lbFilter.year===y?'#1a0e2a':'#0a0e1a'};color:${lbFilter.mode==='year'&&lbFilter.year===y?'#c084fc':'#4a5a7a'};font-size:12px;font-weight:${lbFilter.mode==='year'&&lbFilter.year===y?'800':'600'};font-family:'Nunito',sans-serif;transition:all 0.2s;white-space:nowrap;">${y}</button>`).join("");
 
-  // ── date filter bar ──
+  // ── date filter bar — slim pill style ──
   const filterBar = `
-    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:${lbYears.size>0?'10px':'0'};">
-        <span style="font-size:12px;color:#7a8aaa;font-weight:700;white-space:nowrap;">📅 Show For:</span>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;flex:1;">
-          <button onclick="setLbFilter('all')" style="cursor:pointer;border-radius:8px;padding:6px 14px;border:2px solid ${lbFilter.mode==='all'?'#FFD700':'#1e2a45'};background:${lbFilter.mode==='all'?'#1a1400':'#0a0e1a'};color:${lbFilter.mode==='all'?'#FFD700':'#4a5a7a'};font-size:12px;font-weight:${lbFilter.mode==='all'?'800':'600'};font-family:'Nunito',sans-serif;transition:all 0.2s;white-space:nowrap;">All Time</button>
-          <button onclick="setLbFilter('today')" style="cursor:pointer;border-radius:8px;padding:6px 14px;border:2px solid ${lbFilter.mode==='today'?'#4f4':'#1e2a45'};background:${lbFilter.mode==='today'?'#0a1a0a':'#0a0e1a'};color:${lbFilter.mode==='today'?'#4f4':'#4a5a7a'};font-size:12px;font-weight:${lbFilter.mode==='today'?'800':'600'};font-family:'Nunito',sans-serif;transition:all 0.2s;white-space:nowrap;">Today</button>
-          <button onclick="setLbFilter('custom')" style="cursor:pointer;border-radius:8px;padding:6px 14px;border:2px solid ${lbFilter.mode==='custom'?'#5af':'#1e2a45'};background:${lbFilter.mode==='custom'?'#0a0e1a':'#0a0e1a'};color:${lbFilter.mode==='custom'?'#5af':'#4a5a7a'};font-size:12px;font-weight:${lbFilter.mode==='custom'?'800':'600'};font-family:'Nunito',sans-serif;transition:all 0.2s;white-space:nowrap;">📆 Pick Date</button>
-        </div>
-        ${isFiltered ? `<span style="background:#1a1400;border:1px solid #FFD70044;border-radius:20px;padding:3px 10px;font-size:11px;color:#FFD700;white-space:nowrap;">🔍 ${filterLabel}</span>` : ""}
-      </div>
-      ${lbYears.size>0?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid #1a2a40;"><span style="font-size:11px;color:#7a5aaa;font-weight:700;white-space:nowrap;">📆 YEAR:</span>${lbYearBtns}</div>`:''}
+    <div style="display:flex;gap:8px;overflow-x:auto;padding:0 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:6px;">
+      <button onclick="setLbFilter('all')" style="cursor:pointer;border-radius:20px;padding:7px 16px;border:2px solid ${lbFilter.mode==='all'?'#FFD700':'#1e2a45'};background:${lbFilter.mode==='all'?'#1a1400':'transparent'};color:${lbFilter.mode==='all'?'#FFD700':'#4a5a7a'};font-size:13px;font-weight:${lbFilter.mode==='all'?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;flex-shrink:0;">All Time</button>
+      <button onclick="setLbFilter('today')" style="cursor:pointer;border-radius:20px;padding:7px 16px;border:2px solid ${lbFilter.mode==='today'?'#4f4':'#1e2a45'};background:${lbFilter.mode==='today'?'#0a1a0a':'transparent'};color:${lbFilter.mode==='today'?'#4f4':'#4a5a7a'};font-size:13px;font-weight:${lbFilter.mode==='today'?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;flex-shrink:0;">Today</button>
+      ${lbYearBtns?lbYearBtns.replace(/border-radius:8px/g,'border-radius:20px').replace(/font-size:12px/g,'font-size:13px'):''}
+      <button onclick="setLbFilter('custom')" style="cursor:pointer;border-radius:20px;padding:7px 16px;border:2px solid ${lbFilter.mode==='custom'?'#5af':'#1e2a45'};background:${lbFilter.mode==='custom'?'#0a1628':'transparent'};color:${lbFilter.mode==='custom'?'#5af':'#4a5a7a'};font-size:13px;font-weight:${lbFilter.mode==='custom'?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;flex-shrink:0;">📅 Pick Date</button>
     </div>
-    <div id="lb-custom-date-row" style="display:${lbFilter.mode==='custom'?'flex':'none'};align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-      <input type="date" id="lb-date-pick" class="input" value="${lbFilter.customDate||todayStr()}" style="max-width:200px;" />
-      <button onclick="applyCustomDate()" style="cursor:pointer;border-radius:8px;padding:9px 18px;border:2px solid #5af;background:#0a0e1a;color:#5af;font-size:13px;font-weight:800;font-family:'Nunito',sans-serif;">Apply</button>
-      ${lbFilter.customDate?`<span style="font-size:12px;color:#5af;">Showing: ${filterLabel}</span>`:""}
+    <div id="lb-custom-date-row" style="display:${lbFilter.mode==='custom'?'flex':'none'};align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <input type="date" id="lb-date-pick" class="input" value="${lbFilter.customDate||todayStr()}" style="max-width:180px;font-size:14px;" />
+      <button onclick="applyCustomDate()" style="cursor:pointer;border-radius:20px;padding:9px 20px;border:2px solid #5af;background:#0a1628;color:#5af;font-size:13px;font-weight:800;font-family:'Nunito',sans-serif;">Apply</button>
     </div>`;
 
   // ── column header label changes based on filter ──
   const spendLabel = isFiltered ? (lbFilter.mode==="today"?"Today's Spend":lbFilter.mode==="year"?lbFilter.year+" Spend":"Day's Spend") : "Total Spend";
 
-  const hdr=`<div style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px 10px 0 0;padding:10px 16px;margin-bottom:2px;">
+  const hdr=`<div class="lb-hdr" style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px 10px 0 0;padding:10px 16px;margin:0 14px 2px;">
     <div style="font-size:11px;color:#4a5a7a;font-weight:700;text-transform:uppercase;text-align:center;">#</div>
     <div style="font-size:11px;color:#4a5a7a;font-weight:700;text-transform:uppercase;">Customer</div>
     <div style="font-size:11px;color:#4a5a7a;font-weight:700;text-transform:uppercase;text-align:right;">${spendLabel}</div>
@@ -2696,28 +2689,51 @@ function renderLeaderboard(sorted){
   ${totalPages>1?`<div style="height:4px;border:1px solid #1e2a45;border-top:none;border-radius:0 0 10px 10px;"></div>`:""}`;
 
   return `<div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <div>
-        <h2 style="margin:0;font-size:20px;font-weight:800;color:#e8eaf0;font-family:'Rajdhani',sans-serif;">Leaderboard</h2>
-        <div style="color:#4a5a7a;font-size:12px;margin-top:2px;">${sorted.length} customers · ${isFiltered?`<span style="color:#FFD700;">Filtered: ${filterLabel}</span>`:"All-time ranking"}</div>
-      </div>
-      ${syncBinId?`<button class="btn" onclick="showDisplayUrlModal()" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;padding:8px 14px;font-size:12px;">📺 Display Setup</button>`:""}
+    <div style="padding:16px 14px 4px;display:flex;justify-content:space-between;align-items:baseline;">
+      <h2 style="margin:0;font-size:19px;font-weight:800;color:#e8eaf0;font-family:'Rajdhani',sans-serif;">Leaderboard <span style="font-size:13px;color:#4a5a7a;font-weight:600;">${sorted.length} ${isFiltered?`· <span style='color:#FFD700;'>${filterLabel}</span>`:""}</span></h2>
+      ${isFiltered?`<button onclick="setLbFilter('all')" style="background:none;border:none;color:#f86;font-size:12px;cursor:pointer;font-family:'Nunito',sans-serif;padding:0;">✕ Clear</button>`:""}
     </div>
-    ${filterBar}
+    <div style="padding:8px 14px 0;">${filterBar}</div>
     ${hdr}<div>${rows}</div>${footer}
   </div>`;
 }
 
 // ─── CUSTOMERS ────────────────────────────────────────────────
+let custDateFilter = 'all'; // 'all' | '7d' | '30d' | 'custom'
+let custCustomDate = '';
+
+function setCustDateFilter(f, date='') {
+  custDateFilter = f;
+  custCustomDate = date;
+  renderTab(1);
+}
+
+function custMatchesDateFilter(c) {
+  if (custDateFilter === 'all') return true;
+  const purchases = c.purchases || [];
+  let cutoff;
+  if (custDateFilter === '7d') cutoff = Date.now() - 7*24*3600*1000;
+  else if (custDateFilter === '30d') cutoff = Date.now() - 30*24*3600*1000;
+  else if (custDateFilter === 'custom' && custCustomDate) {
+    const d = new Date(custCustomDate);
+    return purchases.some(p => {
+      const pd = new Date(p.date);
+      return pd.toDateString() === d.toDateString();
+    });
+  }
+  return purchases.some(p => new Date(p.date).getTime() >= cutoff);
+}
+
 function renderCustomers(sorted,q=""){
   const ql=q.toLowerCase().trim();
-  const f=!ql?sorted:sorted.filter(c=>
+  let f=!ql?sorted:sorted.filter(c=>
     c.name.toLowerCase().includes(ql)||
     (c.phone&&c.phone.includes(ql))||
     c.id.toLowerCase().includes(ql)
   );
-  custFilteredIds = f.map(c=>c.id); // store for Select All
-  // Lazy load: show first CUST_BATCH rows, rest loaded on demand
+  // Apply date filter
+  if (custDateFilter !== 'all') f = f.filter(custMatchesDateFilter);
+  custFilteredIds = f.map(c=>c.id);
   const visibleCount = Math.min(custPage > 0 ? custPage : CUST_BATCH, f.length);
   const visible = f.slice(0, visibleCount);
   const hasMore = visibleCount < f.length;
@@ -2727,92 +2743,80 @@ function renderCustomers(sorted,q=""){
     const lastVisit=lastP?timeSince(lastP.date):"Never";
     const daysSince=lastP?Math.floor((Date.now()-new Date(lastP.date))/86400000):9999;
     const visitColor=daysSince<=7?"#4f4":daysSince<=30?"#FFD700":daysSince<=60?"#f84":"#f66";
-    const waMsg=c.phone?`https://wa.me/91${c.phone}?text=${encodeURIComponent(`Hi ${c.name.split(" ")[0]}! 👋\nYou are ranked #${c.rank} at ${appSettings.shopName}.\nYour total spend: ${formatINR(c.totalSpend)} 🏆\nVisit us again to climb the leaderboard!`)}`:"";
+    const waMsg=c.phone?`https://wa.me/91${c.phone}?text=${encodeURIComponent(`Hi ${c.name.split(" ")[0]}! 👋\nYou are ranked #${c.rank} at ${appSettings.shopName}.\nYour total spend: ${formatINR(c.totalSpend)} 🏆\nVisit us again to climb the leaderboard!`)}`:""
     const isSel = custSelected.has(c.id);
-    const selBg = isSel ? 'background:#1a0d30;' : '';
-    const selBorder = isSel ? 'outline:2px solid #a060ff;outline-offset:-2px;' : '';
+    const isPro = typeof isSubFeatureAllowed==="function";
+    const showVisits = !isPro||isSubFeatureAllowed(8);
+    const showLastVisit = !isPro||isSubFeatureAllowed(10);
+    const showRank = true;
+
     if(custSelectMode) return `
-    <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer;transition:background 0.15s;${selBg}${selBorder}" onclick="custToggleSelect('${c.id}')">
+    <div class="card cust-card" style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;${isSel?'background:#1a0d30;outline:2px solid #a060ff;outline-offset:-2px;':''}" onclick="custToggleSelect('${c.id}')">
       <div style="flex-shrink:0;width:22px;height:22px;border-radius:5px;border:2px solid ${isSel?'#a060ff':'#3a4a6a'};background:${isSel?'#a060ff':'transparent'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;">${isSel?'✓':''}</div>
-      ${avatarEl(c,46)}
+      ${avatarEl(c,42)}
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:700;font-size:15px;color:#e8eaf0;">${c.name}</div>
-        <div style="font-size:12px;color:#7a8aaa;margin-top:1px;">${c.phone?`📞 ${c.phone}`:"<em style='color:#2a3a5a;'>No phone</em>"} · <span style="font-family:monospace;font-size:11px;">${c.id}</span></div>
-        <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;align-items:center;">
-          <span style="font-size:12px;color:#FFD700;font-weight:700;">Rank #${c.rank}</span>
-          <span style="font-size:12px;color:#7a8aaa;">🪙 ${c.points.toLocaleString()} pts</span>
-          ${(typeof isSubFeatureAllowed==='undefined'||isSubFeatureAllowed(8))?`<span style="font-size:12px;color:#7a8aaa;">🧾 ${(c.purchases||[]).length} visits</span>`:''}
-        </div>
+        <div style="font-weight:700;font-size:15px;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${c.phone?`📞 ${c.phone}`:"No phone"} · ${formatINR(c.totalSpend)}</div>
       </div>
-      <div style="font-weight:800;color:#FFD700;font-size:15px;">${formatINR(c.totalSpend)}</div>
     </div>`;
+
+    // Clean slim card — tap to open details
     return `
-    <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer;transition:background 0.15s;" onclick="openCustomerPage('${c.id}')" onmouseenter="this.style.background='#151f38'" onmouseleave="this.style.background=''">
-      ${avatarEl(c,46)}
+    <div class="card cust-card" style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;" onclick="openCustomerPage('${c.id}')">
+      ${avatarEl(c,44)}
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:700;font-size:15px;color:#e8eaf0;">${c.name}</div>
-        <div style="font-size:12px;color:#7a8aaa;margin-top:1px;">${c.phone?`📞 ${c.phone}`:"<em style='color:#2a3a5a;'>No phone</em>"} · <span style="font-family:monospace;font-size:11px;">${c.id}</span></div>
-        <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;align-items:center;">
-          <span style="font-size:12px;color:#FFD700;font-weight:700;">Rank #${c.rank}</span>
-          <span style="font-size:12px;color:#7a8aaa;">🪙 ${c.points.toLocaleString()} pts</span>
-          ${(typeof isSubFeatureAllowed==='undefined'||isSubFeatureAllowed(10))?`<span style="font-size:12px;color:${visitColor};">🕐 ${lastVisit}</span>`:''}
-          ${(typeof isSubFeatureAllowed==='undefined'||isSubFeatureAllowed(8))?`<span style="font-size:12px;color:#7a8aaa;">🧾 ${(c.purchases||[]).length} visits</span>`:''}
-        </div>
+        <div style="font-weight:700;font-size:15px;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.phone?`📞 ${c.phone}`:"No phone"} ${showVisits?`· 🧾 ${(c.purchases||[]).length}`:""}</div>
+        ${showLastVisit&&lastP?`<div style="font-size:11px;margin-top:2px;color:${visitColor};">🕐 ${lastVisit}</div>`:""}
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;" onclick="event.stopPropagation()">
-        <div style="font-weight:800;color:#FFD700;font-size:15px;">${formatINR(c.totalSpend)}</div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;">
-          <button class="btn" onclick="openPurchaseModal('${c.id}')" style="background:#1a3a5c;color:#5af;border:1px solid #1a4a7a;padding:5px 9px;font-size:12px;" title="Add Purchase">+₹</button>
-          ${(typeof isSubFeatureAllowed==='undefined'||isSubFeatureAllowed(9))?(c.phone?`<a href="${waMsg}" target="_blank"><button class="btn" style="background:#1a3a1a;color:#4f4;border:1px solid #1a5a1a;padding:5px 9px;font-size:12px;" title="WhatsApp">💬</button></a>`:`<button class="btn" style="background:#111;color:#2a3a2a;border:1px solid #1a2a1a;padding:5px 9px;font-size:12px;cursor:not-allowed;" title="No phone number saved">💬</button>`):`<button class="btn" style="background:#2a1a1a;color:#553;border:1px solid #3a2a1a;padding:5px 9px;font-size:12px;cursor:not-allowed;" title="WhatsApp (Pro feature)">🔒</button>`}
-          <button class="btn" onclick="openEditModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #1a4a1a;padding:5px 9px;font-size:12px;" title="Edit">✏️</button>
-          <button class="btn" onclick="deleteCustomer('${c.id}')" style="background:#3a1a1a;color:#f66;border:1px solid #4a1515;padding:5px 9px;font-size:12px;" title="Delete">🗑️</button>
-        </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+        <div style="font-weight:800;color:#FFD700;font-size:14px;">${formatINR(c.totalSpend)}</div>
+        <div style="font-size:11px;color:#4a5a7a;">Rank #${c.rank}</div>
       </div>
     </div>`;
   }
 
+  // Date filter pills
+  const dfPills = `
+    <div style="display:flex;gap:8px;overflow-x:auto;padding:0 0 4px;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:10px;">
+      ${[['all','All'],['7d','7 Days'],['30d','1 Month']].map(([k,l])=>`
+        <button onclick="setCustDateFilter('${k}')" style="cursor:pointer;border-radius:20px;padding:6px 14px;border:2px solid ${custDateFilter===k?'#FFD700':'#1e2a45'};background:${custDateFilter===k?'#1a1400':'transparent'};color:${custDateFilter===k?'#FFD700':'#4a5a7a'};font-size:12px;font-weight:${custDateFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;flex-shrink:0;">${l}</button>
+      `).join('')}
+      <button onclick="(()=>{const d=prompt('Enter date (YYYY-MM-DD):',new Date().toISOString().slice(0,10));if(d)setCustDateFilter('custom',d);})()" style="cursor:pointer;border-radius:20px;padding:6px 14px;border:2px solid ${custDateFilter==='custom'?'#5af':'#1e2a45'};background:${custDateFilter==='custom'?'#0a1628':'transparent'};color:${custDateFilter==='custom'?'#5af':'#4a5a7a'};font-size:12px;font-weight:${custDateFilter==='custom'?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;flex-shrink:0;">📅 ${custDateFilter==='custom'&&custCustomDate?custCustomDate:'Date'}</button>
+    </div>`;
+
   const list = visible.map(custCardHTML).join("");
   const loadMoreBtn = hasMore ? `
-    <div id="cust-load-more" style="text-align:center;padding:16px 0;">
+    <div style="padding:12px 0;text-align:center;">
       <button class="btn" onclick="custLoadMore()" style="background:#1a2540;color:#5af;border:1px solid #2a3560;padding:10px 28px;font-size:13px;font-weight:700;">Load More (${f.length - visibleCount} remaining)</button>
-    </div>` : `<div style="text-align:center;padding:12px 0;font-size:12px;color:#2a3a5a;">— All ${f.length} customers shown —</div>`;
+    </div>` : `<div style="text-align:center;padding:10px 0;font-size:12px;color:#2a3a5a;">— ${f.length} customers —</div>`;
+
+  const headerBtns = custSelectMode ? `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:0 14px 12px;">
+      <span style="font-size:12px;color:#aaa;">${custSelected.size} selected</span>
+      <button class="btn" onclick="custSelectAll()" style="background:#1a2a3a;color:#7ab3ff;border:1px solid #2a4060;padding:7px 12px;font-size:12px;">All</button>
+      <button class="btn" onclick="deleteSelectedCustomers()" style="background:#3a1010;color:#f66;border:1px solid #5a1515;padding:7px 14px;font-size:12px;font-weight:700;" ${custSelected.size===0?'disabled':''}>🗑️ Delete (${custSelected.size})</button>
+      <button class="btn" onclick="custToggleSelectMode()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:7px 12px;font-size:12px;">✕ Cancel</button>
+    </div>` : `
+    <div style="display:flex;gap:8px;align-items:center;padding:0 14px 12px;flex-wrap:wrap;">
+      <button class="btn" onclick="openAddModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:9px 20px;font-size:13px;font-weight:800;flex:1;">+ Add Customer</button>
+      <button class="btn" onclick="openBulkAddModal()" style="background:#1a3a5c;color:#7ab3ff;border:1px solid #2a5080;padding:9px 14px;font-size:13px;">👥 Bulk</button>
+      <button class="btn" onclick="exportCSV()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:9px 12px;font-size:13px;">⬇</button>
+      <button class="btn" onclick="custToggleSelectMode()" style="background:#1a2540;color:#f88;border:1px solid #3a2020;padding:9px 12px;font-size:13px;">☑</button>
+    </div>`;
 
   return `<div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-      <h2 style="margin:0;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Customers (${sorted.length})</h2>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        ${custSelectMode ? `
-          <span style="font-size:12px;color:#aaa;padding:4px 8px;">${custSelected.size} selected</span>
-          <button class="btn" onclick="custSelectAll()" style="background:#1a2a3a;color:#7ab3ff;border:1px solid #2a4060;padding:7px 12px;font-size:12px;">☑ All</button>
-          <button class="btn" onclick="custDeselectAll()" style="background:#1a2a3a;color:#aaa;border:1px solid #2a3560;padding:7px 12px;font-size:12px;">☐ None</button>
-          <button class="btn" onclick="deleteSelectedCustomers()" style="background:#3a1010;color:#f66;border:1px solid #5a1515;padding:7px 14px;font-size:12px;font-weight:700;" ${custSelected.size===0?'disabled':''}>🗑️ Delete (${custSelected.size})</button>
-          <button class="btn" onclick="custToggleSelectMode()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:7px 12px;font-size:12px;">✕ Cancel</button>
-        ` : `
-          <button class="btn" onclick="exportCSV()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:7px 14px;font-size:12px;">⬇ Export CSV</button>
-          <button class="btn" onclick="openBulkAddModal()" style="background:#1a3a5c;color:#7ab3ff;border:1px solid #2a5080;padding:8px 14px;font-size:13px;">👥 Bulk Add</button>
-          <button class="btn" onclick="custToggleSelectMode()" style="background:#3a1a1a;color:#f88;border:1px solid #4a2020;padding:8px 14px;font-size:13px;" title="Select multiple customers to delete">☑ Select</button>
-          <button class="btn" onclick="openAddModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 18px;font-size:13px;">+ Add Customer</button>
-        `}
-      </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 14px 8px;">
+      <h2 style="margin:0;font-size:19px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Customers <span style="font-size:14px;color:#4a5a7a;font-weight:600;">(${f.length}${custDateFilter!=='all'?' filtered':''})</span></h2>
     </div>
-    <div style="background:#0a1628;border:1px solid #1a2a45;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#5a8aaa;">
-      💬 <strong style="color:#4f4;">Green WhatsApp button</strong> opens a pre-written message for that customer. Grey means no phone saved.
+    ${headerBtns}
+    <div style="padding:0 14px 8px;">
+      <input class="input" id="cust-search" dir="ltr" placeholder="🔍 Search name, phone, ID..." value="${q}" oninput="refreshCustSearch(this.value)" style="text-align:left;" />
     </div>
-    <input class="input" id="cust-search" dir="ltr" placeholder="🔍 Search by name, phone, or ID..." value="${q}" oninput="refreshCustSearch(this.value)" style="margin-bottom:16px;text-align:left;" />
-    <div style="font-size:12px;color:#4a5a7a;margin-bottom:10px;">Showing ${visibleCount} of ${f.length}${ql?' matching':''}${ql?'':' total'} customers</div>
-    <div id="cust-list" style="display:flex;flex-direction:column;gap:8px;">${list||'<div style="text-align:center;color:#4a5a7a;padding:40px;">No customers found</div>'}</div>
+    <div style="padding:0 14px 2px;">${dfPills}</div>
+    <div id="cust-list" style="display:flex;flex-direction:column;gap:6px;padding:0 14px;">${list||'<div style="text-align:center;color:#4a5a7a;padding:40px;">No customers found</div>'}</div>
     ${loadMoreBtn}
   </div>`;
-}
-// custLoadMore: append next batch to cust-list
-function custLoadMore(){
-  custPage += CUST_BATCH;
-  renderTab(1);
-  // Scroll to load-more position
-  setTimeout(()=>{
-    const lm=document.getElementById("cust-load-more");
-    if(lm)lm.scrollIntoView({behavior:"smooth",block:"center"});
-  },50);
 }
 
 function refreshCustSearch(q){
