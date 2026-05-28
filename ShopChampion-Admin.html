@@ -1075,7 +1075,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <!-- Hidden lang menu — still works from settings -->
       <div id="lang-menu" style="display:none;position:fixed;right:14px;top:60px;background:var(--bg-card);border:1px solid var(--border-main);border-radius:12px;padding:8px;z-index:9999;min-width:160px;box-shadow:0 8px 32px #0008;"></div>
       <span id="lang-label" style="display:none;">EN</span>
-      <button class="btn" id="header-settings-btn" onclick="switchTab(6)" title="Settings" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;padding:7px 11px;font-size:18px;line-height:1;">⚙️</button>
+      <button class="btn" id="push-btn" onclick="pushSync();" title="Push to Display" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:7px 14px;font-size:13px;font-weight:800;">⬆ Push</button>
     </div>
   </div>
 
@@ -1086,10 +1086,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
     <span id="db-status-text" style="font-size:11px;color:#4a5a7a;margin-left:4px;"></span>
     <span style="font-size:11px;color:#556;" id="sync-time"></span>
     <button class="btn" onclick="showFirebaseSettings()" style="display:none;">🔥 Firebase</button>
-    <!-- Push to Display moved to right side of banner only, slim -->
-    <div style="margin-left:auto;">
-      <button class="btn" id="push-btn" onclick="pushSync();" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:5px 14px;font-size:12px;font-weight:800;">⬆ Push</button>
-    </div>
+
   </div>
 
   <!-- Tabs (desktop horizontal scroll) -->
