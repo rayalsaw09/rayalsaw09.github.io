@@ -435,81 +435,275 @@
   #sync-status-dot.syncing { background: #aa4; box-shadow: 0 0 6px #FFD700; }
   #sync-status-dot.error { background: #a22; box-shadow: 0 0 6px #f44; animation: none; }
 
-  /* ═══════════════════════════════════════════
-     MOBILE FRIENDLY — responsive overrides
-     ═══════════════════════════════════════════ */
+  
+/* ═══════════════════════════════════════════════════════════
+   MOBILE — Clean, comfortable, Instagram/YouTube feel
+   ═══════════════════════════════════════════════════════════ */
 
-  #bottom-nav { display: none; }
-  #more-menu { display: none; }
+/* Always hide bottom nav on desktop */
+#bottom-nav, #more-menu { display: none; }
 
-  @media (max-width: 600px) {
-    #main-header { padding: 10px 12px !important; gap: 10px !important; }
-    #header-shop-name { font-size: 16px !important; }
-    #header-admin-badge { display: none !important; }
-    #header-logout-btn { padding: 5px 10px !important; font-size: 11px !important; }
-    #header-theme-btn { padding: 5px 8px !important; font-size: 13px !important; }
-    #header-lang-btn { padding: 5px 8px !important; font-size: 11px !important; }
-    #sync-banner { flex-wrap: wrap !important; gap: 6px !important; padding: 8px 12px !important; }
-    #sync-banner-actions { width: 100% !important; justify-content: flex-end !important; }
-    #tab-bar { display: none !important; }
-    #bottom-nav {
-      display: flex !important;
-      position: fixed !important;
-      bottom: 0; left: 0; right: 0;
-      background: #0d1220;
-      border-top: 1px solid #1e2a45;
-      z-index: 800;
-      padding: 4px 0 env(safe-area-inset-bottom, 4px);
-    }
-    .bnav-btn {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-      background: none;
-      border: none;
-      color: #556;
-      cursor: pointer;
-      padding: 6px 2px;
-      font-family: 'Nunito', sans-serif;
-      transition: color 0.2s;
-      min-width: 0;
-    }
-    .bnav-btn.active { color: #FFD700; }
-    .bnav-btn .bnav-icon { font-size: 20px; line-height: 1; }
-    .bnav-btn .bnav-label { font-size: 9px; font-weight: 700; letter-spacing: 0.3px; white-space: nowrap; }
-    #more-menu {
-      position: fixed;
-      bottom: 60px; left: 0; right: 0;
-      background: #0f1628;
-      border-top: 1px solid #1e2a45;
-      border-radius: 16px 16px 0 0;
-      z-index: 799;
-      padding: 12px 8px 8px;
-    }
-    #more-menu.open { display: grid !important; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-    .more-menu-btn {
-      display: flex; flex-direction: column; align-items: center; gap: 4px;
-      background: #1a2540; border: 1px solid #2a3560; border-radius: 12px;
-      padding: 12px 8px; color: #aaa; cursor: pointer; font-family: 'Nunito', sans-serif;
-    }
-    .more-menu-btn.active { background: #1a1a00; border-color: #FFD700; color: #FFD700; }
-    .more-menu-btn .mm-icon { font-size: 22px; }
-    .more-menu-btn .mm-label { font-size: 11px; font-weight: 700; }
-    #tab-content { padding: 12px 12px 80px !important; }
-    #customer-page-inner { padding: 12px 12px 80px !important; }
-    .btn { min-height: 36px; }
-    .input { font-size: 16px !important; }
+@media (max-width: 640px) {
+
+  /* ── HEADER — slim, clean ── */
+  #main-header {
+    padding: 10px 16px !important;
+    gap: 8px !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 200 !important;
+  }
+  #header-shop-icon { font-size: 22px !important; }
+  #header-shop-name { font-size: 15px !important; }
+  #header-admin-badge { display: none !important; }
+  #header-logout-btn { padding: 5px 10px !important; font-size: 11px !important; }
+  #header-theme-btn { padding: 5px 8px !important; font-size: 14px !important; }
+  #header-lang-btn { padding: 5px 8px !important; font-size: 11px !important; }
+
+  /* ── SYNC BANNER — compact ── */
+  #sync-banner {
+    flex-wrap: wrap !important;
+    padding: 8px 16px !important;
+    gap: 6px !important;
+    font-size: 12px !important;
+    position: sticky !important;
+    top: 54px !important;
+    z-index: 199 !important;
+  }
+  #sync-banner-actions {
+    width: 100% !important;
+    display: flex !important;
+    gap: 8px !important;
+  }
+  #sync-banner-actions button {
+    flex: 1 !important;
+    font-size: 11px !important;
+    padding: 7px 4px !important;
+    text-align: center !important;
+    border-radius: 10px !important;
   }
 
-  body.day-theme #bottom-nav { background: #f0f2fa; border-color: #d0d4e8; }
-  body.day-theme .bnav-btn { color: #9aa; }
-  body.day-theme .bnav-btn.active { color: #1a56db; }
-  body.day-theme #more-menu { background: #fff; border-color: #d0d4e8; }
-  body.day-theme .more-menu-btn { background: #f0f2fa; border-color: #d0d4e8; color: #556; }
-  body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD700; color: #856000; }
+  /* ── HIDE DESKTOP TABS ── */
+  #tab-bar { display: none !important; }
+
+  /* ── CONTENT PADDING ── */
+  #tab-content {
+    padding: 0 0 76px !important;
+    min-height: calc(100vh - 140px) !important;
+  }
+
+  /* ── SECTION HEADERS ── */
+  #tab-content h2 {
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    padding: 16px 16px 4px !important;
+    margin: 0 !important;
+  }
+
+  /* ── CARDS — rounded, spacious ── */
+  .card {
+    border-radius: 16px !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* ── INPUTS — big, no zoom on iOS ── */
+  .input {
+    font-size: 16px !important;
+    padding: 14px 16px !important;
+    min-height: 50px !important;
+    border-radius: 14px !important;
+  }
+
+  /* ── BUTTONS — easy to tap ── */
+  .btn {
+    min-height: 42px !important;
+    border-radius: 12px !important;
+    font-size: 13px !important;
+  }
+
+  /* ── MODALS — slide up from bottom like Instagram ── */
+  .modal-overlay {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+  .modal-box {
+    border-radius: 24px 24px 0 0 !important;
+    max-height: 90vh !important;
+    padding: 24px 18px 32px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .modal-title { font-size: 17px !important; margin-bottom: 18px !important; }
+
+  /* ── LEADERBOARD ROWS — compact mobile cards ── */
+  .lb-row {
+    grid-template-columns: 36px 1fr auto !important;
+    padding: 10px 14px !important;
+  }
+  .lb-row > div:nth-child(4),
+  .lb-row > div:nth-child(5) { display: none !important; }
+
+  /* Leaderboard header row */
+  #tab-content > div > div[style*="grid-template-columns:48px 1fr 160px 110px 130px"] {
+    grid-template-columns: 36px 1fr auto !important;
+    padding: 8px 14px !important;
+  }
+  #tab-content > div > div[style*="grid-template-columns:48px 1fr 160px 110px 130px"] > div:nth-child(4),
+  #tab-content > div > div[style*="grid-template-columns:48px 1fr 160px 110px 130px"] > div:nth-child(5) {
+    display: none !important;
+  }
+
+  /* ── CUSTOMER CARDS — WhatsApp list style ── */
+  #tab-content .card[style*="display:flex;align-items:center"] {
+    padding: 12px 14px !important;
+  }
+  #tab-content .card > div:last-child > div:last-child {
+    flex-wrap: wrap !important;
+    gap: 4px !important;
+  }
+
+  /* ── PURCHASE TAB ── */
+  #tab-content [style*="grid-template-columns:1fr 1fr 1fr"][style*="gap:8px"] {
+    gap: 8px !important;
+    padding: 0 14px 12px !important;
+  }
+
+  /* Filter bar inside leaderboard */
+  #tab-content > div > div[style*="border-radius:12px;padding:14px 16px;margin-bottom:16px"] {
+    margin: 8px 14px 8px !important;
+    border-radius: 16px !important;
+    padding: 12px 14px !important;
+  }
+
+  /* Leaderboard title */
+  #tab-content > div > div[style*="justify-content:space-between;align-items:center;margin-bottom:16px"] {
+    padding: 14px 14px 0 !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* Pagination bar */
+  #tab-content button[onclick*="lbGoPage"] {
+    min-width: 38px !important;
+    min-height: 38px !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
+  }
+
+  /* Search input */
+  #cust-search { margin: 0 14px 12px !important; width: calc(100% - 28px) !important; }
+
+  /* Customer count text */
+  #tab-content > div > div[style*="font-size:12px;color:#4a5a7a;margin-bottom:10px"] {
+    padding: 0 14px !important;
+  }
+
+  /* Customer list */
+  #cust-list { gap: 6px !important; padding: 0 14px !important; }
+
+  /* Customer header actions */
+  #tab-content > div > div:first-child[style*="justify-content:space-between"] {
+    padding: 14px 14px 8px !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  #tab-content > div > div:first-child > div:last-child {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  /* WhatsApp tip box */
+  #tab-content > div > div[style*="0a1628"][style*="border-radius:8px;padding:10px"] {
+    margin: 0 14px 10px !important;
+    border-radius: 12px !important;
+    font-size: 11px !important;
+  }
+
+  /* Load more button */
+  #cust-load-more { padding: 12px 14px !important; }
+
+  /* ── BOTTOM NAV — YouTube style ── */
+  #bottom-nav {
+    display: flex !important;
+    position: fixed !important;
+    bottom: 0; left: 0; right: 0;
+    background: #0a0e1a;
+    border-top: 1.5px solid #16203a;
+    z-index: 800;
+    padding: 4px 0 env(safe-area-inset-bottom, 4px);
+    box-shadow: 0 -2px 16px #0005;
+  }
+  .bnav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    color: #3a4a6a;
+    cursor: pointer;
+    padding: 7px 2px;
+    font-family: 'Nunito', sans-serif;
+    transition: color 0.15s;
+    min-width: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bnav-btn.active { color: #FFD700; }
+  .bnav-btn .bnav-icon { font-size: 22px; line-height: 1; }
+  .bnav-btn .bnav-label { font-size: 10px; font-weight: 700; letter-spacing: 0.2px; }
+
+  /* ── MORE MENU — Instagram bottom sheet ── */
+  #more-menu {
+    position: fixed;
+    bottom: 64px; left: 0; right: 0;
+    background: #0d1525;
+    border: 1px solid #1e2a45;
+    border-radius: 24px 24px 0 0;
+    z-index: 799;
+    padding: 8px 16px 16px;
+    box-shadow: 0 -8px 40px #0009;
+  }
+  #more-menu::before {
+    content: '';
+    display: block;
+    width: 36px; height: 4px;
+    background: #2a3560;
+    border-radius: 2px;
+    margin: 8px auto 16px;
+  }
+  #more-menu.open { display: grid !important; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .more-menu-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    background: #131d35; border: 1.5px solid #1e2a45; border-radius: 18px;
+    padding: 18px 8px 14px; color: #5a7aaa; cursor: pointer;
+    font-family: 'Nunito', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.15s;
+    min-height: 80px;
+  }
+  .more-menu-btn:active { transform: scale(0.96); }
+  .more-menu-btn.active { background: #1a1500; border-color: #FFD700; color: #FFD700; }
+  .more-menu-btn .mm-icon { font-size: 26px; line-height: 1; }
+  .more-menu-btn .mm-label { font-size: 12px; font-weight: 700; }
+
+  /* ── PWA INSTALL BANNER ── */
+  #pwa-install-banner { bottom: 72px !important; left: 10px !important; right: 10px !important; border-radius: 16px !important; }
+
+  /* ── DB TABLE mobile ── */
+  .db-table th { font-size: 10px !important; padding: 8px 8px !important; }
+  .db-table td { font-size: 12px !important; padding: 8px 8px !important; }
+}
+
+/* ── Day theme overrides ── */
+body.day-theme #bottom-nav { background: #f4f6ff; border-color: #dde2f5; box-shadow: 0 -2px 12px #0001; }
+body.day-theme .bnav-btn { color: #99aacc; }
+body.day-theme .bnav-btn.active { color: #2563eb; }
+body.day-theme #more-menu { background: #fff; border-color: #dde2f5; }
+body.day-theme #more-menu::before { background: #dde2f5; }
+body.day-theme .more-menu-btn { background: #f0f4ff; border-color: #dde2f5; color: #667; }
+body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD700; color: #856000; }
+
 
   /* PWA Install Banner */
   #pwa-install-banner {
@@ -1147,7 +1341,11 @@ function ptRestoreState() {
       const _lv1=_lp1?timeSince(_lp1.date):"Never";
       const _dd1=_lp1?Math.floor((Date.now()-new Date(_lp1.date))/86400000):9999;
       const _vc1=_dd1<=7?"#4f4":_dd1<=30?"#FFD700":_dd1<=60?"#f84":"#f66";
-      pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)} &middot; Rank #${c.rank||"?"} &middot; 🧾 ${(c.purchases||[]).length} visits</div><div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc1};font-weight:700;">${_lv1}</span></div></div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
+      const _isPro1 = typeof isSubFeatureAllowed==="function";
+      const _showVisits1 = !_isPro1||isSubFeatureAllowed(8);
+      const _showLastVisit1 = !_isPro1||isSubFeatureAllowed(10);
+      const _showRank1 = !_isPro1||isSubFeatureAllowed(0);
+      pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank1?` &middot; Rank #${c.rank||"?"}`:""} ${_showVisits1?`&middot; 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit1?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc1};font-weight:700;">${_lv1}</span></div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
     }
   }
   // Restore date mode - only restore manual picker if it was open
@@ -2457,7 +2655,7 @@ function renderLeaderboard(sorted){
       ? `<span style="font-size:10px;color:#3a5a4a;margin-left:4px;">(all-time: ${formatINR(c._realSpend)})</span>` : "";
     const zeroDay = isFiltered && c.totalSpend === 0;
     return `
-    <div style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;align-items:center;background:${zeroDay?'#0a0d14':gi%2===0?"#0d1220":"#0f1628"};border-left:1px solid #1e2a45;border-right:1px solid #1e2a45;border-bottom:1px solid #141c30;padding:10px 16px;cursor:pointer;transition:background 0.15s;${zeroDay?'opacity:0.55':''}" onclick="openCustomerPage('${c.id}')" onmouseenter="this.style.background='#151f38'" onmouseleave="this.style.background='${zeroDay?'#0a0d14':gi%2===0?'#0d1220':'#0f1628'}'">
+    <div class="lb-row" style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;align-items:center;background:${zeroDay?'#0a0d14':gi%2===0?"#0d1220":"#0f1628"};border-left:1px solid #1e2a45;border-right:1px solid #1e2a45;border-bottom:1px solid #141c30;padding:10px 16px;cursor:pointer;transition:background 0.15s;${zeroDay?'opacity:0.55':''}" onclick="openCustomerPage('${c.id}')" onmouseenter="this.style.background='#151f38'" onmouseleave="this.style.background='${zeroDay?'#0a0d14':gi%2===0?'#0d1220':'#0f1628'}'">
       ${rankBadge(c.rank)}
       <div style="display:flex;align-items:center;gap:10px;min-width:0;">
         ${avatarEl(c,34)}
@@ -2891,7 +3089,11 @@ function ptSelectCustomer(id){
   const _lv2=_lp2?timeSince(_lp2.date):"Never";
   const _dd2=_lp2?Math.floor((Date.now()-new Date(_lp2.date))/86400000):9999;
   const _vc2=_dd2<=7?"#4f4":_dd2<=30?"#FFD700":_dd2<=60?"#f84":"#f66";
-  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)} · Rank #${c.rank} · 🧾 ${(c.purchases||[]).length} visits</div><div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div></div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  const _isPro2 = typeof isSubFeatureAllowed==="function";
+  const _showVisits2 = !_isPro2||isSubFeatureAllowed(8);
+  const _showLastVisit2 = !_isPro2||isSubFeatureAllowed(10);
+  const _showRank2 = !_isPro2||isSubFeatureAllowed(0);
+  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank2?` · Rank #${c.rank}`:""}${_showVisits2?` · 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit2?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
   ptPts();
 }
 
@@ -2928,7 +3130,11 @@ function bptSelectCustomer(id){
   const _lv3=_lp3?timeSince(_lp3.date):"Never";
   const _dd3=_lp3?Math.floor((Date.now()-new Date(_lp3.date))/86400000):9999;
   const _vc3=_dd3<=7?"#4f4":_dd3<=30?"#FFD700":_dd3<=60?"#f84":"#f66";
-  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)} · Rank #${c.rank||"?"} · 🧾 ${(c.purchases||[]).length} visits</div><div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc3};font-weight:700;">${_lv3}</span></div></div><button onclick="bptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  const _isPro3 = typeof isSubFeatureAllowed==="function";
+  const _showVisits3 = !_isPro3||isSubFeatureAllowed(8);
+  const _showLastVisit3 = !_isPro3||isSubFeatureAllowed(10);
+  const _showRank3 = !_isPro3||isSubFeatureAllowed(0);
+  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank3?` · Rank #${c.rank||"?"}`:""} ${_showVisits3?`· 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit3?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc3};font-weight:700;">${_lv3}</span></div>`:""}</div><button onclick="bptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
 }
 
 function bptClearCustomer(){
