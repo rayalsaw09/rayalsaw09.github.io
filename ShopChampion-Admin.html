@@ -18,7 +18,7 @@
     });
   }
 </script>
-<script src="/config.js"></script>
+<script src="/config.js" onerror="console.warn('config.js failed to load — using fallback')"></script>
 <!-- Firebase v9 compat (CDN) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -1151,6 +1151,21 @@ async function scHashPassword(phone, password) {
 }
 
 // SC_SUPABASE_URL and SC_SUPABASE_ANON loaded from /config.js
+// Fallback in case config.js fails to load (e.g. service worker cache issue)
+if (typeof SC_SUPABASE_URL === 'undefined') {
+  console.warn('config.js not loaded — using fallback credentials');
+  var SC_SUPABASE_URL  = "https://dgmzfqwglnafghpfnqau.supabase.co";
+  var SC_SUPABASE_ANON = "sb_publishable_yxPk_18wrBIPebrJkYn9FQ_91lhKmjE";
+  var SC_FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAdNjL9gCptnAbJ6ZVm9BZ61rKfBtwc1Qc",
+    authDomain: "shop-champion.firebaseapp.com",
+    projectId: "shop-champion",
+    storageBucket: "shop-champion.firebasestorage.app",
+    messagingSenderId: "81324128909",
+    appId: "1:81324128909:web:cc023f5c031c505bfe00c4",
+    measurementId: "G-YCX9WJ4DP5"
+  };
+}
 
 // ─── CONSTANTS ───────────────────────────────────────────────
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
@@ -2138,6 +2153,9 @@ async function checkPhone() {
     if(el) el.textContent = phone;
     authShowStep("newpass");
   };
+
+  // Safety check — if config.js failed, SC_SUPABASE_URL will still be defined via fallback
+  if (!SC_SUPABASE_URL) { goNewUser(); resetBtn(); return; }
 
   try {
     // 6-second timeout so button never hangs forever
