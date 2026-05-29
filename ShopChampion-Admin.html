@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Shop Champion — Admin</title>
+<meta name="app-version" content="v5.1" />
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/icons/icon-192.png" />
@@ -13,7 +14,17 @@
 <meta name="theme-color" content="#FFD700" />
 <script>
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
+    window.addEventListener('load', async () => {
+      // Unregister ALL old service workers to force fresh load
+      const regs = await navigator.serviceWorker.getRegistrations();
+      for (const reg of regs) {
+        const sw = reg.active || reg.waiting || reg.installing;
+        if (sw) {
+          const url = sw.scriptURL || '';
+          // If it's our sw or unknown, update it
+          await reg.update();
+        }
+      }
       navigator.serviceWorker.register('/sw.js');
     });
   }
