@@ -2713,11 +2713,7 @@ function renderLeaderboard(sorted){
 // ─── CUSTOMERS ────────────────────────────────────────────────
 let custDateFilter = 'all'; // 'all' | '7d' | '30d' | 'custom'
 let custCustomDate = '';
-if (typeof custPage === 'undefined') var custPage = 0;
-if (typeof custSelected === 'undefined') var custSelected = new Set();
-if (typeof custSelectMode === 'undefined') var custSelectMode = false;
-if (typeof custFilteredIds === 'undefined') var custFilteredIds = [];
-if (typeof CUST_BATCH === 'undefined') var CUST_BATCH = 20;
+// custPage and related vars declared at top level
 
 function setCustDateFilter(f, date='') {
   custDateFilter = f;
@@ -3146,9 +3142,9 @@ async function ptSubmit(){
   if(!s){notify("❌ Please select a customer","error");return;}
   if(!a||a<=0){notify("❌ Amount must be greater than ₹0","error");document.getElementById("pt-amt").focus();return;}
   if(a>10000000){notify("❌ Amount seems too high — please check","error");return;}
-  const btn=document.getElementById("pt-sub");
-  if(btn.disabled)return;
-  btn.disabled=true;setTimeout(()=>btn.disabled=false,3000);addPurchase(s,{amount:a,bill:document.getElementById("pt-bill").value,notes:document.getElementById("pt-notes").value,date:document.getElementById("pt-date-val").value||document.getElementById("pt-date").value});document.getElementById("pt-amt").value="";document.getElementById("pt-notes").value="";window._ptState.selId="";window._ptState.selName="";window._ptState.selData=null;window._ptState.amt="";window._ptState.notes="";ptRestoreLiveBadge();const btn=document.getElementById("pt-sub");btn.style.background="linear-gradient(135deg,#1a5a2a,#2a8a3a)";btn.style.color="#4f4";btn.textContent="✅ Added!";setTimeout(()=>{btn.style.background="linear-gradient(135deg,#FFD700,#FFA500)";btn.style.color="#1a0a00";btn.textContent="Add Purchase →";},2000);}
+  const submitBtn=document.getElementById("pt-sub");
+  if(submitBtn&&submitBtn.disabled)return;
+  if(submitBtn){submitBtn.disabled=true;setTimeout(()=>submitBtn.disabled=false,3000);}addPurchase(s,{amount:a,bill:document.getElementById("pt-bill").value,notes:document.getElementById("pt-notes").value,date:document.getElementById("pt-date-val").value||document.getElementById("pt-date").value});document.getElementById("pt-amt").value="";document.getElementById("pt-notes").value="";window._ptState.selId="";window._ptState.selName="";window._ptState.selData=null;window._ptState.amt="";window._ptState.notes="";ptRestoreLiveBadge();const btn=document.getElementById("pt-sub");btn.style.background="linear-gradient(135deg,#1a5a2a,#2a8a3a)";btn.style.color="#4f4";btn.textContent="✅ Added!";setTimeout(()=>{btn.style.background="linear-gradient(135deg,#FFD700,#FFA500)";btn.style.color="#1a0a00";btn.textContent="Add Purchase →";},2000);}
 
 // ─── BULK PURCHASE TAB FUNCTIONS ─────────────────────────────────────────────
 function bptFilterCustomers(){
