@@ -5,26 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Shop Champion — Live Leaderboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700;900&family=Nunito:wght@400;600;700;800;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
-<link rel="manifest" href="/manifest-display.json" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="SC Display" />
-<meta name="theme-color" content="#FFD700" />
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js');
-    });
-  }
-</script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="/config.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 100%; height: 100%; font-family: 'Nunito', sans-serif; }
-  body { overflow: hidden; }
-  body.setup-mode { overflow-y: auto !important; height: auto !important; }
+  html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Nunito', sans-serif; }
 
   /* ══════════════════════════════════════════════
      THEME VARIABLES
@@ -564,10 +549,18 @@ function avatarColor(name) {
   return cols[name.charCodeAt(0) % cols.length];
 }
 
-// ── FIREBASE CONFIG (loaded from /config.js) ──
+// ── FIREBASE CONFIG ──
+const FB_CFG = {
+  apiKey: "AIzaSyAdNjL9gCptnAbJ6ZVm9BZ61rKfBtwc1Qc",
+  authDomain: "shop-champion.firebaseapp.com",
+  projectId: "shop-champion",
+  storageBucket: "shop-champion.firebasestorage.app",
+  messagingSenderId: "81324128909",
+  appId: "1:81324128909:web:cc023f5c031c505bfe00c4"
+};
 let fbDb = null;
 try {
-  if (!firebase.apps.length) firebase.initializeApp(SC_FIREBASE_CONFIG);
+  if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
   else firebase.app();
   fbDb = firebase.firestore();
 } catch(e) { console.warn("Firebase init failed:", e.message); }
@@ -598,7 +591,7 @@ function disconnectAndReset() {
   document.getElementById('waiting-overlay').style.display = 'none';
   document.getElementById('loading-screen').style.display = 'none';
   document.getElementById('error-banner').style.display = 'none';
-  document.getElementById('setup-screen').style.display = 'flex'; document.body.classList.add('setup-mode');
+  document.getElementById('setup-screen').style.display = 'flex';
   document.getElementById('manual-bin').value = '';
 
   // Reset status indicators
@@ -612,7 +605,7 @@ window.addEventListener('load', () => {
   const shop = params.get('shop'); // Firebase shop ID param
   if (shop) { fbShopId = shop; startFirebaseDisplay(); }
   else if (bin) { binId = bin; startDisplay(); }
-  else { document.getElementById('setup-screen').style.display = 'flex'; document.body.classList.add('setup-mode'); }
+  else { document.getElementById('setup-screen').style.display = 'flex'; }
   startClock();
   // Pre-fill bin from localStorage if saved
   const saved = localStorage.getItem('sc_display_binid');
@@ -652,7 +645,7 @@ function startFirebaseDisplay() {
     if (as.shopName && titleEl) { titleEl.textContent = as.shopName.toUpperCase(); document.title = as.shopName + ' — Live Leaderboard'; }
     if (iconEl) iconEl.innerHTML = as.appIcon ? `<img src="${as.appIcon}" style="height:100%;max-height:48px;object-fit:contain;border-radius:8px;" />` : '🏆';
   } catch {}
-  document.getElementById('setup-screen').style.display = 'none'; document.body.classList.remove('setup-mode');
+  document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('loading-screen').style.display = 'flex';
   if (fbUnsubscribe) fbUnsubscribe();
   fbUnsubscribe = fbDb.collection('users').doc(fbShopId || 'unknown').collection('display').doc('leaderboard')
@@ -723,7 +716,7 @@ function runDemo() {
       {id:'SC020',name:'Geeta Nambiar',  totalSpend:1500,  points:150,  rank:20},
     ]
   };
-  document.getElementById('setup-screen').style.display = 'none'; document.body.classList.remove('setup-mode');
+  document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('lb-meta').textContent = 'DEMO MODE';
   showLeaderboard(demo);
   document.getElementById('refresh-dot').className = '';
@@ -741,7 +734,7 @@ function startDisplay() {
     if (as.shopName && titleEl) { titleEl.textContent = as.shopName.toUpperCase(); document.title = as.shopName + ' — Live Leaderboard'; }
     if (iconEl) iconEl.innerHTML = as.appIcon ? `<img src="${as.appIcon}" style="height:100%;max-height:48px;object-fit:contain;border-radius:8px;" />` : '🏆';
   } catch {}
-  document.getElementById('setup-screen').style.display = 'none'; document.body.classList.remove('setup-mode');
+  document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('loading-screen').style.display = 'flex';
   document.getElementById('disconnect-btn').style.display = 'block';
   fetchData(true);
@@ -770,7 +763,7 @@ async function fetchData(initial) {
   } catch(e) {
     document.getElementById('loading-screen').style.display = 'none';
     if (initial) {
-      document.getElementById('setup-screen').style.display = 'flex'; document.body.classList.add('setup-mode');
+      document.getElementById('setup-screen').style.display = 'flex';
       showError('Could not connect — check your Bin ID');
     } else {
       showError('Connection error — retrying...');

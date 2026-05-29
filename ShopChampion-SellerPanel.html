@@ -5,18 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>ShopChampion — Seller Panel</title>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="manifest" href="/manifest-seller.json" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="SC Seller" />
-<meta name="theme-color" content="#FFD700" />
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js');
-    });
-  }
-</script>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
   body{background:#0a0e1a;color:#e8eaf0;font-family:'Nunito',sans-serif;min-height:100vh;}
@@ -398,19 +386,12 @@
   </div>
 </div>
 
-<script src="/config.js"></script>
 <script>
-// ── Config (credentials loaded from /config.js) ──
-let SB_URL = SC_SUPABASE_URL;
-let SB_ANON = SC_SUPABASE_ANON;
+// ── Config ──
+let SB_URL = "https://dgmzfqwglnafghpfnqau.supabase.co";
+let SB_ANON = "sb_publishable_yxPk_18wrBIPebrJkYn9FQ_91lhKmjE";
 let SB_SERVICE_KEY = "";
-let SELLER_PASS = ""; // stored as SHA-256 hex, never plain text
-
-// ── Seller password hashing (Web Crypto SHA-256) ──
-async function hashSellerPass(pass) {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("sc_seller:" + pass));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
+let SELLER_PASS = "";
 let allKeys = [];
 let allUsers = [];
 let allPayments = [];
@@ -442,24 +423,20 @@ function saveSetup() {
     err.style.display = "block";
     return;
   }
-  hashSellerPass(pass).then(hashed => {
-    SELLER_PASS = hashed;
-    localStorage.setItem("sc_seller_cfg", JSON.stringify({pass: hashed}));
-    document.getElementById("setup-overlay").style.display = "none";
-    openMain();
-  });
+  SELLER_PASS = pass;
+  localStorage.setItem("sc_seller_cfg", JSON.stringify({pass}));
+  document.getElementById("setup-overlay").style.display = "none";
+  openMain();
 }
 
 function doLogin() {
   const p = document.getElementById("login-pass").value;
-  hashSellerPass(p).then(hashed => {
-    if (hashed === SELLER_PASS) {
-      document.getElementById("login-overlay").style.display = "none";
-      openMain();
-    } else {
-      document.getElementById("login-err").style.display = "block";
-    }
-  });
+  if (p === SELLER_PASS) {
+    document.getElementById("login-overlay").style.display = "none";
+    openMain();
+  } else {
+    document.getElementById("login-err").style.display = "block";
+  }
 }
 
 function openMain() {
@@ -1284,8 +1261,7 @@ async function confirmDeleteUser() {
   const enteredPass = document.getElementById("del-confirm-pass").value;
   const errEl = document.getElementById("del-pass-err");
   errEl.style.display = "none";
-  const hashedEntry = await hashSellerPass(enteredPass);
-  if (hashedEntry !== SELLER_PASS) {
+  if (enteredPass !== SELLER_PASS) {
     errEl.style.display = "block";
     document.getElementById("del-confirm-pass").value = "";
     return;
@@ -1313,11 +1289,9 @@ async function confirmDeleteUser() {
 // ══════════════════════════════════════════════
 // RESET PASSWORD
 // ══════════════════════════════════════════════
-// Must match Admin app: SHA-256(phone + ":" + pass + ":sc2026")
-async function hashPass(phone, pass) {
-  const raw = phone + ":" + pass + ":sc2026";
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+// Must match Admin app: btoa(phone + ":" + pass)
+function hashPass(phone, pass) {
+  return btoa(phone + ":" + pass);
 }
 
 function openResetModal(phone, name) {
@@ -1352,24 +1326,12 @@ async function confirmResetPassword() {
   const phone = pendingResetPhone;
   closeResetModal();
   try {
-    const hashed = await hashPass(phone, pass1);
+    const hashed = hashPass(phone, pass1);
     await sbFetch(`/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}`, {
       method: "PATCH", prefer: "return=minimal",
       body: JSON.stringify({ password_hash: hashed })
     });
-    // Show password once in a dismissible in-panel modal — not a browser alert
-    const modal = document.createElement("div");
-    modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:9999;";
-    modal.innerHTML = `
-      <div style="background:#0d1b2a;border:1px solid #1e3a5f;border-radius:14px;padding:28px 24px;max-width:340px;width:90%;text-align:center;">
-        <div style="font-size:28px;margin-bottom:10px;">🔑</div>
-        <div style="font-size:15px;font-weight:700;color:#e8eaf0;margin-bottom:8px;">Password Reset</div>
-        <div style="font-size:13px;color:#7a8aaa;margin-bottom:14px;">Tell <strong style="color:#e8eaf0;">+91 ${phone}</strong> their new temporary password:</div>
-        <div style="background:#0a0e1a;border:1px solid #FFD700;border-radius:8px;padding:12px;font-size:20px;font-weight:800;color:#FFD700;letter-spacing:2px;margin-bottom:16px;">${pass1}</div>
-        <div style="font-size:11px;color:#7a8aaa;margin-bottom:18px;">They can change it inside the app after logging in.</div>
-        <button onclick="this.closest('[style]').remove()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:800;cursor:pointer;">✓ Got it</button>
-      </div>`;
-    document.body.appendChild(modal);
+    alert(`✅ Password reset for +91 ${phone}!\n\nTell the user their new password:\n"${pass1}"\n\nThey can log in with it immediately.`);
   } catch(e) { alert("❌ Error resetting password: " + e.message); }
 }
 

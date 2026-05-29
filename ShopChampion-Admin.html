@@ -18,7 +18,6 @@
     });
   }
 </script>
-<script src="/config.js"></script>
 <!-- Firebase v9 compat (CDN) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -429,324 +428,37 @@
   .inline-edit { background: #0a0e1a; border: 1px solid #FFD700; border-radius: 4px; color: #e8eaf0; padding: 3px 6px; font-size: 13px; font-family: 'Nunito', sans-serif; min-width: 60px; }
 
   /* Sync banner */
-  #sync-banner { background: linear-gradient(135deg, #0a1f0a, #0d2a10); border-bottom: 1px solid #1a4a1a; padding: 10px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; position: sticky; top: 0; z-index: 100; }
+  #sync-banner { background: linear-gradient(135deg, #0a1f0a, #0d2a10); border-bottom: 1px solid #1a4a1a; padding: 10px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   #sync-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #2a2; flex-shrink: 0; box-shadow: 0 0 6px #4f4; animation: pulse-green 2s infinite; }
   @keyframes pulse-green { 0%,100%{opacity:1} 50%{opacity:0.4} }
   #sync-status-dot.syncing { background: #aa4; box-shadow: 0 0 6px #FFD700; }
   #sync-status-dot.error { background: #a22; box-shadow: 0 0 6px #f44; animation: none; }
 
-  
-/* ═══════════════════════════════════════════════════════════
-   MOBILE — Clean, comfortable, Instagram/YouTube feel
-   ═══════════════════════════════════════════════════════════ */
-
-/* Always hide bottom nav on desktop */
-#bottom-nav, #more-menu { display: none; }
-
-@media (max-width: 640px) {
-
-  /* ── HEADER — slim, clean ── */
-  #main-header {
-    padding: 10px 16px !important;
-    gap: 8px !important;
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 200 !important;
-  }
-  #header-shop-icon { font-size: 22px !important; }
-  #header-shop-name { font-size: 15px !important; }
-  #header-admin-badge { display: none !important; }
-  #header-logout-btn { padding: 5px 10px !important; font-size: 11px !important; }
-  #header-theme-btn { padding: 5px 8px !important; font-size: 14px !important; }
-  #header-lang-btn { padding: 5px 8px !important; font-size: 11px !important; }
-
-  /* ── SYNC BANNER — compact ── */
-  #sync-banner {
-    flex-wrap: wrap !important;
-    padding: 8px 16px !important;
-    gap: 6px !important;
-    font-size: 12px !important;
-    position: sticky !important;
-    top: 54px !important;
-    z-index: 199 !important;
-  }
-  #sync-banner-actions {
-    width: 100% !important;
-    display: flex !important;
-    gap: 8px !important;
-  }
-  #sync-banner-actions button {
-    flex: 1 !important;
-    font-size: 11px !important;
-    padding: 7px 4px !important;
-    text-align: center !important;
-    border-radius: 10px !important;
-  }
-
-  /* ── HIDE DESKTOP TABS ── */
-  #tab-bar { display: none !important; }
-
-  /* ── CONTENT PADDING ── */
-  #tab-content {
-    padding: 0 0 76px !important;
-    min-height: calc(100vh - 140px) !important;
-  }
-
-  /* ── SECTION HEADERS ── */
-  #tab-content h2 {
-    font-size: 18px !important;
-    font-weight: 800 !important;
-    padding: 16px 16px 4px !important;
-    margin: 0 !important;
-  }
-
-  /* ── CARDS — rounded, spacious ── */
-  .card {
-    border-radius: 16px !important;
-    margin-bottom: 8px !important;
-  }
-
-  /* ── INPUTS — big, no zoom on iOS ── */
-  .input {
-    font-size: 16px !important;
-    padding: 14px 16px !important;
-    min-height: 50px !important;
-    border-radius: 14px !important;
-  }
-
-  /* ── BUTTONS — easy to tap ── */
-  .btn {
-    min-height: 42px !important;
-    border-radius: 12px !important;
-    font-size: 13px !important;
-  }
-
-  /* ── MODALS — slide up from bottom like Instagram ── */
-  .modal-overlay {
-    padding: 0 !important;
-    align-items: flex-end !important;
-  }
-  .modal-box {
-    border-radius: 24px 24px 0 0 !important;
-    max-height: 90vh !important;
-    padding: 24px 18px 32px !important;
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-  .modal-title { font-size: 17px !important; margin-bottom: 18px !important; }
-
-  /* ── LEADERBOARD ROWS — compact mobile cards ── */
-  .lb-row {
-    grid-template-columns: 36px 1fr auto !important;
-    padding: 10px 14px !important;
-  }
-  .lb-row > div:nth-child(4),
-  .lb-row > div:nth-child(5) { display: none !important; }
-
-  /* Leaderboard header row */
-  #tab-content > div > div[style*="grid-template-columns:48px 1fr 160px 110px 130px"] {
-    grid-template-columns: 36px 1fr auto !important;
-    padding: 8px 14px !important;
-  }
-  #tab-content > div > div[style*="grid-template-columns:48px 1fr 160px 110px 130px"] > div:nth-child(4),
-  #tab-content > div > div[style*="grid-template-columns:48px 1fr 160px 110px 130px"] > div:nth-child(5) {
-    display: none !important;
-  }
-
-  /* ── CUSTOMER CARDS — WhatsApp list style ── */
-  #tab-content .card[style*="display:flex;align-items:center"] {
-    padding: 12px 14px !important;
-  }
-  #tab-content .card > div:last-child > div:last-child {
-    flex-wrap: wrap !important;
-    gap: 4px !important;
-  }
-
-  /* ── PURCHASE TAB ── */
-  #tab-content [style*="grid-template-columns:1fr 1fr 1fr"][style*="gap:8px"] {
-    gap: 8px !important;
-    padding: 0 14px 12px !important;
-  }
-
-  /* Filter bar inside leaderboard */
-  #tab-content > div > div[style*="border-radius:12px;padding:14px 16px;margin-bottom:16px"] {
-    margin: 8px 14px 8px !important;
-    border-radius: 16px !important;
-    padding: 12px 14px !important;
-  }
-
-  /* Leaderboard title */
-  #tab-content > div > div[style*="justify-content:space-between;align-items:center;margin-bottom:16px"] {
-    padding: 14px 14px 0 !important;
-    margin-bottom: 8px !important;
-  }
-
-  /* Pagination bar */
-  #tab-content button[onclick*="lbGoPage"] {
-    min-width: 38px !important;
-    min-height: 38px !important;
-    border-radius: 10px !important;
-    font-size: 13px !important;
-  }
-
-  /* Search input */
-  #cust-search { margin: 0 14px 12px !important; width: calc(100% - 28px) !important; }
-
-  /* Customer count text */
-  #tab-content > div > div[style*="font-size:12px;color:#4a5a7a;margin-bottom:10px"] {
-    padding: 0 14px !important;
-  }
-
-  /* Customer list */
-  #cust-list { gap: 6px !important; padding: 0 14px !important; }
-
-  /* Customer header actions */
-  #tab-content > div > div:first-child[style*="justify-content:space-between"] {
-    padding: 14px 14px 8px !important;
-    flex-wrap: wrap !important;
-    gap: 8px !important;
-  }
-  #tab-content > div > div:first-child > div:last-child {
-    flex-wrap: wrap !important;
-    gap: 6px !important;
-  }
-
-  /* WhatsApp tip box */
-  #tab-content > div > div[style*="0a1628"][style*="border-radius:8px;padding:10px"] {
-    margin: 0 14px 10px !important;
-    border-radius: 12px !important;
-    font-size: 11px !important;
-  }
-
-  /* Load more button */
-  #cust-load-more { padding: 12px 14px !important; }
-
-  /* ── BOTTOM NAV — YouTube style ── */
-  #bottom-nav {
-    display: flex !important;
-    position: fixed !important;
-    bottom: 0; left: 0; right: 0;
-    background: #0a0e1a;
-    border-top: 1.5px solid #16203a;
-    z-index: 800;
-    padding: 4px 0 env(safe-area-inset-bottom, 4px);
-    box-shadow: 0 -2px 16px #0005;
-  }
-  .bnav-btn {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    background: none;
-    border: none;
-    color: #3a4a6a;
-    cursor: pointer;
-    padding: 7px 2px;
-    font-family: 'Nunito', sans-serif;
-    transition: color 0.15s;
-    min-width: 0;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .bnav-btn.active { color: #FFD700; }
-  .bnav-btn .bnav-icon { font-size: 22px; line-height: 1; }
-  .bnav-btn .bnav-label { font-size: 10px; font-weight: 700; letter-spacing: 0.2px; }
-
-  /* ── MORE MENU — Instagram bottom sheet ── */
-  #more-menu {
-    position: fixed;
-    bottom: 64px; left: 0; right: 0;
-    background: #0d1525;
-    border: 1px solid #1e2a45;
-    border-radius: 24px 24px 0 0;
-    z-index: 799;
-    padding: 8px 16px 16px;
-    box-shadow: 0 -8px 40px #0009;
-  }
-  #more-menu::before {
-    content: '';
-    display: block;
-    width: 36px; height: 4px;
-    background: #2a3560;
-    border-radius: 2px;
-    margin: 8px auto 16px;
-  }
-  #more-menu.open { display: grid !important; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-  .more-menu-btn {
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-    background: #131d35; border: 1.5px solid #1e2a45; border-radius: 18px;
-    padding: 18px 8px 14px; color: #5a7aaa; cursor: pointer;
-    font-family: 'Nunito', sans-serif;
-    -webkit-tap-highlight-color: transparent;
-    transition: all 0.15s;
-    min-height: 80px;
-  }
-  .more-menu-btn:active { transform: scale(0.96); }
-  .more-menu-btn.active { background: #1a1500; border-color: #FFD700; color: #FFD700; }
-  .more-menu-btn .mm-icon { font-size: 26px; line-height: 1; }
-  .more-menu-btn .mm-label { font-size: 12px; font-weight: 700; }
-
-  /* ── PWA INSTALL BANNER ── */
-  #pwa-install-banner { bottom: 72px !important; left: 10px !important; right: 10px !important; border-radius: 16px !important; }
-
-  /* ── DB TABLE mobile ── */
-  .db-table th { font-size: 10px !important; padding: 8px 8px !important; }
-  .db-table td { font-size: 12px !important; padding: 8px 8px !important; }
-}
-
-/* ── Day theme overrides ── */
-body.day-theme #bottom-nav { background: #f4f6ff; border-color: #dde2f5; box-shadow: 0 -2px 12px #0001; }
-body.day-theme .bnav-btn { color: #99aacc; }
-body.day-theme .bnav-btn.active { color: #2563eb; }
-body.day-theme #more-menu { background: #fff; border-color: #dde2f5; }
-body.day-theme #more-menu::before { background: #dde2f5; }
-body.day-theme .more-menu-btn { background: #f0f4ff; border-color: #dde2f5; color: #667; }
-body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD700; color: #856000; }
-
-
-  /* PWA Install Banner */
-  #pwa-install-banner {
-    display: none;
-    position: fixed;
-    bottom: 70px;
-    left: 12px; right: 12px;
-    background: linear-gradient(135deg, #1a3a1a, #0d2a10);
-    border: 1px solid #FFD700;
-    border-radius: 14px;
-    padding: 14px 16px;
-    z-index: 900;
-    align-items: center;
-    gap: 12px;
-    box-shadow: 0 4px 24px #0008;
-  }
-  #pwa-install-banner.show { display: flex; }
-  body.day-theme #pwa-install-banner { background: linear-gradient(135deg, #fffbe6, #fff8d6); }
-
-  /* Leaderboard mobile — collapse 5-col grid to 3-col */
+  /* ── RESPONSIVE ── */
   @media (max-width: 600px) {
-    .lb-row-grid {
-      grid-template-columns: 40px 1fr auto !important;
+    #tab-bar { gap: 2px; padding: 6px 4px; }
+    .tab-btn { font-size: 10px; padding: 6px 6px; min-width: 0; }
+    #tab-content { padding: 12px 10px; }
+    #customer-page-inner { padding: 12px 10px; }
+    #app-header { padding: 8px 12px; }
+    #header-title { font-size: 15px; }
+    .card { padding: 12px; }
+    .btn { font-size: 12px; padding: 6px 10px; }
+    .input { font-size: 14px; }
+    table { font-size: 12px; }
+    .modal-inner, [style*="max-width:540px"], [style*="max-width:460px"], [style*="max-width:700px"] {
+      max-width: 100% !important;
+      border-radius: 12px !important;
+      padding: 18px !important;
     }
-    .lb-row-grid .lb-col-points { display: none !important; }
-    .lb-row-grid .lb-col-actions { display: none !important; }
-    .lb-hdr-grid {
-      grid-template-columns: 40px 1fr auto !important;
-    }
-    .lb-hdr-grid .lb-col-points { display: none !important; }
-    .lb-hdr-grid .lb-col-actions { display: none !important; }
-
-    /* Customer sub-info — hide phone/ID on mobile, show only visits */
-    .lb-sub-info { display: none !important; }
-    .lb-visits { display: inline !important; }
-
-    /* Make purchase buttons in lb full width on mobile */
-    .lb-action-btns { display: none !important; }
-
-    /* Sync banner — make Display/Push buttons smaller on mobile */
-    #sync-banner button { font-size: 11px !important; padding: 4px 8px !important; }
+    #notification { right: 10px; left: 10px; max-width: none; font-size: 13px; }
+    .customer-row { flex-wrap: wrap; gap: 6px; }
+    .customer-row .btn-group { flex-wrap: wrap; }
   }
-
+  @media (max-width: 400px) {
+    .tab-btn { font-size: 9px; padding: 5px 4px; }
+    #tab-content { padding: 8px 6px; }
+  }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
@@ -779,8 +491,9 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
         <div>1. Go to <a href="https://console.firebase.google.com" target="_blank" style="color:#5af;">console.firebase.google.com</a></div>
         <div>2. Click <strong style="color:#e8eaf0;">Add project</strong> → name it anything → Continue</div>
         <div>3. Click the <strong style="color:#e8eaf0;">&lt;/&gt; Web</strong> icon → Register app → copy the config</div>
-        <div>4. Go to <strong style="color:#e8eaf0;">Build → Firestore Database</strong> → Create → <strong style="color:#4f4;">test mode</strong></div>
-        <div>5. Go to <strong style="color:#e8eaf0;">Build → Storage</strong> → Get started → test mode</div>
+        <div>4. Go to <strong style="color:#e8eaf0;">Build → Firestore Database</strong> → Create → Start in <strong style="color:#4f4;">production mode</strong></div>
+        <div style="background:#1a0a00;border:1px solid #f84;border-radius:6px;padding:6px 10px;margin:4px 0;font-size:11px;color:#f84;">⚠️ Do NOT use test mode — it exposes your entire database publicly. Use production mode and set these security rules:<br><code style="font-size:10px;color:#ffa;display:block;margin-top:4px;">rules_version = '2';<br>service cloud.firestore {'{'}<br>&nbsp;&nbsp;match /databases/{'{'}'{'}'}/documents {'{'}<br>&nbsp;&nbsp;&nbsp;&nbsp;match /users/{'{'}userId{'}'} {'{'}<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if request.auth != null;<br>&nbsp;&nbsp;&nbsp;&nbsp;{'}'}<br>&nbsp;&nbsp;{'}'}<br>{'}'}</code></div>
+        <div>5. Go to <strong style="color:#e8eaf0;">Build → Storage</strong> → Get started → <strong style="color:#4f4;">production mode</strong></div>
       </div>
 
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Paste your Firebase config JSON:</label>
@@ -1031,7 +744,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <div style="font-size:13px;color:#7a8aaa;margin-bottom:16px;" id="auth-pass-subtitle">Enter your password</div>
       <input class="input" type="password" id="auth-pass" placeholder="Enter your password" style="text-align:center;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')loginWithPassword()"/>
       <div id="auth-pass-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
-      <button id="login-pass-btn" class="btn" onclick="loginWithPassword()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:10px;">
+      <button class="btn" onclick="loginWithPassword()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:10px;">
         Login →
       </button>
       <button onclick="showForgotPassword()" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;display:block;width:100%;margin-bottom:6px;">🔑 Forgot Password?</button>
@@ -1060,22 +773,28 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
     </div>
 
   </div>
+  <div style="font-size:10px;color:#2a3a5a;text-align:center;margin-top:14px;line-height:1.7;max-width:300px;margin-left:auto;margin-right:auto;">
+    By using ShopChampion you agree that your name and phone number may be stored to manage your loyalty account. Data is stored securely and never sold to third parties. (DPDP Act 2023)
+  </div>
 </div>
 
 <!-- MAIN APP -->
 <div id="main-app">
   <!-- Header -->
-  <div id="main-header" style="background:linear-gradient(135deg,#0a0e1a,#101828);border-bottom:1px solid #1e2a45;padding:16px 20px;display:flex;align-items:center;gap:16px;">
+  <div style="background:linear-gradient(135deg,#0a0e1a,#101828);border-bottom:1px solid #1e2a45;padding:16px 20px;display:flex;align-items:center;gap:16px;">
     <div id="header-shop-icon" style="font-size:28px;">🏆</div>
     <div>
       <div id="header-shop-name" style="font-size:20px;font-weight:800;background:linear-gradient(90deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">Shop Champion</div>
       <div style="font-size:11px;color:#556;letter-spacing:2px;text-transform:uppercase;">Admin Panel</div>
     </div>
-    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
-      <!-- Hidden lang menu — still works from settings -->
-      <div id="lang-menu" style="display:none;position:fixed;right:14px;top:60px;background:var(--bg-card);border:1px solid var(--border-main);border-radius:12px;padding:8px;z-index:9999;min-width:160px;box-shadow:0 8px 32px #0008;"></div>
-      <span id="lang-label" style="display:none;">EN</span>
-      <button class="btn" id="push-btn" onclick="pushSync();" title="Push to Display" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:7px 14px;font-size:13px;font-weight:800;">⬆ Push</button>
+    <div style="margin-left:auto;display:flex;gap:10px;align-items:center;">
+      <span style="background:#1a2540;border:1px solid #2a3560;border-radius:8px;padding:4px 12px;font-size:12px;color:#aaa;">👤 Admin</span>
+      <button class="btn" onclick="doLogout()" style="background:#1a0a0a;border:1px solid #4a1515;color:#f66;padding:6px 14px;font-size:12px;">Logout</button>
+      <button class="btn" id="theme-btn" onclick="toggleTheme()" title="Toggle Day/Night Theme" style="background:#1a2540;border:1px solid #2a3560;color:#FFD700;padding:6px 12px;font-size:15px;">🌙</button>
+      <div style="position:relative;">
+        <button class="btn" id="lang-btn" onclick="toggleLangMenu()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;padding:6px 12px;font-size:12px;font-weight:700;">🌐 <span id="lang-label">EN</span> ▾</button>
+        <div id="lang-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--bg-card);border:1px solid var(--border-main);border-radius:12px;padding:8px;z-index:9999;min-width:160px;box-shadow:0 8px 32px #0008;"></div>
+      </div>
     </div>
   </div>
 
@@ -1083,57 +802,22 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
   <div id="sync-banner">
     <div id="sync-status-dot"></div>
     <span style="font-size:12px;color:#4f4;font-weight:700;" id="sync-status-text">Ready</span>
+    <span style="font-size:12px;color:#556;" id="sync-time"></span>
+    <!-- Firebase status -->
     <span id="db-status-text" style="font-size:11px;color:#4a5a7a;margin-left:4px;"></span>
-    <span style="font-size:11px;color:#556;" id="sync-time"></span>
-    <button class="btn" onclick="showFirebaseSettings()" style="display:none;">🔥 Firebase</button>
-
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn" onclick="showFirebaseSettings()" style="display:none;">🔥 Firebase</button>
+      <button class="btn" onclick="showSyncSetup()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;padding:5px 12px;font-size:12px;">📺 Display Setup</button>
+      <button class="btn" id="push-btn" onclick="pushSync();" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:5px 14px;font-size:12px;font-weight:800;">⬆ Push to Display</button>
+    </div>
   </div>
 
-  <!-- Tabs (desktop horizontal scroll) -->
+  <!-- Tabs -->
   <div id="tab-bar" style="background:#0d1220;border-bottom:1px solid #1e2a45;overflow-x:auto;display:flex;padding:6px 12px;gap:4px;"></div>
   <div id="tab-content" style="padding:20px;max-width:1200px;margin:0 auto;"></div>
-
-  <!-- More menu overlay (mobile) -->
-  <div id="more-menu" onclick="event.stopPropagation()"></div>
-  <div id="more-menu-backdrop" style="display:none;position:fixed;inset:0;z-index:798;" onclick="closeMoreMenu()"></div>
-
-  <!-- Bottom Nav (mobile only) -->
-  <nav id="bottom-nav">
-    <button class="bnav-btn" id="bnav-0" onclick="mobileTab(0)">
-      <span class="bnav-icon">🏆</span>
-      <span class="bnav-label">Board</span>
-    </button>
-    <button class="bnav-btn" id="bnav-1" onclick="mobileTab(1)">
-      <span class="bnav-icon">👥</span>
-      <span class="bnav-label">Customers</span>
-    </button>
-    <button class="bnav-btn" id="bnav-2" onclick="mobileTab(2)">
-      <span class="bnav-icon">💳</span>
-      <span class="bnav-label">Purchase</span>
-    </button>
-    <button class="bnav-btn" id="bnav-3" onclick="mobileTab(3)">
-      <span class="bnav-icon">📊</span>
-      <span class="bnav-label">Analytics</span>
-    </button>
-    <button class="bnav-btn" id="bnav-more" onclick="toggleMoreMenu()">
-      <span class="bnav-icon">⋯</span>
-      <span class="bnav-label">More</span>
-    </button>
-  </nav>
 </div>
 
 <div id="modal-container"></div>
-
-<!-- PWA Install Banner -->
-<div id="pwa-install-banner">
-  <span style="font-size:26px;">📲</span>
-  <div style="flex:1;min-width:0;">
-    <div style="font-size:13px;font-weight:800;color:#FFD700;">Install ShopChampion</div>
-    <div style="font-size:11px;color:#4f4;margin-top:2px;">Add to home screen for the best experience</div>
-  </div>
-  <button id="pwa-install-btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;">Install ✓</button>
-  <button onclick="document.getElementById('pwa-install-banner').classList.remove('show');localStorage.setItem('pwa_dismissed','1');" style="background:none;border:none;color:#4a6a4a;cursor:pointer;font-size:18px;padding:0 4px;">×</button>
-</div>
 
 <!-- Customer Detail Full Page -->
 <div id="customer-page" style="display:none;position:fixed;inset:0;background:#0a0e1a;z-index:500;overflow-y:auto;">
@@ -1142,15 +826,8 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 
 <script>
 // ─── SUPABASE CONFIG (defined first so all functions can use it) ───
-// ── Secure password hashing (Web Crypto SHA-256) ──
-// Replaces insecure btoa encoding. Phone number acts as a unique per-user salt.
-async function scHashPassword(phone, password) {
-  const raw = phone + ":" + password + ":sc2026";
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-// SC_SUPABASE_URL and SC_SUPABASE_ANON loaded from /config.js
+const SC_SUPABASE_URL  = "https://dgmzfqwglnafghpfnqau.supabase.co";
+const SC_SUPABASE_ANON = "sb_publishable_yxPk_18wrBIPebrJkYn9FQ_91lhKmjE";
 
 // ─── CONSTANTS ───────────────────────────────────────────────
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
@@ -1330,15 +1007,7 @@ function ptRestoreState() {
     const c  = window._ptState.selData;
     if (pr && c) {
       pr.style.cssText="display:flex;align-items:center;gap:12px;background:#0a0e1a;border-radius:10px;padding:12px;margin-bottom:14px;";
-      const _lp1=[...(c.purchases||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
-      const _lv1=_lp1?timeSince(_lp1.date):"Never";
-      const _dd1=_lp1?Math.floor((Date.now()-new Date(_lp1.date))/86400000):9999;
-      const _vc1=_dd1<=7?"#4f4":_dd1<=30?"#FFD700":_dd1<=60?"#f84":"#f66";
-      const _isPro1 = typeof isSubFeatureAllowed==="function";
-      const _showVisits1 = !_isPro1||isSubFeatureAllowed(8);
-      const _showLastVisit1 = !_isPro1||isSubFeatureAllowed(10);
-      const _showRank1 = !_isPro1||isSubFeatureAllowed(0);
-      pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank1?` &middot; Rank #${c.rank||"?"}`:""} ${_showVisits1?`&middot; 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit1?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc1};font-weight:700;">${_lv1}</span></div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
+      pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${esc(c.name)}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} &middot; Rank #${c.rank||"?"} &middot; &#x1F6B6; ${(c.purchases||[]).length} visits</div></div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
     }
   }
   // Restore date mode - only restore manual picker if it was open
@@ -1370,7 +1039,7 @@ function ptRestoreState() {
       const pending=(c.borrows||[]).filter(b=>b.status==="pending");
       const owed=pending.reduce((s,b)=>s+Number(b.amount),0);
       pr.style.cssText="display:flex;align-items:center;gap:12px;background:#0a0e1a;border-radius:10px;padding:12px;margin-bottom:14px;";
-      pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} spend &middot; ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':"No pending borrows"}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
+      pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${esc(c.name)}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} spend &middot; ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':"No pending borrows"}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
     }
   }
   ptPts();
@@ -1433,107 +1102,19 @@ async function deleteOneCustomer(id) {
   await userCol().doc(id).delete();
 }
 
-
-
-// ── PWA Install Prompt ─────────────────────────────────────────
-let _deferredInstallPrompt = null;
-
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  _deferredInstallPrompt = e;
-  // Show banner if not dismissed before
-  if (!localStorage.getItem('pwa_dismissed') && !localStorage.getItem('pwa_installed')) {
-    setTimeout(() => {
-      document.getElementById('pwa-install-banner').classList.add('show');
-    }, 3000);
-  }
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-  const btn = document.getElementById('pwa-install-btn');
-  if (btn) {
-    btn.addEventListener('click', async () => {
-      if (_deferredInstallPrompt) {
-        _deferredInstallPrompt.prompt();
-        const { outcome } = await _deferredInstallPrompt.userChoice;
-        if (outcome === 'accepted') {
-          localStorage.setItem('pwa_installed', '1');
-          document.getElementById('pwa-install-banner').classList.remove('show');
-        }
-        _deferredInstallPrompt = null;
-      } else {
-        // Fallback instructions
-        alert('To install:\n\n1. Tap the 3-dot menu in Chrome\n2. Tap "Add to Home Screen"\n3. Tap "Add"');
-      }
-    });
-  }
-});
-
-window.addEventListener('appinstalled', () => {
-  localStorage.setItem('pwa_installed', '1');
-  document.getElementById('pwa-install-banner').classList.remove('show');
-});
-
-// ── Mobile Bottom Nav ──────────────────────────────────────────
-const MOBILE_MAIN_TABS = [0, 1, 2, 3]; // leaderboard, customers, purchase, analytics
-const MOBILE_MORE_TABS = [4, 5, 6];    // compare, festivals, settings
-
-function mobileTab(i) {
-  closeMoreMenu();
-  switchTab(i);
-  updateBottomNav(i);
-}
-
-function updateBottomNav(activeIdx) {
-  MOBILE_MAIN_TABS.forEach(i => {
-    const btn = document.getElementById('bnav-' + i);
-    if (btn) btn.classList.toggle('active', i === activeIdx);
-  });
-  const moreBtn = document.getElementById('bnav-more');
-  if (moreBtn) moreBtn.classList.toggle('active', MOBILE_MORE_TABS.includes(activeIdx));
-}
-
-function toggleMoreMenu() {
-  const menu = document.getElementById('more-menu');
-  const backdrop = document.getElementById('more-menu-backdrop');
-  const isOpen = menu.classList.contains('open');
-  if (isOpen) {
-    closeMoreMenu();
-  } else {
-    // Build more menu items
-    const TABS = getTabs();
-    menu.innerHTML = MOBILE_MORE_TABS.map(i => `
-      <button class="more-menu-btn${currentTab === i ? ' active' : ''}" onclick="mobileTab(${i});closeMoreMenu()">
-        <span class="mm-icon">${TABS_ICON[i]}</span>
-        <span class="mm-label">${TABS_BASE[i].charAt(0).toUpperCase() + TABS_BASE[i].slice(1)}</span>
-      </button>
-    `).join('');
-    menu.classList.add('open');
-    backdrop.style.display = 'block';
-  }
-}
-
-function closeMoreMenu() {
-  const menu = document.getElementById('more-menu');
-  const backdrop = document.getElementById('more-menu-backdrop');
-  if (menu) menu.classList.remove('open');
-  if (backdrop) backdrop.style.display = 'none';
-}
-
-// Override switchTab to also update bottom nav
-const _origSwitchTab = switchTab;
-switchTab = function(i) {
-  _origSwitchTab(i);
-  updateBottomNav(i);
-};
-
-// Init bottom nav state on load
-document.addEventListener('DOMContentLoaded', () => updateBottomNav(0));
-
 // ── On page load: decide which mode ──
 window.addEventListener("load", () => {
-  // Firebase config loaded from /config.js
-  initFirebase(SC_FIREBASE_CONFIG);
+  // ── Firebase is hardcoded — no setup screen needed ──
+  const HARDCODED_FB = {
+    apiKey: "AIzaSyAdNjL9gCptnAbJ6ZVm9BZ61rKfBtwc1Qc",
+    authDomain: "shop-champion.firebaseapp.com",
+    projectId: "shop-champion",
+    storageBucket: "shop-champion.firebasestorage.app",
+    messagingSenderId: "81324128909",
+    appId: "1:81324128909:web:cc023f5c031c505bfe00c4",
+    measurementId: "G-YCX9WJ4DP5"
+  };
+  initFirebase(HARDCODED_FB);
   useLocalOnly = false;
   loadLicense();
   // Check if already logged in — always verify block status online first
@@ -2028,7 +1609,7 @@ function showSyncSetup(){
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">JSONbin Master Key</label>
     <input class="input" id="m-apikey" value="${syncApiKey||''}" placeholder="$2a$10$..." style="margin-bottom:14px;font-family:monospace;font-size:12px;" />
     ${syncBinId?`<div style="font-size:12px;color:#7a8aaa;margin-bottom:14px;">Bin: <span style="color:#5af;font-family:monospace;">${syncBinId}</span>
-      <button class="btn" onclick="if(confirm('Reset sync?')){resetSync()}" style="background:#3a1a1a;color:#f66;border:1px solid #4a1515;padding:2px 8px;font-size:11px;margin-left:8px;">Reset</button></div>`:""}
+      <button class="btn" onclick="scConfirm('Reset sync? This will disconnect the display screen until reconnected.', resetSync, 'Reset', 'background:#c0392b;color:#fff;')" style="background:#3a1a1a;color:#f66;border:1px solid #4a1515;padding:2px 8px;font-size:11px;margin-left:8px;">Reset</button></div>`:""}
     <div style="display:flex;gap:10px;">
       <button class="btn" onclick="saveApiKey()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;flex:1;padding:12px;font-weight:800;">Save & Push →</button>
       <button class="btn" onclick="closeModal()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:12px;width:80px;">Cancel</button>
@@ -2173,81 +1754,40 @@ async function checkPhone() {
 }
 
 // ── Step 2a: Login with password ──
-// ── Brute-force login protection ──────────────────────────────
-const SC_MAX_ATTEMPTS  = 5;          // max wrong passwords
-const SC_LOCKOUT_MS    = 15 * 60 * 1000; // 15 minutes in ms
-
-function bfKey(phone) { return "sc_bf_" + phone; }
-
-function getBfState(phone) {
-  try {
-    const raw = localStorage.getItem(bfKey(phone));
-    return raw ? JSON.parse(raw) : { attempts: 0, lockedUntil: 0 };
-  } catch { return { attempts: 0, lockedUntil: 0 }; }
-}
-
-function saveBfState(phone, state) {
-  try { localStorage.setItem(bfKey(phone), JSON.stringify(state)); } catch {}
-}
-
-function resetBfState(phone) {
-  try { localStorage.removeItem(bfKey(phone)); } catch {}
-}
-
-function isLockedOut(phone) {
-  const s = getBfState(phone);
-  if (s.lockedUntil && Date.now() < s.lockedUntil) return s.lockedUntil;
-  return false;
-}
-
-function recordFailedAttempt(phone) {
-  const s = getBfState(phone);
-  s.attempts = (s.attempts || 0) + 1;
-  if (s.attempts >= SC_MAX_ATTEMPTS) {
-    s.lockedUntil = Date.now() + SC_LOCKOUT_MS;
-    s.attempts = 0; // reset counter so next lockout is fresh
+// ── Rate limiting for login attempts ──
+const _loginAttempts = {};
+function _checkRateLimit(phone) {
+  const now = Date.now();
+  const rec = _loginAttempts[phone] || { count: 0, lockedUntil: 0 };
+  if (now < rec.lockedUntil) {
+    const secs = Math.ceil((rec.lockedUntil - now) / 1000);
+    return `Too many attempts. Try again in ${secs}s.`;
   }
-  saveBfState(phone, s);
-  return s;
+  return null;
 }
-
-function showLockoutMessage(phone, errEl) {
-  const until = isLockedOut(phone);
-  if (!until) return false;
-  const secsLeft = Math.ceil((until - Date.now()) / 1000);
-  const mins = Math.floor(secsLeft / 60);
-  const secs = secsLeft % 60;
-  errEl.innerHTML = `🔒 Too many wrong attempts. Try again in <strong>${mins}m ${secs}s</strong>.`;
-  errEl.style.display = "block";
-  // Disable the login button and update the countdown every second
-  const btn = document.getElementById("login-pass-btn");
-  if (btn) btn.disabled = true;
-  if (window._bfTimer) clearInterval(window._bfTimer);
-  window._bfTimer = setInterval(() => {
-    const remaining = isLockedOut(phone);
-    if (!remaining) {
-      clearInterval(window._bfTimer);
-      errEl.style.display = "none";
-      if (btn) btn.disabled = false;
-      return;
-    }
-    const s2 = Math.ceil((remaining - Date.now()) / 1000);
-    const m2 = Math.floor(s2 / 60), ss2 = s2 % 60;
-    errEl.innerHTML = `🔒 Too many wrong attempts. Try again in <strong>${m2}m ${ss2}s</strong>.`;
-  }, 1000);
-  return true;
+function _recordFailedAttempt(phone) {
+  const now = Date.now();
+  const rec = _loginAttempts[phone] || { count: 0, lockedUntil: 0 };
+  rec.count++;
+  if (rec.count >= 5) { rec.lockedUntil = now + 30000; rec.count = 0; }
+  _loginAttempts[phone] = rec;
 }
+function _resetAttempts(phone) { delete _loginAttempts[phone]; }
 
 function loginWithPassword() {
   const pass = (document.getElementById("auth-pass").value || "").trim();
   const errEl = document.getElementById("auth-pass-err");
   errEl.style.display = "none";
 
-  // ── Lockout check ──
-  if (showLockoutMessage(authPhone, errEl)) return;
-
   if (!pass) {
     errEl.textContent = "❌ Please enter your password";
+    errEl.style.display = "block";
+    return;
+  }
+
+  const rateErr = _checkRateLimit(authPhone);
+  if (rateErr) {
+    errEl.textContent = "🔒 " + rateErr;
     errEl.style.display = "block";
     return;
   }
@@ -2256,10 +1796,44 @@ function loginWithPassword() {
   verifyPasswordOnline(authPhone, pass);
 }
 
+// ── Custom confirm/alert (replaces native browser dialogs) ──
+function scAlert(msg, cb) {
+  const d = document.createElement("div");
+  d.style.cssText = "position:fixed;inset:0;background:#0008;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;";
+  d.innerHTML = `<div style="background:#0f1628;border:1px solid #FFD70044;border-radius:16px;padding:28px 24px;max-width:360px;width:100%;text-align:center;">
+    <div style="font-size:14px;color:#e8eaf0;margin-bottom:20px;line-height:1.6;">${msg}</div>
+    <button onclick="this.closest('[style]').remove();if(cb)cb();" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:700;cursor:pointer;">OK</button>
+  </div>`;
+  document.body.appendChild(d);
+}
+function scConfirm(msg, onYes, yesLabel, yesStyle) {
+  const d = document.createElement("div");
+  d.style.cssText = "position:fixed;inset:0;background:#0008;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;";
+  d.innerHTML = `<div style="background:#0f1628;border:1px solid #FFD70044;border-radius:16px;padding:28px 24px;max-width:360px;width:100%;text-align:center;">
+    <div style="font-size:14px;color:#e8eaf0;margin-bottom:20px;line-height:1.6;">${msg}</div>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button onclick="this.closest('[style]').remove();" style="background:#1a2040;color:#aaa;border:1px solid #2a3560;border-radius:8px;padding:10px 22px;font-size:13px;cursor:pointer;">Cancel</button>
+      <button id="sc-confirm-yes" style="${yesStyle||'background:#c0392b;color:#fff;'};border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer;">${yesLabel||'Confirm'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(d);
+  d.querySelector('#sc-confirm-yes').onclick = () => { d.remove(); onYes(); };
+}
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+function esc(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
 async function verifyPasswordOnline(phone, pass) {
   const errEl = document.getElementById("auth-pass-err");
   try {
-    const hashed = await scHashPassword(phone, pass);
+    const hashed = await sha256(phone + ":" + pass);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 6000);
     const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=phone,password_hash,blocked`, {
@@ -2275,20 +1849,17 @@ async function verifyPasswordOnline(phone, pass) {
         return;
       }
       if (rows[0].password_hash === hashed) {
-        resetBfState(phone); // clear failed attempts on success
+        _resetAttempts(phone);
         localStorage.setItem("sc_auth_phone", phone);
-        localStorage.setItem("sc_user_" + phone, hashed); // cache locally
+        localStorage.setItem("sc_user_" + phone, hashed); // cache locally (SHA-256)
         onLoginSuccess(phone);
       } else {
-        const bfState = recordFailedAttempt(phone);
-        const attemptsLeft = SC_MAX_ATTEMPTS - (bfState.attempts || 0);
-        if (showLockoutMessage(phone, errEl)) return;
-        errEl.textContent = `❌ Wrong password. ${attemptsLeft > 0 ? attemptsLeft + " attempt(s) left before lockout." : "Try again or use Forgot Password."}`;
+        _recordFailedAttempt(phone);
+        errEl.textContent = "❌ Wrong password. Try again or use Forgot Password.";
         errEl.style.display = "block";
       }
     } else {
-      recordFailedAttempt(phone);
-      if (showLockoutMessage(phone, errEl)) return;
+      _recordFailedAttempt(phone);
       errEl.textContent = "❌ Wrong password. Try again or use Forgot Password.";
       errEl.style.display = "block";
     }
@@ -2333,7 +1904,7 @@ async function setNewPassword() {
   if(saveBtn) saveBtn.disabled = true;
   if(saveTxt) saveTxt.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Saving...`;
 
-  const hashed = await scHashPassword(authPhone, p1);
+  const hashed = await sha256(authPhone + ":" + p1);
   const userNum = Date.now();
 
   try {
@@ -2382,9 +1953,9 @@ function onLoginSuccess(phone) {
   try { const sd=localStorage.getItem(storageKey("sync_data"));        if(sd){const p=JSON.parse(sd);syncBinId=p.binId;syncApiKey=p.apiKey;} } catch {}
   try { const th=localStorage.getItem(storageKey("theme"));            if(th) { currentTheme=th; applyTheme(th); } } catch {}
   try { const lg=localStorage.getItem(storageKey("lang"));             if(lg) currentLang=lg; } catch {}
-  // ── Firebase config — always use config.js values, save to localStorage for UI ──
-  try { localStorage.setItem(storageKey("fb_config"), JSON.stringify(SC_FIREBASE_CONFIG)); } catch {}
-  if (!db) { try { initFirebase(SC_FIREBASE_CONFIG); } catch {} }
+  // ── Firebase config ──
+  const fbCfg = localStorage.getItem(storageKey("fb_config"));
+  if (fbCfg && !db) { try { initFirebaseFromConfig(JSON.parse(fbCfg)); } catch {} }
 
   if (db && phone) {
     shopId = phone;
@@ -2431,18 +2002,6 @@ async function checkIfBlocked(phone) {
       }
     }
   } catch(e) { /* silent — don't kick user out on network error */ }
-}
-
-function doLogin() { /* legacy stub */ }
-
-function doLogout() {
-  try { firebase.auth().signOut(); } catch{}
-  localStorage.removeItem("sc_auth_phone");
-  document.getElementById("main-app").style.display = "none";
-  document.getElementById("login-screen").style.display = "flex";
-  authShowStep("phone");
-  document.getElementById("auth-phone").value = "";
-  clearRecaptcha();
 }
 
 function doLogin() {
@@ -2604,23 +2163,30 @@ function renderLeaderboard(sorted){
   customers.forEach(c=>(c.purchases||[]).forEach(p=>{const y=parseInt((p.date||"").slice(0,4));if(y>=2000&&y<=2100)lbYears.add(y);}));
   const lbYearBtns = [...lbYears].sort((a,b)=>b-a).map(y=>`<button onclick="setLbYear(${y})" style="cursor:pointer;border-radius:8px;padding:5px 11px;border:2px solid ${lbFilter.mode==='year'&&lbFilter.year===y?'#c084fc':'#1e2a45'};background:${lbFilter.mode==='year'&&lbFilter.year===y?'#1a0e2a':'#0a0e1a'};color:${lbFilter.mode==='year'&&lbFilter.year===y?'#c084fc':'#4a5a7a'};font-size:12px;font-weight:${lbFilter.mode==='year'&&lbFilter.year===y?'800':'600'};font-family:'Nunito',sans-serif;transition:all 0.2s;white-space:nowrap;">${y}</button>`).join("");
 
-  // ── date filter bar — slim pill style ──
+  // ── date filter bar ──
   const filterBar = `
-    <div style="display:flex;gap:8px;overflow-x:auto;padding:0 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin-bottom:6px;">
-      <button onclick="setLbFilter('all')" style="cursor:pointer;border-radius:20px;padding:7px 16px;border:2px solid ${lbFilter.mode==='all'?'#FFD700':'#1e2a45'};background:${lbFilter.mode==='all'?'#1a1400':'transparent'};color:${lbFilter.mode==='all'?'#FFD700':'#4a5a7a'};font-size:13px;font-weight:${lbFilter.mode==='all'?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;flex-shrink:0;">All Time</button>
-      <button onclick="setLbFilter('today')" style="cursor:pointer;border-radius:20px;padding:7px 16px;border:2px solid ${lbFilter.mode==='today'?'#4f4':'#1e2a45'};background:${lbFilter.mode==='today'?'#0a1a0a':'transparent'};color:${lbFilter.mode==='today'?'#4f4':'#4a5a7a'};font-size:13px;font-weight:${lbFilter.mode==='today'?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;flex-shrink:0;">Today</button>
-      ${lbYearBtns?lbYearBtns.replace(/border-radius:8px/g,'border-radius:20px').replace(/font-size:12px/g,'font-size:13px'):''}
-      <button onclick="setLbFilter('custom')" style="cursor:pointer;border-radius:20px;padding:7px 16px;border:2px solid ${lbFilter.mode==='custom'?'#5af':'#1e2a45'};background:${lbFilter.mode==='custom'?'#0a1628':'transparent'};color:${lbFilter.mode==='custom'?'#5af':'#4a5a7a'};font-size:13px;font-weight:${lbFilter.mode==='custom'?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;flex-shrink:0;">📅 Pick Date</button>
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:${lbYears.size>0?'10px':'0'};">
+        <span style="font-size:12px;color:#7a8aaa;font-weight:700;white-space:nowrap;">📅 Show For:</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;flex:1;">
+          <button onclick="setLbFilter('all')" style="cursor:pointer;border-radius:8px;padding:6px 14px;border:2px solid ${lbFilter.mode==='all'?'#FFD700':'#1e2a45'};background:${lbFilter.mode==='all'?'#1a1400':'#0a0e1a'};color:${lbFilter.mode==='all'?'#FFD700':'#4a5a7a'};font-size:12px;font-weight:${lbFilter.mode==='all'?'800':'600'};font-family:'Nunito',sans-serif;transition:all 0.2s;white-space:nowrap;">All Time</button>
+          <button onclick="setLbFilter('today')" style="cursor:pointer;border-radius:8px;padding:6px 14px;border:2px solid ${lbFilter.mode==='today'?'#4f4':'#1e2a45'};background:${lbFilter.mode==='today'?'#0a1a0a':'#0a0e1a'};color:${lbFilter.mode==='today'?'#4f4':'#4a5a7a'};font-size:12px;font-weight:${lbFilter.mode==='today'?'800':'600'};font-family:'Nunito',sans-serif;transition:all 0.2s;white-space:nowrap;">Today</button>
+          <button onclick="setLbFilter('custom')" style="cursor:pointer;border-radius:8px;padding:6px 14px;border:2px solid ${lbFilter.mode==='custom'?'#5af':'#1e2a45'};background:${lbFilter.mode==='custom'?'#0a0e1a':'#0a0e1a'};color:${lbFilter.mode==='custom'?'#5af':'#4a5a7a'};font-size:12px;font-weight:${lbFilter.mode==='custom'?'800':'600'};font-family:'Nunito',sans-serif;transition:all 0.2s;white-space:nowrap;">📆 Pick Date</button>
+        </div>
+        ${isFiltered ? `<span style="background:#1a1400;border:1px solid #FFD70044;border-radius:20px;padding:3px 10px;font-size:11px;color:#FFD700;white-space:nowrap;">🔍 ${filterLabel}</span>` : ""}
+      </div>
+      ${lbYears.size>0?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid #1a2a40;"><span style="font-size:11px;color:#7a5aaa;font-weight:700;white-space:nowrap;">📆 YEAR:</span>${lbYearBtns}</div>`:''}
     </div>
-    <div id="lb-custom-date-row" style="display:${lbFilter.mode==='custom'?'flex':'none'};align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-      <input type="date" id="lb-date-pick" class="input" value="${lbFilter.customDate||todayStr()}" style="max-width:180px;font-size:14px;" />
-      <button onclick="applyCustomDate()" style="cursor:pointer;border-radius:20px;padding:9px 20px;border:2px solid #5af;background:#0a1628;color:#5af;font-size:13px;font-weight:800;font-family:'Nunito',sans-serif;">Apply</button>
+    <div id="lb-custom-date-row" style="display:${lbFilter.mode==='custom'?'flex':'none'};align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <input type="date" id="lb-date-pick" class="input" value="${lbFilter.customDate||todayStr()}" style="max-width:200px;" />
+      <button onclick="applyCustomDate()" style="cursor:pointer;border-radius:8px;padding:9px 18px;border:2px solid #5af;background:#0a0e1a;color:#5af;font-size:13px;font-weight:800;font-family:'Nunito',sans-serif;">Apply</button>
+      ${lbFilter.customDate?`<span style="font-size:12px;color:#5af;">Showing: ${filterLabel}</span>`:""}
     </div>`;
 
   // ── column header label changes based on filter ──
   const spendLabel = isFiltered ? (lbFilter.mode==="today"?"Today's Spend":lbFilter.mode==="year"?lbFilter.year+" Spend":"Day's Spend") : "Total Spend";
 
-  const hdr=`<div class="lb-hdr" style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px 10px 0 0;padding:10px 16px;margin:0 14px 2px;">
+  const hdr=`<div style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px 10px 0 0;padding:10px 16px;margin-bottom:2px;">
     <div style="font-size:11px;color:#4a5a7a;font-weight:700;text-transform:uppercase;text-align:center;">#</div>
     <div style="font-size:11px;color:#4a5a7a;font-weight:700;text-transform:uppercase;">Customer</div>
     <div style="font-size:11px;color:#4a5a7a;font-weight:700;text-transform:uppercase;text-align:right;">${spendLabel}</div>
@@ -2641,13 +2207,13 @@ function renderLeaderboard(sorted){
       ? `<span style="font-size:10px;color:#3a5a4a;margin-left:4px;">(all-time: ${formatINR(c._realSpend)})</span>` : "";
     const zeroDay = isFiltered && c.totalSpend === 0;
     return `
-    <div class="lb-row" style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;align-items:center;background:${zeroDay?'#0a0d14':gi%2===0?"#0d1220":"#0f1628"};border-left:1px solid #1e2a45;border-right:1px solid #1e2a45;border-bottom:1px solid #141c30;padding:10px 16px;cursor:pointer;transition:background 0.15s;${zeroDay?'opacity:0.55':''}" onclick="openCustomerPage('${c.id}')" onmouseenter="this.style.background='#151f38'" onmouseleave="this.style.background='${zeroDay?'#0a0d14':gi%2===0?'#0d1220':'#0f1628'}'">
+    <div style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;align-items:center;background:${zeroDay?'#0a0d14':gi%2===0?"#0d1220":"#0f1628"};border-left:1px solid #1e2a45;border-right:1px solid #1e2a45;border-bottom:1px solid #141c30;padding:10px 16px;cursor:pointer;transition:background 0.15s;${zeroDay?'opacity:0.55':''}" onclick="openCustomerPage('${esc(c.id)}')" onmouseenter="this.style.background='#151f38'" onmouseleave="this.style.background='${zeroDay?'#0a0d14':gi%2===0?'#0d1220':'#0f1628'}'">
       ${rankBadge(c.rank)}
       <div style="display:flex;align-items:center;gap:10px;min-width:0;">
         ${avatarEl(c,34)}
         <div style="min-width:0;">
-          <div style="font-weight:700;font-size:14px;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
-          <div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone:"<em style='color:#2a3a5a;'>No phone</em>"} · <span style="font-family:monospace;">${c.id}</span> · 🚶 ${(c.purchases||[]).length} visit${(c.purchases||[]).length===1?'':'s'}</div>
+          <div style="font-weight:700;font-size:14px;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(c.name)}</div>
+          <div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone:"<em style='color:#2a3a5a;'>No phone</em>"} · <span style="font-family:monospace;">${esc(c.id)}</span> · 🚶 ${(c.purchases||[]).length} visit${(c.purchases||[]).length===1?'':'s'}</div>
         </div>
       </div>
       <div style="text-align:right;">
@@ -2656,8 +2222,8 @@ function renderLeaderboard(sorted){
       </div>
       <div style="text-align:right;font-size:13px;color:${zeroDay?'#2a3a4a':'#5a7aaa'};">🪙 ${c.points>0?c.points.toLocaleString():"—"}</div>
       <div style="text-align:right;display:flex;gap:6px;justify-content:flex-end;">
-        <button class="btn" onclick="event.stopPropagation();openBulkPurchaseModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:5px 10px;font-size:12px;" title="Add multiple purchases at once">+ Bulk</button>
-        <button class="btn" onclick="event.stopPropagation();openPurchaseModal('${c.id}')" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;padding:5px 12px;font-size:12px;">+ Purchase</button>
+        <button class="btn" onclick="event.stopPropagation();openBulkPurchaseModal('${esc(c.id)}')" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:5px 10px;font-size:12px;" title="Add multiple purchases at once">+ Bulk</button>
+        <button class="btn" onclick="event.stopPropagation();openPurchaseModal('${esc(c.id)}')" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;padding:5px 12px;font-size:12px;">+ Purchase</button>
       </div>
     </div>`;
   }).join("");
@@ -2682,55 +2248,28 @@ function renderLeaderboard(sorted){
   ${totalPages>1?`<div style="height:4px;border:1px solid #1e2a45;border-top:none;border-radius:0 0 10px 10px;"></div>`:""}`;
 
   return `<div>
-    <div style="padding:16px 14px 4px;display:flex;justify-content:space-between;align-items:baseline;">
-      <h2 style="margin:0;font-size:19px;font-weight:800;color:#e8eaf0;font-family:'Rajdhani',sans-serif;">Leaderboard <span style="font-size:13px;color:#4a5a7a;font-weight:600;">${sorted.length} ${isFiltered?`· <span style='color:#FFD700;'>${filterLabel}</span>`:""}</span></h2>
-      ${isFiltered?`<button onclick="setLbFilter('all')" style="background:none;border:none;color:#f86;font-size:12px;cursor:pointer;font-family:'Nunito',sans-serif;padding:0;">✕ Clear</button>`:""}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div>
+        <h2 style="margin:0;font-size:20px;font-weight:800;color:#e8eaf0;font-family:'Rajdhani',sans-serif;">Leaderboard</h2>
+        <div style="color:#4a5a7a;font-size:12px;margin-top:2px;">${sorted.length} customers · ${isFiltered?`<span style="color:#FFD700;">Filtered: ${filterLabel}</span>`:"All-time ranking"}</div>
+      </div>
+      ${syncBinId?`<button class="btn" onclick="showDisplayUrlModal()" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;padding:8px 14px;font-size:12px;">📺 Display Setup</button>`:""}
     </div>
-    <div style="padding:8px 14px 0;">${filterBar}</div>
+    ${filterBar}
     ${hdr}<div>${rows}</div>${footer}
   </div>`;
 }
 
 // ─── CUSTOMERS ────────────────────────────────────────────────
-let custDateFilter = 'all'; // 'all' | '7d' | '30d' | 'custom'
-let custCustomDate = '';
-
-function setCustDateFilter(f, date='') {
-  custDateFilter = f;
-  custCustomDate = date;
-  renderTab(1);
-}
-
-function custMatchesDateFilter(c) {
-  // Shows customers who have NOT visited since the selected period (inactive customers)
-  if (custDateFilter === 'all') return true;
-  const purchases = c.purchases || [];
-  const lastP = [...purchases].sort((a,b) => new Date(b.date)-new Date(a.date))[0];
-  if (!lastP) return true; // never visited — always show in inactive filter
-
-  const lastVisitTime = new Date(lastP.date).getTime();
-  let cutoff;
-  if (custDateFilter === '7d') cutoff = Date.now() - 7*24*3600*1000;
-  else if (custDateFilter === '30d') cutoff = Date.now() - 30*24*3600*1000;
-  else if (custDateFilter === '3m') cutoff = Date.now() - 90*24*3600*1000;
-  else if (custDateFilter === 'custom' && custCustomDate) {
-    cutoff = new Date(custCustomDate).getTime();
-  } else return true;
-
-  // Return true if last visit was BEFORE the cutoff (i.e. inactive since that date)
-  return lastVisitTime < cutoff;
-}
-
 function renderCustomers(sorted,q=""){
   const ql=q.toLowerCase().trim();
-  let f=!ql?sorted:sorted.filter(c=>
+  const f=!ql?sorted:sorted.filter(c=>
     c.name.toLowerCase().includes(ql)||
     (c.phone&&c.phone.includes(ql))||
     c.id.toLowerCase().includes(ql)
   );
-  // Apply date filter
-  if (custDateFilter !== 'all') f = f.filter(custMatchesDateFilter);
-  custFilteredIds = f.map(c=>c.id);
+  custFilteredIds = f.map(c=>c.id); // store for Select All
+  // Lazy load: show first CUST_BATCH rows, rest loaded on demand
   const visibleCount = Math.min(custPage > 0 ? custPage : CUST_BATCH, f.length);
   const visible = f.slice(0, visibleCount);
   const hasMore = visibleCount < f.length;
@@ -2740,85 +2279,92 @@ function renderCustomers(sorted,q=""){
     const lastVisit=lastP?timeSince(lastP.date):"Never";
     const daysSince=lastP?Math.floor((Date.now()-new Date(lastP.date))/86400000):9999;
     const visitColor=daysSince<=7?"#4f4":daysSince<=30?"#FFD700":daysSince<=60?"#f84":"#f66";
-    const waMsg=c.phone?`https://wa.me/91${c.phone}?text=${encodeURIComponent(`Hi ${c.name.split(" ")[0]}! 👋\nYou are ranked #${c.rank} at ${appSettings.shopName}.\nYour total spend: ${formatINR(c.totalSpend)} 🏆\nVisit us again to climb the leaderboard!`)}`:""
+    const waMsg=c.phone?`https://wa.me/91${esc(c.phone)}?text=${encodeURIComponent(`Hi ${c.name.split(" ")[0]}! 👋\nYou are ranked #${c.rank} at ${esc(appSettings.shopName)}.\nYour total spend: ${formatINR(c.totalSpend)} 🏆\nVisit us again to climb the leaderboard!`)}`:"";
     const isSel = custSelected.has(c.id);
-    const isPro = typeof isSubFeatureAllowed==="function";
-    const showVisits = !isPro||isSubFeatureAllowed(8);
-    const showLastVisit = !isPro||isSubFeatureAllowed(10);
-    const showRank = true;
-
+    const selBg = isSel ? 'background:#1a0d30;' : '';
+    const selBorder = isSel ? 'outline:2px solid #a060ff;outline-offset:-2px;' : '';
     if(custSelectMode) return `
-    <div class="card cust-card" style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;${isSel?'background:#1a0d30;outline:2px solid #a060ff;outline-offset:-2px;':''}" onclick="custToggleSelect('${c.id}')">
+    <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer;transition:background 0.15s;${selBg}${selBorder}" onclick="custToggleSelect('${esc(c.id)}')">
       <div style="flex-shrink:0;width:22px;height:22px;border-radius:5px;border:2px solid ${isSel?'#a060ff':'#3a4a6a'};background:${isSel?'#a060ff':'transparent'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;">${isSel?'✓':''}</div>
-      ${avatarEl(c,42)}
+      ${avatarEl(c,46)}
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:700;font-size:15px;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
-        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${c.phone?`📞 ${c.phone}`:"No phone"} · ${formatINR(c.totalSpend)}</div>
+        <div style="font-weight:700;font-size:15px;color:#e8eaf0;">${esc(c.name)}</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:1px;">${c.phone?`📞 ${esc(c.phone)}`:"<em style='color:#2a3a5a;'>No phone</em>"} · <span style="font-family:monospace;font-size:11px;">${esc(c.id)}</span></div>
+        <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;align-items:center;">
+          <span style="font-size:12px;color:#FFD700;font-weight:700;">Rank #${c.rank}</span>
+          <span style="font-size:12px;color:#7a8aaa;">🪙 ${c.points.toLocaleString()} pts</span>
+          ${(typeof isSubFeatureAllowed==='undefined'||isSubFeatureAllowed(8))?`<span style="font-size:12px;color:#7a8aaa;">🧾 ${(c.purchases||[]).length} visits</span>`:''}
+        </div>
       </div>
+      <div style="font-weight:800;color:#FFD700;font-size:15px;">${formatINR(c.totalSpend)}</div>
     </div>`;
-
-    // Clean slim card — tap to open details
     return `
-    <div class="card cust-card" style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;" onclick="openCustomerPage('${c.id}')">
-      ${avatarEl(c,44)}
+    <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer;transition:background 0.15s;" onclick="openCustomerPage('${esc(c.id)}')" onmouseenter="this.style.background='#151f38'" onmouseleave="this.style.background=''">
+      ${avatarEl(c,46)}
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:700;font-size:15px;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
-        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.phone?`📞 ${c.phone}`:"No phone"} ${showVisits?`· 🧾 ${(c.purchases||[]).length}`:""}</div>
-        ${showLastVisit&&lastP?`<div style="font-size:11px;margin-top:2px;color:${visitColor};">🕐 ${lastVisit}</div>`:""}
+        <div style="font-weight:700;font-size:15px;color:#e8eaf0;">${esc(c.name)}</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:1px;">${c.phone?`📞 ${esc(c.phone)}`:"<em style='color:#2a3a5a;'>No phone</em>"} · <span style="font-family:monospace;font-size:11px;">${esc(c.id)}</span></div>
+        <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;align-items:center;">
+          <span style="font-size:12px;color:#FFD700;font-weight:700;">Rank #${c.rank}</span>
+          <span style="font-size:12px;color:#7a8aaa;">🪙 ${c.points.toLocaleString()} pts</span>
+          ${(typeof isSubFeatureAllowed==='undefined'||isSubFeatureAllowed(10))?`<span style="font-size:12px;color:${visitColor};">🕐 ${lastVisit}</span>`:''}
+          ${(typeof isSubFeatureAllowed==='undefined'||isSubFeatureAllowed(8))?`<span style="font-size:12px;color:#7a8aaa;">🧾 ${(c.purchases||[]).length} visits</span>`:''}
+        </div>
       </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
-        <div style="font-weight:800;color:#FFD700;font-size:14px;">${formatINR(c.totalSpend)}</div>
-        <div style="font-size:11px;color:#4a5a7a;">Rank #${c.rank}</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;" onclick="event.stopPropagation()">
+        <div style="font-weight:800;color:#FFD700;font-size:15px;">${formatINR(c.totalSpend)}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;">
+          <button class="btn" onclick="openPurchaseModal('${esc(c.id)}')" style="background:#1a3a5c;color:#5af;border:1px solid #1a4a7a;padding:5px 9px;font-size:12px;" title="Add Purchase">+₹</button>
+          ${(typeof isSubFeatureAllowed==='undefined'||isSubFeatureAllowed(9))?(c.phone?`<a href="${waMsg}" target="_blank"><button class="btn" style="background:#1a3a1a;color:#4f4;border:1px solid #1a5a1a;padding:5px 9px;font-size:12px;" title="WhatsApp">💬</button></a>`:`<button class="btn" style="background:#111;color:#2a3a2a;border:1px solid #1a2a1a;padding:5px 9px;font-size:12px;cursor:not-allowed;" title="No phone number saved">💬</button>`):`<button class="btn" style="background:#2a1a1a;color:#553;border:1px solid #3a2a1a;padding:5px 9px;font-size:12px;cursor:not-allowed;" title="WhatsApp (Pro feature)">🔒</button>`}
+          <button class="btn" onclick="openEditModal('${esc(c.id)}')" style="background:#1a3a1a;color:#4f4;border:1px solid #1a4a1a;padding:5px 9px;font-size:12px;" title="Edit">✏️</button>
+          <button class="btn" onclick="deleteCustomer('${esc(c.id)}')" style="background:#3a1a1a;color:#f66;border:1px solid #4a1515;padding:5px 9px;font-size:12px;" title="Delete">🗑️</button>
+        </div>
       </div>
     </div>`;
   }
 
-  // Date filter pills
-  const dfPills = `
-    <div style="margin-bottom:6px;">
-      <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">⚠️ Not visited since:</div>
-      <div style="display:flex;gap:6px;overflow-x:auto;padding:0 0 6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;">
-        ${[['all','👥 All'],['7d','7 Days'],['30d','1 Month'],['3m','3 Months']].map(([k,l])=>`
-          <button onclick="setCustDateFilter('${k}')" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${custDateFilter===k?'#FFD700':'#1e2a45'};background:${custDateFilter===k?'#1a1400':'transparent'};color:${custDateFilter===k?'#FFD700':'#4a5a7a'};font-size:12px;font-weight:${custDateFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;flex-shrink:0;">${l}</button>
-        `).join('')}
-        <button onclick="document.getElementById('cust-date-picker').showPicker?document.getElementById('cust-date-picker').showPicker():document.getElementById('cust-date-picker').click()" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${custDateFilter==='custom'?'#5af':'#1e2a45'};background:${custDateFilter==='custom'?'#0a1628':'transparent'};color:${custDateFilter==='custom'?'#5af':'#4a5a7a'};font-size:12px;font-weight:${custDateFilter==='custom'?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;flex-shrink:0;">📅 ${custDateFilter==='custom'&&custCustomDate?custCustomDate:'Pick Date'}</button>
-      </div>
-      <input type="date" id="cust-date-picker" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;" max="${new Date().toISOString().slice(0,10)}" onchange="setCustDateFilter('custom',this.value)" />
-      ${custDateFilter!=='all'?`<div style="font-size:11px;color:#f84;margin-top:4px;">Showing ${f.length} customers inactive ${custDateFilter==='7d'?'7+ days':custDateFilter==='30d'?'1+ month':custDateFilter==='3m'?'3+ months':('since '+custCustomDate)}</div>`:''}
-    </div>`;
-
   const list = visible.map(custCardHTML).join("");
   const loadMoreBtn = hasMore ? `
-    <div style="padding:12px 0;text-align:center;">
+    <div id="cust-load-more" style="text-align:center;padding:16px 0;">
       <button class="btn" onclick="custLoadMore()" style="background:#1a2540;color:#5af;border:1px solid #2a3560;padding:10px 28px;font-size:13px;font-weight:700;">Load More (${f.length - visibleCount} remaining)</button>
-    </div>` : `<div style="text-align:center;padding:10px 0;font-size:12px;color:#2a3a5a;">— ${f.length} customers —</div>`;
-
-  const headerBtns = custSelectMode ? `
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:0 14px 12px;">
-      <span style="font-size:12px;color:#aaa;">${custSelected.size} selected</span>
-      <button class="btn" onclick="custSelectAll()" style="background:#1a2a3a;color:#7ab3ff;border:1px solid #2a4060;padding:7px 12px;font-size:12px;">All</button>
-      <button class="btn" onclick="deleteSelectedCustomers()" style="background:#3a1010;color:#f66;border:1px solid #5a1515;padding:7px 14px;font-size:12px;font-weight:700;" ${custSelected.size===0?'disabled':''}>🗑️ Delete (${custSelected.size})</button>
-      <button class="btn" onclick="custToggleSelectMode()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:7px 12px;font-size:12px;">✕ Cancel</button>
-    </div>` : `
-    <div style="display:flex;gap:8px;align-items:center;padding:0 14px 12px;flex-wrap:wrap;">
-      <button class="btn" onclick="openAddModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:9px 20px;font-size:13px;font-weight:800;flex:1;">+ Add Customer</button>
-      <button class="btn" onclick="openBulkAddModal()" style="background:#1a3a5c;color:#7ab3ff;border:1px solid #2a5080;padding:9px 14px;font-size:13px;">👥 Bulk</button>
-      <button class="btn" onclick="exportCSV()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:9px 12px;font-size:13px;">⬇</button>
-      <button class="btn" onclick="custToggleSelectMode()" style="background:#1a2540;color:#f88;border:1px solid #3a2020;padding:9px 12px;font-size:13px;">☑</button>
-    </div>`;
+    </div>` : `<div style="text-align:center;padding:12px 0;font-size:12px;color:#2a3a5a;">— All ${f.length} customers shown —</div>`;
 
   return `<div>
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 14px 8px;">
-      <h2 style="margin:0;font-size:19px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Customers <span style="font-size:14px;color:#4a5a7a;font-weight:600;">(${f.length}${custDateFilter!=='all'?' filtered':''})</span></h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <h2 style="margin:0;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Customers (${sorted.length})</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        ${custSelectMode ? `
+          <span style="font-size:12px;color:#aaa;padding:4px 8px;">${custSelected.size} selected</span>
+          <button class="btn" onclick="custSelectAll()" style="background:#1a2a3a;color:#7ab3ff;border:1px solid #2a4060;padding:7px 12px;font-size:12px;">☑ All</button>
+          <button class="btn" onclick="custDeselectAll()" style="background:#1a2a3a;color:#aaa;border:1px solid #2a3560;padding:7px 12px;font-size:12px;">☐ None</button>
+          <button class="btn" onclick="deleteSelectedCustomers()" style="background:#3a1010;color:#f66;border:1px solid #5a1515;padding:7px 14px;font-size:12px;font-weight:700;" ${custSelected.size===0?'disabled':''}>🗑️ Delete (${custSelected.size})</button>
+          <button class="btn" onclick="custToggleSelectMode()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:7px 12px;font-size:12px;">✕ Cancel</button>
+        ` : `
+          <button class="btn" onclick="exportCSV()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:7px 14px;font-size:12px;">⬇ Export CSV</button>
+          <button class="btn" onclick="openBulkAddModal()" style="background:#1a3a5c;color:#7ab3ff;border:1px solid #2a5080;padding:8px 14px;font-size:13px;">👥 Bulk Add</button>
+          <button class="btn" onclick="custToggleSelectMode()" style="background:#3a1a1a;color:#f88;border:1px solid #4a2020;padding:8px 14px;font-size:13px;" title="Select multiple customers to delete">☑ Select</button>
+          <button class="btn" onclick="openAddModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 18px;font-size:13px;">+ Add Customer</button>
+        `}
+      </div>
     </div>
-    ${headerBtns}
-    <div style="padding:0 14px 8px;">
-      <input class="input" id="cust-search" dir="ltr" placeholder="🔍 Search name, phone, ID..." value="${q}" oninput="refreshCustSearch(this.value)" style="text-align:left;" />
+    <div style="background:#0a1628;border:1px solid #1a2a45;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#5a8aaa;">
+      💬 <strong style="color:#4f4;">Green WhatsApp button</strong> opens a pre-written message for that customer. Grey means no phone saved.
     </div>
-    <div style="padding:0 14px 2px;">${dfPills}</div>
-    <div id="cust-list" style="display:flex;flex-direction:column;gap:6px;padding:0 14px;">${list||'<div style="text-align:center;color:#4a5a7a;padding:40px;">No customers found</div>'}</div>
+    <input class="input" id="cust-search" dir="ltr" placeholder="🔍 Search by name, phone, or ID..." value="${q}" oninput="refreshCustSearch(this.value)" style="margin-bottom:16px;text-align:left;" />
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:10px;">Showing ${visibleCount} of ${f.length}${ql?' matching':''}${ql?'':' total'} customers</div>
+    <div id="cust-list" style="display:flex;flex-direction:column;gap:8px;">${list||'<div style="text-align:center;color:#4a5a7a;padding:40px;">No customers found</div>'}</div>
     ${loadMoreBtn}
   </div>`;
+}
+// custLoadMore: append next batch to cust-list
+function custLoadMore(){
+  custPage += CUST_BATCH;
+  renderTab(1);
+  // Scroll to load-more position
+  setTimeout(()=>{
+    const lm=document.getElementById("cust-load-more");
+    if(lm)lm.scrollIntoView({behavior:"smooth",block:"center"});
+  },50);
 }
 
 function refreshCustSearch(q){
@@ -2899,10 +2445,10 @@ function renderPurchaseTab(sorted){
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
             ${avatarEl(c,36)}
             <div style="flex:1;">
-              <div style="font-weight:700;color:#e8eaf0;font-size:13px;">${c.name}</div>
+              <div style="font-weight:700;color:#e8eaf0;font-size:13px;">${esc(c.name)}</div>
               <div style="font-size:11px;color:#7a8aaa;">${c.phone?"📞 "+c.phone+" · ":""}${pending.length} item${pending.length>1?"s":""} · Owes <span style="color:#f84;font-weight:700;">${formatINR(owed)}</span></div>
             </div>
-            <button onclick="showBorrowDetails('${c.id}')" style="cursor:pointer;padding:5px 12px;border-radius:8px;border:1px solid #2a3560;background:#0a0e1a;color:#5af;font-size:12px;font-weight:700;">Details</button>
+            <button onclick="showBorrowDetails('${esc(c.id)}')" style="cursor:pointer;padding:5px 12px;border-radius:8px;border:1px solid #2a3560;background:#0a0e1a;color:#5af;font-size:12px;font-weight:700;">Details</button>
           </div>
           ${pending.map(b=>`
             <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#0a0e1a;border-radius:8px;margin-bottom:4px;">
@@ -2910,7 +2456,7 @@ function renderPurchaseTab(sorted){
                 <div style="font-size:12px;font-weight:700;color:#f84;">${formatINR(b.amount)} <span style="color:#7a8aaa;font-weight:400;">— ${b.item||"No description"}</span></div>
                 <div style="font-size:10px;color:#556;">Borrowed: ${new Date(b.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${b.due?" · Due: "+new Date(b.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short"})+(new Date(b.due)<new Date()?' <span style="color:#f44;">⚠️ Overdue</span>':""):""}</div>
               </div>
-              <button onclick="bwMarkReturned('${c.id}','${b.id}')" style="cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:11px;font-weight:700;white-space:nowrap;">✓ Returned</button>
+              <button onclick="bwMarkReturned('${esc(c.id)}','${b.id}')" style="cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:11px;font-weight:700;white-space:nowrap;">✓ Returned</button>
             </div>`).join("")}
         </div>`;
       }).join("")}
@@ -3074,11 +2620,11 @@ function ptFilterCustomers(){
   if(!matches.length){dd.style.display="none";return;}
   dd.style.display="block";
   dd.innerHTML=matches.map(c=>`
-    <div onclick="ptSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">
+    <div onclick="ptSelectCustomer('${esc(c.id)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">
       ${avatarEl(c,34)}
       <div>
-        <div style="font-weight:700;font-size:13px;color:#e8eaf0;">${c.name}</div>
-        <div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span> · ${formatINR(c.totalSpend)}</div>
+        <div style="font-weight:700;font-size:13px;color:#e8eaf0;">${esc(c.name)}</div>
+        <div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${esc(c.id)}</span> · ${formatINR(c.totalSpend)}</div>
       </div>
     </div>`).join("");
 }
@@ -3091,15 +2637,7 @@ function ptSelectCustomer(id){
   document.getElementById("pt-dropdown").style.display="none";
   const pr=document.getElementById("pt-prev");
   pr.style.display="flex";pr.style.alignItems="center";pr.style.gap="12px";
-  const _lp2=[...(c.purchases||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
-  const _lv2=_lp2?timeSince(_lp2.date):"Never";
-  const _dd2=_lp2?Math.floor((Date.now()-new Date(_lp2.date))/86400000):9999;
-  const _vc2=_dd2<=7?"#4f4":_dd2<=30?"#FFD700":_dd2<=60?"#f84":"#f66";
-  const _isPro2 = typeof isSubFeatureAllowed==="function";
-  const _showVisits2 = !_isPro2||isSubFeatureAllowed(8);
-  const _showLastVisit2 = !_isPro2||isSubFeatureAllowed(10);
-  const _showRank2 = !_isPro2||isSubFeatureAllowed(0);
-  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank2?` · Rank #${c.rank}`:""}${_showVisits2?` · 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit2?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${esc(c.name)}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} · Rank #${c.rank} · 🚶 ${(c.purchases||[]).length} visits</div></div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
   ptPts();
 }
 
@@ -3122,7 +2660,7 @@ function bptFilterCustomers(){
   const matches=getSorted().filter(c=>c.name.toLowerCase().includes(q)||(c.phone&&c.phone.includes(q))||c.id.toLowerCase().includes(q)).slice(0,8);
   if(!matches.length){dd.style.display="none";return;}
   dd.style.display="block";
-  dd.innerHTML=matches.map(c=>`<div onclick="bptSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">${avatarEl(c,34)}<div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${c.name}</div><div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span> · ${formatINR(c.totalSpend)}</div></div></div>`).join("");
+  dd.innerHTML=matches.map(c=>`<div onclick="bptSelectCustomer('${esc(c.id)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">${avatarEl(c,34)}<div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${esc(c.name)}</div><div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${esc(c.id)}</span> · ${formatINR(c.totalSpend)}</div></div></div>`).join("");
 }
 
 function bptSelectCustomer(id){
@@ -3132,15 +2670,7 @@ function bptSelectCustomer(id){
   document.getElementById("bpt-dropdown").style.display="none";
   const pr=document.getElementById("bpt-prev");
   pr.style.display="flex";pr.style.alignItems="center";pr.style.gap="12px";
-  const _lp3=[...(c.purchases||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
-  const _lv3=_lp3?timeSince(_lp3.date):"Never";
-  const _dd3=_lp3?Math.floor((Date.now()-new Date(_lp3.date))/86400000):9999;
-  const _vc3=_dd3<=7?"#4f4":_dd3<=30?"#FFD700":_dd3<=60?"#f84":"#f66";
-  const _isPro3 = typeof isSubFeatureAllowed==="function";
-  const _showVisits3 = !_isPro3||isSubFeatureAllowed(8);
-  const _showLastVisit3 = !_isPro3||isSubFeatureAllowed(10);
-  const _showRank3 = !_isPro3||isSubFeatureAllowed(0);
-  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank3?` · Rank #${c.rank||"?"}`:""} ${_showVisits3?`· 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit3?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc3};font-weight:700;">${_lv3}</span></div>`:""}</div><button onclick="bptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${esc(c.name)}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} · Rank #${c.rank||"?"} · 🚶 ${(c.purchases||[]).length} visits</div></div><button onclick="bptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
 }
 
 function bptClearCustomer(){
@@ -3192,7 +2722,7 @@ async function bptSubmit(){
   document.getElementById("bpt-amounts").value="";
   document.getElementById("bpt-preview").innerHTML="";
   bptClearCustomer();
-  notify(`✅ ${amounts.length} purchases added for ${c.name} — ₹${total.toLocaleString("en-IN")}`);
+  notify(`✅ ${amounts.length} purchases added for ${esc(c.name)} — ₹${total.toLocaleString("en-IN")}`);
   setTimeout(()=>{const b=document.getElementById("bpt-sub");if(b){b.textContent="⚡ Add All Purchases →";b.style.background="linear-gradient(135deg,#00c853,#1a8a3a)";}},2000);
   try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
   if(useLocalOnly)safeRenderTab(currentTab);
@@ -3207,10 +2737,10 @@ function bwFilterCustomers(){
   const matches=getSorted().filter(c=>c.name.toLowerCase().includes(q)||(c.phone&&c.phone.includes(q))||c.id.toLowerCase().includes(q)).slice(0,8);
   if(!matches.length){dd.style.display="none";return;}
   dd.style.display="block";
-  dd.innerHTML=matches.map(c=>`<div onclick="bwSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">
+  dd.innerHTML=matches.map(c=>`<div onclick="bwSelectCustomer('${esc(c.id)}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">
     ${avatarEl(c,34)}
-    <div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${c.name}</div>
-    <div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span></div></div>
+    <div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${esc(c.name)}</div>
+    <div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${esc(c.id)}</span></div></div>
   </div>`).join("");
 }
 
@@ -3224,7 +2754,7 @@ function bwSelectCustomer(id){
   const pending=(c.borrows||[]).filter(b=>b.status==="pending");
   const owed=pending.reduce((s,b)=>s+Number(b.amount),0);
   pr.style.display="flex";pr.style.alignItems="center";pr.style.gap="12px";
-  pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} spend · ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':'No pending borrows'}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${esc(c.name)}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} spend · ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':'No pending borrows'}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
 }
 
 function bwClearCustomer(){
@@ -3253,7 +2783,7 @@ async function bwSubmit(){
   // Also add to purchase history (so it counts in totalSpend & history)
   c.purchases.unshift({bill:borrowId,amount:a,date:isoDate,notes:item||"",type:"borrow",borrowStatus:"pending",due:due||""});
   c.totalSpend+=a;
-  notify(`📦 Borrow of ${formatINR(a)} added to ${c.name}'s total`);
+  notify(`📦 Borrow of ${formatINR(a)} added to ${esc(c.name)}'s total`);
   try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
   document.getElementById("bw-amt").value="";
   document.getElementById("bw-item").value="";
@@ -3272,7 +2802,7 @@ async function bwMarkReturned(custId,borrowId){
   // Sync status on the matching purchase entry
   const p=(c.purchases||[]).find(x=>x.bill===borrowId);
   if(p){p.borrowStatus="returned";}
-  notify(`✅ Marked as returned for ${c.name}`);
+  notify(`✅ Marked as returned for ${esc(c.name)}`);
   try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
   safeRenderTab(currentTab);
 }
@@ -3296,7 +2826,7 @@ function showBorrowDetails(custId){
           ${b.returnedAt?" · Returned: "+new Date(b.returnedAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}):""}
         </div>
       </div>
-      ${isPending?`<button onclick="bwMarkReturned('${c.id}','${b.id}');closeModal();showBorrowDetails('${c.id}')" style="cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:11px;font-weight:700;white-space:nowrap;">✓ Returned</button>`:'<span style="font-size:11px;color:#4f4;font-weight:700;">✓ Returned</span>'}
+      ${isPending?`<button onclick="bwMarkReturned('${esc(c.id)}','${b.id}');closeModal();showBorrowDetails('${esc(c.id)}')" style="cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:11px;font-weight:700;white-space:nowrap;">✓ Returned</button>`:'<span style="font-size:11px;color:#4f4;font-weight:700;">✓ Returned</span>'}
     </div>`;
   };
 
@@ -3312,8 +2842,10 @@ function showBorrowDetails(custId){
 }
 
 // ─── DELETE PURCHASE (used in profile modal) ─────────────────
-async function deletePurchase(custId,bill,dateEnc){
-  if(!confirm("Delete this purchase? The customer's total spend will decrease."))return;
+function deletePurchase(custId,bill,dateEnc){
+  scConfirm("Delete this purchase? The customer's total spend will decrease.", () => _doDeletePurchase(custId, bill, dateEnc), "Delete", "background:#c0392b;color:#fff;");
+}
+async function _doDeletePurchase(custId,bill,dateEnc){
   const c=customers.find(x=>x.id===custId);if(!c)return;
   const date=decodeURIComponent(dateEnc);
   const idx=c.purchases.findIndex(p=>p.bill===bill&&p.date===date);
@@ -3322,7 +2854,7 @@ async function deletePurchase(custId,bill,dateEnc){
     c.purchases.splice(idx,1);
     notify("✅ Purchase deleted");
     try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
-    if(useLocalOnly)safeRenderTab(currentTab);
+    safeRenderTab(currentTab);
   }
 }
 
@@ -3431,7 +2963,7 @@ function renderAnalytics(sorted){
       ${avatarEl(c,28)}
       <div style="flex:1;min-width:0;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
-          <span style="font-size:13px;font-weight:700;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</span>
+          <span style="font-size:13px;font-weight:700;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(c.name)}</span>
           <span style="font-size:13px;font-weight:700;color:#FFD700;white-space:nowrap;margin-left:8px;">${formatINR(c._ys)}</span>
         </div>
         <div style="display:flex;align-items:center;gap:6px;">
@@ -3789,7 +3321,7 @@ let festWinners=[],festAnnounced=[];
 function renderFestivals(sorted){
   const fOpts=FESTIVALS.map(f=>`<option>${f}</option>`).join("");
   const rOpts=REWARDS.map(r=>`<option>${r}</option>`).join("");
-  const wList=sorted.slice(0,10).map(c=>{const ch=festWinners.includes(c.id);return`<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 8px;border-radius:8px;background:${ch?"#1a3a1a":"#0a0e1a"};border:1px solid ${ch?"#4f4":"#1e2a45"};margin-bottom:6px;"><input type="checkbox" ${ch?"checked":""} onchange="toggleFestWinner('${c.id}')" style="accent-color:#4f4;" /><span style="font-size:13px;color:#e8eaf0;">#${c.rank} ${c.name}</span><span style="margin-left:auto;font-size:11px;color:#7a8aaa;">${formatINR(c.totalSpend)}</span></label>`;}).join("");
+  const wList=sorted.slice(0,10).map(c=>{const ch=festWinners.includes(c.id);return`<label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 8px;border-radius:8px;background:${ch?"#1a3a1a":"#0a0e1a"};border:1px solid ${ch?"#4f4":"#1e2a45"};margin-bottom:6px;"><input type="checkbox" ${ch?"checked":""} onchange="toggleFestWinner('${esc(c.id)}')" style="accent-color:#4f4;" /><span style="font-size:13px;color:#e8eaf0;">#${c.rank} ${esc(c.name)}</span><span style="margin-left:auto;font-size:11px;color:#7a8aaa;">${formatINR(c.totalSpend)}</span></label>`;}).join("");
   const past=festAnnounced.map(a=>`<div style="background:#0a0e1a;border-radius:8px;padding:12px;margin-bottom:8px;border-left:3px solid #FFD700;"><div style="font-weight:700;color:#FFD700;">${a.event} — ${a.reward}</div><div style="color:#e8eaf0;font-size:13px;margin-top:4px;">🏅 ${a.winners.join(", ")}</div><div style="color:#556;font-size:11px;margin-top:2px;">${a.date}</div></div>`).join("");
   return `<div>
     <h2 style="margin:0 0 20px;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Festival Rewards</h2>
@@ -3810,7 +3342,7 @@ function renderFestivals(sorted){
   </div>`;
 }
 function toggleFestWinner(id){const i=festWinners.indexOf(id);if(i>-1)festWinners.splice(i,1);else festWinners.push(id);safeRenderTab(currentTab);}
-function announceWinners(){const ev=document.getElementById("fest-event").value,rw=document.getElementById("fest-reward").value,s=getSorted(),ws=s.filter(c=>festWinners.includes(c.id));festAnnounced.unshift({event:ev,reward:rw,winners:ws.map(c=>c.name),date:new Date().toLocaleDateString()});festWinners=[];startConfetti();alert(`🎉 ${ws.map(c=>c.name).join(", ")} win ${rw} for ${ev}!`);safeRenderTab(currentTab);}
+function announceWinners(){const ev=document.getElementById("fest-event").value,rw=document.getElementById("fest-reward").value,s=getSorted(),ws=s.filter(c=>festWinners.includes(c.id));festAnnounced.unshift({event:ev,reward:rw,winners:ws.map(c=>c.name),date:new Date().toLocaleDateString()});festWinners=[];startConfetti();scAlert(`🎉 ${ws.map(c=>esc(c.name)).join(", ")} win ${esc(rw)} for ${esc(ev)}!`, ()=>safeRenderTab(currentTab));safeRenderTab(currentTab);}
 
 // ─── FIREBASE SETTINGS MODAL ─────────────────────────────────
 function showFirebaseSettings(){
@@ -3828,116 +3360,148 @@ function showFirebaseSettings(){
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;">
       <button class="btn" onclick="closeModal();document.getElementById('fb-setup-screen').style.display='flex';" style="background:#1a1a0a;color:#FFD700;border:1px solid #3a3a1a;padding:10px;font-size:13px;">🔧 Change Firebase Config</button>
-      ${connected?`<button class="btn" onclick="if(confirm('Disconnect Firebase? You will switch to local demo mode.')){useLocalOnly=true;localStorage.removeItem(storageKey('fb_config'));if(fbUnsubscribe)fbUnsubscribe();loadLocalCustomers();closeModal();safeRenderTab(currentTab);updateDbStatus('📦 Local storage (demo mode)','#f84');}" style="background:#3a1a1a;color:#f66;border:1px solid #4a1515;padding:10px;font-size:13px;">Disconnect Firebase</button>`:''}
+      ${connected?`<button class="btn" onclick="scConfirm('Disconnect Firebase? You will switch to local demo mode.', ()=>{useLocalOnly=true;localStorage.removeItem(storageKey('fb_config'));if(fbUnsubscribe)fbUnsubscribe();loadLocalCustomers();closeModal();safeRenderTab(currentTab);updateDbStatus('📦 Local storage (demo mode)','#f84');}, 'Disconnect', 'background:#c0392b;color:#fff;')" style="background:#3a1a1a;color:#f66;border:1px solid #4a1515;padding:10px;font-size:13px;">Disconnect Firebase</button>`:''}
       <button class="btn" onclick="closeModal()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:10px;font-size:13px;">Close</button>
     </div>`);
 }
 
 // ─── SETTINGS ────────────────────────────────────────────────
 function renderSettings(){
+  const counts=[5,10,15,20,25,50];
+  const cBtns=counts.map(n=>`<button onclick="setDisplayCount(${n})" style="cursor:pointer;border-radius:8px;padding:12px 0;border:2px solid ${displaySettings.showCount===n?"#3a6aaa":"#1e2a45"};background:${displaySettings.showCount===n?"#0f1e38":"#0a0e1a"};color:${displaySettings.showCount===n?"#7ab3ff":"#4a5a7a"};font-weight:800;font-size:16px;font-family:'Nunito',sans-serif;">${n}</button>`).join("");
   const savedPhone = localStorage.getItem("sc_auth_phone") || "";
   const userNumRaw = savedPhone ? localStorage.getItem("sc_usernum_" + savedPhone) || "" : "";
   const displayUID = userNumRaw ? "#" + String(userNumRaw).slice(-6) : "—";
-  const themeIcon = document.body.classList.contains("day-theme") ? "🌙 Dark Mode" : "☀️ Light Mode";
-  const curLang = localStorage.getItem("sc_lang") || "en";
-  const langNames = {en:"English",hi:"हिंदी",mr:"मराठी",gu:"ગુજરાતી"};
-  const curLangName = langNames[curLang] || "English";
-  const fbConnected = !!(typeof db !== "undefined" && db);
-  const voiceOn = voiceSettings.enabled;
-  const dispCount = displaySettings.showCount || 10;
+  return `<div style="max-width:560px;">
+    <h2 style="margin:0 0 24px;font-size:20px;font-weight:800;color:#e8eaf0;font-family:'Rajdhani',sans-serif;">Display Settings</h2>
 
-  function row(icon, label, sub, onclick, rightEl="›", danger=false) {
-    return `<div onclick="${onclick}" style="display:flex;align-items:center;gap:14px;padding:15px 18px;cursor:pointer;border-bottom:1px solid #1a2035;-webkit-tap-highlight-color:transparent;" onmousedown="this.style.background='#0d1525'" onmouseup="this.style.background=''" onmouseleave="this.style.background=''">
-      <span style="font-size:22px;flex-shrink:0;width:28px;text-align:center;">${icon}</span>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:15px;font-weight:700;color:${danger?'#f66':'#e8eaf0'};">${label}</div>
-        ${sub?`<div style="font-size:12px;color:#4a5a7a;margin-top:2px;">${sub}</div>`:""}
+    <div class="card" style="padding:20px 24px;margin-bottom:20px;background:#0a0f1f;border:1px solid #1a3a60;">
+      <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:10px;">🪪 Your Support ID</div>
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:12px;">If you need help or want to reset your password, contact your ShopChampion admin and tell them your <strong style="color:#e8eaf0;">Support ID</strong>:</div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div style="font-family:monospace;font-size:28px;font-weight:900;color:#7ab3ff;letter-spacing:4px;background:#060c1a;border:2px solid #1a3a60;padding:10px 22px;border-radius:12px;">${displayUID}</div>
+        <div style="flex:1;">
+          <div style="font-size:12px;color:#7a8aaa;">Phone: <strong style="color:#FFD700;font-family:monospace;">+91 ${savedPhone}</strong></div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:4px;">Share your ID or phone with your admin when you call for support.</div>
+        </div>
       </div>
-      <span style="color:#4a5a7a;font-size:16px;flex-shrink:0;">${rightEl}</span>
-    </div>`;
-  }
+    </div>
 
-  function section(title, rows) {
-    return `<div style="background:#0d1220;border:1px solid #1a2035;border-radius:16px;overflow:hidden;margin-bottom:16px;">
-      <div style="font-size:11px;font-weight:800;color:#4a5a7a;text-transform:uppercase;letter-spacing:1px;padding:12px 18px 8px;">${title}</div>
-      ${rows}
-    </div>`;
-  }
+    <div class="card" style="padding:24px;margin-bottom:20px;">
+      <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:12px;">🏪 Shop Name & Icon</div>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
+        <div style="position:relative;flex-shrink:0;">
+          <div id="icon-preview" onclick="document.getElementById('icon-file-input').click()" style="width:64px;height:64px;border-radius:12px;background:#0a0e1a;border:2px dashed #2a3560;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;overflow:hidden;transition:border-color 0.2s;" onmouseover="this.style.borderColor='#FFD700'" onmouseout="this.style.borderColor='#2a3560'">
+            ${appSettings.appIcon?`<img src="${appSettings.appIcon}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" />`:'🏆'}
+          </div>
+          <input type="file" id="icon-file-input" accept="image/*" style="display:none;" onchange="handleIconUpload(this)" />
+          <div style="text-align:center;font-size:10px;color:#4a5a7a;margin-top:4px;">Click to change</div>
+        </div>
+        <div style="flex:1;">
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Shop Name</label>
+          <input class="input" id="shop-name-input" value="${esc(appSettings.shopName)}" placeholder="Enter your shop name" style="margin-bottom:8px;" />
+          <div style="display:flex;gap:8px;">
+            <button class="btn" onclick="saveShopName()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 16px;font-size:13px;font-weight:800;flex:1;">✅ Save Name</button>
+            ${appSettings.appIcon?`<button class="btn" onclick="removeAppIcon()" style="background:#3a1a1a;color:#f66;border:1px solid #4a1515;padding:8px 12px;font-size:12px;">🗑 Remove Icon</button>`:''}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="padding:24px;margin-bottom:20px;">
+      <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:4px;">Customers on Display Screen</div>
+      <div style="font-size:12px;color:#4a5a7a;margin-bottom:16px;">Currently: top <strong style="color:#7ab3ff;">${displaySettings.showCount}</strong> customers</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;">${cBtns}</div>
+    </div>
+    <div class="card" style="padding:24px;margin-bottom:20px;">
+      <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:12px;">🔥 Database Storage</div>
+      <div style="background:${!useLocalOnly&&db?'#0a1a0a':'#1a0a0a'};border:1px solid ${!useLocalOnly&&db?'#2a4a2a':'#4a1515'};border-radius:8px;padding:12px;margin-bottom:12px;">
+        <div style="font-size:13px;color:${!useLocalOnly&&db?'#4f4':'#f84'};font-weight:700;">${!useLocalOnly&&db?'✅ Firebase Firestore — unlimited storage, never deleted':'⚠️ Local Storage — 5MB limit, browser-only'}</div>
+        ${!useLocalOnly&&db?`<div style="font-size:11px;color:#7a8aaa;margin-top:4px;">Project: ${(()=>{try{return JSON.parse(localStorage.getItem(storageKey('fb_config'))||'{}').projectId||'—';}catch{return '—';}})()}</div>`:'<div style="font-size:11px;color:#7a8aaa;margin-top:4px;">Connect Firebase for permanent cloud storage</div>'}
+      </div>
+      <button class="btn" onclick="showFirebaseSettings()" style="background:#1a1a0a;color:#FFD700;border:1px solid #3a3a1a;width:100%;padding:10px;font-size:13px;">🔥 Manage Firebase Connection</button>
+    </div>
+    <!-- VOICE ANNOUNCEMENT SETTINGS CARD -->
+    <div class="card" style="padding:24px;margin-bottom:20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <div style="font-weight:800;font-size:16px;color:#e8eaf0;">🔊 Voice Announcement</div>
+        <div onclick="voiceSettings.enabled=!voiceSettings.enabled;saveVoiceSettings();renderTab(6);" style="width:46px;height:26px;background:${voiceSettings.enabled?'#22c55e':'#1e2a45'};border-radius:13px;position:relative;cursor:pointer;transition:background 0.25s;flex-shrink:0;">
+          <div style="width:20px;height:20px;background:#fff;border-radius:50%;position:absolute;top:3px;left:${voiceSettings.enabled?'23px':'3px'};transition:left 0.25s;box-shadow:0 1px 4px #0006;"></div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:#4a5a7a;margin-bottom:18px;">Speaks on every purchase. Use <code style="color:#FFD700;">{name}</code> <code style="color:#FFD700;">{amount}</code> <code style="color:#FFD700;">{rank}</code> as placeholders.</div>
 
-  return `<div style="max-width:560px;padding:16px 14px 80px;">
-    <h2 style="margin:0 0 20px;font-size:22px;font-weight:800;color:#e8eaf0;font-family:'Rajdhani',sans-serif;">⚙️ Settings</h2>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:8px;">🌐 Announcement Language</label>
+        <div style="display:flex;gap:8px;">
+          <button onclick="voiceSettings.voiceLang='en';saveVoiceSettings();renderTab(6);" style="flex:1;padding:9px 0;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;border:2px solid ${voiceSettings.voiceLang==='en'?'#FFD700':'#1e2a45'};background:${voiceSettings.voiceLang==='en'?'#1a1200':'#0a0e1a'};color:${voiceSettings.voiceLang==='en'?'#FFD700':'#4a5a7a'};">🇬🇧 English</button>
+          <button onclick="voiceSettings.voiceLang='hi';saveVoiceSettings();renderTab(6);" style="flex:1;padding:9px 0;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;border:2px solid ${voiceSettings.voiceLang==='hi'?'#FF9933':'#1e2a45'};background:${voiceSettings.voiceLang==='hi'?'#1a0800':'#0a0e1a'};color:${voiceSettings.voiceLang==='hi'?'#FF9933':'#4a5a7a'};">🇮🇳 हिंदी</button>
+        </div>
+      </div>
 
-    ${section("Account",
-      row("🪪","Support ID",`Your ID: <strong style="color:#7ab3ff;font-family:monospace;">${displayUID}</strong> · +91 ${savedPhone}`,"","") +
-      row("🚪","Logout","Sign out of your account","doLogout()","›",true)
-    )}
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:8px;">🎭 Quick Presets — click to load</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${(voiceSettings.voiceLang==='hi'?VOICE_PRESETS_HI:VOICE_PRESETS_EN).map((p,i)=>`<button onclick="applyVoicePreset(${i})" style="padding:5px 11px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid ${voiceSettings.voiceLang==='hi'?'#4a1a00':'#1a3a1a'};background:${voiceSettings.voiceLang==='hi'?'#1a0800':'#0a1a0a'};color:${voiceSettings.voiceLang==='hi'?'#FF9933':'#4f4'};">${p.label}</button>`).join('')}
+        </div>
+      </div>
 
-    ${section("Appearance",
-      row("🎨","Theme",themeIcon,"toggleTheme();renderTab(6)") +
-      row("🌐","Language",`Current: ${curLangName}`,"toggleLangMenu()")
-    )}
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">📝 Template ${voiceSettings.voiceLang==='hi'?'(हिंदी)':'(English)'}</label>
+        <textarea id="voice-template" rows="4" class="input" style="width:100%;font-size:${voiceSettings.voiceLang==='hi'?'14px':'13px'};line-height:1.7;resize:vertical;" placeholder="${voiceSettings.voiceLang==='hi'?'जैसे: बधाई हो {name} जी!':'e.g. Congratulations {name}! Rank: {rank}.'}">${(voiceSettings.voiceLang==='hi'?voiceSettings.templateHi:voiceSettings.template).replace(/</g,'&lt;')}</textarea>
+      </div>
 
-    ${section("Display Screen",
-      row("📺","Display Setup","Connect to leaderboard TV screen","showSyncSetup()") +
-      row("⬆️","Push to Display","Send latest data to screen","pushSync()") +
-      row("🔢","Customers on Screen",`Showing top ${dispCount}`,"openDisplayCountModal()")
-    )}
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">🗣 Voice ${voiceSettings.voiceLang==='hi'?'(Hindi voices)':'(English voices)'}</label>
+        <select id="voice-select" class="input" style="font-size:13px;" onchange="voiceSettings.voiceName=this.value;saveVoiceSettings();">
+          ${(()=>{
+            const all=getAllVoices();
+            const lang=voiceSettings.voiceLang||'en';
+            const pool=getVoicesForLang(lang);
+            if(!pool.length) return '<option value="">── No voices loaded yet ──</option>';
+            const autoVoice = getBestVoice(lang);
+            let opts = `<option value="" ${!voiceSettings.voiceName?'selected':''}>🤖 Auto-pick best ${lang==='hi'?'Hindi':'English'} voice${autoVoice?' ('+autoVoice.name+')':''}</option>`;
+            opts += pool.map(v=>`<option value="${v.name.replace(/"/g,'&quot;')}" ${v.name===voiceSettings.voiceName?'selected':''}>${v.name} · ${v.lang}${v.localService?' 📱':' 🌐'}</option>`).join('');
+            return opts;
+          })()}
+        </select>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:5px;">
+          ${voiceSettings.voiceLang==='hi'
+            ? (hasHindiVoice()
+                ? '✅ <strong style="color:#4f4;">Hindi voice detected!</strong> Announcement will play in हिंदी.'
+                : '⚠️ <strong style="color:#FF9933;">No Hindi voice on this device.</strong> Auto-fallback: Hindi text → romanised → spoken in English-Indian accent. <br><span style="color:#5a8aaa;">To install real Hindi: <b>Android</b> → Settings → General Mgmt → Language → Add हिंदी. <b>iOS</b> → Settings → Accessibility → Spoken Content → Voices → Hindi.</span>')
+            : '💡 📱 = on-device voice (faster, works offline) · 🌐 = network voice (higher quality)'}
+        </div>
+      </div>
 
-    ${section("Shop",
-      row("🏪","Shop Name & Icon",appSettings.shopName||"Not set","openShopNameModal()") +
-      row("🔊","Voice Announcement",voiceOn?"Enabled":"Disabled","openVoiceModal()")
-    )}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;display:block;margin-bottom:5px;">🎚 Speed <span id="voice-rate-val">${voiceSettings.rate}x</span></label>
+          <input type="range" id="voice-rate" min="0.5" max="2" step="0.1" value="${voiceSettings.rate}" oninput="document.getElementById('voice-rate-val').textContent=this.value+'x'" style="width:100%;accent-color:#FFD700;" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;display:block;margin-bottom:5px;">🎵 Pitch <span id="voice-pitch-val">${voiceSettings.pitch}</span></label>
+          <input type="range" id="voice-pitch" min="0.5" max="2" step="0.1" value="${voiceSettings.pitch}" oninput="document.getElementById('voice-pitch-val').textContent=this.value" style="width:100%;accent-color:#FFD700;" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;display:block;margin-bottom:5px;">🔈 Vol <span id="voice-vol-val">${Math.round(voiceSettings.volume*100)}%</span></label>
+          <input type="range" id="voice-vol" min="0" max="1" step="0.05" value="${voiceSettings.volume}" oninput="document.getElementById('voice-vol-val').textContent=Math.round(this.value*100)+'%'" style="width:100%;accent-color:#FFD700;" />
+        </div>
+      </div>
 
-    ${section("Data",
-      row("🔥","Firebase Connection",fbConnected?"Connected · Cloud storage":"Not connected · Local only","showFirebaseSettings()") +
-      row("⬇️","Export CSV","Download all customer data","exportCSV()")
-    )}
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="saveVoiceSettingsFromUI()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;flex:3;padding:11px;font-size:13px;font-weight:800;">💾 Save</button>
+        <button class="btn" onclick="previewVoice()" style="background:#0a1a2a;color:#5af;border:1px solid #1a3a60;flex:2;padding:11px;font-size:13px;font-weight:700;">▶ Preview</button>
+        <button class="btn" onclick="stopVoice()" style="background:#1a0a0a;color:#f66;border:1px solid #4a1515;flex:1;padding:11px;font-size:13px;">⏹</button>
+      </div>
+    </div>
 
-    <div style="text-align:center;padding:20px 0;font-size:12px;color:#2a3a5a;">ShopChampion Pro · Your data is secure</div>
+    <div class="card" style="padding:24px;">
+      <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:12px;">📺 Sync & Display</div>
+      ${syncBinId?`<div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:8px;padding:12px;margin-bottom:14px;"><div style="font-size:12px;color:#4f4;font-weight:700;margin-bottom:6px;">✅ Display connected</div><div style="font-family:monospace;font-size:12px;color:#aaa;">Bin: ${syncBinId}</div></div><div style="display:flex;gap:10px;"><button class="btn" onclick="pushSync();" style="background:#1a3a1a;color:#4f4;border:1px solid #2a4a2a;flex:1;padding:10px;font-size:13px;">⬆ Push</button><button class="btn" onclick="showDisplayUrlModal();" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;flex:1;padding:10px;font-size:13px;">📋 Bin ID</button></div>`:`<div style="background:#1a0a0a;border:1px solid #4a1515;border-radius:8px;padding:12px;margin-bottom:14px;color:#f88;font-size:13px;">⚠️ No display connected.</div><button class="btn" onclick="showSyncSetup();" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;width:100%;padding:10px;font-size:13px;">📺 Set Up Display Sync</button>`}
+    </div>
   </div>`;
-}
 
-// ── Settings modals opened from settings page ──
-function openDisplayCountModal(){
-  const counts=[5,10,15,20,25,50];
-  const cBtns=counts.map(n=>`<button onclick="setDisplayCount(${n});closeModal();" style="cursor:pointer;border-radius:12px;padding:14px 0;border:2px solid ${displaySettings.showCount===n?"#3a6aaa":"#1e2a45"};background:${displaySettings.showCount===n?"#0f1e38":"#0a0e1a"};color:${displaySettings.showCount===n?"#7ab3ff":"#4a5a7a"};font-weight:800;font-size:18px;font-family:'Nunito',sans-serif;">${n}</button>`).join("");
-  showWideModal(`${modalHeader("🔢 Customers on Screen")}<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">${cBtns}</div>`);
 }
-
-function openShopNameModal(){
-  showWideModal(`${modalHeader("🏪 Shop Name & Icon")}
-    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
-      <div id="icon-preview" onclick="document.getElementById('icon-file-input').click()" style="width:64px;height:64px;border-radius:14px;background:#0a0e1a;border:2px dashed #2a3560;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;overflow:hidden;">
-        ${appSettings.appIcon?`<img src="${appSettings.appIcon}" style="width:100%;height:100%;object-fit:cover;" />`:"🏆"}
-      </div>
-      <input type="file" id="icon-file-input" accept="image/*" style="display:none;" onchange="handleIconUpload(this)" />
-      <div style="flex:1;font-size:12px;color:#7a8aaa;">Tap the icon to change your shop logo</div>
-    </div>
-    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Shop Name</label>
-    <input class="input" id="shop-name-input" value="${appSettings.shopName}" placeholder="Enter your shop name" style="margin-bottom:16px;" />
-    <button class="btn" onclick="saveShopName();closeModal();" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:13px;font-size:15px;font-weight:800;">✅ Save</button>
-  `);
-}
-
-function openVoiceModal(){
-  showWideModal(`${modalHeader("🔊 Voice Announcement")}
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid #1a2035;margin-bottom:16px;">
-      <div style="font-size:15px;font-weight:700;color:#e8eaf0;">Enable Voice</div>
-      <div onclick="voiceSettings.enabled=!voiceSettings.enabled;saveVoiceSettings();this.style.background=voiceSettings.enabled?'#22c55e':'#1e2a45';this.querySelector('div').style.left=voiceSettings.enabled?'23px':'3px';" style="width:46px;height:26px;background:${voiceSettings.enabled?'#22c55e':'#1e2a45'};border-radius:13px;position:relative;cursor:pointer;transition:background 0.25s;flex-shrink:0;">
-        <div style="width:20px;height:20px;background:#fff;border-radius:50%;position:absolute;top:3px;left:${voiceSettings.enabled?'23px':'3px'};transition:left 0.25s;box-shadow:0 1px 4px #0006;"></div>
-      </div>
-    </div>
-    <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:8px;">Language</label>
-    <div style="display:flex;gap:8px;margin-bottom:16px;">
-      <button onclick="voiceSettings.voiceLang='en';saveVoiceSettings();closeModal();openVoiceModal();" style="flex:1;padding:10px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;border:2px solid ${voiceSettings.voiceLang==='en'?'#FFD700':'#1e2a45'};background:${voiceSettings.voiceLang==='en'?'#1a1200':'#0a0e1a'};color:${voiceSettings.voiceLang==='en'?'#FFD700':'#4a5a7a'};">🇬🇧 English</button>
-      <button onclick="voiceSettings.voiceLang='hi';saveVoiceSettings();closeModal();openVoiceModal();" style="flex:1;padding:10px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;border:2px solid ${voiceSettings.voiceLang==='hi'?'#FF9933':'#1e2a45'};background:${voiceSettings.voiceLang==='hi'?'#1a0800':'#0a0e1a'};color:${voiceSettings.voiceLang==='hi'?'#FF9933':'#4a5a7a'};">🇮🇳 हिंदी</button>
-    </div>
-    <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Template</label>
-    <textarea id="voice-template" rows="3" class="input" style="width:100%;font-size:14px;resize:vertical;margin-bottom:14px;">${(voiceSettings.voiceLang==='hi'?voiceSettings.templateHi:voiceSettings.template).replace(/</g,'&lt;')}</textarea>
-    <button class="btn" onclick="saveVoiceSettingsFromUI();" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:13px;font-size:15px;font-weight:800;">💾 Save</button>
-  `);
-}
-
 function saveVoiceSettingsFromUI(){
   const tmpl  = document.getElementById("voice-template")?.value;
   const rate  = parseFloat(document.getElementById("voice-rate")?.value  || 1);
@@ -3979,17 +3543,34 @@ function saveShopName(){
   notify("✅ Shop name updated!");
 }
 
+// ── Image compression (max 200px, ~50KB) ──
+function compressImage(file, maxPx, quality, cb) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      cb(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function handleIconUpload(inp){
   const f=inp.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=e=>{
-    appSettings.appIcon=e.target.result;
+  compressImage(f, 128, 0.8, compressed => {
+    appSettings.appIcon=compressed;
     saveAppSettings();
     updateAppHeader();
     renderTab(6);
     notify("✅ App icon updated!");
-  };
-  r.readAsDataURL(f);
+  });
 }
 
 function removeAppIcon(){
@@ -4233,11 +3814,11 @@ async function bulkSaveAll() {
   entries.forEach(e => {
     const id = e.rawId ? e.rawId.toUpperCase() : autoId();
     if (idExists(id, null) || toAdd.some(c => c.id === id)) {
-      skipped.push(`${e.name} (ID ${id} duplicate)`);
+      skipped.push(`${esc(e.name)} (ID ${id} duplicate)`);
       return;
     }
     if (e.rawId && isDeletedId(id)) {
-      skipped.push(`${e.name} (ID ${id} was previously deleted — cannot reuse)`);
+      skipped.push(`${esc(e.name)} (ID ${id} was previously deleted — cannot reuse)`);
       return;
     }
     toAdd.push({ id, name: e.name, phone: e.phone, photo: '', totalSpend: 0, purchases: [], borrows: [] });
@@ -4285,23 +3866,21 @@ function openEditModal(id){
       </div>
     </div>
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Full Name <span style="color:#f66;">*</span></label>
-    <input class="input" id="m-name" value="${c.name}" style="margin-bottom:14px;" />
+    <input class="input" id="m-name" value="${esc(c.name)}" style="margin-bottom:14px;" />
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Phone Number <span style="color:#556;font-weight:400;">(optional)</span></label>
     <input class="input" id="m-phone" value="${c.phone||""}" placeholder="Leave blank if none" style="margin-bottom:14px;" />
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Customer ID</label>
-    <input class="input" id="m-id" value="${c.id}" style="margin-bottom:4px;font-family:monospace;" />
+    <input class="input" id="m-id" value="${esc(c.id)}" style="margin-bottom:4px;font-family:monospace;" />
     <div style="font-size:11px;color:#4a5a7a;margin-bottom:20px;">Only change the ID if needed — it must be unique.</div>
     <button class="btn" onclick="saveEditCustomer('${id}')" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-weight:800;">Save Changes</button>`);
 }
 function handleEditPhoto(inp){
   const f=inp.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=e=>{
-    tempPhoto=e.target.result;
+  compressImage(f, 200, 0.75, compressed => {
+    tempPhoto=compressed;
     const box=document.getElementById("edit-photo-box");
     if(box) box.innerHTML=`<img src="${tempPhoto}" /><input type="file" id="edit-photo-file" accept="image/*" style="display:none;" onchange="handleEditPhoto(this)" />`;
-  };
-  r.readAsDataURL(f);
+  });
 }
 async function saveEditCustomer(oldId){
   const name=document.getElementById("m-name")?.value.trim();
@@ -4335,7 +3914,7 @@ function openPhotoModal(id){
     ${tempPhoto?`<button class="btn" onclick="savePhoto('${id}','')" style="background:#3a1a1a;color:#f66;border:1px solid #4a1515;width:100%;padding:8px;margin-bottom:8px;font-size:12px;">Remove Photo</button>`:""}
     <button class="btn" onclick="closeModal()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;width:100%;padding:8px;font-size:12px;">Cancel</button>`);
 }
-function handlePhotoFile(inp,id){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>savePhoto(id,e.target.result);r.readAsDataURL(f);}
+function handlePhotoFile(inp,id){const f=inp.files[0];if(!f)return;compressImage(f, 200, 0.75, compressed=>savePhoto(id,compressed));}
 async function savePhoto(id,photo){
   const c=customers.find(x=>x.id===id);if(!c)return;
   c.photo=photo||"";closeModal();
@@ -4344,11 +3923,13 @@ async function savePhoto(id,photo){
   if(useLocalOnly)safeRenderTab(currentTab);
 }
 
-async function deleteCustomer(id){
-  if(!confirm("Delete this customer and all their purchases?"))return;
+function deleteCustomer(id){
+  scConfirm("Delete this customer and all their purchases? This cannot be undone.", () => _doDeleteCustomer(id), "Delete", "background:#c0392b;color:#fff;");
+}
+async function _doDeleteCustomer(id){
   try{await deleteOneCustomer(id);notify("🗑 Customer deleted");}
   catch(e){notify("⚠️ Delete error: "+e.message);}
-  if(useLocalOnly)safeRenderTab(currentTab);
+  safeRenderTab(currentTab);
 }
 
 // ─── MULTI-SELECT DELETE ──────────────────────────────────────
@@ -4370,9 +3951,11 @@ function custDeselectAll(){
   custSelected.clear();
   renderTab(1);
 }
-async function deleteSelectedCustomers(){
+function deleteSelectedCustomers(){
   if(custSelected.size===0)return;
-  if(!confirm(`Delete ${custSelected.size} selected customer${custSelected.size>1?"s":""} and all their purchases? This cannot be undone.`))return;
+  scConfirm(`Delete ${custSelected.size} selected customer${custSelected.size>1?"s":""} and all their purchases? This cannot be undone.`, _doBulkDelete, "Delete All", "background:#c0392b;color:#fff;");
+}
+async function _doBulkDelete(){
   const ids=[...custSelected];
   let errors=0;
   for(const id of ids){
@@ -4488,7 +4071,7 @@ async function saveBulkPurchase(custId) {
 
   const total = amounts.reduce((a, b) => a + b, 0);
   closeModal();
-  notify(`✅ ${amounts.length} purchases added for ${c.name} — Total ₹${total.toLocaleString("en-IN")}`);
+  notify(`✅ ${amounts.length} purchases added for ${esc(c.name)} — Total ₹${total.toLocaleString("en-IN")}`);
   try { await saveOneCustomer(c); } catch(e) { notify("⚠️ Firebase error: " + e.message); }
   if (useLocalOnly) safeRenderTab(currentTab);
 }
@@ -4499,7 +4082,7 @@ async function addPurchase(custId,{amount,bill,date,notes}){
   const c=customers.find(x=>x.id===custId);if(!c)return;
   c.totalSpend+=amt;
   c.purchases=[{bill,amount:amt,date:date||new Date().toISOString(),notes},...(c.purchases||[])];
-  notify(`✅ ${formatINR(amt)} added for ${c.name}`);
+  notify(`✅ ${formatINR(amt)} added for ${esc(c.name)}`);
   // ── Voice Announcement ─────────────────────────────
   const _sortedV=getSorted();
   const _rankedV=_sortedV.find(x=>x.id===custId);
@@ -4591,8 +4174,8 @@ function showProfile(id){
     <div style="display:flex;gap:16px;align-items:center;margin-bottom:20px;">
       ${avatarEl(c,64)}
       <div>
-        <div style="font-size:22px;font-weight:800;color:#e8eaf0;">${c.name}</div>
-        <div style="font-size:13px;color:#7a8aaa;margin-top:2px;">${c.phone?"📞 "+c.phone:"<em>No phone</em>"} · <span style="font-family:monospace;">${c.id}</span></div>
+        <div style="font-size:22px;font-weight:800;color:#e8eaf0;">${esc(c.name)}</div>
+        <div style="font-size:13px;color:#7a8aaa;margin-top:2px;">${c.phone?"📞 "+c.phone:"<em>No phone</em>"} · <span style="font-family:monospace;">${esc(c.id)}</span></div>
         <div style="margin-top:6px;font-size:13px;color:#7a8aaa;">Rank #${c.rank}</div>
       </div>
     </div>
@@ -4608,9 +4191,9 @@ function showProfile(id){
 
     ${hist}
     <div style="display:flex;gap:8px;margin-top:16px;">
-      <button class="btn" onclick="closeModal();openPurchaseModal('${c.id}')" style="background:#1a3a60;color:#5af;border:1px solid #1a4a80;flex:1;padding:12px;font-weight:800;">+ Add Purchase</button>
-      ${(()=>{const pb=(c.borrows||[]).filter(b=>b.status==="pending");const owed=pb.reduce((s,b)=>s+Number(b.amount),0);return pb.length?`<button class="btn" onclick="closeModal();showBorrowDetails('${c.id}')" style="background:#2a1500;color:#f84;border:1px solid #5a2a00;flex:1;padding:12px;font-weight:800;">📦 Owes ${formatINR(owed)}</button>`:''})()}
-      <button class="btn" onclick="closeModal();openEditModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #1a4a1a;flex:1;padding:12px;font-weight:800;">✏️ Edit</button>
+      <button class="btn" onclick="closeModal();openPurchaseModal('${esc(c.id)}')" style="background:#1a3a60;color:#5af;border:1px solid #1a4a80;flex:1;padding:12px;font-weight:800;">+ Add Purchase</button>
+      ${(()=>{const pb=(c.borrows||[]).filter(b=>b.status==="pending");const owed=pb.reduce((s,b)=>s+Number(b.amount),0);return pb.length?`<button class="btn" onclick="closeModal();showBorrowDetails('${esc(c.id)}')" style="background:#2a1500;color:#f84;border:1px solid #5a2a00;flex:1;padding:12px;font-weight:800;">📦 Owes ${formatINR(owed)}</button>`:''})()}
+      <button class="btn" onclick="closeModal();openEditModal('${esc(c.id)}')" style="background:#1a3a1a;color:#4f4;border:1px solid #1a4a1a;flex:1;padding:12px;font-weight:800;">✏️ Edit</button>
     </div>`);
   if(visits>0) setTimeout(phInit,0);
 }
@@ -4985,9 +4568,9 @@ function openCustomerPage(id){
       <button onclick="closeCustomerPage()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;font-weight:700;display:flex;align-items:center;gap:6px;">← Back</button>
       <div style="font-size:18px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Customer Profile</div>
       <div style="margin-left:auto;display:flex;gap:8px;">
-        <button class="btn" onclick="closeCustomerPage();openBulkPurchaseModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px 14px;font-size:12px;font-weight:800;">+ Bulk</button>
-        <button class="btn" onclick="closeCustomerPage();openPurchaseModal('${c.id}')" style="background:#1a3a60;color:#5af;border:1px solid #1a4a80;padding:8px 14px;font-size:12px;font-weight:800;">+ Purchase</button>
-        <button class="btn" onclick="closeCustomerPage();openEditModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #1a4a1a;padding:8px 14px;font-size:12px;font-weight:800;">✏️ Edit</button>
+        <button class="btn" onclick="closeCustomerPage();openBulkPurchaseModal('${esc(c.id)}')" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px 14px;font-size:12px;font-weight:800;">+ Bulk</button>
+        <button class="btn" onclick="closeCustomerPage();openPurchaseModal('${esc(c.id)}')" style="background:#1a3a60;color:#5af;border:1px solid #1a4a80;padding:8px 14px;font-size:12px;font-weight:800;">+ Purchase</button>
+        <button class="btn" onclick="closeCustomerPage();openEditModal('${esc(c.id)}')" style="background:#1a3a1a;color:#4f4;border:1px solid #1a4a1a;padding:8px 14px;font-size:12px;font-weight:800;">✏️ Edit</button>
       </div>
     </div>
 
@@ -4995,8 +4578,8 @@ function openCustomerPage(id){
     <div class="card" style="padding:20px;margin-bottom:14px;display:flex;gap:18px;align-items:center;">
       ${avatarEl(c,72)}
       <div style="flex:1;min-width:0;">
-        <div style="font-size:24px;font-weight:800;color:#e8eaf0;">${c.name}</div>
-        <div style="font-size:13px;color:#7a8aaa;margin-top:3px;">${c.phone?"📞 "+c.phone:"<em style='color:#2a3a5a;'>No phone</em>"} &nbsp;·&nbsp; <span style="font-family:monospace;font-size:11px;">${c.id}</span></div>
+        <div style="font-size:24px;font-weight:800;color:#e8eaf0;">${esc(c.name)}</div>
+        <div style="font-size:13px;color:#7a8aaa;margin-top:3px;">${c.phone?"📞 "+c.phone:"<em style='color:#2a3a5a;'>No phone</em>"} &nbsp;·&nbsp; <span style="font-family:monospace;font-size:11px;">${esc(c.id)}</span></div>
         <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;">
           <span style="background:#1a2e50;border:1px solid #2a4a7a;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;color:#7ab3ff;">Rank #${c.rank}</span>
           ${pendingBorrows.length?`<span style="background:#2a1500;border:1px solid #5a3000;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;color:#f84;">📦 Owes ${formatINR(totalOwed)}</span>`:""}
@@ -5355,8 +4938,13 @@ async function loadFreeTabs() {
   if (pushBtn) pushBtn.style.display = ""; // Push to Display always available
 }
 
-// Poll every 30s so changes in Seller Panel reflect live
-setInterval(loadFreeTabs, 5000);
+// Poll every 60s — pause when tab is hidden to save quota
+let _freeTabsInterval = setInterval(() => {
+  if (!document.hidden) loadFreeTabs();
+}, 60000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) loadFreeTabs(); // refresh immediately on tab focus
+});
 
 let licenseStatus = null; // null | "pro" | "free" | "expired"
 let licensePlan   = "free";
