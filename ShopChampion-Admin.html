@@ -2451,7 +2451,12 @@ async function checkIfBlocked(phone) {
   } catch(e) { /* silent — don't kick user out on network error */ }
 }
 
-// doLogin/doLogout defined below
+// ── Login functions ──
+function doLogin() {
+  // Redirect to proper OTP/password flow
+  document.getElementById("login-screen").style.display = "flex";
+  authShowStep("phone");
+}
 
 function doLogout() {
   try { firebase.auth().signOut(); } catch{}
@@ -2827,6 +2832,11 @@ function renderCustomers(sorted,q=""){
     <div id="cust-list" style="display:flex;flex-direction:column;gap:6px;padding:0 14px;">${list||'<div style="text-align:center;color:#4a5a7a;padding:40px;">No customers found</div>'}</div>
     ${loadMoreBtn}
   </div>`;
+}
+
+function custLoadMore() {
+  custPage = (custPage || 20) + 20;
+  renderTab(1);
 }
 
 function refreshCustSearch(q){
