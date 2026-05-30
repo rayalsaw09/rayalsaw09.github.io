@@ -890,8 +890,8 @@ function renderTable(customers, showCount, rankChanged) {
       const topCls  = c.rank===1?'top1':c.rank===2?'top2':c.rank===3?'top3':'';
       const changed = rankChanged && rankChanged.has(c.id) ? 'rank-changed' : '';
       const bg      = avatarColor(c.name);
-      // User ID display
-      const uid = c.userNumber ? '#'+String(c.userNumber).slice(-6) : '';
+      // User ID display — already formatted as #XXXXXX from Admin payload
+      const uid = c.userNumber || '';
       // Name + optional user ID below
       const showName = df.name !== false;
       const nameBlock = `

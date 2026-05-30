@@ -2000,17 +2000,25 @@ function buildPayload() {
     filterLabel: filterDesc,
     displaySettings:{layout:"row",showCount: (typeof displaySettings.showCount === "number" ? displaySettings.showCount : (displaySettings.topN || 10))},
     displayFields: displaySettings.fields || {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false},
-    customers:sorted.slice(0, (typeof displaySettings.showCount === "number" ? displaySettings.showCount : (displaySettings.topN || 10))).map(c=>({
-      id:c.id,
-      name:c.name,
-      totalSpend:c.totalSpend,
-      points:c.points||0,
-      rank:c.rank,
-      photo:c.photo||"",
-      visits:(c.purchases||[]).length,
-      userNumber:c.userNumber||c.user_number||"",
-      highestPurchase:c.purchases&&c.purchases.length?(Math.max(...c.purchases.map(p=>p.amount||0))):0
-    }))
+    customers:sorted.slice(0, (typeof displaySettings.showCount === "number" ? displaySettings.showCount : (displaySettings.topN || 10))).map(c=>{
+      // userNumber stored in localStorage keyed by phone, not inside customer object
+      const phone = c.phone || "";
+      const rawNum = c.userNumber || c.user_number ||
+        (phone ? localStorage.getItem("sc_usernum_" + phone) : "") ||
+        (c.id ? localStorage.getItem("sc_usernum_" + c.id) : "") || "";
+      const uid = rawNum ? "#" + String(rawNum).slice(-6) : (c.id ? "#" + String(c.id).slice(-6) : "");
+      return {
+        id:c.id,
+        name:c.name,
+        totalSpend:c.totalSpend,
+        points:c.points||0,
+        rank:c.rank,
+        photo:c.photo||"",
+        visits:(c.purchases||[]).length,
+        userNumber:uid,
+        highestPurchase:c.purchases&&c.purchases.length?(Math.max(...c.purchases.map(p=>parseFloat(p.amount)||0))):0
+      };
+    })
   };
 }
 async function pushSync() {
