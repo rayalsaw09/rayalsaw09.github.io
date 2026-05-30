@@ -2571,6 +2571,8 @@ function renderTabs(){const TABS=getTabs();document.getElementById("tab-bar").in
 function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}currentTab=i;renderTabs();renderTab(i);}
 function renderTab(i){
   const el=document.getElementById("tab-content"),s=getSorted();
+  // Reset position/overflow before rendering
+  el.style.position="";el.style.overflow="";
   if(i===0)el.innerHTML=renderLeaderboard(getSortedFiltered());
   else if(i===1){const q=document.getElementById("cust-search")?.value||"";el.innerHTML=renderCustomers(s,q);}
   else if(i===2)el.innerHTML=renderPurchaseTab(s);
@@ -2578,7 +2580,7 @@ function renderTab(i){
   else if(i===4)el.innerHTML=renderCompare();
   else if(i===5)el.innerHTML=renderFestivals(s);
   else if(i===6)el.innerHTML=renderSettings();
-  // License gate — overwrite tab content if not allowed
+  // License gate — show overlay on top, don't replace content
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
 }
 
@@ -5709,17 +5711,27 @@ function applyLicenseOverlay(i) {
   if (isTabAllowed(i)) return;
   const el = document.getElementById("tab-content");
   if (!el) return;
-  el.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:340px;gap:18px;text-align:center;padding:40px;">
-      <div style="font-size:52px;">🔒</div>
-      <div style="font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Pro Feature</div>
-      <div style="font-size:14px;color:#7a8aaa;max-width:320px;line-height:1.7;">This feature requires an active subscription.<br>Contact your seller to activate or renew your plan.</div>
-      <button class="btn" onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:12px 28px;font-size:14px;font-weight:800;">
-        💳 ${licenseStatus === "expired" ? "Renew Subscription →" : "Buy Subscription →"}
-      </button>
-      <button class="btn" onclick="showRenewPrompt()" style="background:transparent;color:#4a5a7a;border:1px solid #1e2a45;padding:8px 18px;font-size:12px;margin-top:4px;">Already have a key? Enter it →</button>
-      <div style="font-size:11px;color:#4a5a7a;">Free plan access depends on your seller's settings</div>
-    </div>`;
+  // Add overlay on top of existing content instead of replacing it
+  // so switching away still works normally
+  const existing = el.innerHTML;
+  el.style.position = "relative";
+  el.style.overflow = "hidden";
+  // Remove any old overlay first
+  const old = el.querySelector(".license-overlay");
+  if (old) old.remove();
+  const overlay = document.createElement("div");
+  overlay.className = "license-overlay";
+  overlay.style.cssText = "position:absolute;inset:0;background:rgba(10,14,26,0.92);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:40px;backdrop-filter:blur(4px);";
+  overlay.innerHTML = `
+    <div style="font-size:52px;">🔒</div>
+    <div style="font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Pro Feature</div>
+    <div style="font-size:14px;color:#7a8aaa;max-width:320px;line-height:1.7;">This feature requires an active subscription.<br>Contact your seller to activate or renew your plan.</div>
+    <button class="btn" onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:12px 28px;font-size:14px;font-weight:800;">
+      💳 ${licenseStatus === "expired" ? "Renew Subscription →" : "Buy Subscription →"}
+    </button>
+    <button class="btn" onclick="showRenewPrompt()" style="background:transparent;color:#4a5a7a;border:1px solid #1e2a45;padding:8px 18px;font-size:12px;margin-top:4px;">Already have a key? Enter it →</button>
+    <div style="font-size:11px;color:#4a5a7a;">Free plan access depends on your seller's settings</div>`;
+  el.appendChild(overlay);
 }
 
 // ── Validate on every app load in background ──

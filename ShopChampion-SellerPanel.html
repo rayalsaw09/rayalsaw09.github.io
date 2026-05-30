@@ -77,6 +77,67 @@
   .sub-expired{background:#2a1a00;color:#f84;border:1px solid #4a3a00;}
   .sub-none{background:#1a1a2a;color:#556;border:1px solid #2a2a4a;}
   .sub-off{background:#3a0a0a;color:#f66;border:1px solid #4a1515;}
+
+  /* ── DAY THEME ─────────────────────────────── */
+  body.day-theme { background: #f4f6ff; color: #1a2040; }
+  body.day-theme .card { background: #fff; border-color: #dde2f5; }
+  body.day-theme .input { background: #f4f6ff; border-color: #c0cae8; color: #1a2040; }
+  body.day-theme .input:focus { border-color: #2563eb; }
+  body.day-theme th { color: #6677aa; border-color: #dde2f5; }
+  body.day-theme td { border-color: #eef0fa; }
+  body.day-theme tr:hover td { background: #f0f4ff; }
+  body.day-theme .stat { background: #fff; border-color: #dde2f5; }
+  body.day-theme .stat-num { color: #2563eb; }
+  body.day-theme .stat-label { color: #6677aa; }
+  body.day-theme .section-title { color: #2563eb; }
+  body.day-theme .tab-strip { background: #eef0fa; border-color: #dde2f5; }
+  body.day-theme .tab-btn { color: #6677aa; }
+  body.day-theme .tab-btn.active { background: #2563eb; color: #fff; }
+  body.day-theme .badge-pro { background: #e8fde8; color: #1a7a1a; border-color: #99dd99; }
+  body.day-theme .badge-free { background: #e8e8ff; color: #4444bb; border-color: #aaaadd; }
+  body.day-theme .badge-off { background: #ffe8e8; color: #aa1111; border-color: #ddaaaa; }
+  body.day-theme .badge-expired { background: #fff3e0; color: #aa5500; border-color: #ddbb88; }
+  body.day-theme .badge-nokey { background: #f0f0f4; color: #6677aa; border-color: #c0c8e0; }
+  body.day-theme .tag { background: #fffbe6; color: #856000; border-color: #ffe066; }
+  body.day-theme .modal-box { background: #fff; border-color: #dde2f5; }
+  body.day-theme .ph-row { background: #f4f6ff; border-color: #dde2f5; }
+  body.day-theme .ph-utr { color: #2563eb; }
+  body.day-theme .user-key-row:hover td { background: #f0f4ff; }
+  body.day-theme #setup-overlay,
+  body.day-theme #login-overlay { background: #f4f6ff; }
+  body.day-theme .setup-box { background: #fff; border-color: #dde2f5; }
+
+  /* ── HEADER ──────────────────────────────── */
+  .sp-header {
+    background: #0d1220;
+    border-bottom: 1px solid #1e2a45;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  body.day-theme .sp-header { background: #fff; border-color: #dde2f5; }
+  .sp-logo { font-size: 24px; }
+  .sp-title { font-family: 'Rajdhani',sans-serif; font-size: 18px; font-weight: 800; color: #FFD700; }
+  body.day-theme .sp-title { color: #2563eb; }
+  .sp-subtitle { font-size: 11px; color: #4a5a7a; }
+  .sp-header-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+  /* ── MOBILE ──────────────────────────────── */
+  @media (max-width: 600px) {
+    #main-panel { padding: 12px 12px 40px; }
+    .card { padding: 16px; }
+    .stat { padding: 12px 10px; }
+    .stat-num { font-size: 22px; }
+    .search-bar-row { flex-direction: column; }
+    .search-bar-row .input { max-width: 100%; }
+    table { font-size: 12px; }
+    th, td { padding: 8px 8px; }
+    .section-title { font-size: 16px; }
+  }
 </style>
 </head>
 <body>
@@ -111,6 +172,19 @@
 </div>
 
 <!-- MAIN PANEL -->
+<!-- HEADER -->
+<div class="sp-header" id="sp-header" style="display:none;">
+  <span class="sp-logo">🏪</span>
+  <div>
+    <div class="sp-title">ShopChampion</div>
+    <div class="sp-subtitle">Seller Panel</div>
+  </div>
+  <div class="sp-header-right">
+    <button class="btn" onclick="toggleSpTheme()" id="sp-theme-btn" style="background:#1a2540;border:1px solid #2a3560;color:#FFD700;padding:6px 10px;font-size:16px;">🌙</button>
+    <button class="btn" onclick="spLogout()" style="background:#1a0a0a;border:1px solid #4a1515;color:#f66;padding:6px 12px;font-size:12px;">Logout</button>
+  </div>
+</div>
+
 <div id="main-panel" style="display:none;max-width:1200px;margin:0 auto;padding:24px 16px;">
 
   <!-- Header -->
@@ -243,7 +317,7 @@
   <!-- ═══════════════════════════════════════════
        PAYMENT REQUESTS
   ═══════════════════════════════════════════ -->
-  <div style="margin-top:20px;background:#0d1117;border:1px solid #1e2a45;border-radius:14px;padding:20px;" id="payments-section">
+  <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="payments-section">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:10px;">
       <div class="section-title" style="margin-bottom:0;">💳 Payment Requests
         <span id="pending-badge" style="display:none;background:#f84;color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:20px;margin-left:8px;vertical-align:middle;"></span>
@@ -462,8 +536,27 @@ function doLogin() {
   });
 }
 
+function toggleSpTheme() {
+  const isDay = document.body.classList.toggle("day-theme");
+  localStorage.setItem("sp_theme", isDay ? "day" : "night");
+  document.getElementById("sp-theme-btn").textContent = isDay ? "☀️" : "🌙";
+}
+
+function spLogout() {
+  if (!confirm("Log out of Seller Panel?")) return;
+  localStorage.removeItem("sc_seller_cfg");
+  location.reload();
+}
+
 function openMain() {
   document.getElementById("main-panel").style.display = "block";
+  document.getElementById("sp-header").style.display = "flex";
+  // Restore theme
+  const spTheme = localStorage.getItem("sp_theme");
+  if (spTheme === "day") {
+    document.body.classList.add("day-theme");
+    document.getElementById("sp-theme-btn").textContent = "☀️";
+  }
   refreshAll();
   loadFreeTabsFromSupabase();
   spInitVoicePanel();
