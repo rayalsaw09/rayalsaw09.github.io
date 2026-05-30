@@ -3960,38 +3960,47 @@ function renderSettings(){
 }
 
 // ── Settings modals opened from settings page ──
+// ── Display field toggle — global scope so onclick works ──
+function toggleDisplayField(key){
+  if(!displaySettings.fields) displaySettings.fields = {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false};
+  displaySettings.fields[key] = !displaySettings.fields[key];
+  saveDisplaySettings();
+  const el = document.getElementById('df-'+key);
+  const dot = document.getElementById('df-dot-'+key);
+  if(!el) return;
+  const on = displaySettings.fields[key];
+  el.style.background = on ? '#22c55e' : '#1e2a45';
+  el.style.borderColor = on ? '#16a34a' : '#2a3560';
+  if(dot){ dot.style.left = on ? 'auto' : '2px'; dot.style.right = on ? '2px' : 'auto'; }
+}
+
 function openDisplayFieldsModal(){
-  const f = displaySettings.fields || {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false};
+  if(!displaySettings.fields) displaySettings.fields = {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false};
+  const f = displaySettings.fields;
   const fields = [
-    {key:'name',      icon:'👤', label:'Customer Name',     locked:true},
+    {key:'name',      icon:'👤', label:'Customer Name',     locked:false},
     {key:'userId',    icon:'🪪', label:'User ID (#XXXXXX)',  locked:false},
     {key:'amount',    icon:'₹',  label:'Total Spend',        locked:false},
     {key:'points',    icon:'🪙', label:'Points',             locked:false},
     {key:'visits',    icon:'🧾', label:'Visit Count',        locked:false},
     {key:'highestPurchase', icon:'🏆', label:'Highest Purchase', locked:false},
   ];
-  function toggleField(key){
-    displaySettings.fields[key] = !displaySettings.fields[key];
-    saveDisplaySettings();
-    document.getElementById('df-'+key).style.background = displaySettings.fields[key]?'#22c55e':'#1e2a45';
-    document.getElementById('df-'+key).style.borderColor = displaySettings.fields[key]?'#16a34a':'#2a3560';
+
+  function toggle(key, on){
+    return `<div id="df-${key}" onclick="toggleDisplayField('${key}')" style="width:46px;height:26px;border-radius:13px;border:2px solid ${on?'#16a34a':'#2a3560'};background:${on?'#22c55e':'#1e2a45'};cursor:pointer;transition:all 0.25s;flex-shrink:0;position:relative;">
+      <div id="df-dot-${key}" style="width:20px;height:20px;background:#fff;border-radius:50%;position:absolute;top:1px;${on?'right:1px;left:auto':'left:2px;right:auto'};transition:all 0.25s;box-shadow:0 1px 4px #0004;"></div>
+    </div>`;
   }
+
   const rows = fields.map(fl=>`
-    <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #1a2035;">
-      <span style="font-size:18px;width:24px;text-align:center;">${fl.icon}</span>
-      <div style="flex:1;">
-        <div style="font-size:14px;font-weight:700;color:#e8eaf0;">${fl.label}</div>
-        ${fl.locked?'<div style="font-size:11px;color:#4a5a7a;">Always shown</div>':''}
-      </div>
-      ${fl.locked
-        ? '<div style="width:44px;height:24px;background:#22c55e;border-radius:12px;opacity:0.5;"></div>'
-        : `<div id="df-${fl.key}" onclick="toggleField('${fl.key}')" style="width:44px;height:24px;border-radius:12px;border:2px solid ${(f[fl.key])?'#16a34a':'#2a3560'};background:${(f[fl.key])?'#22c55e':'#1e2a45'};cursor:pointer;transition:all 0.2s;flex-shrink:0;position:relative;">
-             <div style="width:18px;height:18px;background:#fff;border-radius:50%;position:absolute;top:1px;${(f[fl.key])?'right:1px':'left:1px'};transition:all 0.2s;box-shadow:0 1px 3px #0004;"></div>
-           </div>`
-      }
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #1a2035;">
+      <span style="font-size:20px;width:26px;text-align:center;">${fl.icon}</span>
+      <div style="flex:1;font-size:14px;font-weight:700;color:#e8eaf0;">${fl.label}</div>
+      ${toggle(fl.key, f[fl.key]!==false)}
     </div>`).join('');
+
   showWideModal(`${modalHeader("👁️ Display Fields")}
-    <div style="font-size:12px;color:#4a5a7a;margin-bottom:12px;">Choose what appears on your TV leaderboard screen</div>
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:10px;">Choose what appears on your TV leaderboard screen</div>
     <div style="margin-bottom:20px;">${rows}</div>
     <button class="btn" onclick="pushSync();closeModal();notify('✅ Display updated!');" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:13px;font-size:15px;font-weight:800;">⬆ Save & Push to Display</button>
   `);
