@@ -715,6 +715,17 @@ body.day-theme #more-menu::before { background: #dde2f5; }
 body.day-theme .more-menu-btn { background: #f0f4ff; border-color: #dde2f5; color: #667; }
 body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD700; color: #856000; }
 
+  /* ── Analytics & wide tabs mobile overflow fix ── */
+  @media (max-width: 640px) {
+    #tab-content { overflow-x: hidden !important; max-width: 100vw !important; }
+    #tab-content > div { max-width: 100% !important; overflow-x: hidden !important; box-sizing: border-box !important; }
+    #tab-content .card { overflow-x: hidden !important; box-sizing: border-box !important; }
+    #tab-content [style*="repeat(auto-fit,minmax(140px,1fr))"] { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+    #tab-content [style*="repeat(auto-fit,minmax(280px,1fr))"] { grid-template-columns: 1fr !important; }
+    #tab-content [style*="overflow-x:auto"] { max-width: calc(100vw - 28px) !important; }
+  }
+
+
 
   /* PWA Install Banner */
   #pwa-install-banner {
@@ -1102,7 +1113,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 
   <!-- Tabs (desktop horizontal scroll) -->
   <div id="tab-bar" style="background:#0d1220;border-bottom:1px solid #1e2a45;overflow-x:auto;display:flex;padding:6px 12px;gap:4px;"></div>
-  <div id="tab-content" style="padding:20px;max-width:1200px;margin:0 auto;"></div>
+  <div id="tab-content" style="padding:20px;max-width:1200px;margin:0 auto;overflow-x:hidden;"></div>
 
   <!-- More menu overlay (mobile) -->
   <div id="more-menu" onclick="event.stopPropagation()"></div>
@@ -1548,6 +1559,7 @@ function closeMoreMenu() {
 
 // Override switchTab to also update bottom nav — done after DOM ready
 window.addEventListener('load', () => {
+  applyTextSize(); // restore saved text size
   const _origSwitchTab = switchTab;
   switchTab = function(i) {
     _origSwitchTab(i);
@@ -3489,7 +3501,7 @@ function renderAnalytics(sorted){
   }).join("");
 
   return `<div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;padding:0 2px;">
       <h2 style="margin:0;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">📊 Yearly Analytics</h2>
       <button onclick="exportYearCSV(${analyticsYear})" style="cursor:pointer;border-radius:8px;padding:7px 14px;border:1px solid #2a3560;background:#1a2540;color:#aaa;font-size:12px;font-weight:700;font-family:'Nunito',sans-serif;">⬇ Export ${analyticsYear} CSV</button>
     </div>
@@ -3515,7 +3527,7 @@ function renderAnalytics(sorted){
       <div style="display:flex;gap:4px;align-items:flex-end;padding:0 4px;">${barChart}</div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px;">
       <!-- Top customers -->
       <div class="card" style="padding:20px;">
         <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:14px;">🏆 Top Customers — ${yr}</div>
@@ -3908,7 +3920,8 @@ function renderSettings(){
 
     ${section("Appearance",
       row("🎨","Theme",themeIcon,"toggleTheme();renderTab(6)") +
-      row("🌐","Language",`Current: ${curLangName}`,"toggleLangMenu()")
+      row("🌐","Language",`Current: ${curLangName}`,"toggleLangMenu()") +
+      row("🔡","Text Size","Adjust app font size","openTextSizeModal()")
     )}
 
     ${section("Display Screen",
@@ -3951,6 +3964,26 @@ function openShopNameModal(){
     <input class="input" id="shop-name-input" value="${appSettings.shopName}" placeholder="Enter your shop name" style="margin-bottom:16px;" />
     <button class="btn" onclick="saveShopName();closeModal();" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:13px;font-size:15px;font-weight:800;">✅ Save</button>
   `);
+}
+
+function openTextSizeModal(){
+  const current = parseFloat(localStorage.getItem('sc_text_size') || '1');
+  showWideModal(`${modalHeader("🔡 Text Size")}
+    <div style="text-align:center;margin-bottom:20px;">
+      <div id="text-size-preview" style="font-size:${current}rem;font-weight:700;color:#FFD700;padding:20px;background:#0a0e1a;border-radius:12px;margin-bottom:16px;">Shop Champion Preview Text</div>
+      <input type="range" min="0.8" max="1.4" step="0.05" value="${current}" oninput="document.getElementById('text-size-preview').style.fontSize=this.value+'rem';document.getElementById('text-size-val').textContent=Math.round(this.value*100)+'%'" style="width:100%;accent-color:#FFD700;margin-bottom:8px;" id="text-size-range"/>
+      <div style="font-size:13px;color:#7a8aaa;">Size: <strong id="text-size-val" style="color:#FFD700;">${Math.round(current*100)}%</strong></div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn" onclick="localStorage.setItem('sc_text_size','1');document.documentElement.style.fontSize='16px';closeModal();notify('✅ Reset to default');" style="flex:1;background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:12px;">Reset</button>
+      <button class="btn" onclick="const v=document.getElementById('text-size-range').value;localStorage.setItem('sc_text_size',v);document.documentElement.style.fontSize=(parseFloat(v)*16)+'px';closeModal();notify('✅ Text size saved');" style="flex:2;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:12px;font-weight:800;">✅ Apply</button>
+    </div>
+  `);
+}
+
+function applyTextSize(){
+  const v = parseFloat(localStorage.getItem('sc_text_size') || '1');
+  if(v !== 1) document.documentElement.style.fontSize = (v*16) + 'px';
 }
 
 function openVoiceModal(){
