@@ -679,6 +679,7 @@ function startFirebaseDisplay() {
       const payload = snap.data();
       const isNew = !lastData || JSON.stringify(payload) !== JSON.stringify(lastData);
       lastData = payload;
+      window._displayFields = payload.displayFields || window._displayFields || {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false};
       if (isNew) {
         showLeaderboard(payload);
         document.getElementById('refresh-label').textContent = 'Updated ' + new Date().toLocaleTimeString();
@@ -760,6 +761,7 @@ async function fetchData(initial) {
     hideError();
     const isNew = !lastData || JSON.stringify(payload) !== JSON.stringify(lastData);
     lastData = payload;
+      window._displayFields = payload.displayFields || window._displayFields || {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false};
     if (isNew || initial) {
       showLeaderboard(payload);
       document.getElementById('refresh-label').textContent = 'Updated ' + new Date().toLocaleTimeString();
@@ -875,21 +877,43 @@ function renderTable(customers, showCount, rankChanged) {
         <span class="col-label" style="text-align:right;font-size:${labelFs}px;">${spendColLabel}</span>
         <span class="col-label" style="text-align:right;font-size:${labelFs}px;">Pts</span>
       </div>`;
+    const df = window._displayFields || {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false};
+    // Build dynamic column definition based on enabled fields
+    const extraCols = [];
+    if(df.amount!==false) extraCols.push({key:'amount',w:spendW});
+    if(df.points!==false) extraCols.push({key:'points',w:ptsW});
+    if(df.visits) extraCols.push({key:'visits',w:Math.round(ptsFs*5)});
+    if(df.highestPurchase) extraCols.push({key:'hp',w:spendW});
+    const dynColDef = `${rankW}px 1fr ${extraCols.map(e=>e.w+'px').join(' ')}`;
+
     const rows = panel.map(c => {
       const topCls  = c.rank===1?'top1':c.rank===2?'top2':c.rank===3?'top3':'';
       const changed = rankChanged && rankChanged.has(c.id) ? 'rank-changed' : '';
       const bg      = avatarColor(c.name);
-      return `
-        <div class="lb-row ${topCls} ${changed}" style="height:${rowH}px;grid-template-columns:${colDef};">
-          <div class="rank-num" style="font-size:${rankFs}px;">${c.rank}</div>
-          <div style="display:flex;align-items:center;gap:${Math.round(rowH*0.15)}px;min-width:0;">
-            <div class="avatar-circle" style="width:${avatarSz}px;height:${avatarSz}px;font-size:${avatarFs}px;background:${bg};flex-shrink:0;">
-              ${getInitials(c.name)}
-            </div>
+      // User ID display
+      const uid = c.userNumber ? '#'+String(c.userNumber).slice(-6) : '';
+      // Name + optional user ID below
+      const nameBlock = `
+        <div style="display:flex;align-items:center;gap:${Math.round(rowH*0.15)}px;min-width:0;">
+          <div class="avatar-circle" style="width:${avatarSz}px;height:${avatarSz}px;font-size:${avatarFs}px;background:${bg};flex-shrink:0;">${getInitials(c.name)}</div>
+          <div style="min-width:0;overflow:hidden;">
             <div class="cust-name" style="font-size:${nameFs}px;">${c.name}</div>
+            ${df.userId&&uid?`<div style="font-size:${Math.max(7,Math.round(nameFs*0.65))}px;color:var(--text-sub,#7a8aaa);letter-spacing:0.5px;">${uid}</div>`:''}
           </div>
-          <div class="cust-spend" style="font-size:${spendFs}px;">${formatINR(c.totalSpend)}</div>
-          <div class="cust-pts"   style="font-size:${ptsFs}px;">${(c.points||0).toLocaleString()} pts</div>
+        </div>`;
+      // Extra columns
+      const extraCells = extraCols.map(e => {
+        if(e.key==='amount') return `<div class="cust-spend" style="font-size:${spendFs}px;">${formatINR(c.totalSpend)}</div>`;
+        if(e.key==='points') return `<div class="cust-pts" style="font-size:${ptsFs}px;">${(c.points||0).toLocaleString()}<span style="font-size:${Math.round(ptsFs*0.7)}px;"> pts</span></div>`;
+        if(e.key==='visits') return `<div class="cust-pts" style="font-size:${ptsFs}px;">${c.visits||0}<span style="font-size:${Math.round(ptsFs*0.7)}px;"> visits</span></div>`;
+        if(e.key==='hp')     return `<div class="cust-spend" style="font-size:${spendFs}px;">${formatINR(c.highestPurchase||0)}</div>`;
+        return '';
+      }).join('');
+      return `
+        <div class="lb-row ${topCls} ${changed}" style="height:${rowH}px;grid-template-columns:${dynColDef};">
+          <div class="rank-num" style="font-size:${rankFs}px;">${c.rank}</div>
+          ${nameBlock}
+          ${extraCells}
         </div>`;
     }).join('');
     return `<div class="lb-col-panel">${miniHeader}${rows}</div>`;
@@ -897,11 +921,14 @@ function renderTable(customers, showCount, rankChanged) {
 }
 
 window.addEventListener('resize', () => {
-  if (lastData) renderTable(
-    lastData.customers || [],
-    (lastData.displaySettings && lastData.displaySettings.showCount) || (lastData.customers||[]).length,
-    new Set()
-  );
+  if (lastData) {
+    window._displayFields = lastData.displayFields || window._displayFields || {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false};
+    renderTable(
+     lastData.customers || [],
+     (lastData.displaySettings && lastData.displaySettings.showCount) || (lastData.customers||[]).length,
+     new Set()
+    );
+  }
 });
 
 // ── CLOCK ──

@@ -1559,7 +1559,7 @@ function closeMoreMenu() {
 
 // Override switchTab to also update bottom nav — done after DOM ready
 window.addEventListener('load', () => {
-  applyTextSize(); // restore saved text size
+  applyTextSize(); // restore saved text size — uses zoom
   const _origSwitchTab = switchTab;
   switchTab = function(i) {
     _origSwitchTab(i);
@@ -1605,7 +1605,10 @@ function getSorted() {
 }
 
 // ─── DISPLAY SETTINGS ────────────────────────────────────────
-let displaySettings = {showCount:10};
+let displaySettings = {
+  showCount: 10,
+  fields: {name:true, userId:true, points:true, amount:true, visits:false, highestPurchase:false}
+};
 try { const ds=localStorage.getItem(storageKey("display_settings")); if(ds) displaySettings={...displaySettings,...JSON.parse(ds)}; } catch {}
 function saveDisplaySettings() { try { localStorage.setItem(storageKey("display_settings"),JSON.stringify(displaySettings)); } catch {} }
 
@@ -1996,7 +1999,18 @@ function buildPayload() {
     filterMode: lbFilter.mode,
     filterLabel: filterDesc,
     displaySettings:{layout:"row",showCount: (typeof displaySettings.showCount === "number" ? displaySettings.showCount : (displaySettings.topN || 10))},
-    customers:sorted.slice(0, (typeof displaySettings.showCount === "number" ? displaySettings.showCount : (displaySettings.topN || 10))).map(c=>({id:c.id,name:c.name,totalSpend:c.totalSpend,points:c.points,rank:c.rank,photo:c.photo||""}))
+    displayFields: displaySettings.fields || {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false},
+    customers:sorted.slice(0, (typeof displaySettings.showCount === "number" ? displaySettings.showCount : (displaySettings.topN || 10))).map(c=>({
+      id:c.id,
+      name:c.name,
+      totalSpend:c.totalSpend,
+      points:c.points||0,
+      rank:c.rank,
+      photo:c.photo||"",
+      visits:(c.purchases||[]).length,
+      userNumber:c.userNumber||c.user_number||"",
+      highestPurchase:c.purchases&&c.purchases.length?(Math.max(...c.purchases.map(p=>p.amount||0))):0
+    }))
   };
 }
 async function pushSync() {
@@ -3927,7 +3941,8 @@ function renderSettings(){
     ${section("Display Screen",
       row("📺","Display Setup","Connect to leaderboard TV screen","showSyncSetup()") +
       row("⬆️","Push to Display","Send latest data to screen","pushSync()") +
-      row("🔢","Customers on Screen",`Showing top ${dispCount}`,"openDisplayCountModal()")
+      row("🔢","Customers on Screen",`Showing top ${dispCount}`,"openDisplayCountModal()") +
+      row("👁️","Display Fields","Choose what to show on TV screen","openDisplayFieldsModal()")
     )}
 
     ${section("Shop",
@@ -3945,6 +3960,43 @@ function renderSettings(){
 }
 
 // ── Settings modals opened from settings page ──
+function openDisplayFieldsModal(){
+  const f = displaySettings.fields || {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false};
+  const fields = [
+    {key:'name',      icon:'👤', label:'Customer Name',     locked:true},
+    {key:'userId',    icon:'🪪', label:'User ID (#XXXXXX)',  locked:false},
+    {key:'amount',    icon:'₹',  label:'Total Spend',        locked:false},
+    {key:'points',    icon:'🪙', label:'Points',             locked:false},
+    {key:'visits',    icon:'🧾', label:'Visit Count',        locked:false},
+    {key:'highestPurchase', icon:'🏆', label:'Highest Purchase', locked:false},
+  ];
+  function toggleField(key){
+    displaySettings.fields[key] = !displaySettings.fields[key];
+    saveDisplaySettings();
+    document.getElementById('df-'+key).style.background = displaySettings.fields[key]?'#22c55e':'#1e2a45';
+    document.getElementById('df-'+key).style.borderColor = displaySettings.fields[key]?'#16a34a':'#2a3560';
+  }
+  const rows = fields.map(fl=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #1a2035;">
+      <span style="font-size:18px;width:24px;text-align:center;">${fl.icon}</span>
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:700;color:#e8eaf0;">${fl.label}</div>
+        ${fl.locked?'<div style="font-size:11px;color:#4a5a7a;">Always shown</div>':''}
+      </div>
+      ${fl.locked
+        ? '<div style="width:44px;height:24px;background:#22c55e;border-radius:12px;opacity:0.5;"></div>'
+        : `<div id="df-${fl.key}" onclick="toggleField('${fl.key}')" style="width:44px;height:24px;border-radius:12px;border:2px solid ${(f[fl.key])?'#16a34a':'#2a3560'};background:${(f[fl.key])?'#22c55e':'#1e2a45'};cursor:pointer;transition:all 0.2s;flex-shrink:0;position:relative;">
+             <div style="width:18px;height:18px;background:#fff;border-radius:50%;position:absolute;top:1px;${(f[fl.key])?'right:1px':'left:1px'};transition:all 0.2s;box-shadow:0 1px 3px #0004;"></div>
+           </div>`
+      }
+    </div>`).join('');
+  showWideModal(`${modalHeader("👁️ Display Fields")}
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:12px;">Choose what appears on your TV leaderboard screen</div>
+    <div style="margin-bottom:20px;">${rows}</div>
+    <button class="btn" onclick="pushSync();closeModal();notify('✅ Display updated!');" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:13px;font-size:15px;font-weight:800;">⬆ Save & Push to Display</button>
+  `);
+}
+
 function openDisplayCountModal(){
   const counts=[5,10,15,20,25,50];
   const cBtns=counts.map(n=>`<button onclick="setDisplayCount(${n});closeModal();" style="cursor:pointer;border-radius:12px;padding:14px 0;border:2px solid ${displaySettings.showCount===n?"#3a6aaa":"#1e2a45"};background:${displaySettings.showCount===n?"#0f1e38":"#0a0e1a"};color:${displaySettings.showCount===n?"#7ab3ff":"#4a5a7a"};font-weight:800;font-size:18px;font-family:'Nunito',sans-serif;">${n}</button>`).join("");
@@ -3967,23 +4019,42 @@ function openShopNameModal(){
 }
 
 function openTextSizeModal(){
-  const current = parseFloat(localStorage.getItem('sc_text_size') || '1');
+  const sizes = [
+    {label:'Small',val:'0.88',desc:'More content visible'},
+    {label:'Normal',val:'1',desc:'Default size'},
+    {label:'Large',val:'1.12',desc:'Easier to read'},
+    {label:'Extra Large',val:'1.25',desc:'Maximum comfort'},
+  ];
+  const cur = localStorage.getItem('sc_text_size') || '1';
+  const btns = sizes.map(s=>`
+    <button onclick="applyTextSize('${s.val}');localStorage.setItem('sc_text_size','${s.val}');document.querySelectorAll('.ts-btn').forEach(b=>b.style.borderColor='#1e2a45');this.style.borderColor='#FFD700';notify('✅ Text size: ${s.label}');"
+      class="ts-btn" style="flex:1;min-width:0;padding:14px 6px;border-radius:14px;border:2px solid ${cur===s.val?'#FFD700':'#1e2a45'};background:${cur===s.val?'#1a1400':'#0a0e1a'};cursor:pointer;font-family:'Nunito',sans-serif;">
+      <div style="font-size:${parseFloat(s.val)*16}px;font-weight:800;color:#FFD700;margin-bottom:4px;">Aa</div>
+      <div style="font-size:11px;font-weight:700;color:#e8eaf0;">${s.label}</div>
+      <div style="font-size:10px;color:#4a5a7a;margin-top:2px;">${s.desc}</div>
+    </button>`).join('');
   showWideModal(`${modalHeader("🔡 Text Size")}
-    <div style="text-align:center;margin-bottom:20px;">
-      <div id="text-size-preview" style="font-size:${current}rem;font-weight:700;color:#FFD700;padding:20px;background:#0a0e1a;border-radius:12px;margin-bottom:16px;">Shop Champion Preview Text</div>
-      <input type="range" min="0.8" max="1.4" step="0.05" value="${current}" oninput="document.getElementById('text-size-preview').style.fontSize=this.value+'rem';document.getElementById('text-size-val').textContent=Math.round(this.value*100)+'%'" style="width:100%;accent-color:#FFD700;margin-bottom:8px;" id="text-size-range"/>
-      <div style="font-size:13px;color:#7a8aaa;">Size: <strong id="text-size-val" style="color:#FFD700;">${Math.round(current*100)}%</strong></div>
-    </div>
-    <div style="display:flex;gap:10px;">
-      <button class="btn" onclick="localStorage.setItem('sc_text_size','1');document.documentElement.style.fontSize='16px';closeModal();notify('✅ Reset to default');" style="flex:1;background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:12px;">Reset</button>
-      <button class="btn" onclick="const v=document.getElementById('text-size-range').value;localStorage.setItem('sc_text_size',v);document.documentElement.style.fontSize=(parseFloat(v)*16)+'px';closeModal();notify('✅ Text size saved');" style="flex:2;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:12px;font-weight:800;">✅ Apply</button>
-    </div>
+    <div style="display:flex;gap:8px;margin-bottom:20px;">${btns}</div>
+    <div style="font-size:12px;color:#4a5a7a;text-align:center;">Changes apply immediately</div>
   `);
 }
 
-function applyTextSize(){
-  const v = parseFloat(localStorage.getItem('sc_text_size') || '1');
-  if(v !== 1) document.documentElement.style.fontSize = (v*16) + 'px';
+function applyTextSize(val){
+  const v = val || localStorage.getItem('sc_text_size') || '1';
+  const pct = parseFloat(v);
+  // Apply via zoom on body — works reliably across all CSS units
+  if(pct === 1){
+    document.body.style.zoom = '';
+    document.body.style.transform = '';
+  } else {
+    document.body.style.zoom = pct;
+    // Fallback for Firefox
+    if(!document.body.style.zoom){
+      document.body.style.transform = `scale(${pct})`;
+      document.body.style.transformOrigin = 'top left';
+      document.body.style.width = (100/pct)+'%';
+    }
+  }
 }
 
 function openVoiceModal(){
