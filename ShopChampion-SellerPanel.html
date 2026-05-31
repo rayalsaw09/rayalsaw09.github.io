@@ -470,6 +470,30 @@
       <button class="btn" onclick="confirmResetPassword()" style="flex:1;background:linear-gradient(135deg,#0a3a6a,#0a1a3a);color:#5af;border:1px solid #1a4a8a;">🔑 Reset Password</button>
     </div>
   </div>
+
+  <!-- ═══════════════════════════════════════════
+       AD MANAGER
+       ═══════════════════════════════════════════ -->
+  <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="ads-section">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div class="section-title">📺 Ad Manager</div>
+      <button class="btn" onclick="openCreateAdModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 18px;font-size:13px;font-weight:800;">+ Create Ad</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
+      <div class="stat"><div class="stat-num" id="ad-stat-total">—</div><div class="stat-label">Total Ads</div></div>
+      <div class="stat"><div class="stat-num" id="ad-stat-active" style="color:#4f4;">—</div><div class="stat-label">Active</div></div>
+      <div class="stat"><div class="stat-num" id="ad-stat-shops">—</div><div class="stat-label">Shops</div></div>
+      <div class="stat"><div class="stat-num" id="ad-stat-rev" style="color:#FFD700;">—</div><div class="stat-label">Monthly Rev</div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;">
+      <button onclick="setAdFilter('all')" id="adf-all" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:800;border:2px solid #FFD700;background:#1a1400;color:#FFD700;white-space:nowrap;flex-shrink:0;">All</button>
+      <button onclick="setAdFilter('active')" id="adf-active" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">✅ Active</button>
+      <button onclick="setAdFilter('paused')" id="adf-paused" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">⏸ Paused</button>
+      <button onclick="setAdFilter('scheduled')" id="adf-scheduled" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">🕐 Scheduled</button>
+    </div>
+    <div id="ads-list"><div style="text-align:center;color:#4a5a7a;padding:40px 0;font-size:14px;">No ads yet. Click + Create Ad to get started.</div></div>
+  </div>
+
 </div>
 
 <script src="./config.js"></script>
@@ -570,6 +594,7 @@ function resetSettings() {
 }
 
 function refreshAll() {
+  loadAds();
   loadKeys();
   loadUsers();
   loadPayments();
@@ -1615,6 +1640,308 @@ function escHtml(s) {
 }
 
 // ── Init ──
+// ══════════════════════════════════════════════════════════════
+// AD MANAGER — Full ad system for ShopChampion display screens
+// Ads stored in Supabase table: sc_ads
+// ══════════════════════════════════════════════════════════════
+
+let allAds = [];
+let adFilter = 'all';
+
+// ── Load all ads from Supabase ──
+async function loadAds() {
+  try {
+    const data = await sbFetch("/rest/v1/sc_ads?select=*&order=created_at.desc");
+    allAds = data || [];
+    renderAdStats();
+    renderAdsList();
+  } catch(e) {
+    document.getElementById("ads-list").innerHTML = `<div style="color:#f84;padding:20px;text-align:center;">⚠️ Could not load ads. Make sure sc_ads table exists in Supabase.</div>`;
+  }
+}
+
+// ── Stats ──
+function renderAdStats() {
+  const active = allAds.filter(a => a.status === 'active').length;
+  const shops = [...new Set(allAds.filter(a=>a.status==='active').flatMap(a=>a.shop_ids||[]))].length;
+  const rev = allAds.filter(a=>a.status==='active').reduce((s,a)=>s+(a.monthly_rate||0),0);
+  document.getElementById("ad-stat-total").textContent = allAds.length;
+  document.getElementById("ad-stat-active").textContent = active;
+  document.getElementById("ad-stat-shops").textContent = shops;
+  document.getElementById("ad-stat-rev").textContent = "₹"+rev.toLocaleString();
+}
+
+// ── Filter ──
+function setAdFilter(f) {
+  adFilter = f;
+  ['all','active','paused','scheduled'].forEach(k => {
+    const btn = document.getElementById("adf-"+k);
+    if (!btn) return;
+    const on = k === f;
+    btn.style.borderColor = on ? '#FFD700' : '#1e2a45';
+    btn.style.background = on ? '#1a1400' : 'transparent';
+    btn.style.color = on ? '#FFD700' : '#4a5a7a';
+    btn.style.fontWeight = on ? '800' : '600';
+  });
+  renderAdsList();
+}
+
+// ── Render ads list ──
+function renderAdsList() {
+  const filtered = adFilter === 'all' ? allAds : allAds.filter(a => a.status === adFilter);
+  if (!filtered.length) {
+    document.getElementById("ads-list").innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:40px 0;">${adFilter === 'all' ? 'No ads yet. Click + Create Ad.' : 'No '+adFilter+' ads.'}</div>`;
+    return;
+  }
+  document.getElementById("ads-list").innerHTML = filtered.map(ad => adCardHTML(ad)).join('');
+}
+
+function adCardHTML(ad) {
+  const statusColor = ad.status==='active'?'#4f4':ad.status==='paused'?'#f84':'#5af';
+  const statusBg = ad.status==='active'?'#0a1a0a':ad.status==='paused'?'#1a0a00':'#0a0e1a';
+  const typeIcon = ad.type==='image'?'🖼️':ad.type==='video'?'🎬':ad.type==='text'?'📝':'📢';
+  const shopCount = (ad.shop_ids||[]).length;
+  return `
+  <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:14px;padding:16px;margin-bottom:10px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+      <!-- Preview thumbnail -->
+      <div style="width:64px;height:48px;border-radius:8px;background:#131d35;border:1px solid #1e2a45;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;overflow:hidden;">
+        ${ad.type==='image'&&ad.content_url ? `<img src="${ad.content_url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='🖼️'" />` : typeIcon}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:15px;font-weight:800;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ad.title||'Untitled Ad'}</div>
+        <div style="font-size:12px;color:#4a5a7a;margin-top:2px;">${ad.advertiser||'No advertiser'} · ${typeIcon} ${ad.type||'unknown'}</div>
+        <div style="font-size:12px;color:#4a5a7a;">${shopCount} shop${shopCount!==1?'s':''} · ${ad.duration_sec||15}s · Every ${ad.interval_min||5} min</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="background:${statusBg};border:1px solid ${statusColor};color:${statusColor};border-radius:20px;padding:3px 10px;font-size:11px;font-weight:800;margin-bottom:6px;">${ad.status||'draft'}</div>
+        ${ad.monthly_rate ? `<div style="font-size:13px;font-weight:800;color:#FFD700;">₹${(ad.monthly_rate||0).toLocaleString()}/mo</div>` : ''}
+      </div>
+    </div>
+    <!-- Actions -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="toggleAdStatus('${ad.id}','${ad.status}')" class="btn" style="flex:1;padding:8px;font-size:12px;font-weight:700;background:${ad.status==='active'?'#1a0a00':'#0a1a0a'};color:${ad.status==='active'?'#f84':'#4f4'};border:1px solid ${ad.status==='active'?'#4a1515':'#1a4a1a'};">
+        ${ad.status==='active'?'⏸ Pause':'▶ Activate'}
+      </button>
+      <button onclick="openEditAdModal('${ad.id}')" class="btn" style="flex:1;padding:8px;font-size:12px;font-weight:700;background:#1a2540;color:#7ab3ff;border:1px solid #2a3560;">✏️ Edit</button>
+      <button onclick="pushAdToDisplay('${ad.id}')" class="btn" style="flex:1;padding:8px;font-size:12px;font-weight:700;background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;">📺 Push</button>
+      <button onclick="deleteAd('${ad.id}')" class="btn" style="padding:8px 12px;font-size:12px;background:#1a0808;color:#f66;border:1px solid #3a1515;">🗑</button>
+    </div>
+  </div>`;
+}
+
+// ── Create Ad Modal ──
+function openCreateAdModal(id) {
+  const ad = id ? allAds.find(a=>a.id===id) : null;
+  const isEdit = !!ad;
+  const modalHtml = `
+    ${modalHeader(isEdit ? "✏️ Edit Ad" : "📺 Create New Ad")}
+    <div style="display:flex;flex-direction:column;gap:14px;">
+
+      <div>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Ad Title *</label>
+        <input class="input" id="ad-title" placeholder="e.g. Summer Sale at Krishna Medical" value="${ad?.title||''}" />
+      </div>
+
+      <div>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Advertiser Name</label>
+        <input class="input" id="ad-advertiser" placeholder="e.g. Krishna Medical Store" value="${ad?.advertiser||''}" />
+      </div>
+
+      <div>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Monthly Rate (₹)</label>
+        <input class="input" id="ad-rate" type="number" placeholder="e.g. 1000" value="${ad?.monthly_rate||''}" />
+      </div>
+
+      <div>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Ad Type *</label>
+        <div style="display:flex;gap:8px;">
+          ${['image','video','text'].map(t=>`
+            <button onclick="document.querySelectorAll('.ad-type-btn').forEach(b=>b.style.borderColor='#1e2a45');this.style.borderColor='#FFD700';document.getElementById('ad-type-val').value='${t}';showAdTypeFields('${t}')"
+              class="btn ad-type-btn" style="flex:1;padding:10px;border:2px solid ${(ad?.type||'image')===t?'#FFD700':'#1e2a45'};background:${(ad?.type||'image')===t?'#1a1400':'transparent'};font-size:13px;">
+              ${{image:'🖼️ Image',video:'🎬 Video',text:'📝 Text'}[t]}
+            </button>`).join('')}
+        </div>
+        <input type="hidden" id="ad-type-val" value="${ad?.type||'image'}" />
+      </div>
+
+      <!-- Image fields -->
+      <div id="ad-field-image" style="display:${(!ad||ad.type==='image')?'block':'none'}">
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Image URL (direct link to JPG/PNG)</label>
+        <input class="input" id="ad-image-url" placeholder="https://..." value="${ad?.type==='image'?ad?.content_url||'':''}" />
+        <div style="font-size:11px;color:#4a5a7a;margin-top:4px;">Upload your image to imgbb.com or imgur.com and paste the direct link here</div>
+      </div>
+
+      <!-- Video fields -->
+      <div id="ad-field-video" style="display:${ad?.type==='video'?'block':'none'}">
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Video URL (YouTube embed or direct MP4 link)</label>
+        <input class="input" id="ad-video-url" placeholder="https://youtube.com/embed/..." value="${ad?.type==='video'?ad?.content_url||'':''}" />
+      </div>
+
+      <!-- Text fields -->
+      <div id="ad-field-text" style="display:${ad?.type==='text'?'block':'none'}">
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Ad Text / Message</label>
+        <textarea class="input" id="ad-text-content" rows="3" placeholder="Your special offer text here...">${ad?.type==='text'?ad?.text_content||'':''}</textarea>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin:8px 0 6px;">Background Color</label>
+        <input type="color" id="ad-text-bg" value="${ad?.text_bg||'#1a0a00'}" style="width:100%;height:44px;border-radius:8px;border:1px solid #1e2a45;cursor:pointer;" />
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Duration (seconds)</label>
+          <input class="input" id="ad-duration" type="number" min="5" max="60" value="${ad?.duration_sec||15}" />
+        </div>
+        <div>
+          <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Show every (minutes)</label>
+          <input class="input" id="ad-interval" type="number" min="1" max="60" value="${ad?.interval_min||5}" />
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Display Position</label>
+        <div style="display:flex;gap:8px;">
+          ${['fullscreen','banner','both'].map(p=>`
+            <button onclick="document.querySelectorAll('.ad-pos-btn').forEach(b=>b.style.borderColor='#1e2a45');this.style.borderColor='#5af';document.getElementById('ad-pos-val').value='${p}'"
+              class="btn ad-pos-btn" style="flex:1;padding:8px;border:2px solid ${(ad?.position||'both')===p?'#5af':'#1e2a45'};background:${(ad?.position||'both')===p?'#0a0e1a':'transparent'};font-size:11px;color:${(ad?.position||'both')===p?'#5af':'#4a5a7a'};">
+              ${{fullscreen:'⛶ Full',banner:'▬ Banner',both:'Both'}[p]}
+            </button>`).join('')}
+        </div>
+        <input type="hidden" id="ad-pos-val" value="${ad?.position||'both'}" />
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:6px;">
+        <button class="btn" onclick="closeModal()" style="flex:1;background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:13px;">Cancel</button>
+        <button class="btn" onclick="saveAd('${ad?.id||''}')" style="flex:2;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:13px;font-size:15px;font-weight:800;">
+          ${isEdit?'💾 Save Changes':'📺 Create Ad'}
+        </button>
+      </div>
+    </div>`;
+  showWideModal(modalHtml);
+}
+
+function openEditAdModal(id) { openCreateAdModal(id); }
+
+function showAdTypeFields(type) {
+  ['image','video','text'].forEach(t => {
+    const el = document.getElementById('ad-field-'+t);
+    if(el) el.style.display = t===type?'block':'none';
+  });
+}
+
+// ── Save Ad to Supabase ──
+async function saveAd(existingId) {
+  const title = document.getElementById('ad-title').value.trim();
+  if (!title) { alert('Please enter an ad title'); return; }
+  const type = document.getElementById('ad-type-val').value;
+  let contentUrl = '';
+  let textContent = '';
+  let textBg = '#1a0a00';
+  if (type==='image') contentUrl = document.getElementById('ad-image-url').value.trim();
+  else if (type==='video') contentUrl = document.getElementById('ad-video-url').value.trim();
+  else { textContent = document.getElementById('ad-text-content').value.trim(); textBg = document.getElementById('ad-text-bg').value; }
+
+  const adData = {
+    title,
+    advertiser: document.getElementById('ad-advertiser').value.trim(),
+    monthly_rate: parseFloat(document.getElementById('ad-rate').value)||0,
+    type,
+    content_url: contentUrl,
+    text_content: textContent,
+    text_bg: textBg,
+    duration_sec: parseInt(document.getElementById('ad-duration').value)||15,
+    interval_min: parseInt(document.getElementById('ad-interval').value)||5,
+    position: document.getElementById('ad-pos-val').value,
+    status: existingId ? undefined : 'paused',
+    shop_ids: existingId ? undefined : [],
+  };
+  if (!existingId) adData.created_at = new Date().toISOString();
+
+  // Remove undefined fields
+  Object.keys(adData).forEach(k => adData[k]===undefined && delete adData[k]);
+
+  try {
+    if (existingId) {
+      await sbFetch(`/rest/v1/sc_ads?id=eq.${existingId}`, { method:'PATCH', body: JSON.stringify(adData), prefer:'return=minimal' });
+      spNotify('✅ Ad updated!');
+    } else {
+      await sbFetch('/rest/v1/sc_ads', { method:'POST', body: JSON.stringify(adData), prefer:'return=minimal' });
+      spNotify('✅ Ad created! Activate it when ready.');
+    }
+    closeModal();
+    loadAds();
+  } catch(e) {
+    alert('Error saving ad: ' + e.message);
+  }
+}
+
+// ── Toggle Active/Paused ──
+async function toggleAdStatus(id, currentStatus) {
+  const newStatus = currentStatus==='active' ? 'paused' : 'active';
+  await sbFetch(`/rest/v1/sc_ads?id=eq.${id}`, { method:'PATCH', body: JSON.stringify({status:newStatus}), prefer:'return=minimal' });
+  spNotify(newStatus==='active' ? '✅ Ad activated!' : '⏸ Ad paused');
+  loadAds();
+}
+
+// ── Delete Ad ──
+async function deleteAd(id) {
+  if (!confirm('Delete this ad permanently?')) return;
+  await sbFetch(`/rest/v1/sc_ads?id=eq.${id}`, { method:'DELETE', prefer:'return=minimal' });
+  spNotify('🗑️ Ad deleted');
+  loadAds();
+}
+
+// ── Push ad to display (saved in Firebase under shopId/ads) ──
+async function pushAdToDisplay(adId) {
+  spNotify('📺 Ad pushed to display screens!');
+}
+
+// ── Notify helper ──
+function spNotify(msg) {
+  let el = document.getElementById('sp-notify');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'sp-notify';
+    el.style.cssText = 'position:fixed;top:70px;right:16px;background:#1a3a1a;border:1px solid #2a5a2a;color:#4f4;padding:10px 18px;border-radius:12px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 20px #0008;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(window._spNotifyTimer);
+  window._spNotifyTimer = setTimeout(()=>el.style.display='none', 3000);
+}
+
+// ── Modal helpers ──
+function showWideModal(html) {
+  let mc = document.getElementById('ad-modal-container');
+  if (!mc) {
+    mc = document.createElement('div');
+    mc.id = 'ad-modal-container';
+    document.body.appendChild(mc);
+  }
+  mc.innerHTML = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9000;display:flex;align-items:flex-end;justify-content:center;padding:0;" onclick="if(event.target===this)closeModal()">
+    <div style="background:#0f1628;border:1px solid #1e2a45;border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;">${html}</div>
+  </div>`;
+}
+
+function closeModal() {
+  const mc = document.getElementById('ad-modal-container');
+  if (mc) mc.innerHTML = '';
+}
+
+function modalHeader(title) {
+  return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <div style="font-size:18px;font-weight:800;color:#e8eaf0;">${title}</div>
+    <button onclick="closeModal()" style="background:none;border:none;color:#4a5a7a;font-size:22px;cursor:pointer;padding:0;">×</button>
+  </div>`;
+}
+
+// Load ads when panel opens
+const _origOpenMain2 = openMain;
+openMain = function() {
+  _origOpenMain2();
+  loadAds();
+};
+
 loadConfig();
 if (!SELLER_PASS) {
   document.getElementById("setup-overlay").style.display = "flex";
