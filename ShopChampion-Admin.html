@@ -2001,12 +2001,13 @@ function buildPayload() {
     displaySettings:{layout:"row",showCount: (typeof displaySettings.showCount === "number" ? displaySettings.showCount : (displaySettings.topN || 10))},
     displayFields: displaySettings.fields || {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false},
     customers:sorted.slice(0, (typeof displaySettings.showCount === "number" ? displaySettings.showCount : (displaySettings.topN || 10))).map(c=>{
-      // userNumber stored in localStorage keyed by phone, not inside customer object
+      // userNumber stored in localStorage keyed by phone (set during login)
       const phone = c.phone || "";
+      // Try all sources — never fall back to c.id (which is a short Firestore index)
       const rawNum = c.userNumber || c.user_number ||
-        (phone ? localStorage.getItem("sc_usernum_" + phone) : "") ||
-        (c.id ? localStorage.getItem("sc_usernum_" + c.id) : "") || "";
-      const uid = rawNum ? "#" + String(rawNum).slice(-6) : (c.id ? "#" + String(c.id).slice(-6) : "");
+        (phone ? localStorage.getItem("sc_usernum_" + phone) : "") || "";
+      // Only show ID if it's a proper long number (13 digits = timestamp)
+      const uid = rawNum && String(rawNum).length >= 6 ? "#" + String(rawNum).slice(-6) : "";
       return {
         id:c.id,
         name:c.name,

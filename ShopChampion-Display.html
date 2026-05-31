@@ -894,13 +894,14 @@ function renderTable(customers, showCount, rankChanged) {
       const uid = c.userNumber || '';
       // Name + optional user ID below
       const showName = df.name !== false;
+      const showUid = df.userId !== false && uid;
       const nameBlock = `
         <div style="display:flex;align-items:center;gap:${Math.round(rowH*0.15)}px;min-width:0;">
           <div class="avatar-circle" style="width:${avatarSz}px;height:${avatarSz}px;font-size:${avatarFs}px;background:${bg};flex-shrink:0;">${getInitials(c.name)}</div>
           <div style="min-width:0;overflow:hidden;">
-            ${showName?`<div class="cust-name" style="font-size:${nameFs}px;">${c.name}</div>`:''}
-            ${df.userId&&uid?`<div style="font-size:${Math.max(7,Math.round(nameFs*(showName?0.65:1)))}px;color:${showName?'var(--text-sub,#7a8aaa)':'var(--text-main,#e8eaf0)'};font-weight:${showName?'400':'800'};letter-spacing:0.5px;">${uid}</div>`:''}
-            ${!showName&&!uid?`<div style="font-size:${Math.max(9,Math.round(nameFs*0.7))}px;color:var(--text-sub,#7a8aaa);">Customer</div>`:''}
+            ${showName ? `<div class="cust-name" style="font-size:${nameFs}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>` : ''}
+            ${showUid ? `<div style="font-size:${Math.round(nameFs*(showName?0.62:0.85))}px;color:var(--accent,#FFD700);font-weight:700;letter-spacing:1px;font-family:monospace;">${uid}</div>` : ''}
+            ${!showName && !showUid ? `<div style="font-size:${Math.round(nameFs*0.75)}px;color:var(--text-sub,#7a8aaa);">Customer</div>` : ''}
           </div>
         </div>`;
       // Extra columns
