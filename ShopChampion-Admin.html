@@ -2922,15 +2922,25 @@ function renderPurchaseTab(sorted){
     return `<button onclick="ptView='${v}';renderTab(2)" style="cursor:pointer;flex:1;padding:11px;border-radius:12px;border:2px solid ${a?color:'#1e2a45'};background:${a?'#0a0e1a':'transparent'};color:${a?color:'#4a5a7a'};font-size:14px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;">${label}</button>`;
   };
 
+  const invMode = getPurchaseMode()==="inventory";
   const purchaseForm = `
     <div class="card" style="padding:24px;">
+      ${invMode?`<div style="display:flex;align-items:center;gap:8px;background:#0a1a08;border:1px solid #1a4a1a;border-radius:10px;padding:10px 14px;margin-bottom:16px;">
+        <span style="font-size:18px;">📦</span>
+        <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:#4f4;">Inventory Mode</div><div style="font-size:11px;color:#4a7a4a;">Amount auto-calculated from items × price</div></div>
+        <button onclick="setPurchaseMode('standard');safeRenderTab(currentTab)" style="background:#1a2a1a;border:1px solid #2a4a2a;border-radius:7px;color:#7a9a7a;font-size:11px;font-weight:700;cursor:pointer;padding:5px 10px;">Switch</button>
+      </div>`:`<div style="display:flex;align-items:center;gap:8px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px 14px;margin-bottom:16px;">
+        <span style="font-size:18px;">🛒</span>
+        <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:#7ab3ff;">Standard Mode</div><div style="font-size:11px;color:#4a5a7a;">Enter amount manually</div></div>
+        <button onclick="setPurchaseMode('inventory');safeRenderTab(currentTab)" style="background:#0a1a08;border:1px solid #1a4a1a;border-radius:7px;color:#4f4;font-size:11px;font-weight:700;cursor:pointer;padding:5px 10px;">📦 Inventory</button>
+      </div>`}
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Search Customer</label>
       <input class="input" id="pt-search" dir="ltr" placeholder="🔍 Search by name, phone or ID..." oninput="ptFilterCustomers()" style="margin-bottom:8px;text-align:left;" />
       <div id="pt-dropdown" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;max-height:200px;overflow-y:auto;margin-bottom:10px;"></div>
       <div id="pt-prev" style="display:none;background:#0a0e1a;border-radius:10px;padding:12px;margin-bottom:14px;"></div>
       <input type="hidden" id="pt-sel" />
-      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Purchase Amount (₹)</label>
-      <input class="input" type="number" id="pt-amt" min="0" step="0.01" placeholder="0.00" inputmode="decimal" style="margin-bottom:14px;font-size:18px;font-weight:700;" oninput="ptPts()" />
+      ${invMode?"":`<label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Purchase Amount (₹)</label>
+      <input class="input" type="number" id="pt-amt" min="0" step="0.01" placeholder="0.00" inputmode="decimal" style="margin-bottom:14px;font-size:18px;font-weight:700;" oninput="ptPts()" />`}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
         <div><label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Bill Number</label><input class="input" id="pt-bill" value="B${String(Date.now()).slice(-4)}" /></div>
         <div>
@@ -2945,12 +2955,13 @@ function renderPurchaseTab(sorted){
       </div>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Notes (optional)</label>
       <input class="input" id="pt-notes" placeholder="e.g. Diwali purchase..." style="margin-bottom:14px;" />
-      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Items Sold (optional — deducts from Inventory)</label>
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">${invMode?"🛒 Items Sold — enter qty & selling price":"Items Sold (optional — deducts from Inventory)"}</label>
       <div id="pt-items-container" style="margin-bottom:14px;">
         <div id="pt-items-list"></div>
-        <button type="button" onclick="ptAddItemRow()" style="width:100%;padding:9px;border-radius:10px;border:1px dashed #2a3a60;background:transparent;color:#4a8aff;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;">+ Add Item from Inventory</button>
+        ${invMode?`<div id="pt-inv-total" style="display:none;background:#0a1a08;border:1px solid #1a4a1a;border-radius:10px;padding:10px 14px;margin-top:10px;text-align:right;"></div>`:""}
+        <button type="button" onclick="ptAddItemRow()" style="width:100%;padding:9px;border-radius:10px;border:1px dashed ${invMode?"#1a4a1a":"#2a3a60"};background:transparent;color:${invMode?"#4f4":"#4a8aff"};font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;">+ Add Item from Inventory</button>
       </div>
-      <div id="pt-pts" style="display:none;background:#0a1628;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#aaa;"></div>
+      ${invMode?"":`<div id="pt-pts" style="display:none;background:#0a1628;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#aaa;"></div>`}
       <button class="btn" id="pt-sub" onclick="ptSubmit()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">Add Purchase →</button>
     </div>`;
 
@@ -3200,10 +3211,8 @@ function ptClearCustomer(){
 }
 function ptPts(){const a=parseFloat(document.getElementById("pt-amt").value)||0,s=document.getElementById("pt-sel").value,b=document.getElementById("pt-pts");if(a&&s){b.style.display="block";b.innerHTML=`Points: <strong style="color:#FFD700;">+${getPoints(a).toLocaleString()}</strong> pts`;}else b.style.display="none";}
 async function ptSubmit(){
-  const s=document.getElementById("pt-sel").value,a=parseFloat(document.getElementById("pt-amt").value||"0");
+  const s=document.getElementById("pt-sel").value;
   if(!s){notify("❌ Please select a customer","error");return;}
-  if(!a||a<=0){notify("❌ Amount must be greater than ₹0","error");document.getElementById("pt-amt").focus();return;}
-  if(a>10000000){notify("❌ Amount seems too high — please check","error");return;}
   const submitBtn=document.getElementById("pt-sub");
   if(submitBtn&&submitBtn.disabled)return;
   if(submitBtn){submitBtn.disabled=true;setTimeout(()=>submitBtn.disabled=false,3000);}
@@ -3213,12 +3222,26 @@ async function ptSubmit(){
   itemRows.forEach(row=>{
     const nameEl=row.querySelector(".pt-item-name");
     const qtyEl=row.querySelector(".pt-item-qty");
+    const priceEl=row.querySelector(".pt-item-price");
     if(nameEl&&qtyEl){
       const nm=nameEl.value.trim(),qty=parseFloat(qtyEl.value)||0;
-      if(nm&&qty>0)soldItems.push({name:nm,qty});
+      const ppu=priceEl?parseFloat(priceEl.value)||0:0;
+      if(nm&&qty>0)soldItems.push({name:nm,qty,pricePerUnit:ppu});
     }
   });
-  if(soldItems.length)invDeductSold(soldItems);
+  const isInvMode = getPurchaseMode()==="inventory";
+  // In inventory mode, amount comes from items total
+  let a;
+  if(isInvMode){
+    if(!soldItems.length){notify("❌ Add at least one item in Inventory Mode","error");if(submitBtn)submitBtn.disabled=false;return;}
+    a = soldItems.reduce((sum,si)=>sum+(si.qty*(si.pricePerUnit||0)),0);
+    if(a<=0){notify("❌ Total amount is ₹0 — set a selling price per unit for each item","error");if(submitBtn)submitBtn.disabled=false;return;}
+  } else {
+    a=parseFloat(document.getElementById("pt-amt").value||"0");
+    if(!a||a<=0){notify("❌ Amount must be greater than ₹0","error");document.getElementById("pt-amt").focus();if(submitBtn)submitBtn.disabled=false;return;}
+    if(a>10000000){notify("❌ Amount seems too high — please check","error");if(submitBtn)submitBtn.disabled=false;return;}
+  }
+  if(soldItems.length)invDeductSold(soldItems, s);
   addPurchase(s,{amount:a,bill:document.getElementById("pt-bill").value,notes:document.getElementById("pt-notes").value,date:document.getElementById("pt-date-val").value||document.getElementById("pt-date").value,soldItems});
   document.getElementById("pt-amt").value="";
   document.getElementById("pt-notes").value="";
@@ -4002,7 +4025,8 @@ function renderSettings(){
 
     ${section("Shop",
       row("🏪","Shop Name & Icon",appSettings.shopName||"Not set","openShopNameModal()") +
-      row("🔊","Voice Announcement",voiceOn?"Enabled":"Disabled","openVoiceModal()")
+      row("🔊","Voice Announcement",voiceOn?"Enabled":"Disabled","openVoiceModal()") +
+      row("📦","Purchase Mode",getPurchaseMode()==="inventory"?"📦 Inventory Mode — items × price":"🛒 Standard Mode — manual amount","openPurchaseModeModal()")
     )}
 
     ${section("Data",
@@ -4696,11 +4720,11 @@ async function saveBulkPurchase(custId) {
 }
 // ─── END BULK PURCHASE ────────────────────────────────────────────────────────
 
-async function addPurchase(custId,{amount,bill,date,notes}){
+async function addPurchase(custId,{amount,bill,date,notes,soldItems}){
   const amt=parseFloat(amount);if(!amt||amt<=0)return;
   const c=customers.find(x=>x.id===custId);if(!c)return;
   c.totalSpend+=amt;
-  c.purchases=[{bill,amount:amt,date:date||new Date().toISOString(),notes},...(c.purchases||[])];
+  c.purchases=[{bill,amount:amt,date:date||new Date().toISOString(),notes,soldItems:soldItems||[]},...(c.purchases||[])];
   notify(`✅ ${formatINR(amt)} added for ${c.name}`);
   // ── Voice Announcement ─────────────────────────────
   const _sortedV=getSorted();
@@ -5421,6 +5445,7 @@ function cpPurchaseCard(p,custId){
       ${isBorrow&&p.due?`<div style="font-size:11px;color:${isOverdue?'#f44':'#7a8aaa'};margin-top:2px;">Due: ${new Date(p.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${isOverdue?' ⚠️':''}</div>`:''}
       ${p.notes&&!isBorrow?`<div style="font-size:12px;color:#7a8aaa;margin-top:3px;">📝 ${p.notes}</div>`:''}
       ${isBorrow&&p.notes?`<div style="font-size:12px;color:#7a8aaa;margin-top:3px;">Item: ${p.notes}</div>`:''}
+      ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${p.soldItems.map(si=>`<span style="background:#0a1628;border:1px solid #2a3560;border-radius:6px;padding:2px 8px;font-size:11px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||"unit"} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
     </div>
     <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:12px;">
       ${isBorrow
@@ -5454,6 +5479,7 @@ function phPurchaseCardHTML(p,custId){
       ${isSubFeatureAllowed(8)?`<div style="font-size:11px;color:#5af;">Visit #${p.visitNum}</div>`:""}
       ${p.notes&&!isBorrow?`<div style="font-size:11px;color:#7a8aaa;">${p.notes}</div>`:''}
       ${isBorrow&&p.notes?`<div style="font-size:11px;color:#7a8aaa;">Item: ${p.notes}</div>`:''}
+      ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;">${p.soldItems.map(si=>`<span style="background:#0a1628;border:1px solid #2a3560;border-radius:5px;padding:2px 7px;font-size:10px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||""} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
     </div>
     <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
       ${isBorrow
@@ -5911,7 +5937,7 @@ function applyLicenseOverlay(i) {
 // Data: inventorySales = [{date, itemName, qty, custName}]  (auto-logged on ptSubmit)
 
 let inventoryItems = [];
-let invView = "stock"; // "stock" | "add" | "log"
+let invView = "stock"; // "stock" | "add" | "log" | "detail"
 
 function invKey(k){ return storageKey("inventory_"+k); }
 
@@ -5937,14 +5963,16 @@ function invGetStock(itemName){
   return total - sold;
 }
 
-// Called from ptSubmit — deduct sold items
-function invDeductSold(soldItems){
+// Called from ptSubmit — deduct sold items, log customer
+function invDeductSold(soldItems, custId){
   const now = new Date().toISOString();
-  soldItems.forEach(({name,qty})=>{
+  const cust = custId ? customers.find(x=>x.id===custId) : null;
+  const custName = cust ? cust.name : "";
+  soldItems.forEach(({name,qty,pricePerUnit})=>{
     let item = inventoryItems.find(x=>x.name===name);
     if(!item){ item={id:autoId(),name,unit:"unit",stock:[],salesLog:[]}; inventoryItems.push(item); }
     if(!item.salesLog) item.salesLog=[];
-    item.salesLog.push({qty,date:now});
+    item.salesLog.push({qty,date:now,custId:custId||"",custName,pricePerUnit:pricePerUnit||0});
   });
   saveInventory();
 }
@@ -5980,26 +6008,84 @@ function invEditUnit(name){
 }
 
 // ── Purchase tab: item row helpers ──────────────────────────────
+function getPurchaseMode(){
+  return localStorage.getItem(storageKey("purchase_mode"))||"standard";
+}
+function setPurchaseMode(m){
+  localStorage.setItem(storageKey("purchase_mode"),m);
+}
+
 function ptAddItemRow(){
   const list = document.getElementById("pt-items-list");
   if(!list) return;
+  const isInvMode = getPurchaseMode()==="inventory";
   const names = inventoryItems.map(x=>x.name);
-  const opts = names.length
-    ? names.map(n=>`<option value="${n.replace(/"/g,'&quot;')}">${n}</option>`).join("")
-    : "";
-  const dataList = names.length
-    ? `<datalist id="pt-inv-names">${opts}</datalist>` : "";
+  const opts = names.length ? names.map(n=>`<option value="${n.replace(/"/g,'&quot;')}">${n}</option>`).join("") : "";
+  const dataList = names.length ? `<datalist id="pt-inv-names">${opts}</datalist>` : "";
   const idx = list.children.length;
   const div = document.createElement("div");
   div.className="pt-item-row";
-  div.style.cssText="display:grid;grid-template-columns:1fr 90px 32px;gap:6px;margin-bottom:6px;align-items:center;";
-  div.innerHTML=`
-    ${idx===0?dataList:""}
-    <input class="input pt-item-name" list="pt-inv-names" placeholder="Item name..." style="padding:9px 11px;font-size:13px;" oninput="ptShowItemStock(this)" />
-    <input class="input pt-item-qty" type="number" min="0.01" step="0.01" placeholder="Qty" style="padding:9px;font-size:13px;text-align:center;" />
-    <button onclick="this.parentElement.remove()" style="background:#3a1a1a;border:none;border-radius:8px;color:#f66;cursor:pointer;padding:0;height:36px;width:32px;font-size:16px;">✕</button>
-  `;
+  if(isInvMode){
+    div.style.cssText="margin-bottom:10px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;";
+    div.innerHTML=`
+      ${idx===0?dataList:""}
+      <div style="display:grid;grid-template-columns:1fr 32px;gap:6px;margin-bottom:6px;align-items:center;">
+        <input class="input pt-item-name" list="pt-inv-names" placeholder="Search item..." style="padding:9px 11px;font-size:13px;" oninput="ptShowItemStock(this);ptUpdateTotal()" />
+        <button onclick="this.closest('.pt-item-row').remove();ptUpdateTotal()" style="background:#3a1a1a;border:none;border-radius:8px;color:#f66;cursor:pointer;height:36px;width:32px;font-size:16px;">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div>
+          <label style="font-size:10px;color:#7a8aaa;display:block;margin-bottom:3px;">Quantity</label>
+          <input class="input pt-item-qty" type="number" min="0.01" step="0.01" placeholder="0" style="padding:9px;font-size:14px;text-align:center;font-weight:700;" oninput="ptUpdateTotal()" />
+        </div>
+        <div>
+          <label style="font-size:10px;color:#7a8aaa;display:block;margin-bottom:3px;">Sell Price / Unit (₹)</label>
+          <input class="input pt-item-price" type="number" min="0" step="0.01" placeholder="0.00" style="padding:9px;font-size:14px;text-align:center;font-weight:700;color:#FFD700;" oninput="ptUpdateTotal()" />
+        </div>
+      </div>
+      <div class="pt-stock-hint" style="font-size:11px;color:#4a8aff;margin-top:4px;padding-left:2px;"></div>
+      <div class="pt-line-total" style="font-size:12px;color:#4f4;text-align:right;margin-top:4px;font-weight:700;display:none;"></div>
+    `;
+  } else {
+    div.style.cssText="display:grid;grid-template-columns:1fr 90px 32px;gap:6px;margin-bottom:6px;align-items:center;";
+    div.innerHTML=`
+      ${idx===0?dataList:""}
+      <input class="input pt-item-name" list="pt-inv-names" placeholder="Item name..." style="padding:9px 11px;font-size:13px;" oninput="ptShowItemStock(this)" />
+      <input class="input pt-item-qty" type="number" min="0.01" step="0.01" placeholder="Qty" style="padding:9px;font-size:13px;text-align:center;" />
+      <button onclick="this.parentElement.remove()" style="background:#3a1a1a;border:none;border-radius:8px;color:#f66;cursor:pointer;padding:0;height:36px;width:32px;font-size:16px;">✕</button>
+    `;
+  }
   list.appendChild(div);
+}
+
+function ptUpdateTotal(){
+  const rows = document.querySelectorAll(".pt-item-row");
+  let grand = 0;
+  rows.forEach(row=>{
+    const qty = parseFloat(row.querySelector(".pt-item-qty")?.value||"0")||0;
+    const ppu = parseFloat(row.querySelector(".pt-item-price")?.value||"0")||0;
+    const lineTotal = qty*ppu;
+    grand += lineTotal;
+    const lt = row.querySelector(".pt-line-total");
+    if(lt){
+      if(qty>0&&ppu>0){
+        lt.style.display="block";
+        lt.textContent="= ₹"+lineTotal.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+      } else {
+        lt.style.display="none";
+      }
+    }
+  });
+  // Update total display + amount field
+  const totalEl = document.getElementById("pt-inv-total");
+  if(totalEl){
+    if(grand>0){
+      totalEl.style.display="block";
+      totalEl.innerHTML=`<span style="color:#7a8aaa;font-size:13px;">Total Amount:</span> <span style="color:#FFD700;font-size:20px;font-weight:800;">₹${grand.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`;
+    } else {
+      totalEl.style.display="none";
+    }
+  }
 }
 
 function ptShowItemStock(input){
@@ -6020,6 +6106,11 @@ function ptShowItemStock(input){
 
 // ── Render Inventory Tab ────────────────────────────────────────
 function renderInventoryTab(){
+  // Handle item detail view
+  if(invView==="detail" && invDetailItem){
+    return renderInventoryItemDetail(invDetailItem);
+  }
+
   const totalItems = inventoryItems.length;
   const lowStock = inventoryItems.filter(x=>invGetStock(x.name)<=3&&invGetStock(x.name)>=0);
   const outOfStock = inventoryItems.filter(x=>invGetStock(x.name)<=0);
@@ -6134,7 +6225,7 @@ function renderInventoryTab(){
           const avgCost = (item.stock||[]).length?(item.stock.reduce((s,e)=>s+Number(e.costPerUnit||0),0)/item.stock.length).toFixed(2):0;
           const stkColor = stk<=0?"#f66":stk<=3?"#FFD700":"#4f4";
           const stkBg = stk<=0?"#2a0808":stk<=3?"#1a1400":"#081a08";
-          return `<div class="card" style="padding:16px 18px;">
+          return `<div class="card" style="padding:16px 18px;cursor:pointer;" onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}')">
             <div style="display:flex;align-items:flex-start;gap:12px;">
               <div style="background:#1a2540;border-radius:10px;padding:10px;font-size:22px;">🛒</div>
               <div style="flex:1;min-width:0;">
@@ -6157,11 +6248,11 @@ function renderInventoryTab(){
                   </div>
                 </div>
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:6px;">
-                  <div style="font-size:11px;color:#4a5a7a;">Last restocked: ${lastAdded}</div>
-                  <div style="display:flex;gap:6px;">
-                    <button onclick="invView='add';document.addEventListener('inv-rendered',function h(){var el=document.getElementById('inv-name');if(el){el.value='${item.name.replace(/'/g,"\\'")}';document.removeEventListener('inv-rendered',h);}});safeRenderTab(currentTab)" style="background:#1a2a4a;border:none;border-radius:7px;color:#7ab3ff;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;">➕ Restock</button>
-                    <button onclick="invEditUnit('${item.name.replace(/'/g,"\\'")}')" style="background:#1a1a3a;border:none;border-radius:7px;color:#aaa;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;">✏️ Unit</button>
-                    <button onclick="invDeleteItem('${item.name.replace(/'/g,"\\'")}')" style="background:#2a0808;border:none;border-radius:7px;color:#f66;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;">🗑</button>
+                  <div style="font-size:11px;color:#4a5a7a;">Last restocked: ${lastAdded} · <span style="color:#4a8aff;">Tap to see buyers →</span></div>
+                  <div style="display:flex;gap:6px;" onclick="event.stopPropagation()">
+                    <button onclick="invView='add';document.addEventListener('inv-rendered',function h(){var el=document.getElementById('inv-name');if(el){el.value='${item.name.replace(/'/g,"\\\\'")}'  ;document.removeEventListener('inv-rendered',h);}});safeRenderTab(currentTab)" style="background:#1a2a4a;border:none;border-radius:7px;color:#7ab3ff;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;">➕ Restock</button>
+                    <button onclick="invEditUnit('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a3a;border:none;border-radius:7px;color:#aaa;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;">✏️ Unit</button>
+                    <button onclick="invDeleteItem('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#2a0808;border:none;border-radius:7px;color:#f66;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;">🗑</button>
                   </div>
                 </div>
               </div>
@@ -6193,6 +6284,144 @@ function invSubmitAdd(){
   if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
   invAddStock(name,unit,qty,cost,date,notes);
+}
+
+// ─── PURCHASE MODE MODAL ──────────────────────────────────────
+function openPurchaseModeModal(){
+  const cur = getPurchaseMode();
+  const modal = document.createElement("div");
+  modal.id="pm-modal-overlay";
+  modal.style.cssText="position:fixed;inset:0;background:#000a;z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
+  modal.innerHTML=`
+    <div style="background:#0d1220;border:1px solid #1e2a45;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:560px;padding-bottom:max(24px,env(safe-area-inset-bottom));">
+      <div style="font-size:17px;font-weight:800;color:#e8eaf0;margin-bottom:6px;">Purchase Mode</div>
+      <div style="font-size:12px;color:#4a5a7a;margin-bottom:20px;">Choose how purchases are recorded in the Purchase tab</div>
+      <div onclick="setPurchaseMode('standard');document.getElementById('pm-modal-overlay').remove();safeRenderTab(currentTab);"
+           style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:2px solid ${cur==='standard'?'#4a8aff':'#1e2a45'};background:${cur==='standard'?'#0a1628':'#080c18'};cursor:pointer;margin-bottom:12px;">
+        <span style="font-size:28px;">🛒</span>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:15px;color:${cur==='standard'?'#7ab3ff':'#e8eaf0'};">Standard Mode</div>
+          <div style="font-size:12px;color:#4a5a7a;margin-top:3px;">Enter purchase amount manually. Optionally attach items sold (deducts from inventory).</div>
+        </div>
+        ${cur==='standard'?'<span style="font-size:20px;color:#4a8aff;">✓</span>':""}
+      </div>
+      <div onclick="setPurchaseMode('inventory');document.getElementById('pm-modal-overlay').remove();safeRenderTab(currentTab);"
+           style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:2px solid ${cur==='inventory'?'#4f4':'#1e2a45'};background:${cur==='inventory'?'#081a08':'#080c18'};cursor:pointer;margin-bottom:20px;">
+        <span style="font-size:28px;">📦</span>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:15px;color:${cur==='inventory'?'#4f4':'#e8eaf0'};">Inventory Mode</div>
+          <div style="font-size:12px;color:#4a5a7a;margin-top:3px;">Select items, enter quantity & selling price per unit. Amount is auto-calculated. Stock deducted automatically.</div>
+        </div>
+        ${cur==='inventory'?'<span style="font-size:20px;color:#4f4;">✓</span>':""}
+      </div>
+      <button onclick="document.getElementById('pm-modal-overlay').remove()" style="width:100%;padding:13px;background:#1a2540;border:none;border-radius:12px;color:#7a8aaa;font-size:14px;font-weight:700;cursor:pointer;">Close</button>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
+}
+
+// ─── INVENTORY ITEM DETAIL — who bought this item ─────────────
+let invDetailItem = null; // name of item being viewed
+
+function invShowItemDetail(itemName){
+  invDetailItem = itemName;
+  invView = "detail";
+  safeRenderTab(currentTab);
+}
+
+function renderInventoryItemDetail(itemName){
+  const item = inventoryItems.find(x=>x.name===itemName);
+  if(!item) return `<div style="padding:32px;text-align:center;color:#4a5a7a;">Item not found</div>`;
+
+  // Gather all sales log entries for this item with customer info
+  const salesLog = (item.salesLog||[]).slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  // Also scan customer purchase history for more detail
+  const custMap = {}; // custId → {name, totalQty, totalSpend, visits:[]}
+  customers.forEach(c=>{
+    (c.purchases||[]).forEach(p=>{
+      (p.soldItems||[]).forEach(si=>{
+        if(si.name===itemName){
+          if(!custMap[c.id]) custMap[c.id]={name:c.name,id:c.id,totalQty:0,totalSpend:0,visits:[]};
+          custMap[c.id].totalQty+=Number(si.qty)||0;
+          custMap[c.id].totalSpend+=(Number(si.qty)||0)*(Number(si.pricePerUnit)||0);
+          custMap[c.id].visits.push({date:p.date,qty:si.qty,ppu:si.pricePerUnit||0,bill:p.bill||""});
+        }
+      });
+    });
+  });
+
+  const custs = Object.values(custMap).sort((a,b)=>b.totalQty-a.totalQty);
+  const totalSold = salesLog.reduce((s,e)=>s+Number(e.qty),0);
+  const totalRevenue = custs.reduce((s,c)=>s+c.totalSpend,0);
+  const unit = item.unit||"unit";
+  const stk = invGetStock(itemName);
+  const stkColor = stk<=0?"#f66":stk<=3?"#FFD700":"#4f4";
+
+  return `<div style="padding:16px 14px;max-width:600px;margin:0 auto;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <button onclick="invView='stock';invDetailItem=null;safeRenderTab(currentTab)" style="background:#1a2540;border:none;border-radius:9px;color:#7ab3ff;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;">← Back</button>
+      <div style="font-size:17px;font-weight:800;color:#FFD700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${itemName}</div>
+    </div>
+
+    <!-- Item summary bar -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-size:16px;font-weight:800;color:${stkColor};">${stk<=0?"OUT":stk}</div>
+        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">${unit} left</div>
+      </div>
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-size:16px;font-weight:800;color:#f66;">${totalSold}</div>
+        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Total Sold</div>
+      </div>
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-size:16px;font-weight:800;color:#4a8aff;">${custs.length}</div>
+        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Customers</div>
+      </div>
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-size:13px;font-weight:800;color:#4f4;">${totalRevenue>0?"₹"+totalRevenue.toLocaleString("en-IN"):"—"}</div>
+        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Revenue</div>
+      </div>
+    </div>
+
+    <!-- Customers who bought -->
+    <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:10px;">👥 Customers Who Bought</div>
+    ${custs.length===0
+      ? `<div class="card" style="padding:28px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:8px;">🤷</div>
+          <div style="color:#4a5a7a;font-size:13px;">No customer purchases linked yet.<br><span style="font-size:11px;">Use Inventory Mode to record item-linked sales.</span></div>
+        </div>`
+      : `<div style="display:flex;flex-direction:column;gap:8px;">
+          ${custs.map(c=>{
+            const lastVisit = c.visits.sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+            const lastDate = lastVisit ? new Date(lastVisit.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "—";
+            return `<div class="card" style="padding:14px 16px;cursor:pointer;" onclick="showProfile('${c.id}')">
+              <div style="display:flex;align-items:center;gap:12px;">
+                ${avatarEl(c,38)}
+                <div style="flex:1;min-width:0;">
+                  <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${c.name}</div>
+                  <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">
+                    ${c.visits.length} purchase${c.visits.length!==1?"s":""} · Last: ${lastDate}
+                  </div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                  <div style="font-size:15px;font-weight:800;color:#f66;">-${c.totalQty} ${unit}</div>
+                  ${c.totalSpend>0?`<div style="font-size:11px;color:#4f4;margin-top:2px;">₹${c.totalSpend.toLocaleString("en-IN")}</div>`:""}
+                </div>
+              </div>
+              <!-- Visit history for this item -->
+              ${c.visits.length>0?`<div style="margin-top:10px;border-top:1px solid #1e2a45;padding-top:10px;display:flex;flex-direction:column;gap:5px;">
+                ${c.visits.slice(0,3).map(v=>`<div style="display:flex;justify-content:space-between;align-items:center;">
+                  <div style="font-size:11px;color:#4a5a7a;">${new Date(v.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${v.bill?" · "+v.bill:""}</div>
+                  <div style="font-size:12px;font-weight:700;color:#e8eaf0;">${v.qty} ${unit}${v.ppu>0?" @ ₹"+v.ppu+"/"+unit:""}</div>
+                </div>`).join("")}
+                ${c.visits.length>3?`<div style="font-size:11px;color:#4a5a7a;text-align:center;">+${c.visits.length-3} more visits</div>`:""}
+              </div>`:""}
+            </div>`;
+          }).join("")}
+        </div>`
+    }
+  </div>`;
 }
 
 // ═══════════════════════════════════════════════════════════════
