@@ -2007,7 +2007,8 @@ function buildPayload() {
       const rawNum = c.userNumber || c.user_number ||
         (phone ? localStorage.getItem("sc_usernum_" + phone) : "") || "";
       // Only show ID if it's a proper long number (13 digits = timestamp)
-      const uid = rawNum && String(rawNum).length >= 6 ? "#" + String(rawNum).slice(-6) : "";
+      // Format as #XXXXXX using last 6 chars — works for any length ID
+      const uid = rawNum ? "#" + String(rawNum).slice(-6) : "";
       return {
         id:c.id,
         name:c.name,
@@ -2023,6 +2024,24 @@ function buildPayload() {
   };
 }
 async function pushSync() {
+  // Pre-fetch user_numbers for all customers from Supabase
+  try {
+    const phones = customers.filter(c=>c.phone).map(c=>c.phone);
+    if (phones.length > 0) {
+      const q = phones.slice(0,50).map(p=>`phone.eq.${encodeURIComponent(p)}`).join(",");
+      const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?or=(${q})&select=phone,user_number`, {
+        headers: {"apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON}
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        rows.forEach(r => {
+          if (r.phone && r.user_number) {
+            localStorage.setItem("sc_usernum_" + r.phone, r.user_number);
+          }
+        });
+      }
+    }
+  } catch(e) { console.warn("Could not pre-fetch user numbers:", e); }
   const btn=document.getElementById("push-btn"),dot=document.getElementById("sync-status-dot"),txt=document.getElementById("sync-status-text");
   btn.disabled=true;btn.textContent="⏳ Pushing...";dot.className="syncing";txt.textContent="Pushing...";txt.style.color="#FFD700";
 

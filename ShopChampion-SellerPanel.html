@@ -369,7 +369,31 @@
     <div id="sp-voice-status" style="min-height:16px;font-size:12px;color:#4a5a7a;"></div>
   </div>
 
-  <div style="margin-top:20px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:16px;font-size:12px;color:#4a5a7a;line-height:1.9;">
+<!-- ═══════════════════════════════════════════
+       AD MANAGER
+       ═══════════════════════════════════════════ -->
+  <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="ads-section">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div class="section-title">📺 Ad Manager</div>
+      <button class="btn" onclick="openCreateAdModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 18px;font-size:13px;font-weight:800;">+ Create Ad</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
+      <div class="stat"><div class="stat-num" id="ad-stat-total">—</div><div class="stat-label">Total Ads</div></div>
+      <div class="stat"><div class="stat-num" id="ad-stat-active" style="color:#4f4;">—</div><div class="stat-label">Active</div></div>
+      <div class="stat"><div class="stat-num" id="ad-stat-shops">—</div><div class="stat-label">Shops</div></div>
+      <div class="stat"><div class="stat-num" id="ad-stat-rev" style="color:#FFD700;">—</div><div class="stat-label">Monthly Rev</div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;">
+      <button onclick="setAdFilter('all')" id="adf-all" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:800;border:2px solid #FFD700;background:#1a1400;color:#FFD700;white-space:nowrap;flex-shrink:0;">All</button>
+      <button onclick="setAdFilter('active')" id="adf-active" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">✅ Active</button>
+      <button onclick="setAdFilter('paused')" id="adf-paused" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">⏸ Paused</button>
+      <button onclick="setAdFilter('scheduled')" id="adf-scheduled" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">🕐 Scheduled</button>
+    </div>
+    <div id="ads-list"><div style="text-align:center;color:#4a5a7a;padding:40px 0;font-size:14px;">No ads yet. Click + Create Ad to get started.</div></div>
+  </div>
+
+
+    <div style="margin-top:20px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:16px;font-size:12px;color:#4a5a7a;line-height:1.9;">
     <div style="color:#FFD700;font-weight:700;margin-bottom:6px;">📌 How to paste your Supabase credentials into the customer app:</div>
     <div>Open <strong style="color:#e8eaf0;">ShopChampion-Admin.html</strong> in a text editor → find <code style="color:#FFD700;">SC_SUPABASE_URL</code> and <code style="color:#FFD700;">SC_SUPABASE_ANON</code> near the top of the &lt;script&gt; → replace with your Supabase URL and anon key → save → distribute that file to customers.</div>
     <div style="margin-top:6px;">🔑 <strong style="color:#e8eaf0;">Service Role Key</strong> (used here in Seller Panel) → Supabase Dashboard → Project Settings → API → <strong style="color:#FFD700;">service_role</strong>. Keep it secret — never put it in the customer app file.</div>
@@ -471,30 +495,7 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════
-       AD MANAGER
-       ═══════════════════════════════════════════ -->
-  <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="ads-section">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-      <div class="section-title">📺 Ad Manager</div>
-      <button class="btn" onclick="openCreateAdModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 18px;font-size:13px;font-weight:800;">+ Create Ad</button>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
-      <div class="stat"><div class="stat-num" id="ad-stat-total">—</div><div class="stat-label">Total Ads</div></div>
-      <div class="stat"><div class="stat-num" id="ad-stat-active" style="color:#4f4;">—</div><div class="stat-label">Active</div></div>
-      <div class="stat"><div class="stat-num" id="ad-stat-shops">—</div><div class="stat-label">Shops</div></div>
-      <div class="stat"><div class="stat-num" id="ad-stat-rev" style="color:#FFD700;">—</div><div class="stat-label">Monthly Rev</div></div>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;">
-      <button onclick="setAdFilter('all')" id="adf-all" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:800;border:2px solid #FFD700;background:#1a1400;color:#FFD700;white-space:nowrap;flex-shrink:0;">All</button>
-      <button onclick="setAdFilter('active')" id="adf-active" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">✅ Active</button>
-      <button onclick="setAdFilter('paused')" id="adf-paused" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">⏸ Paused</button>
-      <button onclick="setAdFilter('scheduled')" id="adf-scheduled" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">🕐 Scheduled</button>
-    </div>
-    <div id="ads-list"><div style="text-align:center;color:#4a5a7a;padding:40px 0;font-size:14px;">No ads yet. Click + Create Ad to get started.</div></div>
   </div>
-
-</div>
 
 <script src="./config.js"></script>
 <script>
