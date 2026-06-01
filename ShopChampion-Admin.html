@@ -1193,8 +1193,8 @@ if (typeof SC_SUPABASE_URL === 'undefined') {
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
 const ADMIN_PASS = "1234";
-const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","festivals","settings"];
-const TABS_ICON = ["🏆","👥","💳","📊","⚖️","🎉","⚙️"];
+const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","festivals","inventory","settings"];
+const TABS_ICON = ["🏆","👥","💳","📊","⚖️","🎉","📦","⚙️"];
 function getTabs(){ return TABS_BASE.map((k,i)=>TABS_ICON[i]+" "+t(k)); }
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -1513,7 +1513,7 @@ window.addEventListener('appinstalled', () => {
 
 // ── Mobile Bottom Nav ──────────────────────────────────────────
 const MOBILE_MAIN_TABS = [0, 1, 2, 3]; // leaderboard, customers, purchase, analytics
-const MOBILE_MORE_TABS = [4, 5, 6];    // compare, festivals, settings
+const MOBILE_MORE_TABS = [4, 5, 6, 7];    // compare, festivals, inventory, settings
 
 function mobileTab(i) {
   closeMoreMenu();
@@ -1664,7 +1664,7 @@ function _loadVoices() {
 if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => {
     _voiceCache = window.speechSynthesis.getVoices();
-    if (currentTab === 6) safeRenderTab(6); // refresh dropdown
+    if (currentTab === 7) safeRenderTab(7); // refresh dropdown
   };
   // Try immediate load (Chrome sometimes has them ready)
   _loadVoices();
@@ -2633,7 +2633,8 @@ function renderTab(i){
   else if(i===3)el.innerHTML=renderAnalytics(s);
   else if(i===4)el.innerHTML=renderCompare();
   else if(i===5)el.innerHTML=renderFestivals(s);
-  else if(i===6)el.innerHTML=renderSettings();
+  else if(i===6)el.innerHTML=renderInventoryTab();
+  else if(i===7)el.innerHTML=renderSettings();
   // License gate — show overlay on top, don't replace content
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
 }
@@ -2943,7 +2944,12 @@ function renderPurchaseTab(sorted){
         </div>
       </div>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Notes (optional)</label>
-      <input class="input" id="pt-notes" placeholder="e.g. Diwali purchase..." style="margin-bottom:20px;" />
+      <input class="input" id="pt-notes" placeholder="e.g. Diwali purchase..." style="margin-bottom:14px;" />
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Items Sold (optional — deducts from Inventory)</label>
+      <div id="pt-items-container" style="margin-bottom:14px;">
+        <div id="pt-items-list"></div>
+        <button type="button" onclick="ptAddItemRow()" style="width:100%;padding:9px;border-radius:10px;border:1px dashed #2a3a60;background:transparent;color:#4a8aff;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;">+ Add Item from Inventory</button>
+      </div>
       <div id="pt-pts" style="display:none;background:#0a1628;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#aaa;"></div>
       <button class="btn" id="pt-sub" onclick="ptSubmit()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">Add Purchase →</button>
     </div>`;
@@ -3200,7 +3206,28 @@ async function ptSubmit(){
   if(a>10000000){notify("❌ Amount seems too high — please check","error");return;}
   const submitBtn=document.getElementById("pt-sub");
   if(submitBtn&&submitBtn.disabled)return;
-  if(submitBtn){submitBtn.disabled=true;setTimeout(()=>submitBtn.disabled=false,3000);}addPurchase(s,{amount:a,bill:document.getElementById("pt-bill").value,notes:document.getElementById("pt-notes").value,date:document.getElementById("pt-date-val").value||document.getElementById("pt-date").value});document.getElementById("pt-amt").value="";document.getElementById("pt-notes").value="";window._ptState.selId="";window._ptState.selName="";window._ptState.selData=null;window._ptState.amt="";window._ptState.notes="";ptRestoreLiveBadge();const btn=document.getElementById("pt-sub");btn.style.background="linear-gradient(135deg,#1a5a2a,#2a8a3a)";btn.style.color="#4f4";btn.textContent="✅ Added!";setTimeout(()=>{btn.style.background="linear-gradient(135deg,#FFD700,#FFA500)";btn.style.color="#1a0a00";btn.textContent="Add Purchase →";},2000);}
+  if(submitBtn){submitBtn.disabled=true;setTimeout(()=>submitBtn.disabled=false,3000);}
+  // Collect items sold and deduct from inventory
+  const itemRows=document.querySelectorAll(".pt-item-row");
+  const soldItems=[];
+  itemRows.forEach(row=>{
+    const nameEl=row.querySelector(".pt-item-name");
+    const qtyEl=row.querySelector(".pt-item-qty");
+    if(nameEl&&qtyEl){
+      const nm=nameEl.value.trim(),qty=parseFloat(qtyEl.value)||0;
+      if(nm&&qty>0)soldItems.push({name:nm,qty});
+    }
+  });
+  if(soldItems.length)invDeductSold(soldItems);
+  addPurchase(s,{amount:a,bill:document.getElementById("pt-bill").value,notes:document.getElementById("pt-notes").value,date:document.getElementById("pt-date-val").value||document.getElementById("pt-date").value,soldItems});
+  document.getElementById("pt-amt").value="";
+  document.getElementById("pt-notes").value="";
+  window._ptState.selId="";window._ptState.selName="";window._ptState.selData=null;window._ptState.amt="";window._ptState.notes="";
+  ptRestoreLiveBadge();
+  const btn=document.getElementById("pt-sub");
+  btn.style.background="linear-gradient(135deg,#1a5a2a,#2a8a3a)";btn.style.color="#4f4";btn.textContent="✅ Added!";
+  setTimeout(()=>{btn.style.background="linear-gradient(135deg,#FFD700,#FFA500)";btn.style.color="#1a0a00";btn.textContent="Add Purchase →";safeRenderTab(currentTab);},2000);
+}
 
 // ─── BULK PURCHASE TAB FUNCTIONS ─────────────────────────────────────────────
 function bptFilterCustomers(){
@@ -3961,7 +3988,7 @@ function renderSettings(){
     )}
 
     ${section("Appearance",
-      row("🎨","Theme",themeIcon,"toggleTheme();renderTab(6)") +
+      row("🎨","Theme",themeIcon,"toggleTheme();renderTab(7)") +
       row("🌐","Language",`Current: ${curLangName}`,"toggleLangMenu()") +
       row("🔡","Text Size","Adjust app font size","openTextSizeModal()")
     )}
@@ -4143,7 +4170,7 @@ function applyVoicePreset(i){
 }
 
 
-function setDisplayCount(n){displaySettings.showCount=n;saveDisplaySettings();renderTab(6);notify("✅ Count updated");}
+function setDisplayCount(n){displaySettings.showCount=n;saveDisplaySettings();renderTab(7);notify("✅ Count updated");}
 
 function saveShopName(){
   const val=document.getElementById("shop-name-input")?.value.trim();
@@ -4161,7 +4188,7 @@ function handleIconUpload(inp){
     appSettings.appIcon=e.target.result;
     saveAppSettings();
     updateAppHeader();
-    renderTab(6);
+    renderTab(7);
     notify("✅ App icon updated!");
   };
   r.readAsDataURL(f);
@@ -4171,7 +4198,7 @@ function removeAppIcon(){
   appSettings.appIcon="";
   saveAppSettings();
   updateAppHeader();
-  renderTab(6);
+  renderTab(7);
   notify("🗑 Icon removed");
 }
 
@@ -5875,7 +5902,301 @@ function applyLicenseOverlay(i) {
   el.appendChild(overlay);
 }
 
-// ── Validate on every app load in background ──
+
+// ═══════════════════════════════════════════════════════════════
+// ─── INVENTORY SYSTEM ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+
+// Data: inventoryItems = [{id, name, unit, stock:[{qty, costPerUnit, date, notes}]}]
+// Data: inventorySales = [{date, itemName, qty, custName}]  (auto-logged on ptSubmit)
+
+let inventoryItems = [];
+let invView = "stock"; // "stock" | "add" | "log"
+
+function invKey(k){ return storageKey("inventory_"+k); }
+
+function saveInventory(){
+  try{ localStorage.setItem(invKey("items"), JSON.stringify(inventoryItems)); } catch(e){}
+}
+
+function loadInventory(){
+  try{
+    const d = localStorage.getItem(invKey("items"));
+    if(d) inventoryItems = JSON.parse(d);
+  } catch(e){ inventoryItems=[]; }
+}
+
+loadInventory();
+
+// Current stock for an item = sum of stock entries qty - sold qty
+function invGetStock(itemName){
+  const item = inventoryItems.find(x=>x.name===itemName);
+  if(!item) return 0;
+  const total = (item.stock||[]).reduce((s,e)=>s+Number(e.qty),0);
+  const sold  = (item.salesLog||[]).reduce((s,e)=>s+Number(e.qty),0);
+  return total - sold;
+}
+
+// Called from ptSubmit — deduct sold items
+function invDeductSold(soldItems){
+  const now = new Date().toISOString();
+  soldItems.forEach(({name,qty})=>{
+    let item = inventoryItems.find(x=>x.name===name);
+    if(!item){ item={id:autoId(),name,unit:"unit",stock:[],salesLog:[]}; inventoryItems.push(item); }
+    if(!item.salesLog) item.salesLog=[];
+    item.salesLog.push({qty,date:now});
+  });
+  saveInventory();
+}
+
+// Add stock entry
+function invAddStock(name, unit, qty, costPerUnit, date, notes){
+  let item = inventoryItems.find(x=>x.name===name);
+  if(!item){
+    item = {id:autoId(), name, unit:unit||"unit", stock:[], salesLog:[]};
+    inventoryItems.push(item);
+  }
+  item.unit = unit||item.unit;
+  if(!item.stock) item.stock=[];
+  item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes});
+  saveInventory();
+  notify("✅ Stock added for "+name);
+  invView="stock";
+  safeRenderTab(currentTab);
+}
+
+function invDeleteItem(name){
+  if(!confirm("Delete \""+name+"\" and all its history?")) return;
+  inventoryItems = inventoryItems.filter(x=>x.name!==name);
+  saveInventory();
+  safeRenderTab(currentTab);
+}
+
+function invEditUnit(name){
+  const item = inventoryItems.find(x=>x.name===name);
+  if(!item) return;
+  const nu = prompt("Unit for "+name+" (e.g. kg, pcs, litre):", item.unit||"unit");
+  if(nu!==null){ item.unit=nu.trim()||"unit"; saveInventory(); safeRenderTab(currentTab); }
+}
+
+// ── Purchase tab: item row helpers ──────────────────────────────
+function ptAddItemRow(){
+  const list = document.getElementById("pt-items-list");
+  if(!list) return;
+  const names = inventoryItems.map(x=>x.name);
+  const opts = names.length
+    ? names.map(n=>`<option value="${n.replace(/"/g,'&quot;')}">${n}</option>`).join("")
+    : "";
+  const dataList = names.length
+    ? `<datalist id="pt-inv-names">${opts}</datalist>` : "";
+  const idx = list.children.length;
+  const div = document.createElement("div");
+  div.className="pt-item-row";
+  div.style.cssText="display:grid;grid-template-columns:1fr 90px 32px;gap:6px;margin-bottom:6px;align-items:center;";
+  div.innerHTML=`
+    ${idx===0?dataList:""}
+    <input class="input pt-item-name" list="pt-inv-names" placeholder="Item name..." style="padding:9px 11px;font-size:13px;" oninput="ptShowItemStock(this)" />
+    <input class="input pt-item-qty" type="number" min="0.01" step="0.01" placeholder="Qty" style="padding:9px;font-size:13px;text-align:center;" />
+    <button onclick="this.parentElement.remove()" style="background:#3a1a1a;border:none;border-radius:8px;color:#f66;cursor:pointer;padding:0;height:36px;width:32px;font-size:16px;">✕</button>
+  `;
+  list.appendChild(div);
+}
+
+function ptShowItemStock(input){
+  const name = input.value.trim();
+  const stock = invGetStock(name);
+  const row = input.closest(".pt-item-row");
+  let hint = row.querySelector(".pt-stock-hint");
+  if(!hint){ hint=document.createElement("div"); hint.className="pt-stock-hint"; hint.style.cssText="grid-column:1/-1;font-size:11px;color:#4a8aff;margin-top:-2px;padding-left:2px;"; row.appendChild(hint); }
+  if(name && inventoryItems.find(x=>x.name===name)){
+    const item = inventoryItems.find(x=>x.name===name);
+    hint.textContent = "📦 Current stock: "+stock+" "+(item.unit||"unit");
+    hint.style.color = stock<=0?"#f66":stock<=5?"#FFD700":"#4f4";
+  } else {
+    hint.textContent = name?"⚠️ Not in inventory — will be created on save":"";
+    hint.style.color="#f84";
+  }
+}
+
+// ── Render Inventory Tab ────────────────────────────────────────
+function renderInventoryTab(){
+  const totalItems = inventoryItems.length;
+  const lowStock = inventoryItems.filter(x=>invGetStock(x.name)<=3&&invGetStock(x.name)>=0);
+  const outOfStock = inventoryItems.filter(x=>invGetStock(x.name)<=0);
+
+  const tabBtn=(v,label,color)=>{
+    const a=invView===v;
+    return `<button onclick="invView='${v}';safeRenderTab(currentTab)" style="cursor:pointer;flex:1;padding:10px;border-radius:10px;border:2px solid ${a?color:'#1e2a45'};background:${a?'#0a0e1a':'transparent'};color:${a?color:'#4a5a7a'};font-size:13px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;">${label}</button>`;
+  };
+
+  const nav = `<div style="display:flex;gap:8px;margin-bottom:16px;">
+    ${tabBtn("stock","📦 Stock",  "#4f4")}
+    ${tabBtn("add",  "➕ Add Stock","#FFD700")}
+    ${tabBtn("log",  "📋 Sales Log","#4a8aff")}
+  </div>`;
+
+  // Summary cards
+  const summary = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+    <div style="background:#0a1628;border:1px solid #1e2a45;border-radius:12px;padding:14px;text-align:center;">
+      <div style="font-size:22px;font-weight:800;color:#4f4;">${totalItems}</div>
+      <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Products</div>
+    </div>
+    <div style="background:#0a1628;border:1px solid ${lowStock.length?'#b8860b':'#1e2a45'};border-radius:12px;padding:14px;text-align:center;">
+      <div style="font-size:22px;font-weight:800;color:${lowStock.length?'#FFD700':'#4a5a7a'};">${lowStock.length}</div>
+      <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Low Stock</div>
+    </div>
+    <div style="background:#0a1628;border:1px solid ${outOfStock.length?'#4a1515':'#1e2a45'};border-radius:12px;padding:14px;text-align:center;">
+      <div style="font-size:22px;font-weight:800;color:${outOfStock.length?'#f66':'#4a5a7a'};">${outOfStock.length}</div>
+      <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Out of Stock</div>
+    </div>
+  </div>`;
+
+  let body = "";
+
+  if(invView==="add"){
+    body = `<div class="card" style="padding:22px;">
+      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:16px;">➕ Add / Restock Item</div>
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Item / Product Name *</label>
+      <input class="input" id="inv-name" list="inv-existing-names" placeholder="e.g. Basmati Rice 5kg..." style="margin-bottom:12px;" />
+      <datalist id="inv-existing-names">${inventoryItems.map(x=>`<option value="${x.name.replace(/"/g,'&quot;')}">`).join("")}</datalist>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div>
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Quantity *</label>
+          <input class="input" type="number" id="inv-qty" min="0.01" step="0.01" placeholder="0" style="text-align:center;font-size:18px;font-weight:700;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Unit</label>
+          <input class="input" id="inv-unit" list="inv-units" placeholder="kg / pcs / litre..." />
+          <datalist id="inv-units"><option value="kg"><option value="pcs"><option value="litre"><option value="box"><option value="dozen"><option value="packet"><option value="bottle"><option value="bag"></datalist>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div>
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Cost per Unit (₹)</label>
+          <input class="input" type="number" id="inv-cost" min="0" step="0.01" placeholder="0.00" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Date</label>
+          <input class="input" type="date" id="inv-date" value="${new Date().toISOString().slice(0,10)}" />
+        </div>
+      </div>
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Notes (optional)</label>
+      <input class="input" id="inv-notes" placeholder="Supplier, batch info..." style="margin-bottom:18px;" />
+      <button class="btn" onclick="invSubmitAdd()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">Add to Inventory →</button>
+    </div>`;
+  }
+  else if(invView==="log"){
+    // Aggregate all sales logs across items
+    const allSales = [];
+    inventoryItems.forEach(item=>{
+      (item.salesLog||[]).forEach(e=>{
+        allSales.push({item:item.name,unit:item.unit||"unit",qty:e.qty,date:e.date});
+      });
+    });
+    allSales.sort((a,b)=>new Date(b.date)-new Date(a.date));
+    body = `<div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:16px 18px;border-bottom:1px solid #1e2a45;">
+        <div style="font-size:14px;font-weight:800;color:#4a8aff;">📋 Sales Deduction Log</div>
+        <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Auto-recorded when you add purchases in Purchase tab</div>
+      </div>
+      ${!allSales.length
+        ? `<div style="padding:32px;text-align:center;color:#4a5a7a;font-size:13px;">No sales recorded yet.<br>Items sold via Purchase tab appear here.</div>`
+        : allSales.map(e=>`
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #0f1628;">
+            <div style="background:#1a1a3a;border-radius:8px;padding:8px;font-size:18px;">📤</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:700;color:#e8eaf0;font-size:13px;">${e.item}</div>
+              <div style="font-size:11px;color:#7a8aaa;">${new Date(e.date).toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-weight:800;color:#f66;font-size:14px;">-${e.qty} ${e.unit}</div>
+            </div>
+          </div>`).join("")
+      }
+    </div>`;
+  }
+  else {
+    // Stock view
+    if(!inventoryItems.length){
+      body = `<div class="card" style="padding:32px;text-align:center;">
+        <div style="font-size:40px;margin-bottom:12px;">📦</div>
+        <div style="font-size:15px;font-weight:700;color:#e8eaf0;margin-bottom:8px;">No inventory yet</div>
+        <div style="font-size:13px;color:#7a8aaa;margin-bottom:20px;">Add your first product to start tracking stock</div>
+        <button class="btn" onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:12px 28px;font-weight:800;">➕ Add First Item</button>
+      </div>`;
+    } else {
+      body = `<div style="display:flex;flex-direction:column;gap:10px;">
+        ${inventoryItems.map(item=>{
+          const stk = invGetStock(item.name);
+          const totalIn = (item.stock||[]).reduce((s,e)=>s+Number(e.qty),0);
+          const totalOut = (item.salesLog||[]).reduce((s,e)=>s+Number(e.qty),0);
+          const lastAdded = (item.stock||[]).length?new Date(item.stock[item.stock.length-1].date).toLocaleDateString("en-IN",{day:"numeric",month:"short"}):"—";
+          const avgCost = (item.stock||[]).length?(item.stock.reduce((s,e)=>s+Number(e.costPerUnit||0),0)/item.stock.length).toFixed(2):0;
+          const stkColor = stk<=0?"#f66":stk<=3?"#FFD700":"#4f4";
+          const stkBg = stk<=0?"#2a0808":stk<=3?"#1a1400":"#081a08";
+          return `<div class="card" style="padding:16px 18px;">
+            <div style="display:flex;align-items:flex-start;gap:12px;">
+              <div style="background:#1a2540;border-radius:10px;padding:10px;font-size:22px;">🛒</div>
+              <div style="flex:1;min-width:0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                  <div style="font-weight:800;font-size:15px;color:#e8eaf0;">${item.name}</div>
+                  <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:4px 12px;font-size:13px;font-weight:800;color:${stkColor};">${stk<=0?"OUT":stk} ${item.unit||"unit"}</div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px;">
+                  <div style="background:#0a0e1a;border-radius:8px;padding:8px;text-align:center;">
+                    <div style="font-size:14px;font-weight:800;color:#4f4;">+${totalIn}</div>
+                    <div style="font-size:10px;color:#4a5a7a;">Total In</div>
+                  </div>
+                  <div style="background:#0a0e1a;border-radius:8px;padding:8px;text-align:center;">
+                    <div style="font-size:14px;font-weight:800;color:#f66;">-${totalOut}</div>
+                    <div style="font-size:10px;color:#4a5a7a;">Sold</div>
+                  </div>
+                  <div style="background:#0a0e1a;border-radius:8px;padding:8px;text-align:center;">
+                    <div style="font-size:14px;font-weight:800;color:#7ab3ff;">${avgCost>0?"₹"+avgCost:"—"}</div>
+                    <div style="font-size:10px;color:#4a5a7a;">Avg Cost</div>
+                  </div>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:6px;">
+                  <div style="font-size:11px;color:#4a5a7a;">Last restocked: ${lastAdded}</div>
+                  <div style="display:flex;gap:6px;">
+                    <button onclick="invView='add';document.addEventListener('inv-rendered',function h(){var el=document.getElementById('inv-name');if(el){el.value='${item.name.replace(/'/g,"\\'")}';document.removeEventListener('inv-rendered',h);}});safeRenderTab(currentTab)" style="background:#1a2a4a;border:none;border-radius:7px;color:#7ab3ff;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;">➕ Restock</button>
+                    <button onclick="invEditUnit('${item.name.replace(/'/g,"\\'")}')" style="background:#1a1a3a;border:none;border-radius:7px;color:#aaa;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;">✏️ Unit</button>
+                    <button onclick="invDeleteItem('${item.name.replace(/'/g,"\\'")}')" style="background:#2a0808;border:none;border-radius:7px;color:#f66;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;">🗑</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>`;
+    }
+  }
+
+  return `<div style="padding:16px 14px;max-width:600px;margin:0 auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:18px;font-weight:800;color:#FFD700;">📦 Inventory</div>
+      ${invView==="stock"?`<button onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;">➕ Add Stock</button>`:""}
+    </div>
+    ${nav}
+    ${invView==="stock"?summary:""}
+    ${body}
+  </div>`;
+}
+
+function invSubmitAdd(){
+  const name=(document.getElementById("inv-name").value||"").trim();
+  const qty=parseFloat(document.getElementById("inv-qty").value||"0");
+  const unit=(document.getElementById("inv-unit").value||"").trim();
+  const cost=parseFloat(document.getElementById("inv-cost").value||"0");
+  const date=document.getElementById("inv-date").value||new Date().toISOString().slice(0,10);
+  const notes=(document.getElementById("inv-notes").value||"").trim();
+  if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
+  if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
+  invAddStock(name,unit,qty,cost,date,notes);
+}
+
+// ═══════════════════════════════════════════════════════════════
+
 window.addEventListener("load", async () => {
   loadLicense();
   loadFreeTabs(); // load free/pro feature config from Supabase
