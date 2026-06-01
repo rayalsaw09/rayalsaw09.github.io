@@ -1411,6 +1411,11 @@ function ptRestoreState() {
     }
   }
   ptPts();
+  // In inventory mode, auto-add first item row if list is empty
+  if(getPurchaseMode()==="inventory"){
+    const list=document.getElementById("pt-items-list");
+    if(list&&list.children.length===0) ptAddItemRow();
+  }
 }
 
 // ─── PER-USER FIRESTORE HELPERS ──────────────────────────────
@@ -2956,11 +2961,11 @@ function renderPurchaseTab(sorted){
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Notes (optional)</label>
       <input class="input" id="pt-notes" placeholder="e.g. Diwali purchase..." style="margin-bottom:14px;" />
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">${invMode?"🛒 Items Sold — enter qty & selling price":"Items Sold (optional — deducts from Inventory)"}</label>
-      <div id="pt-items-container" style="margin-bottom:14px;">
+      <div id="pt-items-container" style="margin-bottom:${invMode?'6px':'14px'};">
         <div id="pt-items-list"></div>
-        ${invMode?`<div id="pt-inv-total" style="display:none;background:#0a1a08;border:1px solid #1a4a1a;border-radius:10px;padding:10px 14px;margin-top:10px;text-align:right;"></div>`:""}
-        <button type="button" onclick="ptAddItemRow()" style="width:100%;padding:9px;border-radius:10px;border:1px dashed ${invMode?"#1a4a1a":"#2a3a60"};background:transparent;color:${invMode?"#4f4":"#4a8aff"};font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;">+ Add Item from Inventory</button>
+        <button type="button" onclick="ptAddItemRow()" style="width:100%;padding:9px;border-radius:10px;border:1px dashed ${invMode?&quot;#1a4a1a&quot;:&quot;#2a3a60&quot;};background:transparent;color:${invMode?&quot;#4f4&quot;:&quot;#4a8aff&quot;};font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;">➕ Add Item</button>
       </div>
+      ${invMode?`<div id="pt-inv-total" style="display:none;background:#0a1a08;border:1px solid #1a4a1a;border-radius:10px;padding:12px 16px;margin-bottom:14px;text-align:right;"></div>`:""}
       ${invMode?"":`<div id="pt-pts" style="display:none;background:#0a1628;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#aaa;"></div>`}
       <button class="btn" id="pt-sub" onclick="ptSubmit()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">Add Purchase →</button>
     </div>`;
@@ -6093,7 +6098,7 @@ function ptShowItemStock(input){
   const stock = invGetStock(name);
   const row = input.closest(".pt-item-row");
   let hint = row.querySelector(".pt-stock-hint");
-  if(!hint){ hint=document.createElement("div"); hint.className="pt-stock-hint"; hint.style.cssText="grid-column:1/-1;font-size:11px;color:#4a8aff;margin-top:-2px;padding-left:2px;"; row.appendChild(hint); }
+  if(!hint){ hint=document.createElement("div"); hint.className="pt-stock-hint"; hint.style.cssText="font-size:11px;color:#4a8aff;margin-top:4px;padding-left:2px;"; row.appendChild(hint); }
   if(name && inventoryItems.find(x=>x.name===name)){
     const item = inventoryItems.find(x=>x.name===name);
     hint.textContent = "📦 Current stock: "+stock+" "+(item.unit||"unit");
