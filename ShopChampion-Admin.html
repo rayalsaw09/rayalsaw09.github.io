@@ -6024,6 +6024,27 @@ function invEditUnit(name){
   if(nu!==null){ item.unit=nu.trim()||"unit"; saveInventory(); safeRenderTab(currentTab); }
 }
 
+function invEditCategory(name){
+  const item = inventoryItems.find(x=>x.name===name);
+  if(!item) return;
+  const allCats = [...new Set(inventoryItems.map(x=>x.category||"General").filter(Boolean))].sort();
+  const suggestion = allCats.length ? "\n\nExisting: "+allCats.join(", ") : "";
+  const nc = prompt("Category for \""+name+"\":"+suggestion, item.category||"General");
+  if(nc!==null){ item.category=(nc.trim()||"General"); saveInventory(); safeRenderTab(currentTab); }
+}
+
+// Cost value of current stock for an item: stock_qty * avg_cost_per_unit
+function invGetStockValue(itemName){
+  const item = inventoryItems.find(x=>x.name===itemName);
+  if(!item) return 0;
+  const stk = invGetStock(itemName);
+  if(stk<=0) return 0;
+  const entries = (item.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);
+  if(!entries.length) return 0;
+  const avgCost = entries.reduce((s,e)=>s+Number(e.costPerUnit),0) / entries.length;
+  return stk * avgCost;
+}
+
 // ── Purchase tab: item row helpers ──────────────────────────────
 function getPurchaseMode(){
   return localStorage.getItem(storageKey("purchase_mode"))||"standard";
@@ -6129,8 +6150,11 @@ function renderInventoryTab(){
   }
 
   const totalItems = inventoryItems.length;
-  const lowStock = inventoryItems.filter(x=>invGetStock(x.name)<=3&&invGetStock(x.name)>=0);
+  const lowStock = inventoryItems.filter(x=>invGetStock(x.name)<=3&&invGetStock(x.name)>0);
   const outOfStock = inventoryItems.filter(x=>invGetStock(x.name)<=0);
+
+  // ── Total inventory value (cost of all current stock) ──
+  const totalValue = inventoryItems.reduce((s,x)=>s+invGetStockValue(x.name),0);
 
   const tabBtn=(v,label,color)=>{
     const a=invView===v;
@@ -6143,12 +6167,18 @@ function renderInventoryTab(){
     ${tabBtn("log",  "📋 Sales Log","#4a8aff")}
   </div>`;
 
-  // Summary cards
-  const summary = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+  // ── Summary cards with total value ──
+  const summary = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
     <div style="background:#0a1628;border:1px solid #1e2a45;border-radius:12px;padding:14px;text-align:center;">
       <div style="font-size:22px;font-weight:800;color:#4f4;">${totalItems}</div>
       <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Products</div>
     </div>
+    <div style="background:#081a08;border:1px solid #1a4a1a;border-radius:12px;padding:14px;text-align:center;">
+      <div style="font-size:${totalValue>=100000?'14px':'18px'};font-weight:800;color:#4f4;">${totalValue>0?"₹"+totalValue.toLocaleString("en-IN",{maximumFractionDigits:0}):"—"}</div>
+      <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Total Stock Value</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
     <div style="background:#0a1628;border:1px solid ${lowStock.length?'#b8860b':'#1e2a45'};border-radius:12px;padding:14px;text-align:center;">
       <div style="font-size:22px;font-weight:800;color:${lowStock.length?'#FFD700':'#4a5a7a'};">${lowStock.length}</div>
       <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Low Stock</div>
@@ -6162,11 +6192,16 @@ function renderInventoryTab(){
   let body = "";
 
   if(invView==="add"){
+    // Gather existing categories for datalist
+    const existingCats = [...new Set(inventoryItems.map(x=>x.category||"General"))].sort();
     body = `<div class="card" style="padding:22px;">
       <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:16px;">➕ Add / Restock Item</div>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Item / Product Name *</label>
       <input class="input" id="inv-name" list="inv-existing-names" placeholder="e.g. Basmati Rice 5kg..." style="margin-bottom:12px;" />
       <datalist id="inv-existing-names">${inventoryItems.map(x=>`<option value="${x.name.replace(/"/g,'&quot;')}">`).join("")}</datalist>
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Category</label>
+      <input class="input" id="inv-category" list="inv-category-list" placeholder="e.g. Grocery, Dairy, Snacks..." style="margin-bottom:12px;" />
+      <datalist id="inv-category-list">${existingCats.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">`).join("")}</datalist>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div>
           <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Quantity *</label>
@@ -6194,11 +6229,10 @@ function renderInventoryTab(){
     </div>`;
   }
   else if(invView==="log"){
-    // Aggregate all sales logs across items
     const allSales = [];
     inventoryItems.forEach(item=>{
       (item.salesLog||[]).forEach(e=>{
-        allSales.push({item:item.name,unit:item.unit||"unit",qty:e.qty,date:e.date});
+        allSales.push({item:item.name,unit:item.unit||"unit",qty:e.qty,date:e.date,custName:e.custName||""});
       });
     });
     allSales.sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -6214,7 +6248,7 @@ function renderInventoryTab(){
             <div style="background:#1a1a3a;border-radius:8px;padding:8px;font-size:18px;">📤</div>
             <div style="flex:1;min-width:0;">
               <div style="font-weight:700;color:#e8eaf0;font-size:13px;">${e.item}</div>
-              <div style="font-size:11px;color:#7a8aaa;">${new Date(e.date).toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</div>
+              <div style="font-size:11px;color:#7a8aaa;">${e.custName?e.custName+" · ":""}${new Date(e.date).toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}</div>
             </div>
             <div style="text-align:right;">
               <div style="font-weight:800;color:#f66;font-size:14px;">-${e.qty} ${e.unit}</div>
@@ -6224,7 +6258,7 @@ function renderInventoryTab(){
     </div>`;
   }
   else {
-    // Stock view
+    // ── Stock view: grouped by category ──
     if(!inventoryItems.length){
       body = `<div class="card" style="padding:32px;text-align:center;">
         <div style="font-size:40px;margin-bottom:12px;">📦</div>
@@ -6233,50 +6267,91 @@ function renderInventoryTab(){
         <button class="btn" onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:12px 28px;font-weight:800;">➕ Add First Item</button>
       </div>`;
     } else {
-      body = `<div style="display:flex;flex-direction:column;gap:10px;">
-        ${inventoryItems.map(item=>{
+      // Group items by category
+      const grouped = {};
+      inventoryItems.forEach(item=>{
+        const cat = item.category||"General";
+        if(!grouped[cat]) grouped[cat]=[];
+        grouped[cat].push(item);
+      });
+      const catNames = Object.keys(grouped).sort();
+
+      body = catNames.map(cat=>{
+        const items = grouped[cat];
+        // Category totals
+        const catValue = items.reduce((s,item)=>s+invGetStockValue(item.name),0);
+        const catTotalIn = items.reduce((s,item)=>(item.stock||[]).reduce((ss,e)=>ss+Number(e.qty),0)+s,0);
+        const catOut = items.reduce((s,item)=>(item.salesLog||[]).reduce((ss,e)=>ss+Number(e.qty),0)+s,0);
+        const catLow = items.filter(x=>invGetStock(x.name)<=3&&invGetStock(x.name)>0).length;
+        const catOOS = items.filter(x=>invGetStock(x.name)<=0).length;
+
+        const itemCards = items.map(item=>{
           const stk = invGetStock(item.name);
           const totalIn = (item.stock||[]).reduce((s,e)=>s+Number(e.qty),0);
           const totalOut = (item.salesLog||[]).reduce((s,e)=>s+Number(e.qty),0);
+          const stockValue = invGetStockValue(item.name);
           const lastAdded = (item.stock||[]).length?new Date(item.stock[item.stock.length-1].date).toLocaleDateString("en-IN",{day:"numeric",month:"short"}):"—";
-          const avgCost = (item.stock||[]).length?(item.stock.reduce((s,e)=>s+Number(e.costPerUnit||0),0)/item.stock.length).toFixed(2):0;
+          const avgCost = (item.stock||[]).filter(e=>Number(e.costPerUnit||0)>0).length
+            ? (item.stock.filter(e=>Number(e.costPerUnit||0)>0).reduce((s,e)=>s+Number(e.costPerUnit),0)/item.stock.filter(e=>Number(e.costPerUnit||0)>0).length).toFixed(2)
+            : 0;
           const stkColor = stk<=0?"#f66":stk<=3?"#FFD700":"#4f4";
           const stkBg = stk<=0?"#2a0808":stk<=3?"#1a1400":"#081a08";
-          return `<div class="card" style="padding:16px 18px;cursor:pointer;" onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}')">
+          return `<div class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}')">
             <div style="display:flex;align-items:flex-start;gap:12px;">
-              <div style="background:#1a2540;border-radius:10px;padding:10px;font-size:22px;">🛒</div>
+              <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;">🛒</div>
               <div style="flex:1;min-width:0;">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-                  <div style="font-weight:800;font-size:15px;color:#e8eaf0;">${item.name}</div>
-                  <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:4px 12px;font-size:13px;font-weight:800;color:${stkColor};">${stk<=0?"OUT":stk} ${item.unit||"unit"}</div>
+                  <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${item.name}</div>
+                  <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk<=0?"OUT":stk} ${item.unit||"unit"}</div>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px;">
-                  <div style="background:#0a0e1a;border-radius:8px;padding:8px;text-align:center;">
-                    <div style="font-size:14px;font-weight:800;color:#4f4;">+${totalIn}</div>
-                    <div style="font-size:10px;color:#4a5a7a;">Total In</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
+                  <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;">
+                    <div style="font-size:13px;font-weight:800;color:#4f4;">+${totalIn}</div>
+                    <div style="font-size:9px;color:#4a5a7a;">Total In</div>
                   </div>
-                  <div style="background:#0a0e1a;border-radius:8px;padding:8px;text-align:center;">
-                    <div style="font-size:14px;font-weight:800;color:#f66;">-${totalOut}</div>
-                    <div style="font-size:10px;color:#4a5a7a;">Sold</div>
+                  <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;">
+                    <div style="font-size:13px;font-weight:800;color:#f66;">-${totalOut}</div>
+                    <div style="font-size:9px;color:#4a5a7a;">Sold</div>
                   </div>
-                  <div style="background:#0a0e1a;border-radius:8px;padding:8px;text-align:center;">
-                    <div style="font-size:14px;font-weight:800;color:#7ab3ff;">${avgCost>0?"₹"+avgCost:"—"}</div>
-                    <div style="font-size:10px;color:#4a5a7a;">Avg Cost</div>
+                  <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;">
+                    <div style="font-size:12px;font-weight:800;color:#7ab3ff;">${avgCost>0?"₹"+avgCost:"—"}</div>
+                    <div style="font-size:9px;color:#4a5a7a;">Avg Cost</div>
+                  </div>
+                  <div style="background:#081a08;border:1px solid #1a4a1a;border-radius:8px;padding:7px;text-align:center;">
+                    <div style="font-size:12px;font-weight:800;color:#4f4;">${stockValue>0?"₹"+stockValue.toLocaleString("en-IN",{maximumFractionDigits:0}):"—"}</div>
+                    <div style="font-size:9px;color:#4a5a7a;">Stock Val</div>
                   </div>
                 </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:6px;">
-                  <div style="font-size:11px;color:#4a5a7a;">Last restocked: ${lastAdded} · <span style="color:#4a8aff;">Tap to see buyers →</span></div>
-                  <div style="display:flex;gap:6px;" onclick="event.stopPropagation()">
-                    <button onclick="invView='add';document.addEventListener('inv-rendered',function h(){var el=document.getElementById('inv-name');if(el){el.value='${item.name.replace(/'/g,"\\\\'")}'  ;document.removeEventListener('inv-rendered',h);}});safeRenderTab(currentTab)" style="background:#1a2a4a;border:none;border-radius:7px;color:#7ab3ff;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;">➕ Restock</button>
-                    <button onclick="invEditUnit('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a3a;border:none;border-radius:7px;color:#aaa;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;">✏️ Unit</button>
-                    <button onclick="invDeleteItem('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#2a0808;border:none;border-radius:7px;color:#f66;cursor:pointer;padding:6px 10px;font-size:12px;font-weight:700;">🗑</button>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px;flex-wrap:wrap;gap:6px;">
+                  <div style="font-size:11px;color:#4a5a7a;">Restocked: ${lastAdded} · <span style="color:#4a8aff;">Tap for buyers →</span></div>
+                  <div style="display:flex;gap:5px;" onclick="event.stopPropagation()">
+                    <button onclick="invView='add';document.addEventListener('inv-rendered',function h(){var el=document.getElementById('inv-name');if(el){el.value='${item.name.replace(/'/g,"\\\\'")}';document.removeEventListener('inv-rendered',h);}});safeRenderTab(currentTab)" style="background:#1a2a4a;border:none;border-radius:7px;color:#7ab3ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">➕ Restock</button>
+                    <button onclick="invEditCategory('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a3a;border:none;border-radius:7px;color:#b080ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🏷 Cat</button>
+                    <button onclick="invEditUnit('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a3a;border:none;border-radius:7px;color:#aaa;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">✏️ Unit</button>
+                    <button onclick="invDeleteItem('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#2a0808;border:none;border-radius:7px;color:#f66;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🗑</button>
                   </div>
                 </div>
               </div>
             </div>
           </div>`;
-        }).join("")}
-      </div>`;
+        }).join("");
+
+        return `<div style="margin-bottom:18px;">
+          <!-- Category header -->
+          <div style="display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#0d1628,#111e38);border:1px solid #1e2a45;border-radius:14px;padding:12px 16px;margin-bottom:10px;gap:8px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="font-size:15px;font-weight:800;color:#FFD700;">${cat}</div>
+              <div style="font-size:11px;color:#4a5a7a;">${items.length} item${items.length!==1?"s":""}</div>
+              ${catLow>0?`<div style="background:#1a1400;border:1px solid #FFD70060;border-radius:20px;padding:2px 8px;font-size:11px;color:#FFD700;font-weight:700;">⚠ ${catLow} low</div>`:""}
+              ${catOOS>0?`<div style="background:#2a0808;border:1px solid #f6660060;border-radius:20px;padding:2px 8px;font-size:11px;color:#f66;font-weight:700;">❌ ${catOOS} out</div>`:""}
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              ${catValue>0?`<div style="text-align:right;"><div style="font-size:14px;font-weight:800;color:#4f4;">₹${catValue.toLocaleString("en-IN",{maximumFractionDigits:0})}</div><div style="font-size:10px;color:#4a5a7a;">Section Value</div></div>`:""}
+            </div>
+          </div>
+          ${itemCards}
+        </div>`;
+      }).join("");
     }
   }
 
@@ -6293,6 +6368,7 @@ function renderInventoryTab(){
 
 function invSubmitAdd(){
   const name=(document.getElementById("inv-name").value||"").trim();
+  const category=(document.getElementById("inv-category").value||"").trim()||"General";
   const qty=parseFloat(document.getElementById("inv-qty").value||"0");
   const unit=(document.getElementById("inv-unit").value||"").trim();
   const cost=parseFloat(document.getElementById("inv-cost").value||"0");
@@ -6300,6 +6376,9 @@ function invSubmitAdd(){
   const notes=(document.getElementById("inv-notes").value||"").trim();
   if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
+  // Save/update category on the item
+  let item = inventoryItems.find(x=>x.name===name);
+  if(item) item.category = category;
   invAddStock(name,unit,qty,cost,date,notes);
 }
 
