@@ -2486,6 +2486,18 @@ function onLoginSuccess(phone) {
     startFirestoreListener();
     // Load inventory from Firestore for cross-device sync
     loadInventoryFromFirestore(()=>{ safeRenderTab(currentTab); });
+  } else if (phone) {
+    // db may not be ready yet (mobile/PWA) — retry after a short delay
+    shopId = phone;
+    const retryInvSync = (attempts) => {
+      if(db){
+        startFirestoreListener();
+        loadInventoryFromFirestore(()=>{ safeRenderTab(currentTab); });
+      } else if(attempts > 0){
+        setTimeout(()=>retryInvSync(attempts-1), 800);
+      }
+    };
+    setTimeout(()=>retryInvSync(5), 600);
   }
   // Cache user_number for Support ID display
   if (phone && !localStorage.getItem("sc_usernum_" + phone)) {
@@ -6322,142 +6334,83 @@ function renderInventoryTab(){
       </div>`;
     } else {
 
-      // ── Category Search bar ──
-      const catSearchBar = `<div style="position:relative;margin-bottom:12px;">
+      // ── Category Search bar (always shown) ──
+      const searchBarHtml = `<div style="position:relative;margin-bottom:14px;">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none;">🔍</span>
         <input id="inv-search-box" class="input" placeholder="Search categories..." value="${(invSearchQuery||'').replace(/"/g,'&quot;')}"
           oninput="invSearchQuery=this.value;safeRenderTab(currentTab)"
           style="padding-left:36px;margin-bottom:0;" />
-        ${invSearchQuery?`<button onclick="invSearchQuery='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:18px;cursor:pointer;line-height:1;">×</button>`:""}
+        ${invSearchQuery ? `<button onclick="invSearchQuery='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:20px;cursor:pointer;line-height:1;">×</button>` : ""}
       </div>`;
 
-      // ── If searching categories, show matched category cards ──
-      if(invSearchQuery && invSearchQuery.trim()){
-        const q = invSearchQuery.trim().toLowerCase();
-        const matchedCats = allCats.filter(cat=>cat.toLowerCase().includes(q));
-        const catResults = matchedCats.length===0
-          ? `<div class="card" style="padding:28px;text-align:center;color:#4a5a7a;font-size:13px;">No categories found for "<b>${invSearchQuery}</b>"</div>`
-          : matchedCats.map(cat=>{
-              const catItemsList = inventoryItems.filter(x=>(x.category||"General")===cat);
-              const catVal = catItemsList.reduce((s,x)=>s+invGetStockValue(x.name),0);
-              const catOOS = catItemsList.filter(x=>invGetStock(x.name)<=0).length;
-              const catLow = catItemsList.filter(x=>invGetStock(x.name)>0&&invGetStock(x.name)<=3).length;
-              return `<div class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
-                onclick="invCatPageName='${cat.replace(/'/g,"\\'")}';invCatPageSearch='';invView='category';invSearchQuery='';safeRenderTab(currentTab)">
-                <div>
-                  <div style="font-size:15px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
-                  <div style="font-size:12px;color:#4a5a7a;margin-top:3px;">${catItemsList.length} item${catItemsList.length!==1?"s":""}${catLow>0?` · <span style="color:#FFD700;">⚠ ${catLow} low</span>`:""}${catOOS>0?` · <span style="color:#f66;">❌ ${catOOS} out</span>`:""}</div>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;">
-                  ${catVal>0?`<div style="text-align:right;"><div style="font-size:14px;font-weight:800;color:#4f4;">₹${catVal>=100000?(catVal/100000).toFixed(1)+"L":catVal>=1000?(catVal/1000).toFixed(1)+"k":catVal.toFixed(0)}</div><div style="font-size:10px;color:#4a5a7a;">Value</div></div>`:""}
-                  <span style="color:#7ab3ff;font-size:18px;">›</span>
-                </div>
-              </div>`;
-            }).join("");
-        body = catSearchBar + `<div style="margin-top:4px;">${catResults}</div>`;
-      } else {
+      const q = (invSearchQuery||"").trim().toLowerCase();
 
-      // ── Category pills ──
-      const catPills = `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;">
-        <button onclick="invSelectedCat='';invSearchQuery='';safeRenderTab(currentTab)"
-          style="padding:6px 14px;border-radius:20px;border:2px solid ${!invSelectedCat?'#FFD700':'#1e2a45'};background:${!invSelectedCat?'#1a1400':'transparent'};color:${!invSelectedCat?'#FFD700':'#4a5a7a'};font-size:12px;font-weight:700;cursor:pointer;font-family:'Nunito',sans-serif;">
-          All (${inventoryItems.length})
-        </button>
-        ${allCats.map(cat=>{
-          const count = inventoryItems.filter(x=>(x.category||"General")===cat).length;
-          const val = inventoryItems.filter(x=>(x.category||"General")===cat).reduce((s,x)=>s+invGetStockValue(x.name),0);
-          return `<button onclick="invCatPageName='${cat.replace(/'/g,"\\'")}';invCatPageSearch='';invView='category';safeRenderTab(currentTab)"
-            style="padding:6px 14px;border-radius:20px;border:2px solid #1e2a45;background:transparent;color:#7ab3ff;font-size:12px;font-weight:700;cursor:pointer;font-family:'Nunito',sans-serif;display:flex;align-items:center;gap:6px;">
-            <span>${cat}</span>
-            <span style="background:#1e2a45;border-radius:10px;padding:1px 7px;font-size:11px;color:#4a5a7a;">${count}</span>
-            ${val>0?`<span style="font-size:10px;color:#3a5a3a;">₹${val>=100000?(val/100000).toFixed(1)+"L":val>=1000?(val/1000).toFixed(1)+"k":val.toFixed(0)}</span>`:""}
-          </button>`;
-        }).join("")}
-      </div>`;
-
-      // ── Filter items ──
-      let filteredItems = inventoryItems;
-      if(invSearchQuery && invSearchQuery.trim()){
-        const q = invSearchQuery.trim().toLowerCase();
-        filteredItems = inventoryItems.filter(x=>x.name.toLowerCase().includes(q)||(x.category||"General").toLowerCase().includes(q));
-      } else if(invSelectedCat){
-        filteredItems = inventoryItems.filter(x=>(x.category||"General")===invSelectedCat);
-      }
-
-      // ── Category section header (when a category is selected) ──
-      let sectionHeader = "";
-      if(invSelectedCat){
-        const catVal = filteredItems.reduce((s,x)=>s+invGetStockValue(x.name),0);
-        const catOOS = filteredItems.filter(x=>invGetStock(x.name)<=0).length;
-        const catLow = filteredItems.filter(x=>invGetStock(x.name)>0&&invGetStock(x.name)<=3).length;
-        sectionHeader = `<div style="display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#0a1628,#0d1e3a);border:1px solid #1e3a5a;border-radius:14px;padding:14px 18px;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-          <div>
-            <div style="font-size:16px;font-weight:800;color:#FFD700;">${invSelectedCat}</div>
-            <div style="font-size:12px;color:#4a5a7a;margin-top:2px;">${filteredItems.length} item${filteredItems.length!==1?"s":""}${catLow>0?` · <span style="color:#FFD700;">⚠ ${catLow} low</span>`:""}${catOOS>0?` · <span style="color:#f66;">❌ ${catOOS} out</span>`:""}</div>
-          </div>
-          ${catVal>0?`<div style="text-align:right;"><div style="font-size:18px;font-weight:800;color:#4f4;">₹${catVal.toLocaleString("en-IN",{maximumFractionDigits:0})}</div><div style="font-size:11px;color:#4a5a7a;">Section Value</div></div>`:""}
-        </div>`;
-      }
-
-      // ── Item cards ──
-      const itemCards = filteredItems.length===0
-        ? `<div class="card" style="padding:28px;text-align:center;color:#4a5a7a;font-size:13px;">No items found</div>`
-        : filteredItems.map(item=>{
-          const stk = invGetStock(item.name);
-          const totalIn = (item.stock||[]).reduce((s,e)=>s+Number(e.qty),0);
-          const totalOut = (item.salesLog||[]).reduce((s,e)=>s+Number(e.qty),0);
-          const stockValue = invGetStockValue(item.name);
-          const lastAdded = (item.stock||[]).length?new Date(item.stock[item.stock.length-1].date).toLocaleDateString("en-IN",{day:"numeric",month:"short"}):"—";
-          const costEntries = (item.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);
-          const avgCost = costEntries.length?(costEntries.reduce((s,e)=>s+Number(e.costPerUnit),0)/costEntries.length).toFixed(2):0;
-          const stkColor = stk<=0?"#f66":stk<=3?"#FFD700":"#4f4";
-          const stkBg = stk<=0?"#2a0808":stk<=3?"#1a1400":"#081a08";
-          const catLabel = (item.category||"General");
-          return `<div class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}')">
-            <div style="display:flex;align-items:flex-start;gap:12px;">
-              <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
-              <div style="flex:1;min-width:0;">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-                  <div>
-                    <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${item.name}</div>
-                    ${!invSelectedCat&&!invSearchQuery?"":`<div style="font-size:10px;color:#b080ff;margin-top:1px;">🏷 ${catLabel}</div>`}
-                  </div>
-                  <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk<=0?"OUT":stk} ${item.unit||"unit"}</div>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
-                  <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;">
-                    <div style="font-size:13px;font-weight:800;color:#4f4;">+${totalIn}</div>
-                    <div style="font-size:9px;color:#4a5a7a;">Total In</div>
-                  </div>
-                  <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;">
-                    <div style="font-size:13px;font-weight:800;color:#f66;">-${totalOut}</div>
-                    <div style="font-size:9px;color:#4a5a7a;">Sold</div>
-                  </div>
-                  <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;">
-                    <div style="font-size:12px;font-weight:800;color:#7ab3ff;">${avgCost>0?"₹"+avgCost:"—"}</div>
-                    <div style="font-size:9px;color:#4a5a7a;">Avg Cost</div>
-                  </div>
-                  <div style="background:#081a08;border:1px solid #1a4a1a20;border-radius:8px;padding:7px;text-align:center;">
-                    <div style="font-size:11px;font-weight:800;color:#4f4;">${stockValue>0?"₹"+stockValue.toLocaleString("en-IN",{maximumFractionDigits:0}):"—"}</div>
-                    <div style="font-size:9px;color:#4a5a7a;">Stock Val</div>
-                  </div>
-                </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px;flex-wrap:wrap;gap:6px;">
-                  <div style="font-size:11px;color:#4a5a7a;">Restocked: ${lastAdded} · <span style="color:#4a8aff;">Tap for buyers →</span></div>
-                  <div style="display:flex;gap:5px;" onclick="event.stopPropagation()">
-                    <button onclick="invView='add';document.addEventListener('inv-rendered',function h(){var el=document.getElementById('inv-name');if(el){el.value='${item.name.replace(/'/g,"\\\\'")}';document.removeEventListener('inv-rendered',h);}});safeRenderTab(currentTab)" style="background:#1a2a4a;border:none;border-radius:7px;color:#7ab3ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">➕ Restock</button>
-                    <button onclick="invEditCategory('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a0a2a;border:none;border-radius:7px;color:#b080ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🏷 Cat</button>
-                    <button onclick="invEditUnit('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a3a;border:none;border-radius:7px;color:#aaa;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">✏️ Unit</button>
-                    <button onclick="invDeleteItem('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#2a0808;border:none;border-radius:7px;color:#f66;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🗑</button>
-                  </div>
+      if(q){
+        // ── SEARCH MODE: show only matching category cards ──
+        const matchedCats = allCats.filter(cat => cat.toLowerCase().includes(q));
+        let catResultsHtml;
+        if(matchedCats.length === 0){
+          catResultsHtml = `<div class="card" style="padding:32px;text-align:center;color:#4a5a7a;font-size:14px;">
+            <div style="font-size:32px;margin-bottom:10px;">🔍</div>
+            No categories match "<b style="color:#e8eaf0;">${invSearchQuery}</b>"
+          </div>`;
+        } else {
+          catResultsHtml = matchedCats.map(cat => {
+            const catItems = inventoryItems.filter(x=>(x.category||"General")===cat);
+            const catVal   = catItems.reduce((s,x)=>s+invGetStockValue(x.name),0);
+            const catOOS   = catItems.filter(x=>invGetStock(x.name)<=0).length;
+            const catLow   = catItems.filter(x=>invGetStock(x.name)>0&&invGetStock(x.name)<=3).length;
+            return `<div class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #FFD70030;"
+              onclick="invCatPageName='${cat.replace(/'/g,"\\'")}';invCatPageSearch='';invView='category';invSearchQuery='';safeRenderTab(currentTab)">
+              <div>
+                <div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
+                <div style="font-size:12px;color:#7a8aaa;margin-top:4px;">
+                  ${catItems.length} item${catItems.length!==1?"s":""}
+                  ${catLow>0 ? `&nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} low</span>` : ""}
+                  ${catOOS>0 ? `&nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} out</span>` : ""}
                 </div>
               </div>
+              <div style="display:flex;align-items:center;gap:12px;">
+                ${catVal>0 ? `<div style="text-align:right;">
+                  <div style="font-size:15px;font-weight:800;color:#4f4;">₹${catVal>=100000?(catVal/100000).toFixed(1)+"L":catVal>=1000?(catVal/1000).toFixed(1)+"k":catVal.toFixed(0)}</div>
+                  <div style="font-size:10px;color:#4a5a7a;">Value</div>
+                </div>` : ""}
+                <span style="color:#7ab3ff;font-size:22px;font-weight:300;">›</span>
+              </div>
+            </div>`;
+          }).join("");
+        }
+        body = searchBarHtml + catResultsHtml;
+
+      } else {
+        // ── BROWSE MODE: show all categories A-Z as cards ──
+        const catCards = allCats.map(cat => {
+          const catItems = inventoryItems.filter(x=>(x.category||"General")===cat);
+          const catVal   = catItems.reduce((s,x)=>s+invGetStockValue(x.name),0);
+          const catOOS   = catItems.filter(x=>invGetStock(x.name)<=0).length;
+          const catLow   = catItems.filter(x=>invGetStock(x.name)>0&&invGetStock(x.name)<=3).length;
+          return `<div class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
+            onclick="invCatPageName='${cat.replace(/'/g,"\\'")}';invCatPageSearch='';invView='category';safeRenderTab(currentTab)">
+            <div>
+              <div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
+              <div style="font-size:12px;color:#7a8aaa;margin-top:4px;">
+                ${catItems.length} item${catItems.length!==1?"s":""}
+                ${catLow>0?`&nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} low</span>`:""}
+                ${catOOS>0?`&nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} out</span>`:""}
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+              ${catVal>0?`<div style="text-align:right;">
+                <div style="font-size:15px;font-weight:800;color:#4f4;">₹${catVal>=100000?(catVal/100000).toFixed(1)+"L":catVal>=1000?(catVal/1000).toFixed(1)+"k":catVal.toFixed(0)}</div>
+                <div style="font-size:10px;color:#4a5a7a;">Value</div>
+              </div>`:""}
+              <span style="color:#7ab3ff;font-size:22px;font-weight:300;">›</span>
             </div>
           </div>`;
         }).join("");
 
-      body = catSearchBar + catPills + sectionHeader + `<div style="display:flex;flex-direction:column;">${itemCards}</div>`;
-      } // end else (not searching)
+        body = searchBarHtml + `<div style="display:flex;flex-direction:column;">${catCards}</div>`;
+      } // end browse mode
     }
   }
 
