@@ -2542,8 +2542,12 @@ function doLogout() {
   localStorage.removeItem("sc_auth_phone");
   localStorage.removeItem("sc_auth_uid");
   authPhone = ""; // clear in-memory phone so storageKey() resets
+  // Unsubscribe inventory real-time listener
+  if(invUnsubscribe){ try{ invUnsubscribe(); } catch(e){} invUnsubscribe=null; }
   // Reset in-memory state so next account starts clean
   customers = [];
+  inventoryItems = [];
+  invView = "stock"; invSelectedCat = ""; invSearchQuery = ""; invCatPageName = ""; invCatPageSearch = "";
   syncBinId = ""; syncApiKey = "";
   displaySettings = { showCount:10 }; // reset to safe default with correct key
   appSettings = { shopName:"ShopChampion", currency:"₹", pointsPerRupee:1, redeemRate:100, welcomeBonus:0 };
@@ -5988,29 +5992,29 @@ function loadInventory(){
 }
 
 // Called after login to pull latest from Firestore and keep in sync
+let invUnsubscribe = null; // Firestore real-time listener for inventory
+
 function loadInventoryFromFirestore(cb){
   if(!db || !authPhone){ if(cb) cb(); return; }
-  invCollection().doc("items").get()
-    .then(snap=>{
-      if(snap.exists){
+  // Cancel any previous listener
+  if(invUnsubscribe){ try{ invUnsubscribe(); } catch(e){} invUnsubscribe=null; }
+  // Real-time listener — updates inventory whenever Firestore changes (cross-device sync)
+  invUnsubscribe = invCollection().doc("items")
+    .onSnapshot(snap=>{
+      if(snap && snap.exists){
         const data = snap.data();
         if(data && Array.isArray(data.items)){
-          // Merge: Firestore wins (latest write), but only if newer or local is empty
-          const fsTime = data.updatedAt || 0;
-          try{
-            const localRaw = localStorage.getItem(invKey("items"));
-            const localTime = parseInt(localStorage.getItem(invKey("items_ts"))||"0",10);
-            if(!localRaw || fsTime >= localTime){
-              inventoryItems = data.items;
-              try{ localStorage.setItem(invKey("items"), JSON.stringify(inventoryItems)); } catch(e){}
-              try{ localStorage.setItem(invKey("items_ts"), String(fsTime)); } catch(e){}
-            }
-          } catch(e){ inventoryItems = data.items; }
+          inventoryItems = data.items;
+          try{ localStorage.setItem(invKey("items"), JSON.stringify(inventoryItems)); } catch(e){}
+          try{ localStorage.setItem(invKey("items_ts"), String(data.updatedAt||Date.now())); } catch(e){}
+          safeRenderTab(currentTab);
         }
       }
-      if(cb) cb();
-    })
-    .catch(e=>{ console.warn("Inv Firestore load error:",e); if(cb) cb(); });
+      if(cb){ cb(); cb=null; } // call once
+    }, err=>{
+      console.warn("Inv Firestore listener error:",err);
+      if(cb){ cb(); cb=null; }
+    });
 }
 
 loadInventory();
@@ -6318,14 +6322,40 @@ function renderInventoryTab(){
       </div>`;
     } else {
 
-      // ── Search bar ──
-      const searchBar = `<div style="position:relative;margin-bottom:12px;">
+      // ── Category Search bar ──
+      const catSearchBar = `<div style="position:relative;margin-bottom:12px;">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none;">🔍</span>
-        <input id="inv-search-box" class="input" placeholder="Search items..." value="${(invSearchQuery||'').replace(/"/g,'&quot;')}"
-          oninput="invSearchQuery=this.value;invSelectedCat='';safeRenderTab(currentTab)"
+        <input id="inv-search-box" class="input" placeholder="Search categories..." value="${(invSearchQuery||'').replace(/"/g,'&quot;')}"
+          oninput="invSearchQuery=this.value;safeRenderTab(currentTab)"
           style="padding-left:36px;margin-bottom:0;" />
         ${invSearchQuery?`<button onclick="invSearchQuery='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:18px;cursor:pointer;line-height:1;">×</button>`:""}
       </div>`;
+
+      // ── If searching categories, show matched category cards ──
+      if(invSearchQuery && invSearchQuery.trim()){
+        const q = invSearchQuery.trim().toLowerCase();
+        const matchedCats = allCats.filter(cat=>cat.toLowerCase().includes(q));
+        const catResults = matchedCats.length===0
+          ? `<div class="card" style="padding:28px;text-align:center;color:#4a5a7a;font-size:13px;">No categories found for "<b>${invSearchQuery}</b>"</div>`
+          : matchedCats.map(cat=>{
+              const catItemsList = inventoryItems.filter(x=>(x.category||"General")===cat);
+              const catVal = catItemsList.reduce((s,x)=>s+invGetStockValue(x.name),0);
+              const catOOS = catItemsList.filter(x=>invGetStock(x.name)<=0).length;
+              const catLow = catItemsList.filter(x=>invGetStock(x.name)>0&&invGetStock(x.name)<=3).length;
+              return `<div class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
+                onclick="invCatPageName='${cat.replace(/'/g,"\\'")}';invCatPageSearch='';invView='category';invSearchQuery='';safeRenderTab(currentTab)">
+                <div>
+                  <div style="font-size:15px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
+                  <div style="font-size:12px;color:#4a5a7a;margin-top:3px;">${catItemsList.length} item${catItemsList.length!==1?"s":""}${catLow>0?` · <span style="color:#FFD700;">⚠ ${catLow} low</span>`:""}${catOOS>0?` · <span style="color:#f66;">❌ ${catOOS} out</span>`:""}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  ${catVal>0?`<div style="text-align:right;"><div style="font-size:14px;font-weight:800;color:#4f4;">₹${catVal>=100000?(catVal/100000).toFixed(1)+"L":catVal>=1000?(catVal/1000).toFixed(1)+"k":catVal.toFixed(0)}</div><div style="font-size:10px;color:#4a5a7a;">Value</div></div>`:""}
+                  <span style="color:#7ab3ff;font-size:18px;">›</span>
+                </div>
+              </div>`;
+            }).join("");
+        body = catSearchBar + `<div style="margin-top:4px;">${catResults}</div>`;
+      } else {
 
       // ── Category pills ──
       const catPills = `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px;">
@@ -6426,7 +6456,8 @@ function renderInventoryTab(){
           </div>`;
         }).join("");
 
-      body = searchBar + catPills + sectionHeader + `<div style="display:flex;flex-direction:column;">${itemCards}</div>`;
+      body = catSearchBar + catPills + sectionHeader + `<div style="display:flex;flex-direction:column;">${itemCards}</div>`;
+      } // end else (not searching)
     }
   }
 
