@@ -1579,27 +1579,38 @@ window.addEventListener("load", () => {
   initFirebase(SC_FIREBASE_CONFIG);
   useLocalOnly = false;
   loadLicense();
-  // Check if already logged in — always verify block status online first
+// Check if already logged in — always verify block status online first
   const savedPhone = localStorage.getItem("sc_auth_phone");
   if (savedPhone && localStorage.getItem("sc_user_" + savedPhone)) {
     authPhone = savedPhone;
     // Check block status before allowing auto-login
     (async () => {
       try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 6000);
         const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(savedPhone)}&select=blocked`, {
-          headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+          headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON },
+          signal: controller.signal
         });
-        const rows = await res.json();
-        if (rows && rows.length > 0 && rows[0].blocked === true) {
-          localStorage.removeItem("sc_auth_phone");
-          document.getElementById("auth-phone").value = savedPhone;
-          const errEl = document.getElementById("auth-phone-err");
-          if (errEl) { errEl.innerHTML = "🚫 Your account has been blocked. Contact the shop owner."; errEl.style.display = "block"; }
-          authShowStep("phone");
-          return;
+        clearTimeout(timer);
+        if (res.ok) {
+          const rows = await res.json();
+          if (rows && rows.length > 0 && rows[0].blocked === true) {
+            localStorage.removeItem("sc_auth_phone");
+            document.getElementById("auth-phone").value = savedPhone;
+            const errEl = document.getElementById("auth-phone-err");
+            if (errEl) { errEl.innerHTML = "🚫 Your account has been blocked. Contact the shop owner."; errEl.style.display = "block"; }
+            authShowStep("phone");
+            return;
+          }
         }
       } catch(e) { /* network error — allow cached login */ }
-      onLoginSuccess(savedPhone);
+      try { onLoginSuccess(savedPhone); } catch(e) {
+        console.error("Auto-login failed:", e);
+        // If onLoginSuccess throws, fall back to login screen gracefully
+        localStorage.removeItem("sc_auth_phone");
+        authShowStep("phone");
+      }
     })();
   }
   // Otherwise login screen shows by default
@@ -2541,12 +2552,10 @@ function doLogout() {
   voiceSettings = { enabled:false, voiceLang:"en", voiceName:"", template:"", templateHi:"", rate:1, pitch:1, volume:1 };
   document.getElementById("main-app").style.display = "none";
   document.getElementById("login-screen").style.display = "flex";
-  // Reset OTP UI
-  document.getElementById("otp-step-1").style.display = "block";
-  document.getElementById("otp-step-2").style.display = "none";
-  document.getElementById("otp-phone").value = "";
-  document.getElementById("otp-code").value = "";
-  setTimeout(initRecaptcha, 300);
+  // Reset auth UI to phone step
+  authShowStep("phone");
+  document.getElementById("auth-phone").value = "";
+  document.getElementById("auth-phone-err").style.display = "none";
 }
 
 function updateSyncStatus(){
@@ -5582,7 +5591,10 @@ async function loadFreeTabs() {
       FREE_TABS = JSON.parse(rows[0].value);
     }
   } catch(e) { /* keep default */ }
-  try { renderTabs(); safeRenderTab(currentTab); } catch {}
+  // Only re-render if user is already logged in
+  if (localStorage.getItem("sc_auth_phone") && document.getElementById("main-app").style.display !== "none") {
+    try { renderTabs(); safeRenderTab(currentTab); } catch {}
+  }
   // Show/hide push-to-display button based on feature toggle
   const pushBtn = document.getElementById("push-btn");
   if (pushBtn) pushBtn.style.display = ""; // Push to Display always available
