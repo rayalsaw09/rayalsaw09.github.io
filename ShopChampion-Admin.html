@@ -6177,13 +6177,15 @@ function invDeductSold(soldItems, custId){
 }
 
 // Add stock entry
-function invAddStock(name, unit, qty, costPerUnit, date, notes){
+function invAddStock(name, unit, qty, costPerUnit, date, notes, category){
   let item = inventoryItems.find(x=>x.name===name);
   if(!item){
-    item = {id:autoId(), name, unit:unit||"unit", stock:[], salesLog:[]};
+    item = {id:autoId(), name, unit:unit||"unit", category:category||"General", stock:[], salesLog:[]};
     inventoryItems.push(item);
   }
   item.unit = unit||item.unit;
+  // Always update category when explicitly provided
+  if(category && category.trim()) item.category = category.trim();
   if(!item.stock) item.stock=[];
   item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes});
   saveInventory();
@@ -6386,7 +6388,9 @@ function renderInventoryTab(){
     body = `<div class="card" style="padding:22px;">
       <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:16px;">➕ Add / Restock Item</div>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Item / Product Name *</label>
-      <input class="input" id="inv-name" list="inv-existing-names" placeholder="e.g. Basmati Rice 5kg..." style="margin-bottom:12px;" />
+      <input class="input" id="inv-name" list="inv-existing-names" placeholder="e.g. Basmati Rice 5kg..."
+        oninput="(function(){var n=this.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');if(catEl&&!catEl.value)catEl.value=ex.category||'General';if(unitEl&&!unitEl.value)unitEl.value=ex.unit||'';}})()"
+        style="margin-bottom:12px;" />
       <datalist id="inv-existing-names">${inventoryItems.map(x=>`<option value="${x.name.replace(/"/g,'&quot;')}">`).join("")}</datalist>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Category</label>
       <input class="input" id="inv-category" list="inv-category-list" placeholder="e.g. Grocery, Dairy, Snacks..." style="margin-bottom:12px;" />
@@ -6561,10 +6565,7 @@ function invSubmitAdd(){
   const notes=(document.getElementById("inv-notes").value||"").trim();
   if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
-  // Save/update category on the item
-  let item = inventoryItems.find(x=>x.name===name);
-  if(item) item.category = category;
-  invAddStock(name,unit,qty,cost,date,notes);
+  invAddStock(name, unit, qty, cost, date, notes, category);
 }
 
 // ─── PURCHASE MODE MODAL ──────────────────────────────────────
