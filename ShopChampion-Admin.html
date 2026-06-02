@@ -3433,6 +3433,16 @@ async function ptSubmit(){
     }
   });
   const isInvMode = getPurchaseMode()==="inventory";
+
+  // Prevent selling more than available stock
+  for(const si of soldItems){
+    const available = invGetStock(si.name);
+    if(si.qty > available){
+      notify(`❌ Insufficient stock for ${si.name}. Available: ${available}`,'error');
+      if(submitBtn) submitBtn.disabled=false;
+      return;
+    }
+  }
   // In inventory mode, amount comes from items total
   let a;
   if(isInvMode){
@@ -6346,7 +6356,7 @@ function invGetStock(itemName){
   if(!item) return 0;
   const total = (item.stock||[]).reduce((s,e)=>s+Number(e.qty),0);
   const sold  = (item.salesLog||[]).reduce((s,e)=>s+Number(e.qty),0);
-  return total - sold;
+  return Math.max(0, total - sold);
 }
 
 // Called from ptSubmit — deduct sold items, log customer
@@ -6356,6 +6366,7 @@ function invDeductSold(soldItems, custId){
   const custName = cust ? cust.name : "";
   soldItems.forEach(({name,qty,pricePerUnit})=>{
     let item = inventoryItems.find(x=>x.name===name);
+    if(item && qty > invGetStock(name)) return;
     if(!item){ item={id:autoId(),name,unit:"unit",stock:[],salesLog:[]}; inventoryItems.push(item); }
     if(!item.salesLog) item.salesLog=[];
     item.salesLog.push({qty,date:now,custId:custId||"",custName,pricePerUnit:pricePerUnit||0});
@@ -6996,5 +7007,60 @@ window.addEventListener("load", async () => {
   }
 });
 </script>
+
+<script>
+window.__SC_NAV_STACK=[];
+window.__SC_DIRTY=false;
+
+document.addEventListener('input',()=>window.__SC_DIRTY=true,true);
+document.addEventListener('change',()=>window.__SC_DIRTY=true,true);
+
+(function(){
+ const _renderTab = window.renderTab;
+ if(typeof _renderTab==='function'){
+   window.renderTab=function(tab){
+      if(window.currentTab && window.currentTab!==tab){
+         window.__SC_NAV_STACK.push(window.currentTab);
+      }
+      return _renderTab.apply(this,arguments);
+   }
+ }
+
+ window.shopChampionBack=function(){
+    if(window.__SC_DIRTY){
+      const ok=confirm('Unsaved changes detected. Leave this screen?');
+      if(!ok) return;
+    }
+
+    if(window.__SC_NAV_STACK.length){
+      const prev=window.__SC_NAV_STACK.pop();
+      window.__SC_DIRTY=false;
+      if(typeof window.renderTab==='function'){
+        window.renderTab(prev);
+        return;
+      }
+    }
+
+    if(!window.__LAST_BACK__) {
+       window.__LAST_BACK__=Date.now();
+       alert('Press back again to exit');
+       return;
+    }
+
+    if(Date.now()-window.__LAST_BACK__ > 2000){
+       window.__LAST_BACK__=Date.now();
+       alert('Press back again to exit');
+    }
+ };
+
+ window.addEventListener('popstate', function(e){
+    window.shopChampionBack();
+    history.pushState({sc:true},'');
+ });
+
+ history.pushState({sc:true},'');
+})();
+</script>
+
 </body>
 </html>
