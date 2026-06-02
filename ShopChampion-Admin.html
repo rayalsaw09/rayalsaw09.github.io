@@ -6060,18 +6060,23 @@ function invCollection(){
   return db.collection("users").doc(authPhone||"unknown").collection("inventory_data");
 }
 
-// Save to both localStorage (instant) and Firestore (cross-device)
+// Save to Firestore (primary) + localStorage (cache)
 function saveInventory(){
   const now = Date.now();
+  // Always write to Firestore first — this is the source of truth
+  if(db && authPhone){
+    const path = `users/${authPhone}/inventory_data/items`;
+    console.log("[Inv] Saving to Firestore:", path, "items:", inventoryItems.length);
+    db.collection("users").doc(authPhone).collection("inventory_data").doc("items")
+      .set({ items: inventoryItems, updatedAt: now, phone: authPhone })
+      .then(()=> console.log("[Inv] Saved OK"))
+      .catch(e=> console.error("[Inv] Save FAILED:", e.code, e.message));
+  } else {
+    console.warn("[Inv] saveInventory called but db=",!!db,"authPhone=",authPhone);
+  }
+  // localStorage as cache for same-origin fast load
   try{ localStorage.setItem(invKey("items"), JSON.stringify(inventoryItems)); } catch(e){}
   try{ localStorage.setItem(invKey("items_ts"), String(now)); } catch(e){}
-  // Firestore: store as a single doc with all items (simple & fast for small inventories)
-  if(db && authPhone){
-    try{
-      invCollection().doc("items").set({ items: inventoryItems, updatedAt: Date.now() })
-        .catch(e=>console.warn("Inv Firestore save error:",e));
-    } catch(e){}
-  }
 }
 
 // Load from Firestore first, fallback to localStorage
@@ -6086,33 +6091,49 @@ function loadInventory(){
 let invUnsubscribe = null; // Firestore real-time listener for inventory
 
 function loadInventoryFromFirestore(cb){
-  if(!db || !authPhone){ if(cb) cb(); return; }
+  if(!db || !authPhone){ console.warn("[Inv] loadInventoryFromFirestore: db=",!!db,"authPhone=",authPhone); if(cb) cb(); return; }
   // Cancel any previous listener
   if(invUnsubscribe){ try{ invUnsubscribe(); } catch(e){} invUnsubscribe=null; }
-  // Real-time listener — updates inventory whenever Firestore changes (cross-device sync)
-  invUnsubscribe = invCollection().doc("items")
-    .onSnapshot(snap=>{
-      if(snap && snap.exists){
-        const data = snap.data();
-        if(data && Array.isArray(data.items)){
-          inventoryItems = data.items;
-          try{ localStorage.setItem(invKey("items"), JSON.stringify(inventoryItems)); } catch(e){}
-          try{ localStorage.setItem(invKey("items_ts"), String(data.updatedAt||Date.now())); } catch(e){}
-          safeRenderTab(currentTab);
-        }
-      } else {
-        // Doc doesn't exist yet (new account) — that's fine, just render empty
+
+  const docRef = db.collection("users").doc(authPhone).collection("inventory_data").doc("items");
+  console.log("[Inv] Starting listener on users/"+authPhone+"/inventory_data/items");
+
+  // First do a one-time GET for instant load, then start real-time listener
+  docRef.get().then(snap=>{
+    if(snap && snap.exists){
+      const data = snap.data();
+      if(data && Array.isArray(data.items)){
+        console.log("[Inv] Initial GET: got", data.items.length, "items");
+        inventoryItems = data.items;
+        try{ localStorage.setItem(invKey("items"), JSON.stringify(inventoryItems)); } catch(e){}
         safeRenderTab(currentTab);
       }
-      if(cb){ cb(); cb=null; } // call once on first load
-    }, err=>{
-      console.warn("Inv Firestore listener error:", err.code, err.message);
-      // If permission error, show in status bar so user knows
-      if(err.code === "permission-denied"){
-        updateDbStatus("⚠️ Inventory: check Firestore rules", "#f84");
+    } else {
+      console.log("[Inv] Initial GET: doc does not exist yet");
+    }
+    if(cb){ cb(); cb=null; }
+  }).catch(e=>{
+    console.error("[Inv] Initial GET failed:", e.code, e.message);
+    if(cb){ cb(); cb=null; }
+  });
+
+  // Real-time listener for live updates after initial load
+  invUnsubscribe = docRef.onSnapshot(snap=>{
+    if(snap && snap.exists){
+      const data = snap.data();
+      if(data && Array.isArray(data.items)){
+        console.log("[Inv] onSnapshot: got", data.items.length, "items");
+        inventoryItems = data.items;
+        try{ localStorage.setItem(invKey("items"), JSON.stringify(inventoryItems)); } catch(e){}
+        safeRenderTab(currentTab);
       }
-      if(cb){ cb(); cb=null; }
-    });
+    }
+  }, err=>{
+    console.error("[Inv] onSnapshot error:", err.code, err.message);
+    if(err.code === "permission-denied"){
+      updateDbStatus("⚠️ Inventory: Firestore permission denied — check rules", "#f84");
+    }
+  });
 }
 
 // inventoryItems starts empty — always loaded from Firestore after login
