@@ -1437,6 +1437,48 @@ function userCol() {
 function userDisplayDoc() {
   return db.collection("users").doc(authPhone || "unknown").collection("display").doc("leaderboard");
 }
+function userSettingsDoc() {
+  return db.collection("users").doc(authPhone || "unknown").collection("settings").doc("prefs");
+}
+
+// ── Cloud settings: save all user prefs to Firestore ──
+function saveSettingsToCloud(extraFields) {
+  if (!db || !authPhone) return;
+  const data = {
+    display_settings:  displaySettings,
+    app_settings:      appSettings,
+    voice_settings:    voiceSettings,
+    theme:             currentTheme,
+    lang:              currentLang,
+    purchase_mode:     getPurchaseMode(),
+    sync_data:         { binId: syncBinId, apiKey: syncApiKey },
+    updatedAt:         Date.now(),
+    ...(extraFields || {})
+  };
+  userSettingsDoc().set(data, { merge: true })
+    .catch(e => console.warn("Settings cloud save error:", e));
+}
+
+// ── Cloud settings: load all user prefs from Firestore ──
+function loadSettingsFromCloud(cb) {
+  if (!db || !authPhone) { if (cb) cb(); return; }
+  userSettingsDoc().get()
+    .then(snap => {
+      if (snap && snap.exists) {
+        const d = snap.data();
+        if (d.display_settings)  { displaySettings  = { ...displaySettings,  ...d.display_settings  }; }
+        if (d.app_settings)      { appSettings       = { ...appSettings,       ...d.app_settings      }; try { localStorage.setItem("sc_app_settings", JSON.stringify(appSettings)); } catch {} }
+        if (d.voice_settings)    { voiceSettings     = { ...voiceSettings,     ...d.voice_settings    }; }
+        if (d.theme)             { currentTheme = d.theme; applyTheme(d.theme); }
+        if (d.lang)              { currentLang  = d.lang; }
+        if (d.purchase_mode)     { try { localStorage.setItem(storageKey("purchase_mode"), d.purchase_mode); } catch {} }
+        if (d.sync_data)         { syncBinId = d.sync_data.binId || ""; syncApiKey = d.sync_data.apiKey || ""; }
+        if (d.license)           { try { localStorage.setItem(storageKey("license"), JSON.stringify(d.license)); } catch {} }
+      }
+      if (cb) cb();
+    })
+    .catch(e => { console.warn("Settings cloud load error:", e); if (cb) cb(); });
+}
 
 // ── Real-time Firestore listener ──
 function startFirestoreListener() {
@@ -1640,14 +1682,17 @@ let displaySettings = {
   fields: {name:true, userId:true, points:true, amount:true, visits:false, highestPurchase:false}
 };
 try { const ds=localStorage.getItem(storageKey("display_settings")); if(ds) displaySettings={...displaySettings,...JSON.parse(ds)}; } catch {}
-function saveDisplaySettings() { try { localStorage.setItem(storageKey("display_settings"),JSON.stringify(displaySettings)); } catch {} }
+function saveDisplaySettings() {
+  try { localStorage.setItem(storageKey("display_settings"),JSON.stringify(displaySettings)); } catch {}
+  saveSettingsToCloud();
+}
 
 let appSettings = {shopName:"Shop Champion", appIcon:""};
 try { const as=localStorage.getItem(storageKey("app_settings")); if(as) appSettings={...appSettings,...JSON.parse(as)}; } catch {}
 function saveAppSettings() {
   try { localStorage.setItem(storageKey("app_settings"),JSON.stringify(appSettings)); } catch {}
-  // Also write to global key so the Display screen always reflects the current account's settings
   try { localStorage.setItem("sc_app_settings", JSON.stringify(appSettings)); } catch {}
+  saveSettingsToCloud();
 }
 
 // ─── VOICE ANNOUNCEMENT SETTINGS ─────────────────────────────
@@ -1664,7 +1709,10 @@ let voiceSettings = {
   volume: 1.0
 };
 try { const vs=localStorage.getItem(storageKey("voice_settings")); if(vs) voiceSettings={...voiceSettings,...JSON.parse(vs)}; } catch {}
-function saveVoiceSettings() { try { localStorage.setItem(storageKey("voice_settings"),JSON.stringify(voiceSettings)); } catch {} }
+function saveVoiceSettings() {
+  try { localStorage.setItem(storageKey("voice_settings"),JSON.stringify(voiceSettings)); } catch {}
+  saveSettingsToCloud();
+}
 
 // All preset templates per language
 const VOICE_PRESETS_EN = [
@@ -2013,7 +2061,10 @@ function getSortedFiltered() {
 // ─── SYNC ─────────────────────────────────────────────────────
 let syncBinId=null, syncApiKey=null, lastSyncTime=null;
 try { const sd=localStorage.getItem(storageKey("sync_data")); if(sd){const p=JSON.parse(sd);syncBinId=p.binId;syncApiKey=p.apiKey;} } catch {}
-function saveSyncData() { try { localStorage.setItem(storageKey("sync_data"),JSON.stringify({binId:syncBinId,apiKey:syncApiKey})); } catch {} }
+function saveSyncData() {
+  try { localStorage.setItem(storageKey("sync_data"),JSON.stringify({binId:syncBinId,apiKey:syncApiKey})); } catch {}
+  saveSettingsToCloud();
+}
 
 function buildPayload() {
   const sorted=getSortedFiltered();
@@ -2488,7 +2539,7 @@ function onLoginSuccess(phone) {
   document.getElementById("login-screen").style.display = "none";
   document.getElementById("main-app").style.display = "block";
 
-  // ── Reload all per-account settings now that authPhone is set ──
+  // ── Load all per-account settings from localStorage first (fast), then cloud overwrites ──
   try { const ds=localStorage.getItem(storageKey("display_settings")); if(ds) displaySettings={...displaySettings,...JSON.parse(ds)}; } catch {}
   try { const as=localStorage.getItem(storageKey("app_settings"));     if(as) { appSettings={...appSettings,...JSON.parse(as)}; localStorage.setItem("sc_app_settings", JSON.stringify(appSettings)); } } catch {}
   try { const vs=localStorage.getItem(storageKey("voice_settings"));   if(vs) voiceSettings={...voiceSettings,...JSON.parse(vs)};     } catch {}
@@ -2505,12 +2556,14 @@ function onLoginSuccess(phone) {
   if (db && phone) {
     shopId = phone;
     startFirestoreListener();
+    loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
     loadInventoryFromFirestore(()=>{ safeRenderTab(currentTab); });
   } else if (phone) {
     shopId = phone;
     const retrySync = (attempts) => {
       if(db && authPhone){
         startFirestoreListener();
+        loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
         loadInventoryFromFirestore(()=>{ safeRenderTab(currentTab); });
       } else if(attempts > 0){
         setTimeout(()=>retrySync(attempts-1), 1000);
@@ -4903,6 +4956,7 @@ function applyTheme(t) {
   const btn = document.getElementById("theme-btn");
   if (btn) btn.textContent = t === "day" ? "🌙" : "☀️";
   localStorage.setItem(storageKey("theme"), t);
+  saveSettingsToCloud();
 }
 function toggleTheme() {
   applyTheme(currentTheme === "night" ? "day" : "night");
@@ -5144,6 +5198,7 @@ function setLanguage(lang) {
   localStorage.setItem(storageKey("lang"), lang);
   document.getElementById("lang-label").textContent = lang.toUpperCase();
   document.getElementById("lang-menu").style.display = "none";
+  saveSettingsToCloud();
   // Update header labels
   const adminEl = document.querySelector('[style*="letter-spacing:2px"]');
   if (adminEl) adminEl.textContent = t("adminPanel");
@@ -5661,6 +5716,7 @@ function saveLicense(key, plan, status) {
   licensePlan   = plan;
   licenseStatus = status;
   try { localStorage.setItem(storageKey("license"), JSON.stringify({key, plan, status})); } catch {}
+  saveSettingsToCloud({ license: {key, plan, status} });
 }
 
 // Called on every app load — re-validates key against Supabase
@@ -6144,6 +6200,7 @@ function getPurchaseMode(){
 }
 function setPurchaseMode(m){
   localStorage.setItem(storageKey("purchase_mode"),m);
+  saveSettingsToCloud();
 }
 
 function ptAddItemRow(){
