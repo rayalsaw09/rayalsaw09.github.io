@@ -15,17 +15,31 @@
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
-      // Unregister ALL old service workers to force fresh load
+      // Force update all registered SWs
       const regs = await navigator.serviceWorker.getRegistrations();
-      for (const reg of regs) {
-        const sw = reg.active || reg.waiting || reg.installing;
-        if (sw) {
-          const url = sw.scriptURL || '';
-          // If it's our sw or unknown, update it
-          await reg.update();
-        }
+      for (const reg of regs) await reg.update();
+      // Register latest SW
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      // When a new SW activates, reload the page to get fresh code
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        if(!newSW) return;
+        newSW.addEventListener('statechange', () => {
+          if(newSW.state === 'activated'){
+            // Show a non-intrusive banner instead of hard reload
+            const banner = document.createElement('div');
+            banner.innerHTML = '🔄 App updated! <button onclick="location.reload()" style="margin-left:10px;background:#FFD700;border:none;border-radius:6px;padding:4px 12px;font-weight:700;cursor:pointer;">Reload</button>';
+            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#1a2a00;color:#FFD700;text-align:center;padding:10px;font-size:13px;z-index:99999;font-family:Nunito,sans-serif;';
+            document.body.appendChild(banner);
+          }
+        });
+      });
+    });
+    // Listen for SW_UPDATED message
+    navigator.serviceWorker.addEventListener('message', e => {
+      if(e.data && e.data.type === 'SW_UPDATED'){
+        location.reload();
       }
-      navigator.serviceWorker.register('/sw.js');
     });
   }
 </script>
@@ -1435,6 +1449,10 @@ function startFirestoreListener() {
   }, err => {
     updateDbStatus("⚠️ Firebase error: " + err.message, "#f84");
   });
+  // Always start inventory listener together with customer listener
+  if(authPhone && !invUnsubscribe){
+    loadInventoryFromFirestore(null);
+  }
 }
 
 function updateDbStatus(msg, color) {
@@ -2484,20 +2502,22 @@ function onLoginSuccess(phone) {
   if (db && phone) {
     shopId = phone;
     startFirestoreListener();
-    // Load inventory from Firestore for cross-device sync
     loadInventoryFromFirestore(()=>{ safeRenderTab(currentTab); });
   } else if (phone) {
-    // db may not be ready yet (mobile/PWA) — retry after a short delay
+    // db not ready yet (common on mobile/PWA cold start) — poll until ready
     shopId = phone;
-    const retryInvSync = (attempts) => {
-      if(db){
+    const retrySync = (attempts) => {
+      if(db && authPhone){
         startFirestoreListener();
         loadInventoryFromFirestore(()=>{ safeRenderTab(currentTab); });
       } else if(attempts > 0){
-        setTimeout(()=>retryInvSync(attempts-1), 800);
+        setTimeout(()=>retrySync(attempts-1), 1000);
+      } else {
+        // Fallback: render from localStorage after all retries exhausted
+        safeRenderTab(currentTab);
       }
     };
-    setTimeout(()=>retryInvSync(5), 600);
+    setTimeout(()=>retrySync(10), 500); // try for up to ~10 seconds
   }
   // Cache user_number for Support ID display
   if (phone && !localStorage.getItem("sc_usernum_" + phone)) {
@@ -2612,7 +2632,9 @@ function safeRenderTab(i) {
   const tabContent = document.getElementById("tab-content");
   const userIsTyping = active && tabContent && tabContent.contains(active) &&
     (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
-  if (i === 6 && userIsTyping) {
+  // Exception: always allow re-render for inventory search boxes (they need it to filter)
+  const isInvSearch = active && (active.id === 'inv-search-box' || active.id === 'inv-cat-search-box');
+  if (i === 6 && userIsTyping && !isInvSearch) {
     return; // Don't re-render settings tab while user is editing any field
   }
   if (i === 2) {
@@ -6021,10 +6043,17 @@ function loadInventoryFromFirestore(cb){
           try{ localStorage.setItem(invKey("items_ts"), String(data.updatedAt||Date.now())); } catch(e){}
           safeRenderTab(currentTab);
         }
+      } else {
+        // Doc doesn't exist yet (new account) — that's fine, just render empty
+        safeRenderTab(currentTab);
       }
-      if(cb){ cb(); cb=null; } // call once
+      if(cb){ cb(); cb=null; } // call once on first load
     }, err=>{
-      console.warn("Inv Firestore listener error:",err);
+      console.warn("Inv Firestore listener error:", err.code, err.message);
+      // If permission error, show in status bar so user knows
+      if(err.code === "permission-denied"){
+        updateDbStatus("⚠️ Inventory: check Firestore rules", "#f84");
+      }
       if(cb){ cb(); cb=null; }
     });
 }
@@ -6338,7 +6367,7 @@ function renderInventoryTab(){
       const searchBarHtml = `<div style="position:relative;margin-bottom:14px;">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none;">🔍</span>
         <input id="inv-search-box" class="input" placeholder="Search categories..." value="${(invSearchQuery||'').replace(/"/g,'&quot;')}"
-          oninput="invSearchQuery=this.value;safeRenderTab(currentTab)"
+          oninput="invSearchQuery=this.value;safeRenderTab(currentTab);var el=document.getElementById('inv-search-box');if(el){var v=el.value;el.focus();el.setSelectionRange(v.length,v.length);}"
           style="padding-left:36px;margin-bottom:0;" />
         ${invSearchQuery ? `<button onclick="invSearchQuery='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:20px;cursor:pointer;line-height:1;">×</button>` : ""}
       </div>`;
@@ -6417,7 +6446,10 @@ function renderInventoryTab(){
   return `<div style="padding:16px 14px;max-width:600px;margin:0 auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
       <div style="font-size:18px;font-weight:800;color:#FFD700;">📦 Inventory</div>
-      ${invView==="stock"?`<button onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;">➕ Add Stock</button>`:""}
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button onclick="if(db&&authPhone){if(invUnsubscribe){try{invUnsubscribe();}catch(e){}}invUnsubscribe=null;loadInventoryFromFirestore(()=>{safeRenderTab(currentTab);});}" title="Sync from cloud" style="background:#0a1628;border:1px solid #1e3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 10px;font-size:14px;">🔄</button>
+        ${invView==="stock"?`<button onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;">➕ Add Stock</button>`:""}
+      </div>
     </div>
     ${nav}
     ${invView==="stock"?summary:""}
@@ -6551,7 +6583,7 @@ function renderInventoryCategoryPage(catName){
     <!-- Search -->
     <div style="position:relative;margin-bottom:14px;">
       <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;">🔍</span>
-      <input class="input" placeholder="Search in ${catName}..." value="${(invCatPageSearch||"").replace(/"/g,"&quot;")}"
+      <input id="inv-cat-search-box" class="input" placeholder="Search in ${catName}..." value="${(invCatPageSearch||"").replace(/"/g,"&quot;")}"
         oninput="invCatPageSearch=this.value;safeRenderTab(currentTab)"
         style="padding-left:36px;margin-bottom:0;" />
       ${invCatPageSearch?`<button onclick="invCatPageSearch='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:18px;cursor:pointer;line-height:1;">×</button>`:""}
