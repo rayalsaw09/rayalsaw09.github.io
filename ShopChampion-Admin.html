@@ -2499,12 +2499,14 @@ function onLoginSuccess(phone) {
   try { localStorage.setItem(storageKey("fb_config"), JSON.stringify(SC_FIREBASE_CONFIG)); } catch {}
   if (!db) { try { initFirebase(SC_FIREBASE_CONFIG); } catch {} }
 
+  // Load from localStorage first (fast render on same-origin), then Firestore overwrites
+  loadInventory();
+
   if (db && phone) {
     shopId = phone;
     startFirestoreListener();
     loadInventoryFromFirestore(()=>{ safeRenderTab(currentTab); });
   } else if (phone) {
-    // db not ready yet (common on mobile/PWA cold start) — poll until ready
     shopId = phone;
     const retrySync = (attempts) => {
       if(db && authPhone){
@@ -2513,11 +2515,10 @@ function onLoginSuccess(phone) {
       } else if(attempts > 0){
         setTimeout(()=>retrySync(attempts-1), 1000);
       } else {
-        // Fallback: render from localStorage after all retries exhausted
         safeRenderTab(currentTab);
       }
     };
-    setTimeout(()=>retrySync(10), 500); // try for up to ~10 seconds
+    setTimeout(()=>retrySync(10), 500);
   }
   // Cache user_number for Support ID display
   if (phone && !localStorage.getItem("sc_usernum_" + phone)) {
@@ -6058,7 +6059,8 @@ function loadInventoryFromFirestore(cb){
     });
 }
 
-loadInventory();
+// inventoryItems starts empty — always loaded from Firestore after login
+// loadInventory() from localStorage is only used as a fast initial render on same-origin
 
 // Current stock for an item = sum of stock entries qty - sold qty
 function invGetStock(itemName){
