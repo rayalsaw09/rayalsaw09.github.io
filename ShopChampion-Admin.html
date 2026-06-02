@@ -7062,5 +7062,38 @@ document.addEventListener('change',()=>window.__SC_DIRTY=true,true);
 })();
 </script>
 
+
+<script>
+(function(){
+if(window.__REALNAVFIX)return;window.__REALNAVFIX=true;
+window.__tabHistory=[];
+const origSwitch=window.switchTab;
+setTimeout(function(){
+ if(typeof window.switchTab==='function'){
+   const old=window.switchTab;
+   window.switchTab=function(i){
+      if(window.currentTab!==i){window.__tabHistory.push(window.currentTab);}
+      return old.apply(this,arguments);
+   };
+ }
+ let last=0;
+ function doBack(){
+   if(window.__tabHistory && window.__tabHistory.length){
+      const prev=window.__tabHistory.pop();
+      if(typeof window.switchTab==='function'){ window.switchTab(prev); }
+      return;
+   }
+   const now=Date.now();
+   if(now-last<2000){ return; }
+   last=now;
+   alert('Press back again to exit');
+   history.pushState({hold:true},'');
+ }
+ window.addEventListener('popstate',doBack);
+ history.pushState({hold:true},'');
+ window.shopChampionBack=doBack;
+},1000);
+})();
+</script>
 </body>
 </html>
