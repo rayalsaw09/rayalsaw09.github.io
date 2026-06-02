@@ -2557,14 +2557,27 @@ function onLoginSuccess(phone) {
     shopId = phone;
     startFirestoreListener();
     loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
-    loadInventoryFromFirestore(()=>{ safeRenderTab(currentTab); });
+    // Check Firestore — if doc doesn't exist but we have local data, push it up (first-time migration)
+    loadInventoryFromFirestore((docExists)=>{
+      if(!docExists && inventoryItems.length > 0){
+        console.log("[Inv] Migrating", inventoryItems.length, "items from localStorage to Firestore");
+        saveInventory();
+      }
+      safeRenderTab(currentTab);
+    });
   } else if (phone) {
     shopId = phone;
     const retrySync = (attempts) => {
       if(db && authPhone){
         startFirestoreListener();
         loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
-        loadInventoryFromFirestore(()=>{ safeRenderTab(currentTab); });
+        loadInventoryFromFirestore((docExists)=>{
+          if(!docExists && inventoryItems.length > 0){
+            console.log("[Inv] Migrating", inventoryItems.length, "items from localStorage to Firestore");
+            saveInventory();
+          }
+          safeRenderTab(currentTab);
+        });
       } else if(attempts > 0){
         setTimeout(()=>retrySync(attempts-1), 1000);
       } else {
@@ -6100,7 +6113,8 @@ function loadInventoryFromFirestore(cb){
 
   // First do a one-time GET for instant load, then start real-time listener
   docRef.get().then(snap=>{
-    if(snap && snap.exists){
+    const docExists = snap && snap.exists;
+    if(docExists){
       const data = snap.data();
       if(data && Array.isArray(data.items)){
         console.log("[Inv] Initial GET: got", data.items.length, "items");
@@ -6111,10 +6125,10 @@ function loadInventoryFromFirestore(cb){
     } else {
       console.log("[Inv] Initial GET: doc does not exist yet");
     }
-    if(cb){ cb(); cb=null; }
+    if(cb){ cb(docExists); cb=null; }
   }).catch(e=>{
     console.error("[Inv] Initial GET failed:", e.code, e.message);
-    if(cb){ cb(); cb=null; }
+    if(cb){ cb(false); cb=null; }
   });
 
   // Real-time listener for live updates after initial load
