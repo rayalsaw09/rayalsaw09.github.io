@@ -2765,10 +2765,11 @@ function safeRenderTab(i) {
                       <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${item.name}</div>
                       <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk <= 0 ? 'OUT' : stk} ${item.unit || 'unit'}</div>
                     </div>
-                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
                       <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:13px;font-weight:800;color:#4f4;">+${totalIn}</div><div style="font-size:9px;color:#4a5a7a;">Total In</div></div>
                       <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:13px;font-weight:800;color:#f66;">-${totalOut}</div><div style="font-size:9px;color:#4a5a7a;">Sold</div></div>
                       <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:12px;font-weight:800;color:#7ab3ff;">${avgCost > 0 ? '₹' + avgCost : '—'}</div><div style="font-size:9px;color:#4a5a7a;">Avg Cost</div></div>
+                      <div style="background:#081a08;border:1px solid #FFD70030;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:11px;font-weight:800;color:#FFD700;">${item.sellingPrice>0?'₹'+Number(item.sellingPrice).toFixed(2):'—'}</div><div style="font-size:9px;color:#4a5a7a;">Sell Price</div></div>
                       <div style="background:#081a08;border:1px solid #1a4a1a20;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:11px;font-weight:800;color:#4f4;">${stockValue > 0 ? '₹' + stockValue.toLocaleString('en-IN', {maximumFractionDigits:0}) : '—'}</div><div style="font-size:9px;color:#4a5a7a;">Stock Val</div></div>
                     </div>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px;flex-wrap:wrap;gap:6px;">
@@ -2827,7 +2828,7 @@ function renderTab(i){
   el.style.position="";el.style.overflow="";
   if(i===0)el.innerHTML=renderLeaderboard(getSortedFiltered());
   else if(i===1){const q=document.getElementById("cust-search")?.value||"";el.innerHTML=renderCustomers(s,q);}
-  else if(i===2)el.innerHTML=renderPurchaseTab(s);
+  else if(i===2){el.innerHTML=renderPurchaseTab(s);if(getPurchaseMode()==="inventory"){const list=document.getElementById("pt-items-list");if(list&&list.children.length===0)ptAddItemRow();}}
   else if(i===3)el.innerHTML=renderAnalytics(s);
   else if(i===4)el.innerHTML=renderCompare();
   else if(i===5)el.innerHTML=renderFestivals(s);
@@ -6375,7 +6376,7 @@ function invDeductSold(soldItems, custId){
 }
 
 // Add stock entry
-function invAddStock(name, unit, qty, costPerUnit, date, notes, category){
+function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice){
   let item = inventoryItems.find(x=>x.name===name);
   if(!item){
     item = {id:autoId(), name, unit:unit||"unit", category:category||"General", stock:[], salesLog:[]};
@@ -6384,6 +6385,8 @@ function invAddStock(name, unit, qty, costPerUnit, date, notes, category){
   item.unit = unit||item.unit;
   // Always update category when explicitly provided
   if(category && category.trim()) item.category = category.trim();
+  // Save/update selling price if provided
+  if(sellingPrice && Number(sellingPrice)>0) item.sellingPrice = Number(sellingPrice);
   if(!item.stock) item.stock=[];
   item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes});
   saveInventory();
@@ -6406,6 +6409,16 @@ function invEditUnit(name){
   if(!item) return;
   const nu = prompt("Unit for "+name+" (e.g. kg, pcs, litre):", item.unit||"unit");
   if(nu!==null){ item.unit=nu.trim()||"unit"; saveInventory(); safeRenderTab(currentTab); }
+}
+
+function invEditSellPrice(name){
+  const item = inventoryItems.find(x=>x.name===name);
+  if(!item) return;
+  const cur = item.sellingPrice>0 ? Number(item.sellingPrice).toFixed(2) : "";
+  const np = prompt("Selling Price per "+( item.unit||"unit")+" for "+name+" (₹):", cur);
+  if(np===null) return;
+  const val = parseFloat(np);
+  if(!isNaN(val) && val>=0){ item.sellingPrice=val; saveInventory(); notify("✅ Selling price updated for "+name); safeRenderTab(currentTab); }
 }
 
 function invEditCategory(name){
@@ -6521,12 +6534,17 @@ function ptShowItemStock(input){
     const item = inventoryItems.find(x=>x.name===name);
     hint.textContent = "📦 Current stock: "+stock+" "+(item.unit||"unit");
     hint.style.color = stock<=0?"#f66":stock<=5?"#FFD700":"#4f4";
-    // Auto-fill price from last sell price if price field is empty
+    // Auto-fill price from saved selling price, then fall back to last sale price
     const priceEl = row.querySelector(".pt-item-price");
     if(priceEl && !priceEl.value){
-      const logs = (item.salesLog||[]).filter(e=>Number(e.pricePerUnit||0)>0);
-      const lastPrice = logs.length ? Number(logs[logs.length-1].pricePerUnit) : 0;
-      if(lastPrice>0){ priceEl.value=lastPrice.toFixed(2); ptUpdateTotal(); }
+      let autoPrice = 0;
+      if(item.sellingPrice && Number(item.sellingPrice)>0){
+        autoPrice = Number(item.sellingPrice);
+      } else {
+        const logs = (item.salesLog||[]).filter(e=>Number(e.pricePerUnit||0)>0);
+        if(logs.length) autoPrice = Number(logs[logs.length-1].pricePerUnit);
+      }
+      if(autoPrice>0){ priceEl.value=autoPrice.toFixed(2); ptUpdateTotal(); }
     }
   } else {
     hint.textContent = name?"⚠️ Not in inventory — will be created on save":"";
@@ -6617,9 +6635,13 @@ function renderInventoryTab(){
           <input class="input" type="number" id="inv-cost" min="0" step="0.01" placeholder="0.00" />
         </div>
         <div>
-          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Date</label>
-          <input class="input" type="date" id="inv-date" value="${new Date().toISOString().slice(0,10)}" />
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Selling Price / Unit (₹) <span style="color:#4f4;font-size:10px;">★ auto-fill</span></label>
+          <input class="input" type="number" id="inv-sell-price" min="0" step="0.01" placeholder="0.00" style="color:#FFD700;" />
         </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Date</label>
+        <input class="input" type="date" id="inv-date" value="${new Date().toISOString().slice(0,10)}" />
       </div>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Notes (optional)</label>
       <input class="input" id="inv-notes" placeholder="Supplier, batch info..." style="margin-bottom:18px;" />
@@ -6766,11 +6788,12 @@ function invSubmitAdd(){
   const qty=parseFloat(document.getElementById("inv-qty").value||"0");
   const unit=(document.getElementById("inv-unit").value||"").trim();
   const cost=parseFloat(document.getElementById("inv-cost").value||"0");
+  const sellPrice=parseFloat(document.getElementById("inv-sell-price").value||"0");
   const date=document.getElementById("inv-date").value||new Date().toISOString().slice(0,10);
   const notes=(document.getElementById("inv-notes").value||"").trim();
   if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
-  invAddStock(name, unit, qty, cost, date, notes, category);
+  invAddStock(name, unit, qty, cost, date, notes, category, sellPrice);
 }
 
 // ─── PURCHASE MODE MODAL ──────────────────────────────────────
@@ -6850,6 +6873,10 @@ function renderInventoryCategoryPage(catName){
                   <div style="font-size:12px;font-weight:800;color:#7ab3ff;">${avgCost>0?"₹"+avgCost:"—"}</div>
                   <div style="font-size:9px;color:#4a5a7a;">Avg Cost</div>
                 </div>
+                <div style="background:#081a08;border:1px solid #1a4a1a20;border-radius:8px;padding:7px;text-align:center;" onclick="invEditSellPrice('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()">
+                  <div style="font-size:12px;font-weight:800;color:#FFD700;">${item.sellingPrice>0?"₹"+Number(item.sellingPrice).toFixed(2):"Set ✏️"}</div>
+                  <div style="font-size:9px;color:#4a5a7a;">Sell Price</div>
+                </div>
                 <div style="background:#081a08;border:1px solid #1a4a1a20;border-radius:8px;padding:7px;text-align:center;">
                   <div style="font-size:11px;font-weight:800;color:#4f4;">${stockValue>0?"₹"+stockValue.toLocaleString("en-IN",{maximumFractionDigits:0}):"—"}</div>
                   <div style="font-size:9px;color:#4a5a7a;">Stock Val</div>
@@ -6859,6 +6886,7 @@ function renderInventoryCategoryPage(catName){
                 <div style="font-size:11px;color:#4a5a7a;">Restocked: ${lastAdded} · <span style="color:#4a8aff;">Tap for buyers →</span></div>
                 <div style="display:flex;gap:5px;" onclick="event.stopPropagation()">
                   <button onclick="invView='add';document.addEventListener('inv-rendered',function h(){var el=document.getElementById('inv-name');if(el){el.value='${item.name.replace(/'/g,"\\\\'")}';document.removeEventListener('inv-rendered',h);}});safeRenderTab(currentTab)" style="background:#1a2a4a;border:none;border-radius:7px;color:#7ab3ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">➕ Restock</button>
+                  <button onclick="invEditSellPrice('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a08;border:none;border-radius:7px;color:#FFD700;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">₹ Sell Price</button>
                   <button onclick="invEditCategory('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a0a2a;border:none;border-radius:7px;color:#b080ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🏷 Cat</button>
                   <button onclick="invEditUnit('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a3a;border:none;border-radius:7px;color:#aaa;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">✏️ Unit</button>
                   <button onclick="invDeleteItem('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#2a0808;border:none;border-radius:7px;color:#f66;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🗑</button>
@@ -6938,7 +6966,7 @@ function renderInventoryItemDetail(itemName){
     </div>
 
     <!-- Item summary bar -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
       <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;text-align:center;">
         <div style="font-size:16px;font-weight:800;color:${stkColor};">${stk<=0?"OUT":stk}</div>
         <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">${unit} left</div>
@@ -6950,6 +6978,10 @@ function renderInventoryItemDetail(itemName){
       <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;text-align:center;">
         <div style="font-size:16px;font-weight:800;color:#4a8aff;">${custs.length}</div>
         <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Customers</div>
+      </div>
+      <div style="background:#081a08;border:1px solid #FFD70030;border-radius:10px;padding:10px;text-align:center;cursor:pointer;" onclick="invEditSellPrice('${itemName.replace(/'/g,"\\'")}');safeRenderTab(currentTab)">
+        <div style="font-size:13px;font-weight:800;color:#FFD700;">${item.sellingPrice>0?"₹"+Number(item.sellingPrice).toFixed(2):"Set ✏️"}</div>
+        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Sell Price</div>
       </div>
       <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;text-align:center;">
         <div style="font-size:13px;font-weight:800;color:#4f4;">${totalRevenue>0?"₹"+totalRevenue.toLocaleString("en-IN"):"—"}</div>
@@ -7062,38 +7094,5 @@ document.addEventListener('change',()=>window.__SC_DIRTY=true,true);
 })();
 </script>
 
-
-<script>
-(function(){
-if(window.__REALNAVFIX)return;window.__REALNAVFIX=true;
-window.__tabHistory=[];
-const origSwitch=window.switchTab;
-setTimeout(function(){
- if(typeof window.switchTab==='function'){
-   const old=window.switchTab;
-   window.switchTab=function(i){
-      if(window.currentTab!==i){window.__tabHistory.push(window.currentTab);}
-      return old.apply(this,arguments);
-   };
- }
- let last=0;
- function doBack(){
-   if(window.__tabHistory && window.__tabHistory.length){
-      const prev=window.__tabHistory.pop();
-      if(typeof window.switchTab==='function'){ window.switchTab(prev); }
-      return;
-   }
-   const now=Date.now();
-   if(now-last<2000){ return; }
-   last=now;
-   alert('Press back again to exit');
-   history.pushState({hold:true},'');
- }
- window.addEventListener('popstate',doBack);
- history.pushState({hold:true},'');
- window.shopChampionBack=doBack;
-},1000);
-})();
-</script>
 </body>
 </html>
