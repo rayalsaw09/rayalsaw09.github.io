@@ -1359,7 +1359,6 @@ function ptSaveState() {
   window._ptState.notes = get("pt-notes");
   if (window._ptState.dateMode==="manual" && window._ptManualOpen) window._ptState.manualDate = get("pt-date");
   window._ptState.bwAmt  = get("bw-amt");
-  window._ptState.bwItem = get("bw-item");
   window._ptState.bwDate = get("bw-date");
   window._ptState.bwDue  = get("bw-due");
 }
@@ -1405,7 +1404,6 @@ function ptRestoreState() {
   }
   // Restore borrow form
   set("bw-amt",  window._ptState.bwAmt);
-  set("bw-item", window._ptState.bwItem);
   set("bw-date", window._ptState.bwDate);
   set("bw-due",  window._ptState.bwDue);
   if (window._ptState.bwSelId) {
@@ -2672,7 +2670,7 @@ function updateSyncStatus(){
 const _TAB2_FIELD_IDS = [
   "pt-search","pt-sel","pt-amt","pt-bill","pt-notes","pt-date","pt-date-val",
   "bpt-search","bpt-sel","bpt-amounts","bpt-date","bpt-notes",
-  "bw-search","bw-sel","bw-amt","bw-item","bw-date","bw-due"
+  "bw-search","bw-sel","bw-amt","bw-date","bw-due"
 ];
 
 function _tab2SaveFields() {
@@ -2699,8 +2697,91 @@ function safeRenderTab(i) {
   const tabContent = document.getElementById("tab-content");
   const userIsTyping = active && tabContent && tabContent.contains(active) &&
     (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
-  // Exception: always allow re-render for inventory search boxes (they need it to filter)
+  // Exception: partial re-render for inventory search boxes (they need to filter without losing focus)
   const isInvSearch = active && (active.id === 'inv-search-box' || active.id === 'inv-cat-search-box');
+  if (i === 6 && isInvSearch) {
+    // Only re-render the results portion, not the whole tab, so the input keeps focus
+    if (active.id === 'inv-search-box') {
+      const q = (invSearchQuery || '').trim().toLowerCase();
+      const allCats = [...new Set(inventoryItems.map(x => x.category || 'General'))].sort();
+      const resultsEl = document.getElementById('inv-search-results');
+      if (resultsEl) {
+        if (q) {
+          const matchedCats = allCats.filter(cat => cat.toLowerCase().includes(q));
+          if (matchedCats.length === 0) {
+            resultsEl.innerHTML = `<div class="card" style="padding:32px;text-align:center;color:#4a5a7a;font-size:14px;"><div style="font-size:32px;margin-bottom:10px;">🔍</div>No categories match "<b style="color:#e8eaf0;">${invSearchQuery}</b>"</div>`;
+          } else {
+            resultsEl.innerHTML = matchedCats.map(cat => {
+              const catItems = inventoryItems.filter(x => (x.category || 'General') === cat);
+              const catVal = catItems.reduce((s, x) => s + invGetStockValue(x.name), 0);
+              const catOOS = catItems.filter(x => invGetStock(x.name) <= 0).length;
+              const catLow = catItems.filter(x => invGetStock(x.name) > 0 && invGetStock(x.name) <= 3).length;
+              return `<div class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #FFD70030;"
+                onclick="invCatPageName='${cat.replace(/'/g, "\\'")}';invCatPageSearch='';invView='category';invSearchQuery='';safeRenderTab(currentTab)">
+                <div><div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
+                <div style="font-size:12px;color:#7a8aaa;margin-top:4px;">${catItems.length} item${catItems.length !== 1 ? 's' : ''}${catLow > 0 ? ` &nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} low</span>` : ''}${catOOS > 0 ? ` &nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} out</span>` : ''}</div></div>
+                <div style="display:flex;align-items:center;gap:12px;">${catVal > 0 ? `<div style="text-align:right;"><div style="font-size:15px;font-weight:800;color:#4f4;">₹${catVal >= 100000 ? (catVal / 100000).toFixed(1) + 'L' : catVal >= 1000 ? (catVal / 1000).toFixed(1) + 'k' : catVal.toFixed(0)}</div><div style="font-size:10px;color:#4a5a7a;">Value</div></div>` : ''}<span style="color:#7ab3ff;font-size:22px;font-weight:300;">›</span></div>
+              </div>`;
+            }).join('');
+          }
+        } else {
+          resultsEl.innerHTML = allCats.map(cat => {
+            const catItems = inventoryItems.filter(x => (x.category || 'General') === cat);
+            const catVal = catItems.reduce((s, x) => s + invGetStockValue(x.name), 0);
+            const catOOS = catItems.filter(x => invGetStock(x.name) <= 0).length;
+            const catLow = catItems.filter(x => invGetStock(x.name) > 0 && invGetStock(x.name) <= 3).length;
+            return `<div class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
+              onclick="invCatPageName='${cat.replace(/'/g, "\\'")}';invCatPageSearch='';invView='category';safeRenderTab(currentTab)">
+              <div><div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
+              <div style="font-size:12px;color:#7a8aaa;margin-top:4px;">${catItems.length} item${catItems.length !== 1 ? 's' : ''}${catLow > 0 ? `&nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} low</span>` : ''}${catOOS > 0 ? `&nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} out</span>` : ''}</div></div>
+              <div style="display:flex;align-items:center;gap:12px;">${catVal > 0 ? `<div style="text-align:right;"><div style="font-size:15px;font-weight:800;color:#4f4;">₹${catVal >= 100000 ? (catVal / 100000).toFixed(1) + 'L' : catVal >= 1000 ? (catVal / 1000).toFixed(1) + 'k' : catVal.toFixed(0)}</div><div style="font-size:10px;color:#4a5a7a;">Value</div></div>` : ''}<span style="color:#7ab3ff;font-size:22px;font-weight:300;">›</span></div>
+            </div>`;
+          }).join('');
+        }
+      }
+    } else if (active.id === 'inv-cat-search-box') {
+      const q = (invCatPageSearch || '').trim().toLowerCase();
+      const catItems = inventoryItems.filter(x => (x.category || 'General') === invCatPageName);
+      const filtered = q ? catItems.filter(x => x.name.toLowerCase().includes(q)) : catItems;
+      const resultsEl = document.getElementById('inv-cat-search-results');
+      if (resultsEl) {
+        resultsEl.innerHTML = filtered.length === 0
+          ? `<div class="card" style="padding:28px;text-align:center;color:#4a5a7a;font-size:13px;">No items found${q ? ' for "' + q + '"' : ''}</div>`
+          : filtered.map(item => {
+              const stk = invGetStock(item.name);
+              const stkColor = stk <= 0 ? '#f66' : stk <= 3 ? '#FFD700' : '#4f4';
+              const stkBg = stk <= 0 ? '#2a0808' : stk <= 3 ? '#1a1400' : '#081a08';
+              const totalIn = (item.stock || []).reduce((s, e) => s + Number(e.qty), 0);
+              const totalOut = (item.salesLog || []).reduce((s, e) => s + Number(e.qty), 0);
+              const stockValue = invGetStockValue(item.name);
+              const lastAdded = (item.stock || []).length ? new Date(item.stock[item.stock.length - 1].date).toLocaleDateString('en-IN', {day:'numeric',month:'short'}) : '—';
+              const costEntries = (item.stock || []).filter(e => Number(e.costPerUnit || 0) > 0);
+              const avgCost = costEntries.length ? (costEntries.reduce((s, e) => s + Number(e.costPerUnit), 0) / costEntries.length).toFixed(2) : 0;
+              return `<div class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${item.name.replace(/'/g, "\\'")}')">
+                <div style="display:flex;align-items:flex-start;gap:12px;">
+                  <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
+                  <div style="flex:1;min-width:0;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                      <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${item.name}</div>
+                      <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk <= 0 ? 'OUT' : stk} ${item.unit || 'unit'}</div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
+                      <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:13px;font-weight:800;color:#4f4;">+${totalIn}</div><div style="font-size:9px;color:#4a5a7a;">Total In</div></div>
+                      <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:13px;font-weight:800;color:#f66;">-${totalOut}</div><div style="font-size:9px;color:#4a5a7a;">Sold</div></div>
+                      <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:12px;font-weight:800;color:#7ab3ff;">${avgCost > 0 ? '₹' + avgCost : '—'}</div><div style="font-size:9px;color:#4a5a7a;">Avg Cost</div></div>
+                      <div style="background:#081a08;border:1px solid #1a4a1a20;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:11px;font-weight:800;color:#4f4;">${stockValue > 0 ? '₹' + stockValue.toLocaleString('en-IN', {maximumFractionDigits:0}) : '—'}</div><div style="font-size:9px;color:#4a5a7a;">Stock Val</div></div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px;flex-wrap:wrap;gap:6px;">
+                      <div style="font-size:11px;color:#4a5a7a;">Restocked: ${lastAdded} · <span style="color:#4a8aff;">Tap for buyers →</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>`;
+            }).join('');
+      }
+    }
+    return;
+  }
   if (i === 6 && userIsTyping && !isInvSearch) {
     return; // Don't re-render settings tab while user is editing any field
   }
@@ -3082,6 +3163,8 @@ function renderPurchaseTab(sorted){
       <button class="btn" id="pt-sub" onclick="ptSubmit()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">Add Purchase →</button>
     </div>`;
 
+  const bwInvNames = inventoryItems.map(x=>x.name);
+  const bwDataList = bwInvNames.length ? `<datalist id="bw-inv-names">${bwInvNames.map(n=>`<option value="${n.replace(/"/g,'&quot;')}">`).join('')}</datalist>` : '';
   const borrowForm = `
     <div class="card" style="padding:24px;margin-bottom:16px;">
       <div style="font-size:13px;font-weight:700;color:#f84;margin-bottom:16px;">📋 Record a new borrow</div>
@@ -3090,11 +3173,13 @@ function renderPurchaseTab(sorted){
       <div id="bw-dropdown" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;max-height:200px;overflow-y:auto;margin-bottom:10px;"></div>
       <div id="bw-prev" style="display:none;background:#0a0e1a;border-radius:10px;padding:12px;margin-bottom:14px;"></div>
       <input type="hidden" id="bw-sel" />
-      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Amount Borrowed (₹)</label>
-      <input class="input" type="number" id="bw-amt" placeholder="0.00" style="margin-bottom:14px;font-size:18px;font-weight:700;" />
-      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Item / Description</label>
-      <input class="input" id="bw-item" list="bw-item-list" placeholder="e.g. Rice 5kg, Cooking oil..." style="margin-bottom:14px;" />
-      <datalist id="bw-item-list">${inventoryItems.map(x=>`<option value="${x.name.replace(/"/g,'&quot;')}">`).join("")}</datalist>
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">🛒 Items Borrowed</label>
+      ${bwDataList}
+      <div id="bw-items-list" style="margin-bottom:6px;"></div>
+      <button type="button" onclick="bwAddItemRow()" style="width:100%;padding:9px;border-radius:10px;border:1px dashed #3a2a10;background:transparent;color:#f84;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:14px;">➕ Add Item</button>
+      <div id="bw-inv-total" style="display:none;background:#1a0a00;border:1px solid #3a1a00;border-radius:10px;padding:12px 16px;margin-bottom:14px;text-align:right;"></div>
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Amount Borrowed (₹) <span style="color:#f84;font-size:10px;">← auto-filled from items above</span></label>
+      <input class="input" type="number" id="bw-amt" placeholder="0.00" style="margin-bottom:14px;font-size:18px;font-weight:700;" oninput="bwUpdateTotal()" />
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
         <div><label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Date</label><input class="input" type="date" id="bw-date" value="${new Date().toISOString().slice(0,10)}" /></div>
         <div><label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Due Date (optional)</label><input class="input" type="date" id="bw-due" /></div>
@@ -3491,33 +3576,134 @@ function bwClearCustomer(){
   document.getElementById("bw-dropdown").style.display="none";
 }
 
+function bwGetLastSellPrice(itemName){
+  // Returns the most recent sell price from salesLog, or avg cost as fallback
+  const item = inventoryItems.find(x=>x.name===itemName);
+  if(!item) return 0;
+  const logs = (item.salesLog||[]).filter(e=>Number(e.pricePerUnit||0)>0);
+  if(logs.length) return Number(logs[logs.length-1].pricePerUnit);
+  // Fallback: avg cost
+  const entries = (item.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);
+  if(entries.length) return entries.reduce((s,e)=>s+Number(e.costPerUnit),0)/entries.length;
+  return 0;
+}
+
+function bwAddItemRow(){
+  const list = document.getElementById('bw-items-list');
+  if(!list) return;
+  const div = document.createElement('div');
+  div.className = 'bw-item-row';
+  div.style.cssText = 'margin-bottom:10px;background:#0a0e1a;border:1px solid #2a1a08;border-radius:10px;padding:10px;';
+  div.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 32px;gap:6px;margin-bottom:6px;align-items:center;">
+      <input class="input bw-row-name" list="bw-inv-names" placeholder="Search item..." style="padding:9px 11px;font-size:13px;"
+        oninput="bwShowItemStock(this);bwUpdateTotal()" onchange="bwShowItemStock(this);bwUpdateTotal()" />
+      <button onclick="this.closest('.bw-item-row').remove();bwUpdateTotal()" style="background:#3a1a1a;border:none;border-radius:8px;color:#f66;cursor:pointer;height:36px;width:32px;font-size:16px;">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+      <div>
+        <label style="font-size:10px;color:#7a8aaa;display:block;margin-bottom:3px;">Quantity</label>
+        <input class="input bw-row-qty" type="number" min="0.01" step="0.01" placeholder="0"
+          style="padding:9px;font-size:14px;text-align:center;font-weight:700;" oninput="bwUpdateTotal()" />
+      </div>
+      <div>
+        <label style="font-size:10px;color:#7a8aaa;display:block;margin-bottom:3px;">Price / Unit (₹)</label>
+        <input class="input bw-row-price" type="number" min="0" step="0.01" placeholder="0.00"
+          style="padding:9px;font-size:14px;text-align:center;font-weight:700;color:#f84;" oninput="bwUpdateTotal()" />
+      </div>
+    </div>
+    <div class="bw-stock-hint" style="font-size:11px;color:#4a8aff;margin-top:4px;padding-left:2px;"></div>
+    <div class="bw-line-total" style="font-size:12px;color:#f84;text-align:right;margin-top:4px;font-weight:700;display:none;"></div>
+  `;
+  list.appendChild(div);
+}
+
+function bwShowItemStock(input){
+  const name = input.value.trim();
+  const row = input.closest('.bw-item-row');
+  const hint = row.querySelector('.bw-stock-hint');
+  const priceEl = row.querySelector('.bw-row-price');
+  const item = inventoryItems.find(x=>x.name===name);
+  if(item){
+    const stk = invGetStock(name);
+    hint.textContent = '📦 Stock: '+stk+' '+(item.unit||'unit');
+    hint.style.color = stk<=0?'#f66':stk<=5?'#FFD700':'#4f4';
+    // Auto-fill price if empty
+    if(priceEl && !priceEl.value){
+      const p = bwGetLastSellPrice(name);
+      if(p>0){ priceEl.value = p.toFixed(2); bwUpdateTotal(); }
+    }
+  } else {
+    hint.textContent = name ? '⚠️ Not in inventory' : '';
+    hint.style.color = '#f84';
+  }
+}
+
+function bwUpdateTotal(){
+  const rows = document.querySelectorAll('.bw-item-row');
+  let grand = 0;
+  rows.forEach(row=>{
+    const qty = parseFloat(row.querySelector('.bw-row-qty')?.value||'0')||0;
+    const ppu = parseFloat(row.querySelector('.bw-row-price')?.value||'0')||0;
+    const lineTotal = qty*ppu;
+    grand += lineTotal;
+    const lt = row.querySelector('.bw-line-total');
+    if(lt){
+      if(qty>0&&ppu>0){ lt.style.display='block'; lt.textContent='= ₹'+lineTotal.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+      else { lt.style.display='none'; }
+    }
+  });
+  const totalEl = document.getElementById('bw-inv-total');
+  if(totalEl){
+    if(grand>0){
+      totalEl.style.display='block';
+      totalEl.innerHTML=`<span style="color:#7a8aaa;font-size:13px;">Total Amount:</span> <span style="color:#f84;font-size:20px;font-weight:800;">₹${grand.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`;
+      const amtEl=document.getElementById('bw-amt');
+      if(amtEl) amtEl.value=grand.toFixed(2);
+    } else {
+      totalEl.style.display='none';
+    }
+  }
+}
+
 async function bwSubmit(){
-  const s=document.getElementById("bw-sel").value;
-  const a=parseFloat(document.getElementById("bw-amt").value);
-  const item=document.getElementById("bw-item").value.trim();
-  const date=document.getElementById("bw-date").value;
-  const due=document.getElementById("bw-due").value;
-  if(!s||!a||a<=0){notify("⚠️ Select a customer and enter an amount");return;}
+  const s=document.getElementById('bw-sel').value;
+  const date=document.getElementById('bw-date').value;
+  const due=document.getElementById('bw-due').value;
+  // Collect item rows
+  const rows=[...document.querySelectorAll('.bw-item-row')];
+  const borrowedItems=[];
+  rows.forEach(row=>{
+    const nm=(row.querySelector('.bw-row-name')?.value||'').trim();
+    const qty=parseFloat(row.querySelector('.bw-row-qty')?.value||'0')||0;
+    const ppu=parseFloat(row.querySelector('.bw-row-price')?.value||'0')||0;
+    if(nm&&qty>0) borrowedItems.push({name:nm,qty,pricePerUnit:ppu});
+  });
+  const a=borrowedItems.length
+    ? borrowedItems.reduce((sum,bi)=>sum+(bi.qty*(bi.pricePerUnit||0)),0)
+    : parseFloat(document.getElementById('bw-amt').value)||0;
+  if(!s||!a||a<=0){notify('⚠️ Select a customer and add items with quantity');return;}
   const c=customers.find(x=>x.id===s);if(!c)return;
   if(!c.borrows)c.borrows=[];
   if(!c.purchases)c.purchases=[];
-  const borrowId="BW"+Date.now();
-  const isoDate=(date||new Date().toISOString().slice(0,10))+"T00:00:00.000Z";
-  // Record in borrows list
-  const borrow={id:borrowId,amount:a,item:item||"",date:date||new Date().toISOString().slice(0,10),due:due||"",status:"pending",recordedAt:new Date().toISOString()};
+  const borrowId='BW'+Date.now();
+  const isoDate=(date||new Date().toISOString().slice(0,10))+'T00:00:00.000Z';
+  const itemLabel=borrowedItems.length ? borrowedItems.map(bi=>bi.qty+'× '+bi.name).join(', ') : '';
+  const borrow={id:borrowId,amount:a,item:itemLabel,items:borrowedItems,date:date||new Date().toISOString().slice(0,10),due:due||'',status:'pending',recordedAt:new Date().toISOString()};
   c.borrows.unshift(borrow);
-  // Also add to purchase history (so it counts in totalSpend & history)
-  c.purchases.unshift({bill:borrowId,amount:a,date:isoDate,notes:item||"",type:"borrow",borrowStatus:"pending",due:due||""});
+  c.purchases.unshift({bill:borrowId,amount:a,date:isoDate,notes:itemLabel,type:'borrow',borrowStatus:'pending',due:due||'',soldItems:borrowedItems});
   c.totalSpend+=a;
   notify(`📦 Borrow of ${formatINR(a)} added to ${c.name}'s total`);
-  try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
-  document.getElementById("bw-amt").value="";
-  document.getElementById("bw-item").value="";
-  document.getElementById("bw-due").value="";
+  try{await saveOneCustomer(c);}catch(e){notify('⚠️ Firebase error: '+e.message);}
+  document.getElementById('bw-amt').value='';
+  document.getElementById('bw-items-list').innerHTML='';
+  document.getElementById('bw-due').value='';
+  const totalEl=document.getElementById('bw-inv-total');
+  if(totalEl) totalEl.style.display='none';
   bwClearCustomer();
-  const btn=document.getElementById("bw-sub");
-  btn.style.background="linear-gradient(135deg,#1a5a2a,#2a8a3a)";btn.style.color="#4f4";btn.textContent="✅ Recorded!";
-  setTimeout(()=>{btn.style.background="linear-gradient(135deg,#f84,#e05020)";btn.style.color="#fff";btn.textContent="Record Borrow →";safeRenderTab(2);},2000);
+  const btn=document.getElementById('bw-sub');
+  btn.style.background='linear-gradient(135deg,#1a5a2a,#2a8a3a)';btn.style.color='#4f4';btn.textContent='✅ Recorded!';
+  setTimeout(()=>{btn.style.background='linear-gradient(135deg,#f84,#e05020)';btn.style.color='#fff';btn.textContent='Record Borrow →';safeRenderTab(2);},2000);
 }
 
 async function bwMarkReturned(custId,borrowId){
@@ -6256,7 +6442,7 @@ function ptAddItemRow(){
     div.innerHTML=`
       ${idx===0?dataList:""}
       <div style="display:grid;grid-template-columns:1fr 32px;gap:6px;margin-bottom:6px;align-items:center;">
-        <input class="input pt-item-name" list="pt-inv-names" placeholder="Search item..." style="padding:9px 11px;font-size:13px;" oninput="ptShowItemStock(this);ptUpdateTotal()" />
+        <input class="input pt-item-name" list="pt-inv-names" placeholder="Search item..." style="padding:9px 11px;font-size:13px;" oninput="ptShowItemStock(this);ptUpdateTotal()" onchange="ptShowItemStock(this);ptUpdateTotal()" />
         <button onclick="this.closest('.pt-item-row').remove();ptUpdateTotal()" style="background:#3a1a1a;border:none;border-radius:8px;color:#f66;cursor:pointer;height:36px;width:32px;font-size:16px;">✕</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
@@ -6324,6 +6510,13 @@ function ptShowItemStock(input){
     const item = inventoryItems.find(x=>x.name===name);
     hint.textContent = "📦 Current stock: "+stock+" "+(item.unit||"unit");
     hint.style.color = stock<=0?"#f66":stock<=5?"#FFD700":"#4f4";
+    // Auto-fill price from last sell price if price field is empty
+    const priceEl = row.querySelector(".pt-item-price");
+    if(priceEl && !priceEl.value){
+      const logs = (item.salesLog||[]).filter(e=>Number(e.pricePerUnit||0)>0);
+      const lastPrice = logs.length ? Number(logs[logs.length-1].pricePerUnit) : 0;
+      if(lastPrice>0){ priceEl.value=lastPrice.toFixed(2); ptUpdateTotal(); }
+    }
   } else {
     hint.textContent = name?"⚠️ Not in inventory — will be created on save":"";
     hint.style.color="#f84";
@@ -6466,7 +6659,7 @@ function renderInventoryTab(){
       const searchBarHtml = `<div style="position:relative;margin-bottom:14px;">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none;">🔍</span>
         <input id="inv-search-box" class="input" placeholder="Search categories..." value="${(invSearchQuery||'').replace(/"/g,'&quot;')}"
-          oninput="invSearchQuery=this.value;safeRenderTab(currentTab);setTimeout(function(){var el=document.getElementById('inv-search-box');if(el){var v=el.value;el.focus();el.setSelectionRange(v.length,v.length);}},0);"
+          oninput="invSearchQuery=this.value;safeRenderTab(currentTab);"
           style="padding-left:36px;margin-bottom:0;" />
         ${invSearchQuery ? `<button onclick="invSearchQuery='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:20px;cursor:pointer;line-height:1;">×</button>` : ""}
       </div>`;
@@ -6508,7 +6701,7 @@ function renderInventoryTab(){
             </div>`;
           }).join("");
         }
-        body = searchBarHtml + catResultsHtml;
+        body = searchBarHtml + `<div id="inv-search-results">${catResultsHtml}</div>`;
 
       } else {
         // ── BROWSE MODE: show all categories A-Z as cards ──
@@ -6537,7 +6730,7 @@ function renderInventoryTab(){
           </div>`;
         }).join("");
 
-        body = searchBarHtml + `<div style="display:flex;flex-direction:column;">${catCards}</div>`;
+        body = searchBarHtml + `<div id="inv-search-results" style="display:flex;flex-direction:column;">${catCards}</div>`;
       } // end browse mode
     }
   }
@@ -6680,12 +6873,12 @@ function renderInventoryCategoryPage(catName){
     <div style="position:relative;margin-bottom:14px;">
       <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;">🔍</span>
       <input id="inv-cat-search-box" class="input" placeholder="Search in ${catName}..." value="${(invCatPageSearch||"").replace(/"/g,"&quot;")}"
-        oninput="invCatPageSearch=this.value;safeRenderTab(currentTab);setTimeout(function(){var el=document.getElementById('inv-cat-search-box');if(el){var v=el.value;el.focus();el.setSelectionRange(v.length,v.length);}},0);"
+        oninput="invCatPageSearch=this.value;safeRenderTab(currentTab);"
         style="padding-left:36px;margin-bottom:0;" />
       ${invCatPageSearch?`<button onclick="invCatPageSearch='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:18px;cursor:pointer;line-height:1;">×</button>`:""}
     </div>
     <!-- Items -->
-    <div style="display:flex;flex-direction:column;">${itemCards}</div>
+    <div id="inv-cat-search-results" style="display:flex;flex-direction:column;">${itemCards}</div>
   </div>`;
 }
 
