@@ -7615,7 +7615,7 @@ function renderInventoryItemDetail(itemName){
 
   const tabBtn=(id,label,count,color)=>{
     const isActive=activeTab===id;
-    return `<button onclick="window._invDetailTab='${id}';safeRenderTab(window.currentTab)"
+    return `<button id="inv-tab-btn-${id}" onclick="invDetailSwitchTab('${id}')"
       style="flex:1;padding:10px 6px;border:none;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;
              background:${isActive?'#0a0e1a':'transparent'};color:${isActive?color:'#4a5a7a'};
              border-bottom:2px solid ${isActive?color:'transparent'};">${label}
@@ -7700,8 +7700,32 @@ function renderInventoryItemDetail(itemName){
       ${tabBtn('history','📋 All History',timeline.length,'#e8eaf0')}
       ${tabBtn('customers','👥 Customers',custs.length,'#4a8aff')}
     </div>
-    ${activeTab==='history' ? historyTabHtml : customersTabHtml}
+    <div id="inv-tab-history" style="display:${activeTab==='history'?'block':'none'};">${historyTabHtml}</div>
+    <div id="inv-tab-customers" style="display:${activeTab==='customers'?'block':'none'};">${customersTabHtml}</div>
   </div>`;
+}
+
+// ── Inventory Detail Tab Switch (instant, no re-render) ──
+function invDetailSwitchTab(id){
+  window._invDetailTab=id;
+  // Update panel visibility
+  ['history','customers'].forEach(tab=>{
+    const panel=document.getElementById('inv-tab-'+tab);
+    if(panel) panel.style.display=(tab===id?'block':'none');
+  });
+  // Update button styles
+  const colors={history:'#e8eaf0',customers:'#4a8aff'};
+  ['history','customers'].forEach(tab=>{
+    const btn=document.getElementById('inv-tab-btn-'+tab);
+    if(!btn) return;
+    const active=(tab===id);
+    btn.style.background=active?'#0a0e1a':'transparent';
+    btn.style.color=active?colors[tab]:'#4a5a7a';
+    btn.style.borderBottom='2px solid '+(active?colors[tab]:'transparent');
+  });
+  // Trigger the apply so the list renders (it's deferred until first shown)
+  if(id==='history') invHistApply();
+  else invCustApply();
 }
 
 // ── Inventory History filter functions ──
