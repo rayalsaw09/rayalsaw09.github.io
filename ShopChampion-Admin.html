@@ -3839,152 +3839,301 @@ function setAnalyticsYear(y){ analyticsYear=y; renderTab(3); }
 function renderAnalytics(sorted){
   const years = getAnalyticsYears();
   if(!years.includes(analyticsYear)) analyticsYear = years[0];
-  const yr = String(analyticsYear);
-  const prevYr = String(analyticsYear - 1);
+  const yr    = String(analyticsYear);
+  const prevYr= String(analyticsYear - 1);
+  const MONTHS= ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-  // Filter purchases by selected year
-  function yearPurchases(c, y){ return (c.purchases||[]).filter(p=>(p.date||"").slice(0,4)===y); }
-  function yearSpend(c, y){ return yearPurchases(c,y).reduce((a,p)=>a+p.amount,0); }
+  // ── Sales revenue (from customer purchases) ──
+  function yearPurchases(c,y){ return (c.purchases||[]).filter(p=>(p.date||"").slice(0,4)===y); }
+  function yearSpend(c,y){ return yearPurchases(c,y).reduce((a,p)=>a+Number(p.amount),0); }
 
-  // Year stats
-  const yrData = sorted.map(c=>({...c, _ys: yearSpend(c,yr), _yv: yearPurchases(c,yr).length}));
+  const yrData          = sorted.map(c=>({...c,_ys:yearSpend(c,yr),_yv:yearPurchases(c,yr).length}));
   const activeCustomers = yrData.filter(c=>c._ys>0);
-  const totalYrRevenue = activeCustomers.reduce((a,c)=>a+c._ys,0);
-  const prevRevenue = sorted.reduce((a,c)=>a+yearSpend(c,prevYr),0);
-  const growthPct = prevRevenue>0 ? Math.round((totalYrRevenue-prevRevenue)/prevRevenue*100) : null;
-  const avgSpend = activeCustomers.length ? Math.round(totalYrRevenue/activeCustomers.length) : 0;
-  const topCustomer = [...activeCustomers].sort((a,b)=>b._ys-a._ys)[0];
+  const totalSaleRev    = activeCustomers.reduce((a,c)=>a+c._ys,0);
+  const prevSaleRev     = sorted.reduce((a,c)=>a+yearSpend(c,prevYr),0);
 
-  // Monthly revenue for selected year
-  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const monthly = Array(12).fill(0);
-  const monthlyPrev = Array(12).fill(0);
-  customers.forEach(c=>{
-    (c.purchases||[]).forEach(p=>{
-      const y=(p.date||"").slice(0,4), m=parseInt((p.date||"").slice(5,7))-1;
-      if(y===yr && m>=0 && m<12) monthly[m]+=p.amount;
-      if(y===prevYr && m>=0 && m<12) monthlyPrev[m]+=p.amount;
+  // Count total transactions
+  let totalTxns=0, totalQtySold=0;
+  sorted.forEach(c=>(c.purchases||[]).forEach(p=>{
+    if((p.date||"").slice(0,4)===yr){ totalTxns++; (p.soldItems||[]).forEach(si=>totalQtySold+=Number(si.qty)||0); }
+  }));
+
+  // ── Inventory cost (from stock restocks) ──
+  let totalPurchaseCost=0, totalPurchaseCostPrev=0, totalRestocks=0, totalUnitsRestocked=0;
+  inventoryItems.forEach(item=>{
+    (item.stock||[]).forEach(e=>{
+      const ey=(e.date||"").slice(0,4);
+      const cost=(Number(e.qty)||0)*(Number(e.costPerUnit)||0);
+      if(ey===yr){ totalPurchaseCost+=cost; totalRestocks++; totalUnitsRestocked+=Number(e.qty)||0; }
+      if(ey===prevYr) totalPurchaseCostPrev+=cost;
     });
   });
-  const maxBar = Math.max(...monthly,...monthlyPrev,1);
 
-  // Year-picker buttons
-  const yearBtns = years.map(y=>`<button onclick="setAnalyticsYear(${y})" style="cursor:pointer;border-radius:8px;padding:7px 14px;border:2px solid ${y===analyticsYear?'#FFD700':'#1e2a45'};background:${y===analyticsYear?'#1a1400':'#0a0e1a'};color:${y===analyticsYear?'#FFD700':'#4a5a7a'};font-size:13px;font-weight:${y===analyticsYear?'800':'600'};font-family:'Nunito',sans-serif;transition:all 0.2s;">${y}</button>`).join("");
+  // ── Current inventory value ──
+  let inventoryValue=0;
+  inventoryItems.forEach(item=>{
+    const stk=invGetStock(item.name);
+    // Use most recent cost per unit as valuation
+    const lastStock=[...(item.stock||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+    const cpu=lastStock?Number(lastStock.costPerUnit||0):0;
+    inventoryValue+=stk*cpu;
+  });
 
-  // Stat cards
-  const growthTag = growthPct!==null
-    ? `<span style="font-size:11px;color:${growthPct>=0?'#4f4':'#f66'};margin-left:4px;">${growthPct>=0?'▲':'▼'}${Math.abs(growthPct)}% vs ${prevYr}</span>`
-    : "";
-  const cards=[
-    {l:"Revenue "+yr, v:formatINR(totalYrRevenue), i:"💰", extra:growthTag},
-    {l:"Active Customers", v:activeCustomers.length, i:"👥", extra:""},
-    {l:"Top Earner "+yr, v:topCustomer?topCustomer.name.split(" ")[0]:"—", i:"🏆", extra:""},
-    {l:"Avg Spend/Customer", v:avgSpend?formatINR(avgSpend):"₹0", i:"📊", extra:""}
-  ].map(m=>`<div style="background:#0f1628;border:1px solid #1e2a45;border-radius:12px;padding:16px 14px;text-align:center;"><div style="font-size:26px;">${m.i}</div><div style="font-size:18px;font-weight:800;color:#FFD700;margin:6px 0 2px;">${m.v}</div>${m.extra?`<div style="margin-bottom:2px;">${m.extra}</div>`:""}<div style="font-size:11px;color:#556;text-transform:uppercase;letter-spacing:1px;">${m.l}</div></div>`).join("");
+  // ── P&L ──
+  const grossProfit   = totalSaleRev - totalPurchaseCost;
+  const prevGrossProfit = prevSaleRev - totalPurchaseCostPrev;
+  const profitMargin  = totalSaleRev>0 ? (grossProfit/totalSaleRev*100).toFixed(1) : "0.0";
+  const isProfit      = grossProfit>=0;
+  const revenueGrowth = prevSaleRev>0 ? Math.round((totalSaleRev-prevSaleRev)/prevSaleRev*100) : null;
+  const costGrowth    = totalPurchaseCostPrev>0 ? Math.round((totalPurchaseCost-totalPurchaseCostPrev)/totalPurchaseCostPrev*100) : null;
 
-  // Monthly chart
-  const barChart = MONTHS.map((m,i)=>{
-    const h = Math.round((monthly[i]/maxBar)*100);
-    const hp = Math.round((monthlyPrev[i]/maxBar)*100);
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;min-width:0;">
-      <div style="font-size:10px;color:#FFD700;font-weight:700;">${monthly[i]>0?'₹'+Math.round(monthly[i]/1000)+'k':''}</div>
-      <div style="display:flex;align-items:flex-end;gap:1px;height:80px;">
-        <div title="${yr}: ${formatINR(monthly[i])}" style="width:10px;height:${h}%;background:linear-gradient(180deg,#FFD700,#FFA500);border-radius:3px 3px 0 0;transition:height 0.4s;min-height:${monthly[i]>0?2:0}px;cursor:pointer;"></div>
-        <div title="${prevYr}: ${formatINR(monthlyPrev[i])}" style="width:8px;height:${hp}%;background:#2a3a5c;border-radius:3px 3px 0 0;transition:height 0.4s;min-height:${monthlyPrev[i]>0?2:0}px;cursor:pointer;"></div>
+  // ── Monthly breakdown ──
+  const monthlySales =Array(12).fill(0);
+  const monthlyCost  =Array(12).fill(0);
+  const monthlyTxns  =Array(12).fill(0);
+  sorted.forEach(c=>(c.purchases||[]).forEach(p=>{
+    if((p.date||"").slice(0,4)===yr){
+      const m=parseInt((p.date||"").slice(5,7))-1;
+      if(m>=0&&m<12){ monthlySales[m]+=Number(p.amount); monthlyTxns[m]++; }
+    }
+  }));
+  inventoryItems.forEach(item=>(item.stock||[]).forEach(e=>{
+    if((e.date||"").slice(0,4)===yr){
+      const m=parseInt((e.date||"").slice(5,7))-1;
+      if(m>=0&&m<12) monthlyCost[m]+=(Number(e.qty)||0)*(Number(e.costPerUnit)||0);
+    }
+  }));
+
+  // ── Item-level P&L ──
+  const itemPL=inventoryItems.map(item=>{
+    let cost=0,rev=0,unitsSold=0,unitsIn=0;
+    (item.stock||[]).forEach(e=>{ if((e.date||"").slice(0,4)===yr){ cost+=(Number(e.qty)||0)*(Number(e.costPerUnit)||0); unitsIn+=Number(e.qty)||0; }});
+    (item.salesLog||[]).forEach(e=>{ if((e.date||"").slice(0,4)===yr){ rev+=(Number(e.qty)||0)*(Number(e.pricePerUnit)||0); unitsSold+=Number(e.qty)||0; }});
+    return {name:item.name,unit:item.unit||"unit",cost,rev,profit:rev-cost,margin:rev>0?((rev-cost)/rev*100):0,unitsSold,unitsIn};
+  }).filter(x=>x.cost>0||x.rev>0).sort((a,b)=>b.profit-a.profit);
+
+  // ── Top/bottom performers ──
+  const topItems   =itemPL.filter(x=>x.profit>0).slice(0,5);
+  const lossItems  =itemPL.filter(x=>x.profit<0).sort((a,b)=>a.profit-b.profit).slice(0,5);
+
+  // ── Year picker ──
+  const yearBtns=years.map(y=>`<button onclick="setAnalyticsYear(${y})" style="cursor:pointer;border-radius:8px;padding:7px 14px;border:2px solid ${y===analyticsYear?'#FFD700':'#1e2a45'};background:${y===analyticsYear?'#1a1400':'#0a0e1a'};color:${y===analyticsYear?'#FFD700':'#4a5a7a'};font-size:13px;font-weight:${y===analyticsYear?'800':'600'};">${y}</button>`).join("");
+
+  // ── Bar chart helper ──
+  const maxBarH=80;
+  const maxVal=Math.max(...monthlySales,...monthlyCost,1);
+  const barChart=MONTHS.map((m,i)=>{
+    const sh=Math.round(monthlySales[i]/maxVal*maxBarH);
+    const ch=Math.round(monthlyCost[i]/maxVal*maxBarH);
+    const profit=monthlySales[i]-monthlyCost[i];
+    const pc=profit>=0?'#4f4':'#f66';
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0;">
+      <div style="font-size:9px;color:${pc};font-weight:700;">${profit!==0?(profit>0?'+':'')+Math.round(profit/1000)+'k':''}</div>
+      <div style="display:flex;align-items:flex-end;gap:1px;height:${maxBarH}px;">
+        <div title="Sales: ${formatINR(monthlySales[i])}" style="width:9px;height:${sh}px;background:linear-gradient(180deg,#4a8aff,#2a5adf);border-radius:2px 2px 0 0;min-height:${monthlySales[i]>0?2:0}px;"></div>
+        <div title="Cost: ${formatINR(monthlyCost[i])}" style="width:9px;height:${ch}px;background:linear-gradient(180deg,#f66,#a33);border-radius:2px 2px 0 0;min-height:${monthlyCost[i]>0?2:0}px;"></div>
       </div>
-      <div style="font-size:10px;color:#4a5a7a;">${m}</div>
+      <div style="font-size:9px;color:#4a5a7a;">${m}</div>
     </div>`;
   }).join("");
 
-  // Top 10 customers for selected year
-  const top10yr = [...activeCustomers].sort((a,b)=>b._ys-a._ys).slice(0,10);
-  const top10html = top10yr.length ? top10yr.map((c,i)=>`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-      <span style="font-size:12px;color:#FFD700;width:20px;flex-shrink:0;">#${i+1}</span>
-      ${avatarEl(c,28)}
-      <div style="flex:1;min-width:0;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
-          <span style="font-size:13px;font-weight:700;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</span>
-          <span style="font-size:13px;font-weight:700;color:#FFD700;white-space:nowrap;margin-left:8px;">${formatINR(c._ys)}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;">
-          <div class="progress-bar-track" style="flex:1;"><div class="progress-bar-fill" style="width:${top10yr[0]._ys?Math.round(c._ys/top10yr[0]._ys*100):0}%;background:linear-gradient(90deg,#FFD700,#FFA500);"></div></div>
-          <span style="font-size:11px;color:#4a5a7a;white-space:nowrap;">${c._yv} visit${c._yv!==1?'s':''}</span>
-        </div>
-      </div>
-    </div>`).join("") : `<div style="color:#4a5a7a;text-align:center;padding:20px 0;">No purchases recorded for ${yr}</div>`;
-
-  // Monthly breakdown table
-  const monthlyTable = MONTHS.map((m,i)=>{
-    const rev=monthly[i], prev=monthlyPrev[i];
-    const chg = prev>0 ? Math.round((rev-prev)/prev*100) : null;
-    const chgTag = chg!==null ? `<span style="color:${chg>=0?'#4f4':'#f66'};font-size:11px;">${chg>=0?'▲':'▼'}${Math.abs(chg)}%</span>` : (rev>0?`<span style="color:#5af;font-size:11px;">New</span>`:`<span style="color:#2a3a5a;font-size:11px;">—</span>`);
+  // ── Monthly P&L table ──
+  const monthlyTable=MONTHS.map((m,i)=>{
+    const s=monthlySales[i],c=monthlyCost[i],p=s-c;
+    const pc=p>0?'#4f4':p<0?'#f66':'#4a5a7a';
     return `<tr style="border-bottom:1px solid #0d1220;">
-      <td style="padding:8px 12px;color:#e8eaf0;font-weight:600;">${m}</td>
-      <td style="padding:8px 12px;color:${rev>0?'#FFD700':'#2a3a5a'};font-weight:${rev>0?'700':'400'};">${rev>0?formatINR(rev):'—'}</td>
-      <td style="padding:8px 12px;color:#4a5a7a;">${prev>0?formatINR(prev):'—'}</td>
-      <td style="padding:8px 12px;">${chgTag}</td>
+      <td style="padding:7px 10px;color:#e8eaf0;font-weight:600;">${m}</td>
+      <td style="padding:7px 10px;color:${s>0?'#4a8aff':'#2a3a5a'};font-weight:700;">${s>0?formatINR(s):'—'}</td>
+      <td style="padding:7px 10px;color:${c>0?'#f66':'#2a3a5a'};font-weight:700;">${c>0?formatINR(c):'—'}</td>
+      <td style="padding:7px 10px;color:${pc};font-weight:800;">${p!==0?(p>0?'+':'')+formatINR(p):'—'}</td>
+      <td style="padding:7px 10px;color:#4a5a7a;font-size:11px;">${monthlyTxns[i]>0?monthlyTxns[i]+' txn':''}</td>
     </tr>`;
   }).join("");
 
-  return `<div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;padding:0 2px;">
-      <h2 style="margin:0;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">📊 Yearly Analytics</h2>
-      <button onclick="exportYearCSV(${analyticsYear})" style="cursor:pointer;border-radius:8px;padding:7px 14px;border:1px solid #2a3560;background:#1a2540;color:#aaa;font-size:12px;font-weight:700;font-family:'Nunito',sans-serif;">⬇ Export ${analyticsYear} CSV</button>
-    </div>
+  // ── Item P&L table ──
+  const itemTable=itemPL.length===0
+    ?`<div style="color:#4a5a7a;text-align:center;padding:20px;">No inventory data for ${yr}</div>`
+    :itemPL.map(x=>{
+      const pc=x.profit>0?'#4f4':x.profit<0?'#f66':'#4a5a7a';
+      const barW=itemPL[0].rev>0?Math.round(Math.abs(x.profit)/Math.max(...itemPL.map(i=>Math.abs(i.profit)),1)*100):0;
+      return `<div style="padding:10px 0;border-bottom:1px solid #0d1220;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <div style="font-size:13px;font-weight:700;color:#e8eaf0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.name}</div>
+          <div style="font-size:13px;font-weight:800;color:${pc};white-space:nowrap;margin-left:8px;">${x.profit>0?'+':''}${formatINR(x.profit)}</div>
+        </div>
+        <div style="display:flex;gap:12px;font-size:11px;color:#4a5a7a;margin-bottom:5px;flex-wrap:wrap;">
+          <span>🛒 Sales: <span style="color:#4a8aff;font-weight:700;">${formatINR(x.rev)}</span></span>
+          <span>📦 Cost: <span style="color:#f66;font-weight:700;">${formatINR(x.cost)}</span></span>
+          <span>📊 Margin: <span style="color:${pc};font-weight:700;">${x.margin.toFixed(1)}%</span></span>
+          <span>Units: ${x.unitsSold} sold / ${x.unitsIn} in</span>
+        </div>
+        <div style="height:4px;background:#0a0e1a;border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:${barW}%;background:${pc};border-radius:2px;transition:width 0.4s;"></div>
+        </div>
+      </div>`;
+    }).join("");
 
-    <!-- Year picker -->
+  // ── Summary P&L card colours ──
+  const plColor  =isProfit?'#4f4':'#f66';
+  const plBg     =isProfit?'#051a05':'#1a0505';
+  const plBorder =isProfit?'#1a4a1a':'#4a1a1a';
+  const plIcon   =isProfit?'📈':'📉';
+  const plLabel  =isProfit?'NET PROFIT':'NET LOSS';
+
+  return `<div>
+    <!-- Header + year picker -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <h2 style="margin:0;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">📒 Balance Sheet</h2>
+      <button onclick="exportYearCSV(${analyticsYear})" style="cursor:pointer;border-radius:8px;padding:7px 14px;border:1px solid #2a3560;background:#1a2540;color:#aaa;font-size:12px;font-weight:700;">⬇ Export ${analyticsYear}</button>
+    </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;align-items:center;">
-      <span style="font-size:12px;color:#4a5a7a;font-weight:700;">SELECT YEAR:</span>
+      <span style="font-size:11px;color:#4a5a7a;font-weight:700;">YEAR:</span>
       ${yearBtns}
     </div>
 
-    <!-- Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">${cards}</div>
-
-    <!-- Monthly bar chart -->
-    <div class="card" style="padding:20px;margin-bottom:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
-        <div style="font-weight:700;font-size:14px;color:#e8eaf0;">Monthly Revenue — ${yr}</div>
-        <div style="display:flex;gap:12px;align-items:center;">
-          <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;background:linear-gradient(180deg,#FFD700,#FFA500);border-radius:2px;"></div><span style="font-size:11px;color:#7a8aaa;">${yr}</span></div>
-          <div style="display:flex;align-items:center;gap:5px;"><div style="width:8px;height:8px;background:#2a3a5c;border-radius:2px;"></div><span style="font-size:11px;color:#7a8aaa;">${prevYr}</span></div>
+    <!-- Big P&L verdict -->
+    <div style="background:${plBg};border:2px solid ${plBorder};border-radius:16px;padding:20px 18px;margin-bottom:16px;display:flex;align-items:center;gap:16px;">
+      <div style="font-size:40px;">${plIcon}</div>
+      <div style="flex:1;">
+        <div style="font-size:11px;font-weight:800;color:#4a5a7a;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">${plLabel} — ${yr}</div>
+        <div style="font-size:28px;font-weight:800;color:${plColor};">${isProfit?'+':''}${formatINR(Math.abs(grossProfit))}</div>
+        <div style="font-size:12px;color:#4a5a7a;margin-top:4px;">Profit margin: <span style="color:${plColor};font-weight:700;">${profitMargin}%</span>
+          ${revenueGrowth!==null?`· Revenue ${revenueGrowth>=0?'▲':'▼'}<span style="color:${revenueGrowth>=0?'#4f4':'#f66'};font-weight:700;">${Math.abs(revenueGrowth)}%</span> vs ${prevYr}`:''}
         </div>
       </div>
-      <div style="display:flex;gap:4px;align-items:flex-end;padding:0 4px;">${barChart}</div>
+      ${prevGrossProfit!==0?`<div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:10px;color:#4a5a7a;margin-bottom:2px;">${prevYr} P&L</div>
+        <div style="font-size:14px;font-weight:800;color:${prevGrossProfit>=0?'#4f4':'#f66'};">${prevGrossProfit>=0?'+':''}${formatINR(Math.abs(prevGrossProfit))}</div>
+      </div>`:''}
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px;">
-      <!-- Top customers -->
-      <div class="card" style="padding:20px;">
-        <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:14px;">🏆 Top Customers — ${yr}</div>
-        ${top10html}
+    <!-- Summary 3-box row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div style="background:#0a0e1a;border:1px solid #1e3a6e;border-radius:12px;padding:14px 10px;text-align:center;">
+        <div style="font-size:10px;color:#4a5a7a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">💰 Total Sales</div>
+        <div style="font-size:18px;font-weight:800;color:#4a8aff;">${formatINR(totalSaleRev)}</div>
+        <div style="font-size:10px;color:#4a5a7a;margin-top:4px;">${totalTxns} txns · ${activeCustomers.length} customers</div>
+        ${prevSaleRev>0?`<div style="font-size:10px;color:${revenueGrowth>=0?'#4f4':'#f66'};margin-top:2px;">${revenueGrowth>=0?'▲':'▼'}${Math.abs(revenueGrowth)}% vs ${prevYr}</div>`:''}
+      </div>
+      <div style="background:#0a0e1a;border:1px solid #4a1a1a;border-radius:12px;padding:14px 10px;text-align:center;">
+        <div style="font-size:10px;color:#4a5a7a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📦 Purchase Cost</div>
+        <div style="font-size:18px;font-weight:800;color:#f66;">${formatINR(totalPurchaseCost)}</div>
+        <div style="font-size:10px;color:#4a5a7a;margin-top:4px;">${totalRestocks} restocks · ${totalUnitsRestocked} units</div>
+        ${totalPurchaseCostPrev>0?`<div style="font-size:10px;color:${(costGrowth||0)<=0?'#4f4':'#f66'};margin-top:2px;">${(costGrowth||0)>=0?'▲':'▼'}${Math.abs(costGrowth||0)}% vs ${prevYr}</div>`:''}
+      </div>
+      <div style="background:#0a0e1a;border:1px solid #2a4a1a;border-radius:12px;padding:14px 10px;text-align:center;">
+        <div style="font-size:10px;color:#4a5a7a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🏪 Stock Value</div>
+        <div style="font-size:18px;font-weight:800;color:#FFD700;">${formatINR(inventoryValue)}</div>
+        <div style="font-size:10px;color:#4a5a7a;margin-top:4px;">${inventoryItems.length} items tracked</div>
+      </div>
+    </div>
+
+    <!-- Sales vs Cost visual bar -->
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:12px;">⚖️ Sales vs Purchase Cost — ${yr}</div>
+      ${(totalSaleRev+totalPurchaseCost)>0?`
+      <div style="margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#4a5a7a;margin-bottom:4px;">
+          <span>💰 Sales Revenue</span><span style="color:#4a8aff;font-weight:700;">${formatINR(totalSaleRev)}</span>
+        </div>
+        <div style="height:14px;background:#0a0e1a;border-radius:7px;overflow:hidden;">
+          <div style="height:100%;width:${Math.min(totalSaleRev/(Math.max(totalSaleRev,totalPurchaseCost))*100,100).toFixed(1)}%;background:linear-gradient(90deg,#4a8aff,#2a5adf);border-radius:7px;"></div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#4a5a7a;margin-bottom:4px;">
+          <span>📦 Purchase Cost</span><span style="color:#f66;font-weight:700;">${formatINR(totalPurchaseCost)}</span>
+        </div>
+        <div style="height:14px;background:#0a0e1a;border-radius:7px;overflow:hidden;">
+          <div style="height:100%;width:${Math.min(totalPurchaseCost/(Math.max(totalSaleRev,totalPurchaseCost))*100,100).toFixed(1)}%;background:linear-gradient(90deg,#f66,#a33);border-radius:7px;"></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;background:${plBg};border:1px solid ${plBorder};border-radius:8px;padding:8px 12px;">
+        <span style="font-size:12px;font-weight:700;color:#4a5a7a;">${plIcon} ${plLabel}</span>
+        <span style="font-size:14px;font-weight:800;color:${plColor};">${isProfit?'+':''}${formatINR(Math.abs(grossProfit))}</span>
+      </div>`:`<div style="color:#4a5a7a;text-align:center;padding:20px;">No data for ${yr}</div>`}
+    </div>
+
+    <!-- Month chart + table side by side -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:16px;">
+      <!-- Bar chart -->
+      <div class="card" style="padding:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:6px;">
+          <div style="font-size:13px;font-weight:800;color:#e8eaf0;">📊 Monthly P&L — ${yr}</div>
+          <div style="display:flex;gap:10px;">
+            <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#7a8aaa;"><span style="width:8px;height:8px;background:#4a8aff;border-radius:2px;display:inline-block;"></span>Sales</span>
+            <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#7a8aaa;"><span style="width:8px;height:8px;background:#f66;border-radius:2px;display:inline-block;"></span>Cost</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:3px;align-items:flex-end;padding:0 2px;">${barChart}</div>
       </div>
       <!-- Monthly table -->
-      <div class="card" style="padding:20px;">
-        <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:14px;">📅 Month-by-Month — ${yr}</div>
+      <div class="card" style="padding:16px;">
+        <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:12px;">📅 Month-by-Month</div>
         <div style="overflow-x:auto;">
-          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <thead><tr style="border-bottom:1px solid #1e2a45;">
-              <th style="padding:6px 12px;color:#4a5a7a;font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:1px;">Month</th>
-              <th style="padding:6px 12px;color:#4a5a7a;font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:1px;">${yr}</th>
-              <th style="padding:6px 12px;color:#4a5a7a;font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:1px;">${prevYr}</th>
-              <th style="padding:6px 12px;color:#4a5a7a;font-size:11px;text-align:left;text-transform:uppercase;letter-spacing:1px;">Change</th>
+              <th style="padding:5px 10px;color:#4a5a7a;font-size:10px;text-align:left;text-transform:uppercase;">Month</th>
+              <th style="padding:5px 10px;color:#4a8aff;font-size:10px;text-align:left;text-transform:uppercase;">Sales</th>
+              <th style="padding:5px 10px;color:#f66;font-size:10px;text-align:left;text-transform:uppercase;">Cost</th>
+              <th style="padding:5px 10px;color:#4a5a7a;font-size:10px;text-align:left;text-transform:uppercase;">P&L</th>
+              <th style="padding:5px 10px;color:#4a5a7a;font-size:10px;text-align:left;text-transform:uppercase;"></th>
             </tr></thead>
             <tbody>${monthlyTable}</tbody>
-            <tfoot><tr style="border-top:1px solid #1e2a45;">
-              <td style="padding:8px 12px;font-weight:800;color:#FFD700;">Total</td>
-              <td style="padding:8px 12px;font-weight:800;color:#FFD700;">${formatINR(totalYrRevenue)}</td>
-              <td style="padding:8px 12px;font-weight:700;color:#4a5a7a;">${prevRevenue>0?formatINR(prevRevenue):'—'}</td>
-              <td style="padding:8px 12px;">${growthPct!==null?`<span style="color:${growthPct>=0?'#4f4':'#f66'};font-weight:700;">${growthPct>=0?'▲':'▼'}${Math.abs(growthPct)}%</span>`:'—'}</td>
+            <tfoot><tr style="border-top:2px solid #1e2a45;">
+              <td style="padding:8px 10px;font-weight:800;color:#e8eaf0;">Total</td>
+              <td style="padding:8px 10px;font-weight:800;color:#4a8aff;">${formatINR(totalSaleRev)}</td>
+              <td style="padding:8px 10px;font-weight:800;color:#f66;">${formatINR(totalPurchaseCost)}</td>
+              <td style="padding:8px 10px;font-weight:800;color:${plColor};">${isProfit?'+':''}${formatINR(Math.abs(grossProfit))}</td>
+              <td></td>
             </tr></tfoot>
           </table>
         </div>
       </div>
     </div>
+
+    <!-- Item-level P&L -->
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:4px;">🏷 Per-Item P&L — ${yr}</div>
+      <div style="font-size:11px;color:#4a5a7a;margin-bottom:12px;">Sorted by profit · Only items with cost or sales data shown</div>
+      ${itemTable}
+    </div>
+
+    <!-- Top profit / loss items -->
+    ${(topItems.length>0||lossItems.length>0)?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:16px;">
+      ${topItems.length>0?`<div class="card" style="padding:16px;">
+        <div style="font-size:13px;font-weight:800;color:#4f4;margin-bottom:10px;">🏆 Top Profit Items</div>
+        ${topItems.map((x,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #0d1220;">
+          <span style="font-size:12px;color:#e8eaf0;">#${i+1} ${x.name}</span>
+          <span style="font-size:12px;font-weight:800;color:#4f4;">+${formatINR(x.profit)}</span>
+        </div>`).join("")}
+      </div>`:''}
+      ${lossItems.length>0?`<div class="card" style="padding:16px;">
+        <div style="font-size:13px;font-weight:800;color:#f66;margin-bottom:10px;">⚠️ Loss-Making Items</div>
+        ${lossItems.map((x,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #0d1220;">
+          <span style="font-size:12px;color:#e8eaf0;">#${i+1} ${x.name}</span>
+          <span style="font-size:12px;font-weight:800;color:#f66;">${formatINR(x.profit)}</span>
+        </div>`).join("")}
+      </div>`:''}
+    </div>`:''}
+
+    <!-- Customer stats -->
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:12px;">👥 Customer Overview — ${yr}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
+        ${[
+          {l:'Active',v:activeCustomers.length,c:'#4a8aff'},
+          {l:'Transactions',v:totalTxns,c:'#e8eaf0'},
+          {l:'Avg/Customer',v:activeCustomers.length?formatINR(Math.round(totalSaleRev/activeCustomers.length)):'₹0',c:'#FFD700'},
+          {l:'Avg/Txn',v:totalTxns?formatINR(Math.round(totalSaleRev/totalTxns)):'₹0',c:'#b080ff'},
+        ].map(s=>`<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px 8px;text-align:center;">
+          <div style="font-size:15px;font-weight:800;color:${s.c};">${s.v}</div>
+          <div style="font-size:9px;color:#4a5a7a;margin-top:3px;text-transform:uppercase;">${s.l}</div>
+        </div>`).join("")}
+      </div>
+    </div>
   </div>`;
 }
-
 // ─── COMPARE MODE ─────────────────────────────────────────────
 let cmpMode       = "day";  // "day" | "month" | "year" | "years"
 let cmpWeekOffset = 0;
@@ -7062,13 +7211,14 @@ function invShowItemDetail(itemName){
   invDetailItem = itemName;
   invView = "detail";
   safeRenderTab(currentTab);
+  setTimeout(()=>{ invHistApply(); invCustApply(); }, 80);
+  setTimeout(()=>{ invHistApply(); invCustApply(); }, 400);
 }
 
 function renderInventoryItemDetail(itemName){
   const item = inventoryItems.find(x=>x.name===itemName);
   if(!item) return `<div style="padding:32px;text-align:center;color:#4a5a7a;">Item not found</div>`;
 
-  // ── Customer map ──
   const custMap = {};
   customers.forEach(c=>{
     (c.purchases||[]).forEach(p=>{
@@ -7089,121 +7239,90 @@ function renderInventoryItemDetail(itemName){
   const stk       = invGetStock(itemName);
   const stkColor  = stk<=0?"#f66":stk<=3?"#FFD700":"#4f4";
 
-  // ── Build unified timeline ──
+  // Build unified timeline
   const timeline = [];
-  (item.stock||[]).forEach(e=>timeline.push({type:'restock', date:e.date, qty:Number(e.qty), costPerUnit:Number(e.costPerUnit||0), notes:e.notes||""}));
+  (item.stock||[]).forEach(e=>timeline.push({type:'restock',date:e.date,qty:Number(e.qty),costPerUnit:Number(e.costPerUnit||0),notes:e.notes||"",custName:""}));
   (item.salesLog||[]).forEach(e=>{
-    const cust = customers.find(c=>c.id===e.custId);
-    timeline.push({type:'sale', date:e.date, qty:Number(e.qty), pricePerUnit:Number(e.pricePerUnit||0), custName:e.custName||(cust&&cust.name)||"", custId:e.custId||""});
+    const cust=customers.find(c=>c.id===e.custId);
+    timeline.push({type:'sale',date:e.date,qty:Number(e.qty),pricePerUnit:Number(e.pricePerUnit||0),custName:e.custName||(cust&&cust.name)||"",custId:e.custId||""});
   });
   timeline.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const restockCount=(item.stock||[]).length;
 
-  const restockCount = (item.stock||[]).length;
-
-  // ── Tab state ──
   if(window._invDetailTab===undefined) window._invDetailTab='history';
-  const activeTab = window._invDetailTab;
+  const activeTab=window._invDetailTab;
 
-  const tabBtn = (id, label, count, color) => {
-    const isActive = activeTab===id;
+  // Store data for live filter functions
+  window._invHistData={timeline,unit,itemName};
+  window._invCustData={custs,unit};
+  if(!window._invHistMode) window._invHistMode='all';
+  if(!window._invCustMode) window._invCustMode='all';
+
+  const tabBtn=(id,label,count,color)=>{
+    const isActive=activeTab===id;
     return `<button onclick="window._invDetailTab='${id}';safeRenderTab(window.currentTab)"
-      style="flex:1;padding:10px 6px;border:none;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;transition:all 0.15s;
-             background:${isActive?'#0a0e1a':'transparent'};
-             color:${isActive?color:'#4a5a7a'};
+      style="flex:1;padding:10px 6px;border:none;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;
+             background:${isActive?'#0a0e1a':'transparent'};color:${isActive?color:'#4a5a7a'};
              border-bottom:2px solid ${isActive?color:'transparent'};">${label}
       <span style="font-size:10px;font-weight:600;opacity:0.7;">(${count})</span></button>`;
   };
 
-  // ── History tab ──
-  const historyTabHtml = timeline.length===0
-    ? `<div class="card" style="padding:32px;text-align:center;">
-        <div style="font-size:32px;margin-bottom:8px;">📭</div>
-        <div style="color:#4a5a7a;font-size:13px;">No history yet.</div>
-      </div>`
-    : `<div style="display:flex;flex-direction:column;gap:6px;">
-        ${timeline.map((e,i)=>{
-          const isRestock = e.type==='restock';
-          const d = new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
-          const t = new Date(e.date).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-          const icon    = isRestock ? '📦' : '🛒';
-          const badge   = isRestock ? `+${e.qty}` : `-${e.qty}`;
-          const badgeBg = isRestock ? '#0a1f0a' : '#1f0a0a';
-          const badgeBd = isRestock ? '#1a4a1a' : '#4a1a1a';
-          const badgeC  = isRestock ? '#4f4'    : '#f66';
-          const label   = isRestock ? 'Restocked' : 'Sold';
-          const labelC  = isRestock ? '#4f4'      : '#f66';
-          const isFirst = i===0;
-          const borderExtra = isFirst ? `border-color:${isRestock?'#1a4a1a':'#4a1a1a'};` : '';
+  const modeBtn=(fn,id,label,active)=>`<button onclick="${fn}('${id}')"
+    style="padding:5px 10px;font-size:11px;font-weight:700;border-radius:7px;cursor:pointer;border:1px solid ${active?'#FFD700':'#1e2a45'};background:${active?'#1a1500':'#0a0e1a'};color:${active?'#FFD700':'#7a8aaa'};">${label}</button>`;
 
-          let rightHtml = '';
-          if(isRestock){
-            rightHtml = e.costPerUnit>0
-              ? `<div style="font-size:12px;font-weight:700;color:#FFD700;">₹${e.costPerUnit.toFixed(2)}/${unit}</div><div style="font-size:10px;color:#4a5a7a;">₹${(e.qty*e.costPerUnit).toLocaleString('en-IN')} total</div>`
-              : `<div style="font-size:11px;color:#4a5a7a;">No cost</div>`;
-          } else {
-            rightHtml = e.pricePerUnit>0
-              ? `<div style="font-size:12px;font-weight:700;color:#4f4;">₹${e.pricePerUnit.toFixed(2)}/${unit}</div><div style="font-size:10px;color:#4a5a7a;">₹${(e.qty*e.pricePerUnit).toLocaleString('en-IN')}</div>`
-              : `<div style="font-size:11px;color:#4a5a7a;">No price</div>`;
-          }
+  // ── History tab HTML ──
+  const historyTabHtml=`
+    <div style="margin-bottom:10px;">
+      <input class="input" id="inv-hist-search" placeholder="🔍 Search by type, customer, date, notes..." oninput="invHistApply()" style="margin-bottom:8px;font-size:13px;"/>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+        ${modeBtn('invHistSetMode','all','All',window._invHistMode==='all')}
+        ${modeBtn('invHistSetMode','date','📅 Date Range',window._invHistMode==='date')}
+        ${modeBtn('invHistSetMode','type','🏷 Type',window._invHistMode==='type')}
+        ${modeBtn('invHistSetMode','qty','📦 Qty Range',window._invHistMode==='qty')}
+      </div>
+      <div id="inv-hist-filter-date" style="display:${window._invHistMode==='date'?'flex':'none'};gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:130px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">From</div><input type="datetime-local" id="inv-hist-from" class="input" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invHistApply()"/></div>
+        <div style="flex:1;min-width:130px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">To</div><input type="datetime-local" id="inv-hist-to" class="input" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invHistApply()"/></div>
+      </div>
+      <div id="inv-hist-filter-type" style="display:${window._invHistMode==='type'?'flex':'none'};gap:6px;margin-bottom:6px;">
+        <button onclick="window._invHistType='all';invHistApply()" style="padding:5px 12px;font-size:11px;font-weight:700;border-radius:7px;cursor:pointer;border:1px solid ${!window._invHistType||window._invHistType==='all'?'#4a8aff':'#1e2a45'};background:${!window._invHistType||window._invHistType==='all'?'#0a0a2a':'#0a0e1a'};color:${!window._invHistType||window._invHistType==='all'?'#4a8aff':'#7a8aaa'};">All</button>
+        <button onclick="window._invHistType='restock';invHistApply()" style="padding:5px 12px;font-size:11px;font-weight:700;border-radius:7px;cursor:pointer;border:1px solid ${window._invHistType==='restock'?'#4f4':'#1e2a45'};background:${window._invHistType==='restock'?'#0a1a0a':'#0a0e1a'};color:${window._invHistType==='restock'?'#4f4':'#7a8aaa'};">📦 Restock</button>
+        <button onclick="window._invHistType='sale';invHistApply()" style="padding:5px 12px;font-size:11px;font-weight:700;border-radius:7px;cursor:pointer;border:1px solid ${window._invHistType==='sale'?'#f66':'#1e2a45'};background:${window._invHistType==='sale'?'#1a0a0a':'#0a0e1a'};color:${window._invHistType==='sale'?'#f66':'#7a8aaa'};">🛒 Sale</button>
+      </div>
+      <div id="inv-hist-filter-qty" style="display:${window._invHistMode==='qty'?'flex':'none'};gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:100px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">Min Qty</div><input type="number" id="inv-hist-qty-min" class="input" min="0" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invHistApply()"/></div>
+        <div style="flex:1;min-width:100px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">Max Qty</div><input type="number" id="inv-hist-qty-max" class="input" min="0" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invHistApply()"/></div>
+      </div>
+      <div id="inv-hist-info" style="font-size:11px;color:#4a5a7a;margin-bottom:6px;display:none;"></div>
+    </div>
+    <div id="inv-hist-list" style="display:flex;flex-direction:column;gap:6px;"></div>`;
 
-          return `<div class="card" style="padding:11px 14px;display:flex;align-items:center;gap:11px;${borderExtra}">
-            <div style="background:${badgeBg};border:1px solid ${badgeBd};border-radius:8px;min-width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:${badgeC};flex-shrink:0;padding:0 4px;">${badge}</div>
-            <div style="flex:1;min-width:0;">
-              <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
-                <span style="font-size:10px;font-weight:800;color:${labelC};background:${badgeBg};border:1px solid ${badgeBd};border-radius:5px;padding:1px 6px;">${icon} ${label}</span>
-                ${isFirst?`<span style="font-size:10px;color:#7ab3ff;background:#0a1020;border:1px solid #1a2a40;border-radius:5px;padding:1px 5px;">Latest</span>`:''}
-              </div>
-              <div style="font-size:12px;font-weight:700;color:#e8eaf0;">${d} <span style="color:#4a5a7a;font-size:11px;">· ${t}</span></div>
-              ${!isRestock && e.custName ? `<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">👤 ${e.custName}</div>` : ''}
-              ${isRestock && e.notes ? `<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">📝 ${e.notes}</div>` : ''}
-            </div>
-            <div style="text-align:right;flex-shrink:0;">${rightHtml}</div>
-          </div>`;
-        }).join('')}
-      </div>`;
-
-  // ── Customers tab ──
-  const customersTabHtml = custs.length===0
-    ? `<div class="card" style="padding:32px;text-align:center;">
-        <div style="font-size:32px;margin-bottom:8px;">🤷</div>
-        <div style="color:#4a5a7a;font-size:13px;">No customer purchases linked yet.<br><span style="font-size:11px;">Use Inventory Mode to record item-linked sales.</span></div>
-      </div>`
-    : `<div style="display:flex;flex-direction:column;gap:8px;">
-        ${custs.map(c=>{
-          const lastVisit = c.visits.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
-          const lastDate  = lastVisit?new Date(lastVisit.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}):"—";
-          return `<div class="card" style="padding:14px 16px;cursor:pointer;" onclick="showProfile('${c.id}')">
-            <div style="display:flex;align-items:center;gap:12px;">
-              ${avatarEl(c,38)}
-              <div style="flex:1;min-width:0;">
-                <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${c.name}</div>
-                <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${c.visits.length} purchase${c.visits.length!==1?"s":""} · Last: ${lastDate}</div>
-              </div>
-              <div style="text-align:right;flex-shrink:0;">
-                <div style="font-size:15px;font-weight:800;color:#f66;">-${c.totalQty} ${unit}</div>
-                ${c.totalSpend>0?`<div style="font-size:11px;color:#4f4;margin-top:2px;">₹${c.totalSpend.toLocaleString("en-IN")}</div>`:""}
-              </div>
-            </div>
-            ${c.visits.length>0?`<div style="margin-top:10px;border-top:1px solid #1e2a45;padding-top:10px;display:flex;flex-direction:column;gap:5px;">
-              ${c.visits.slice(0,3).map(v=>`<div style="display:flex;justify-content:space-between;align-items:center;">
-                <div style="font-size:11px;color:#4a5a7a;">${new Date(v.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${v.bill?" · "+v.bill:""}</div>
-                <div style="font-size:12px;font-weight:700;color:#e8eaf0;">${v.qty} ${unit}${v.ppu>0?" @ ₹"+v.ppu+"/"+unit:""}</div>
-              </div>`).join("")}
-              ${c.visits.length>3?`<div style="font-size:11px;color:#4a5a7a;text-align:center;">+${c.visits.length-3} more visits</div>`:""}
-            </div>`:""}
-          </div>`;
-        }).join("")}
-      </div>`;
+  // ── Customers tab HTML ──
+  const customersTabHtml=`
+    <div style="margin-bottom:10px;">
+      <input class="input" id="inv-cust-search" placeholder="🔍 Search by name, date, bill..." oninput="invCustApply()" style="margin-bottom:8px;font-size:13px;"/>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+        ${modeBtn('invCustSetMode','all','All',window._invCustMode==='all')}
+        ${modeBtn('invCustSetMode','date','📅 Date Range',window._invCustMode==='date')}
+        ${modeBtn('invCustSetMode','qty','📦 Qty Range',window._invCustMode==='qty')}
+      </div>
+      <div id="inv-cust-filter-date" style="display:${window._invCustMode==='date'?'flex':'none'};gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:130px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">From</div><input type="datetime-local" id="inv-cust-from" class="input" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invCustApply()"/></div>
+        <div style="flex:1;min-width:130px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">To</div><input type="datetime-local" id="inv-cust-to" class="input" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invCustApply()"/></div>
+      </div>
+      <div id="inv-cust-filter-qty" style="display:${window._invCustMode==='qty'?'flex':'none'};gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:100px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">Min Qty</div><input type="number" id="inv-cust-qty-min" class="input" min="0" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invCustApply()"/></div>
+        <div style="flex:1;min-width:100px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">Max Qty</div><input type="number" id="inv-cust-qty-max" class="input" min="0" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invCustApply()"/></div>
+      </div>
+      <div id="inv-cust-info" style="font-size:11px;color:#4a5a7a;margin-bottom:6px;display:none;"></div>
+    </div>
+    <div id="inv-cust-list" style="display:flex;flex-direction:column;gap:8px;"></div>`;
 
   return `<div style="padding:16px 14px;max-width:600px;margin:0 auto;">
-
-    <!-- Header -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-      <button onclick="invView='stock';invDetailItem=null;window._invDetailTab='history';safeRenderTab(currentTab)" style="background:#1a2540;border:none;border-radius:9px;color:#7ab3ff;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;">← Back</button>
+      <button onclick="invView='stock';invDetailItem=null;window._invDetailTab='history';window._invHistMode='all';window._invCustMode='all';safeRenderTab(currentTab)" style="background:#1a2540;border:none;border-radius:9px;color:#7ab3ff;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;">← Back</button>
       <div style="font-size:17px;font-weight:800;color:#FFD700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${itemName}</div>
     </div>
-
-    <!-- Stat pills -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:16px;">
       <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:9px 4px;text-align:center;">
         <div style="font-size:15px;font-weight:800;color:${stkColor};">${stk<=0?"OUT":stk}</div>
@@ -7222,17 +7341,180 @@ function renderInventoryItemDetail(itemName){
         <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Price</div>
       </div>
     </div>
-
-    <!-- Tab switcher -->
     <div style="display:flex;gap:4px;background:#050810;border-radius:12px;padding:4px;margin-bottom:14px;">
       ${tabBtn('history','📋 All History',timeline.length,'#e8eaf0')}
       ${tabBtn('customers','👥 Customers',custs.length,'#4a8aff')}
     </div>
-
-    <!-- Active tab content -->
     ${activeTab==='history' ? historyTabHtml : customersTabHtml}
-
   </div>`;
+}
+
+// ── Inventory History filter functions ──
+function invHistSetMode(mode){
+  window._invHistMode=mode;
+  ['date','type','qty'].forEach(m=>{
+    const el=document.getElementById('inv-hist-filter-'+m);
+    if(el) el.style.display=(m===mode?'flex':'none');
+  });
+  invHistApply();
+}
+
+function invHistApply(){
+  const d=window._invHistData; if(!d) return;
+  const q=(document.getElementById('inv-hist-search')?.value||'').toLowerCase().trim();
+  const mode=window._invHistMode||'all';
+  let filtered=[...d.timeline];
+
+  if(q) filtered=filtered.filter(e=>
+    e.type.includes(q)||
+    (e.custName||'').toLowerCase().includes(q)||
+    (e.notes||'').toLowerCase().includes(q)||
+    (e.date||'').includes(q)||
+    String(e.qty).includes(q)
+  );
+
+  if(mode==='date'){
+    let from=document.getElementById('inv-hist-from')?.value;
+    let to=document.getElementById('inv-hist-to')?.value;
+    if(from&&from.length===10) from+=`T00:00`;
+    if(to&&to.length===10)     to+=`T23:59`;
+    if(from) filtered=filtered.filter(e=>new Date(e.date||0)>=new Date(from));
+    if(to)   filtered=filtered.filter(e=>new Date(e.date||0)<=new Date(to));
+  } else if(mode==='type'){
+    const t=window._invHistType||'all';
+    if(t!=='all') filtered=filtered.filter(e=>e.type===t);
+  } else if(mode==='qty'){
+    const mn=parseFloat(document.getElementById('inv-hist-qty-min')?.value);
+    const mx=parseFloat(document.getElementById('inv-hist-qty-max')?.value);
+    if(!isNaN(mn)) filtered=filtered.filter(e=>e.qty>=mn);
+    if(!isNaN(mx)) filtered=filtered.filter(e=>e.qty<=mx);
+  }
+
+  const list=document.getElementById('inv-hist-list');
+  const info=document.getElementById('inv-hist-info');
+  if(!list) return;
+
+  if(info){
+    const isF=filtered.length!==d.timeline.length;
+    info.style.display=isF?'block':'none';
+    if(isF) info.innerHTML=`Showing <strong style="color:#e8eaf0;">${filtered.length}</strong> of ${d.timeline.length} entries`;
+  }
+
+  if(filtered.length===0){
+    list.innerHTML=`<div style="color:#4a5a7a;font-size:13px;text-align:center;padding:30px;">No entries match your search</div>`;
+    return;
+  }
+
+  const unit=d.unit;
+  list.innerHTML=filtered.map((e,i)=>{
+    const isRestock=e.type==='restock';
+    const dt=new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+    const tm=new Date(e.date).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    const badge=isRestock?`+${e.qty}`:`-${e.qty}`;
+    const badgeBg=isRestock?'#0a1f0a':'#1f0a0a';
+    const badgeBd=isRestock?'#1a4a1a':'#4a1a1a';
+    const badgeC =isRestock?'#4f4':'#f66';
+    const labelC =isRestock?'#4f4':'#f66';
+    const icon   =isRestock?'📦':'🛒';
+    const label  =isRestock?'Restocked':'Sold';
+    const isFirst=i===0&&filtered.length===d.timeline.length;
+    const borderExtra=isFirst?`border-color:${isRestock?'#1a4a1a':'#4a1a1a'};`:'';
+    let rightHtml=isRestock
+      ?(e.costPerUnit>0?`<div style="font-size:12px;font-weight:700;color:#FFD700;">₹${e.costPerUnit.toFixed(2)}/${unit}</div><div style="font-size:10px;color:#4a5a7a;">₹${(e.qty*e.costPerUnit).toLocaleString('en-IN')} total</div>`:`<div style="font-size:11px;color:#4a5a7a;">No cost</div>`)
+      :(e.pricePerUnit>0?`<div style="font-size:12px;font-weight:700;color:#4f4;">₹${e.pricePerUnit.toFixed(2)}/${unit}</div><div style="font-size:10px;color:#4a5a7a;">₹${(e.qty*e.pricePerUnit).toLocaleString('en-IN')}</div>`:`<div style="font-size:11px;color:#4a5a7a;">No price</div>`);
+    return `<div class="card" style="padding:11px 14px;display:flex;align-items:center;gap:11px;${borderExtra}">
+      <div style="background:${badgeBg};border:1px solid ${badgeBd};border-radius:8px;min-width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:${badgeC};flex-shrink:0;padding:0 4px;">${badge}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
+          <span style="font-size:10px;font-weight:800;color:${labelC};background:${badgeBg};border:1px solid ${badgeBd};border-radius:5px;padding:1px 6px;">${icon} ${label}</span>
+          ${isFirst?`<span style="font-size:10px;color:#7ab3ff;background:#0a1020;border:1px solid #1a2a40;border-radius:5px;padding:1px 5px;">Latest</span>`:''}
+        </div>
+        <div style="font-size:12px;font-weight:700;color:#e8eaf0;">${dt} <span style="color:#4a5a7a;font-size:11px;">· ${tm}</span></div>
+        ${!isRestock&&e.custName?`<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">👤 ${e.custName}</div>`:''}
+        ${isRestock&&e.notes?`<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">📝 ${e.notes}</div>`:''}
+      </div>
+      <div style="text-align:right;flex-shrink:0;">${rightHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Inventory Customers filter functions ──
+function invCustSetMode(mode){
+  window._invCustMode=mode;
+  ['date','qty'].forEach(m=>{
+    const el=document.getElementById('inv-cust-filter-'+m);
+    if(el) el.style.display=(m===mode?'flex':'none');
+  });
+  invCustApply();
+}
+
+function invCustApply(){
+  const d=window._invCustData; if(!d) return;
+  const q=(document.getElementById('inv-cust-search')?.value||'').toLowerCase().trim();
+  const mode=window._invCustMode||'all';
+  let filtered=[...d.custs];
+
+  if(q) filtered=filtered.filter(c=>
+    c.name.toLowerCase().includes(q)||
+    c.visits.some(v=>(v.bill||'').toLowerCase().includes(q)||(v.date||'').includes(q))
+  );
+
+  if(mode==='date'){
+    let from=document.getElementById('inv-cust-from')?.value;
+    let to=document.getElementById('inv-cust-to')?.value;
+    if(from&&from.length===10) from+=`T00:00`;
+    if(to&&to.length===10)     to+=`T23:59`;
+    filtered=filtered.filter(c=>c.visits.some(v=>{
+      const vd=new Date(v.date||0);
+      return (!from||vd>=new Date(from))&&(!to||vd<=new Date(to));
+    }));
+  } else if(mode==='qty'){
+    const mn=parseFloat(document.getElementById('inv-cust-qty-min')?.value);
+    const mx=parseFloat(document.getElementById('inv-cust-qty-max')?.value);
+    if(!isNaN(mn)) filtered=filtered.filter(c=>c.totalQty>=mn);
+    if(!isNaN(mx)) filtered=filtered.filter(c=>c.totalQty<=mx);
+  }
+
+  const list=document.getElementById('inv-cust-list');
+  const info=document.getElementById('inv-cust-info');
+  if(!list) return;
+
+  if(info){
+    const isF=filtered.length!==d.custs.length;
+    info.style.display=isF?'block':'none';
+    if(isF) info.innerHTML=`Showing <strong style="color:#e8eaf0;">${filtered.length}</strong> of ${d.custs.length} customers`;
+  }
+
+  if(filtered.length===0){
+    list.innerHTML=`<div style="color:#4a5a7a;font-size:13px;text-align:center;padding:30px;">No customers match your search</div>`;
+    return;
+  }
+
+  const unit=d.unit;
+  list.innerHTML=filtered.map(c=>{
+    const lastVisit=c.visits.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+    const lastDate=lastVisit?new Date(lastVisit.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}):'—';
+    return `<div class="card" style="padding:14px 16px;cursor:pointer;" onclick="showProfile('${c.id}')">
+      <div style="display:flex;align-items:center;gap:12px;">
+        ${avatarEl(c,38)}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${c.name}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${c.visits.length} purchase${c.visits.length!==1?'s':''} · Last: ${lastDate}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:15px;font-weight:800;color:#f66;">-${c.totalQty} ${unit}</div>
+          ${c.totalSpend>0?`<div style="font-size:11px;color:#4f4;margin-top:2px;">₹${c.totalSpend.toLocaleString('en-IN')}</div>`:''}
+        </div>
+      </div>
+      ${c.visits.length>0?`<div style="margin-top:10px;border-top:1px solid #1e2a45;padding-top:10px;display:flex;flex-direction:column;gap:5px;">
+        ${c.visits.slice(0,3).map(v=>`<div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:11px;color:#4a5a7a;">${new Date(v.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}${v.bill?' · '+v.bill:''}</div>
+          <div style="font-size:12px;font-weight:700;color:#e8eaf0;">${v.qty} ${unit}${v.ppu>0?' @ ₹'+v.ppu+'/'+unit:''}</div>
+        </div>`).join('')}
+        ${c.visits.length>3?`<div style="font-size:11px;color:#4a5a7a;text-align:center;">+${c.visits.length-3} more visits</div>`:''}
+      </div>`:''}
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════════════════════════
