@@ -4519,8 +4519,195 @@ function renderSettings(){
       row("⬇️","Export CSV","Download all customer data","exportCSV()")
     )}
 
+    ${section("🔐 History Management",
+      row("🗑","Delete Purchase History","Clear history for one, multiple or all customers","openHistoryManager()","›",true)
+    )}
+
     <div style="text-align:center;padding:20px 0;font-size:12px;color:#2a3a5a;">ShopChampion Pro · Your data is secure</div>
   </div>`;
+}
+
+// ── History Management ────────────────────────────────────────
+const HIST_PASS_KEY = 'sc_hist_mgr_pass';
+
+function openHistoryManager(){
+  const savedPass = localStorage.getItem(HIST_PASS_KEY);
+  if(savedPass){ _showHistPassPrompt(savedPass); }
+  else { _showHistSetPassword(); }
+}
+
+function _showHistSetPassword(){
+  showWideModal(`${modalHeader("🔐 Set History Manager Password")}
+    <div style="font-size:13px;color:#7ab3ff;background:#0a1020;border:1px solid #1a2a40;border-radius:10px;padding:12px;margin-bottom:16px;">
+      Set a password to protect History Management. You'll need it every time.
+    </div>
+    <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">New Password</label>
+    <input class="input" id="hm-pass1" type="password" placeholder="Enter password" style="margin-bottom:10px;" />
+    <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Confirm Password</label>
+    <input class="input" id="hm-pass2" type="password" placeholder="Confirm password" style="margin-bottom:6px;" onkeydown="if(event.key==='Enter')_saveHistPass()" />
+    <div id="hm-pass-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
+    <button class="btn" onclick="_saveHistPass()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:13px;font-size:15px;font-weight:800;">🔐 Set Password & Continue</button>
+  `);
+}
+
+function _saveHistPass(){
+  const p1=document.getElementById('hm-pass1')?.value||'';
+  const p2=document.getElementById('hm-pass2')?.value||'';
+  const err=document.getElementById('hm-pass-err');
+  if(p1.length<4){ if(err){err.style.display='block';err.textContent='Minimum 4 characters';} return; }
+  if(p1!==p2){ if(err){err.style.display='block';err.textContent='Passwords do not match';} return; }
+  localStorage.setItem(HIST_PASS_KEY,p1);
+  closeModal();
+  setTimeout(()=>_showHistManager(),120);
+}
+
+function _showHistPassPrompt(){
+  showWideModal(`${modalHeader("🔐 History Manager")}
+    <div style="font-size:13px;color:#7a8aaa;margin-bottom:14px;">Enter your password to continue.</div>
+    <input class="input" id="hm-auth-pass" type="password" placeholder="Password" style="margin-bottom:6px;" onkeydown="if(event.key==='Enter')_verifyHistPass()" />
+    <div id="hm-auth-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
+    <button class="btn" onclick="_verifyHistPass()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:13px;font-size:15px;font-weight:800;margin-bottom:10px;">🔓 Unlock</button>
+    <button onclick="closeModal();setTimeout(()=>{localStorage.removeItem(HIST_PASS_KEY);_showHistSetPassword();},150)" style="width:100%;background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;padding:6px;">Forgot password? Reset it</button>
+  `);
+  setTimeout(()=>document.getElementById('hm-auth-pass')?.focus(),200);
+}
+
+function _verifyHistPass(){
+  const entered=document.getElementById('hm-auth-pass')?.value||'';
+  const saved=localStorage.getItem(HIST_PASS_KEY)||'';
+  const err=document.getElementById('hm-auth-err');
+  if(entered!==saved){ if(err){err.style.display='block';err.textContent='Incorrect password';} return; }
+  closeModal();
+  setTimeout(()=>_showHistManager(),120);
+}
+
+function _showHistManager(){
+  window._hmSelected=new Set();
+  const custList=customers.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const rows=custList.map(c=>{
+    const pCount=(c.purchases||[]).length;
+    const total=(c.purchases||[]).reduce((s,p)=>s+Number(p.amount),0);
+    return `<div id="hm-row-${c.id}" onclick="_hmToggle('${c.id}',this)"
+      style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #0d1220;cursor:pointer;transition:background 0.12s;"
+      onmouseenter="if(!window._hmSelected?.has('${c.id}'))this.style.background='#0d1525'"
+      onmouseleave="if(!window._hmSelected?.has('${c.id}'))this.style.background=''">
+      <div id="hm-chk-${c.id}" style="width:20px;height:20px;border-radius:6px;border:2px solid #2a3560;background:#0a0e1a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;"></div>
+      ${avatarEl(c,32)}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:1px;">${pCount} purchase${pCount!==1?'s':''} · ${pCount>0?formatINR(total):'No history'}</div>
+      </div>
+      ${pCount>0?`<div style="font-size:11px;background:#1a0a0a;border:1px solid #4a1a1a;border-radius:6px;padding:2px 7px;color:#f66;font-weight:700;">${pCount}</div>`:`<div style="font-size:11px;color:#2a3a5a;">—</div>`}
+    </div>`;
+  }).join('');
+
+  showWideModal(`${modalHeader("🗑 Delete Purchase History")}
+    <div style="font-size:12px;color:#7ab3ff;background:#0a1020;border:1px solid #1a2a40;border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+      ⚠️ Deletes purchase records only — customers are NOT deleted.
+    </div>
+    <input class="input" id="hm-search" placeholder="🔍 Search customers..." oninput="_hmSearch()" style="margin-bottom:8px;font-size:13px;" />
+    <div style="display:flex;gap:6px;margin-bottom:10px;">
+      <button onclick="_hmSelectAll()" style="flex:1;padding:8px 4px;border-radius:8px;border:1px solid #2a3560;background:#0a0e1a;color:#7ab3ff;font-size:12px;font-weight:700;cursor:pointer;">☑ All</button>
+      <button onclick="_hmDeselectAll()" style="flex:1;padding:8px 4px;border-radius:8px;border:1px solid #2a3560;background:#0a0e1a;color:#7ab3ff;font-size:12px;font-weight:700;cursor:pointer;">⬜ None</button>
+      <button onclick="_hmDeleteAll()" style="flex:1;padding:8px 4px;border-radius:8px;border:1px solid #4a1a1a;background:#1a0808;color:#f66;font-size:12px;font-weight:800;cursor:pointer;">🔥 Delete ALL</button>
+    </div>
+    <div id="hm-list" style="max-height:42vh;overflow-y:auto;border:1px solid #1a2035;border-radius:12px;background:#070b14;margin-bottom:10px;">
+      ${rows||'<div style="padding:20px;text-align:center;color:#4a5a7a;">No customers</div>'}
+    </div>
+    <div id="hm-sel-bar" style="display:none;background:#0a1a0a;border:1px solid #1a4a1a;border-radius:10px;padding:10px 14px;margin-bottom:10px;align-items:center;justify-content:space-between;">
+      <span id="hm-sel-count" style="font-size:13px;font-weight:700;color:#4f4;">0 selected</span>
+      <button onclick="_hmDeleteSelected()" style="background:linear-gradient(135deg,#f44,#a22);border:none;border-radius:8px;color:#fff;padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;">🗑 Delete Selected</button>
+    </div>
+    <button onclick="closeModal()" style="width:100%;padding:11px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;color:#7a8aaa;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">Close</button>
+    <div style="text-align:center;">
+      <button onclick="closeModal();setTimeout(()=>{localStorage.removeItem(HIST_PASS_KEY);notify('🔑 Password removed. Set a new one next time.');},150)" style="background:transparent;border:none;color:#2a3a5a;font-size:11px;cursor:pointer;">🔑 Change Password</button>
+    </div>
+  `);
+}
+
+function _hmToggle(id,row){
+  if(!window._hmSelected) window._hmSelected=new Set();
+  const chk=document.getElementById('hm-chk-'+id);
+  if(window._hmSelected.has(id)){
+    window._hmSelected.delete(id);
+    if(chk){chk.innerHTML='';chk.style.background='#0a0e1a';chk.style.borderColor='#2a3560';chk.style.color='';}
+    if(row) row.style.background='';
+  } else {
+    window._hmSelected.add(id);
+    if(chk){chk.innerHTML='✓';chk.style.background='#0a2a0a';chk.style.borderColor='#4f4';chk.style.color='#4f4';}
+    if(row) row.style.background='#080e08';
+  }
+  _hmUpdateBar();
+}
+
+function _hmSelectAll(){
+  if(!window._hmSelected) window._hmSelected=new Set();
+  document.querySelectorAll('[id^="hm-row-"]').forEach(row=>{
+    if(row.style.display==='none') return;
+    const id=row.id.replace('hm-row-','');
+    window._hmSelected.add(id);
+    const chk=document.getElementById('hm-chk-'+id);
+    if(chk){chk.innerHTML='✓';chk.style.background='#0a2a0a';chk.style.borderColor='#4f4';chk.style.color='#4f4';}
+    row.style.background='#080e08';
+  });
+  _hmUpdateBar();
+}
+
+function _hmDeselectAll(){
+  if(!window._hmSelected) window._hmSelected=new Set();
+  window._hmSelected.forEach(id=>{
+    const chk=document.getElementById('hm-chk-'+id);
+    if(chk){chk.innerHTML='';chk.style.background='#0a0e1a';chk.style.borderColor='#2a3560';chk.style.color='';}
+    const row=document.getElementById('hm-row-'+id);
+    if(row) row.style.background='';
+  });
+  window._hmSelected.clear();
+  _hmUpdateBar();
+}
+
+function _hmUpdateBar(){
+  const bar=document.getElementById('hm-sel-bar');
+  const cnt=document.getElementById('hm-sel-count');
+  const n=window._hmSelected?.size||0;
+  if(bar) bar.style.display=n>0?'flex':'none';
+  if(cnt) cnt.textContent=`${n} customer${n!==1?'s':''} selected`;
+}
+
+function _hmSearch(){
+  const q=(document.getElementById('hm-search')?.value||'').toLowerCase().trim();
+  document.querySelectorAll('[id^="hm-row-"]').forEach(row=>{
+    if(!q){ row.style.display=''; return; }
+    const nameEl=row.querySelectorAll('div')[3]; // 4th div = name
+    const name=(nameEl?.textContent||'').toLowerCase();
+    row.style.display=name.includes(q)?'':'none';
+  });
+}
+
+async function _hmDeleteSelected(){
+  const sel=window._hmSelected;
+  if(!sel||sel.size===0){ notify('⚠️ Select at least one customer'); return; }
+  const names=customers.filter(c=>sel.has(c.id)).map(c=>c.name);
+  const preview=names.slice(0,5).join(', ')+(names.length>5?` +${names.length-5} more`:'');
+  if(!confirm(`Clear ALL purchase history for ${sel.size} customer${sel.size!==1?'s':''}?\n\n${preview}\n\nThis cannot be undone.`)) return;
+  let cleared=0, records=0;
+  sel.forEach(id=>{
+    const c=customers.find(x=>x.id===id);
+    if(c){ records+=(c.purchases||[]).length; c.purchases=[]; cleared++; }
+  });
+  await saveCustomers();
+  notify(`✅ Cleared history for ${cleared} customer${cleared!==1?'s':''} (${records} records deleted)`);
+  closeModal();
+  safeRenderTab(currentTab);
+}
+
+async function _hmDeleteAll(){
+  const total=customers.reduce((s,c)=>s+(c.purchases||[]).length,0);
+  if(!confirm(`⚠️ Delete ALL purchase history for ALL ${customers.length} customers?\n\n${total} records will be permanently erased.\n\nCustomers stay. History goes.\n\nThis CANNOT be undone.`)) return;
+  customers.forEach(c=>{ c.purchases=[]; });
+  await saveCustomers();
+  notify(`🔥 All purchase history deleted (${total} records)`);
+  closeModal();
+  safeRenderTab(currentTab);
 }
 
 // ── Settings modals opened from settings page ──
