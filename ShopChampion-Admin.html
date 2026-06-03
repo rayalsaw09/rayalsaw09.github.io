@@ -3463,7 +3463,7 @@ async function ptSubmit(){
   ptRestoreLiveBadge();
   const btn=document.getElementById("pt-sub");
   btn.style.background="linear-gradient(135deg,#1a5a2a,#2a8a3a)";btn.style.color="#4f4";btn.textContent="✅ Added!";
-  setTimeout(()=>{btn.style.background="linear-gradient(135deg,#FFD700,#FFA500)";btn.style.color="#1a0a00";btn.textContent="Add Purchase →";safeRenderTab(currentTab);},2000);
+  setTimeout(()=>{btn.style.background="linear-gradient(135deg,#FFD700,#FFA500)";btn.style.color="#1a0a00";btn.textContent="Add Purchase →";},2000);
 }
 
 // ─── BULK PURCHASE TAB FUNCTIONS ─────────────────────────────────────────────
@@ -3837,64 +3837,121 @@ function getAnalyticsYears(){
 function setAnalyticsYear(y){ analyticsYear=y; renderTab(3); }
 
 function renderAnalytics(sorted){
+  const now       = new Date();
+  const thisMonth = now.getMonth();
+  const thisYear  = now.getFullYear();
+  const prevMonth = thisMonth === 0 ? 11 : thisMonth - 1;
+  const prevMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear;
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
   const years = getAnalyticsYears();
   if(!years.includes(analyticsYear)) analyticsYear = years[0];
-  const yr    = String(analyticsYear);
-  const prevYr= String(analyticsYear - 1);
-  const MONTHS= ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const yr = String(analyticsYear);
 
-  // ── Sales revenue (from customer purchases) ──
-  function yearPurchases(c,y){ return (c.purchases||[]).filter(p=>(p.date||"").slice(0,4)===y); }
-  function yearSpend(c,y){ return yearPurchases(c,y).reduce((a,p)=>a+Number(p.amount),0); }
+  // ── Revenue from customer purchases ──
+  function monthSpend(c, mo, ye){
+    return (c.purchases||[]).filter(p=>{
+      const d = new Date(p.date||"");
+      return d.getMonth()===mo && d.getFullYear()===ye;
+    }).reduce((a,p)=>a+Number(p.amount),0);
+  }
+  function yearSpend(c,y){ return (c.purchases||[]).filter(p=>(p.date||"").slice(0,4)===y).reduce((a,p)=>a+Number(p.amount),0); }
 
-  const yrData          = sorted.map(c=>({...c,_ys:yearSpend(c,yr),_yv:yearPurchases(c,yr).length}));
-  const activeCustomers = yrData.filter(c=>c._ys>0);
-  const totalSaleRev    = activeCustomers.reduce((a,c)=>a+c._ys,0);
-  const prevSaleRev     = sorted.reduce((a,c)=>a+yearSpend(c,prevYr),0);
+  const totalMonthSales = sorted.reduce((a,c)=>a+monthSpend(c,thisMonth,thisYear),0);
+  const totalPrevMonthSales = sorted.reduce((a,c)=>a+monthSpend(c,prevMonth,prevMonthYear),0);
+  const totalYearSales = sorted.reduce((a,c)=>a+yearSpend(c,yr),0);
+  const activeThisMonth = sorted.filter(c=>monthSpend(c,thisMonth,thisYear)>0);
+  const activeYearCustomers = sorted.filter(c=>yearSpend(c,yr)>0);
 
-  // Count total transactions
-  let totalTxns=0, totalQtySold=0;
+  let totalTxns=0;
   sorted.forEach(c=>(c.purchases||[]).forEach(p=>{
-    if((p.date||"").slice(0,4)===yr){ totalTxns++; (p.soldItems||[]).forEach(si=>totalQtySold+=Number(si.qty)||0); }
+    if((p.date||"").slice(0,4)===yr) totalTxns++;
   }));
 
-  // ── Inventory cost (from stock restocks) ──
-  let totalPurchaseCost=0, totalPurchaseCostPrev=0, totalRestocks=0, totalUnitsRestocked=0;
+  // ── Purchase cost from inventory restocks ──
+  let totalMonthCost=0, totalPrevMonthCost=0, totalYearCost=0;
   inventoryItems.forEach(item=>{
     (item.stock||[]).forEach(e=>{
-      const ey=(e.date||"").slice(0,4);
-      const cost=(Number(e.qty)||0)*(Number(e.costPerUnit)||0);
-      if(ey===yr){ totalPurchaseCost+=cost; totalRestocks++; totalUnitsRestocked+=Number(e.qty)||0; }
-      if(ey===prevYr) totalPurchaseCostPrev+=cost;
+      const d = new Date(e.date||"");
+      const cost = (Number(e.qty)||0)*(Number(e.costPerUnit)||0);
+      if(d.getMonth()===thisMonth && d.getFullYear()===thisYear) totalMonthCost+=cost;
+      if(d.getMonth()===prevMonth && d.getFullYear()===prevMonthYear) totalPrevMonthCost+=cost;
+      if((e.date||"").slice(0,4)===yr) totalYearCost+=cost;
     });
   });
 
-  // ── Current inventory value ──
+  // ── Current stock value ──
   let inventoryValue=0;
   inventoryItems.forEach(item=>{
-    const stk=invGetStock(item.name);
-    // Use most recent cost per unit as valuation
-    const lastStock=[...(item.stock||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
-    const cpu=lastStock?Number(lastStock.costPerUnit||0):0;
-    inventoryValue+=stk*cpu;
+    const stk = invGetStock(item.name);
+    const lastStock = [...(item.stock||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+    const cpu = lastStock ? Number(lastStock.costPerUnit||0) : 0;
+    inventoryValue += stk*cpu;
   });
 
-  // ── P&L ──
-  const grossProfit   = totalSaleRev - totalPurchaseCost;
-  const prevGrossProfit = prevSaleRev - totalPurchaseCostPrev;
-  const profitMargin  = totalSaleRev>0 ? (grossProfit/totalSaleRev*100).toFixed(1) : "0.0";
-  const isProfit      = grossProfit>=0;
-  const revenueGrowth = prevSaleRev>0 ? Math.round((totalSaleRev-prevSaleRev)/prevSaleRev*100) : null;
-  const costGrowth    = totalPurchaseCostPrev>0 ? Math.round((totalPurchaseCost-totalPurchaseCostPrev)/totalPurchaseCostPrev*100) : null;
+  // ── Profit calculations ──
+  const monthProfit = totalMonthSales - totalMonthCost;
+  const prevMonthProfit = totalPrevMonthSales - totalPrevMonthCost;
+  const yearProfit  = totalYearSales - totalYearCost;
+  const salesGrowth = totalPrevMonthSales > 0 ? Math.round((totalMonthSales - totalPrevMonthSales)/totalPrevMonthSales*100) : null;
 
-  // ── Monthly breakdown ──
-  const monthlySales =Array(12).fill(0);
-  const monthlyCost  =Array(12).fill(0);
-  const monthlyTxns  =Array(12).fill(0);
+  // ── Business status ──
+  let statusEmoji, statusColor, statusBg, statusBorder, statusMsg, statusSub;
+  if(monthProfit > 0 && (totalPrevMonthSales===0 || salesGrowth >= 0)){
+    statusEmoji="🟢"; statusColor="#22c55e"; statusBg="linear-gradient(135deg,#052a14,#083a1a)"; statusBorder="#16a34a";
+    statusMsg="Business is doing well";
+    statusSub=`Profit this month: ${formatINR(monthProfit)}`;
+  } else if(monthProfit > 0){
+    statusEmoji="🟡"; statusColor="#f59e0b"; statusBg="linear-gradient(135deg,#1a1400,#2a1e00)"; statusBorder="#b45309";
+    statusMsg="Sales are a bit slow";
+    statusSub=`Still making profit: ${formatINR(monthProfit)} — but sales dropped`;
+  } else if(totalMonthSales === 0 && totalMonthCost === 0){
+    statusEmoji="⚪"; statusColor="#64748b"; statusBg="linear-gradient(135deg,#0a0e1a,#111827)"; statusBorder="#1e2a45";
+    statusMsg="No activity this month yet";
+    statusSub="Start recording sales to see your business health";
+  } else {
+    statusEmoji="🔴"; statusColor="#ef4444"; statusBg="linear-gradient(135deg,#1a0505,#2a0808)"; statusBorder="#b91c1c";
+    statusMsg="Business is running at a loss";
+    statusSub=`Loss this month: ${formatINR(Math.abs(monthProfit))} — expenses exceed sales`;
+  }
+
+  // ── Item-level profit ──
+  const itemPL = inventoryItems.map(item=>{
+    let cost=0, rev=0, unitsSold=0;
+    (item.stock||[]).forEach(e=>{
+      if((e.date||"").slice(0,4)===yr) cost+=(Number(e.qty)||0)*(Number(e.costPerUnit)||0);
+    });
+    (item.salesLog||[]).forEach(e=>{
+      if((e.date||"").slice(0,4)===yr){
+        rev+=(Number(e.qty)||0)*(Number(e.pricePerUnit)||0);
+        unitsSold+=Number(e.qty)||0;
+      }
+    });
+    return {name:item.name, unit:item.unit||"unit", cost, rev, profit:rev-cost, unitsSold};
+  }).filter(x=>x.cost>0||x.rev>0);
+
+  const topItems  = [...itemPL].sort((a,b)=>b.profit-a.profit).filter(x=>x.profit>0).slice(0,5);
+  const lossItems = [...itemPL].sort((a,b)=>a.profit-b.profit).filter(x=>x.profit<0).slice(0,5);
+
+  // ── Low stock ──
+  const lowStockItems = inventoryItems.filter(x=>invGetStock(x.name)<=3 && invGetStock(x.name)>0);
+  const outOfStock    = inventoryItems.filter(x=>invGetStock(x.name)<=0);
+
+  // ── Best customer this month ──
+  const custThisMonth = sorted.map(c=>({...c, _ms: monthSpend(c,thisMonth,thisYear)}))
+    .filter(c=>c._ms>0).sort((a,b)=>b._ms-a._ms);
+  const bestCust = custThisMonth[0];
+
+  // ── Year picker ──
+  const yearBtns = years.map(y=>`<button onclick="setAnalyticsYear(${y})" style="cursor:pointer;border-radius:20px;padding:6px 16px;border:2px solid ${y===analyticsYear?'#22c55e':'#1e2a45'};background:${y===analyticsYear?'#052a14':'transparent'};color:${y===analyticsYear?'#22c55e':'#4a5a7a'};font-size:13px;font-weight:700;transition:all 0.2s;">${y}</button>`).join("");
+
+  // ── Monthly mini bars for trend ──
+  const monthlySales = Array(12).fill(0);
+  const monthlyCost  = Array(12).fill(0);
   sorted.forEach(c=>(c.purchases||[]).forEach(p=>{
     if((p.date||"").slice(0,4)===yr){
       const m=parseInt((p.date||"").slice(5,7))-1;
-      if(m>=0&&m<12){ monthlySales[m]+=Number(p.amount); monthlyTxns[m]++; }
+      if(m>=0&&m<12) monthlySales[m]+=Number(p.amount);
     }
   }));
   inventoryItems.forEach(item=>(item.stock||[]).forEach(e=>{
@@ -3903,237 +3960,234 @@ function renderAnalytics(sorted){
       if(m>=0&&m<12) monthlyCost[m]+=(Number(e.qty)||0)*(Number(e.costPerUnit)||0);
     }
   }));
+  const maxBarVal = Math.max(...monthlySales,...monthlyCost,1);
 
-  // ── Item-level P&L ──
-  const itemPL=inventoryItems.map(item=>{
-    let cost=0,rev=0,unitsSold=0,unitsIn=0;
-    (item.stock||[]).forEach(e=>{ if((e.date||"").slice(0,4)===yr){ cost+=(Number(e.qty)||0)*(Number(e.costPerUnit)||0); unitsIn+=Number(e.qty)||0; }});
-    (item.salesLog||[]).forEach(e=>{ if((e.date||"").slice(0,4)===yr){ rev+=(Number(e.qty)||0)*(Number(e.pricePerUnit)||0); unitsSold+=Number(e.qty)||0; }});
-    return {name:item.name,unit:item.unit||"unit",cost,rev,profit:rev-cost,margin:rev>0?((rev-cost)/rev*100):0,unitsSold,unitsIn};
-  }).filter(x=>x.cost>0||x.rev>0).sort((a,b)=>b.profit-a.profit);
-
-  // ── Top/bottom performers ──
-  const topItems   =itemPL.filter(x=>x.profit>0).slice(0,5);
-  const lossItems  =itemPL.filter(x=>x.profit<0).sort((a,b)=>a.profit-b.profit).slice(0,5);
-
-  // ── Year picker ──
-  const yearBtns=years.map(y=>`<button onclick="setAnalyticsYear(${y})" style="cursor:pointer;border-radius:8px;padding:7px 14px;border:2px solid ${y===analyticsYear?'#FFD700':'#1e2a45'};background:${y===analyticsYear?'#1a1400':'#0a0e1a'};color:${y===analyticsYear?'#FFD700':'#4a5a7a'};font-size:13px;font-weight:${y===analyticsYear?'800':'600'};">${y}</button>`).join("");
-
-  // ── Bar chart helper ──
-  const maxBarH=80;
-  const maxVal=Math.max(...monthlySales,...monthlyCost,1);
-  const barChart=MONTHS.map((m,i)=>{
-    const sh=Math.round(monthlySales[i]/maxVal*maxBarH);
-    const ch=Math.round(monthlyCost[i]/maxVal*maxBarH);
-    const profit=monthlySales[i]-monthlyCost[i];
-    const pc=profit>=0?'#4f4':'#f66';
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0;">
-      <div style="font-size:9px;color:${pc};font-weight:700;">${profit!==0?(profit>0?'+':'')+Math.round(profit/1000)+'k':''}</div>
-      <div style="display:flex;align-items:flex-end;gap:1px;height:${maxBarH}px;">
-        <div title="Sales: ${formatINR(monthlySales[i])}" style="width:9px;height:${sh}px;background:linear-gradient(180deg,#4a8aff,#2a5adf);border-radius:2px 2px 0 0;min-height:${monthlySales[i]>0?2:0}px;"></div>
-        <div title="Cost: ${formatINR(monthlyCost[i])}" style="width:9px;height:${ch}px;background:linear-gradient(180deg,#f66,#a33);border-radius:2px 2px 0 0;min-height:${monthlyCost[i]>0?2:0}px;"></div>
+  const monthBars = MONTHS.map((m,i)=>{
+    const s = monthlySales[i], c = monthlyCost[i], p = s - c;
+    const sh = Math.max(Math.round(s/maxBarVal*52),s>0?3:0);
+    const isCurrent = (i===thisMonth && parseInt(yr)===thisYear);
+    const pc = p>=0?'#22c55e':'#ef4444';
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;min-width:0;">
+      <div style="font-size:9px;color:${pc};font-weight:800;line-height:1;">${p!==0?( p>0?'+'+(p>=1000?Math.round(p/1000)+'k':Math.round(p)) : (p<=-1000?Math.round(p/1000)+'k':Math.round(p)) ):''}</div>
+      <div style="height:52px;display:flex;align-items:flex-end;">
+        <div style="width:12px;height:${sh}px;background:${isCurrent?'#22c55e':'#2a4a8a'};border-radius:3px 3px 0 0;opacity:${s>0?1:0.2};"></div>
       </div>
-      <div style="font-size:9px;color:#4a5a7a;">${m}</div>
+      <div style="font-size:9px;color:${isCurrent?'#e8eaf0':'#3a4a6a'};font-weight:${isCurrent?'800':'400'};">${m}</div>
     </div>`;
   }).join("");
 
-  // ── Monthly P&L table ──
-  const monthlyTable=MONTHS.map((m,i)=>{
-    const s=monthlySales[i],c=monthlyCost[i],p=s-c;
-    const pc=p>0?'#4f4':p<0?'#f66':'#4a5a7a';
-    return `<tr style="border-bottom:1px solid #0d1220;">
-      <td style="padding:7px 10px;color:#e8eaf0;font-weight:600;">${m}</td>
-      <td style="padding:7px 10px;color:${s>0?'#4a8aff':'#2a3a5a'};font-weight:700;">${s>0?formatINR(s):'—'}</td>
-      <td style="padding:7px 10px;color:${c>0?'#f66':'#2a3a5a'};font-weight:700;">${c>0?formatINR(c):'—'}</td>
-      <td style="padding:7px 10px;color:${pc};font-weight:800;">${p!==0?(p>0?'+':'')+formatINR(p):'—'}</td>
-      <td style="padding:7px 10px;color:#4a5a7a;font-size:11px;">${monthlyTxns[i]>0?monthlyTxns[i]+' txn':''}</td>
-    </tr>`;
-  }).join("");
+  return `
+  <div style="font-family:'Nunito',sans-serif;max-width:600px;margin:0 auto;padding:0 0 80px 0;">
 
-  // ── Item P&L table ──
-  const itemTable=itemPL.length===0
-    ?`<div style="color:#4a5a7a;text-align:center;padding:20px;">No inventory data for ${yr}</div>`
-    :itemPL.map(x=>{
-      const pc=x.profit>0?'#4f4':x.profit<0?'#f66':'#4a5a7a';
-      const barW=itemPL[0].rev>0?Math.round(Math.abs(x.profit)/Math.max(...itemPL.map(i=>Math.abs(i.profit)),1)*100):0;
-      return `<div style="padding:10px 0;border-bottom:1px solid #0d1220;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-          <div style="font-size:13px;font-weight:700;color:#e8eaf0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.name}</div>
-          <div style="font-size:13px;font-weight:800;color:${pc};white-space:nowrap;margin-left:8px;">${x.profit>0?'+':''}${formatINR(x.profit)}</div>
-        </div>
-        <div style="display:flex;gap:12px;font-size:11px;color:#4a5a7a;margin-bottom:5px;flex-wrap:wrap;">
-          <span>🛒 Sales: <span style="color:#4a8aff;font-weight:700;">${formatINR(x.rev)}</span></span>
-          <span>📦 Cost: <span style="color:#f66;font-weight:700;">${formatINR(x.cost)}</span></span>
-          <span>📊 Margin: <span style="color:${pc};font-weight:700;">${x.margin.toFixed(1)}%</span></span>
-          <span>Units: ${x.unitsSold} sold / ${x.unitsIn} in</span>
-        </div>
-        <div style="height:4px;background:#0a0e1a;border-radius:2px;overflow:hidden;">
-          <div style="height:100%;width:${barW}%;background:${pc};border-radius:2px;transition:width 0.4s;"></div>
-        </div>
-      </div>`;
-    }).join("");
-
-  // ── Summary P&L card colours ──
-  const plColor  =isProfit?'#4f4':'#f66';
-  const plBg     =isProfit?'#051a05':'#1a0505';
-  const plBorder =isProfit?'#1a4a1a':'#4a1a1a';
-  const plIcon   =isProfit?'📈':'📉';
-  const plLabel  =isProfit?'NET PROFIT':'NET LOSS';
-
-  return `<div>
-    <!-- Header + year picker -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-      <h2 style="margin:0;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">📒 Balance Sheet</h2>
-      <button onclick="exportYearCSV(${analyticsYear})" style="cursor:pointer;border-radius:8px;padding:7px 14px;border:1px solid #2a3560;background:#1a2540;color:#aaa;font-size:12px;font-weight:700;">⬇ Export ${analyticsYear}</button>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;align-items:center;">
-      <span style="font-size:11px;color:#4a5a7a;font-weight:700;">YEAR:</span>
-      ${yearBtns}
+    <!-- Year Picker + Export -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">${yearBtns}</div>
+      <button onclick="exportYearCSV(${analyticsYear})" style="cursor:pointer;border-radius:20px;padding:6px 14px;border:1px solid #1e2a45;background:#0a0e1a;color:#4a5a7a;font-size:12px;font-weight:700;">⬇ Export</button>
     </div>
 
-    <!-- Big P&L verdict -->
-    <div style="background:${plBg};border:2px solid ${plBorder};border-radius:16px;padding:20px 18px;margin-bottom:16px;display:flex;align-items:center;gap:16px;">
-      <div style="font-size:40px;">${plIcon}</div>
-      <div style="flex:1;">
-        <div style="font-size:11px;font-weight:800;color:#4a5a7a;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">${plLabel} — ${yr}</div>
-        <div style="font-size:28px;font-weight:800;color:${plColor};">${isProfit?'+':''}${formatINR(Math.abs(grossProfit))}</div>
-        <div style="font-size:12px;color:#4a5a7a;margin-top:4px;">Profit margin: <span style="color:${plColor};font-weight:700;">${profitMargin}%</span>
-          ${revenueGrowth!==null?`· Revenue ${revenueGrowth>=0?'▲':'▼'}<span style="color:${revenueGrowth>=0?'#4f4':'#f66'};font-weight:700;">${Math.abs(revenueGrowth)}%</span> vs ${prevYr}`:''}
+    <!-- SECTION 1: BUSINESS STATUS HERO CARD -->
+    <div style="background:${statusBg};border:2px solid ${statusBorder};border-radius:20px;padding:24px 20px;margin-bottom:14px;position:relative;overflow:hidden;">
+      <div style="position:absolute;right:-20px;top:-20px;font-size:100px;opacity:0.06;pointer-events:none;">💰</div>
+      <div style="display:flex;align-items:flex-start;gap:14px;">
+        <div style="font-size:42px;line-height:1;">${statusEmoji}</div>
+        <div style="flex:1;">
+          <div style="font-size:20px;font-weight:900;color:#f0f4ff;line-height:1.2;margin-bottom:6px;">${statusMsg}</div>
+          <div style="font-size:14px;color:${statusColor};font-weight:700;">${statusSub}</div>
+          ${salesGrowth!==null ? `<div style="margin-top:8px;display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.07);border-radius:20px;padding:4px 10px;">
+            <span style="font-size:16px;">${salesGrowth>=0?'⬆️':'⬇️'}</span>
+            <span style="font-size:13px;color:${salesGrowth>=0?'#22c55e':'#ef4444'};font-weight:800;">Sales ${salesGrowth>=0?'+':''}${salesGrowth}% vs last month</span>
+          </div>` : ''}
         </div>
-      </div>
-      ${prevGrossProfit!==0?`<div style="text-align:right;flex-shrink:0;">
-        <div style="font-size:10px;color:#4a5a7a;margin-bottom:2px;">${prevYr} P&L</div>
-        <div style="font-size:14px;font-weight:800;color:${prevGrossProfit>=0?'#4f4':'#f66'};">${prevGrossProfit>=0?'+':''}${formatINR(Math.abs(prevGrossProfit))}</div>
-      </div>`:''}
-    </div>
-
-    <!-- Summary 3-box row -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
-      <div style="background:#0a0e1a;border:1px solid #1e3a6e;border-radius:12px;padding:14px 10px;text-align:center;">
-        <div style="font-size:10px;color:#4a5a7a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">💰 Total Sales</div>
-        <div style="font-size:18px;font-weight:800;color:#4a8aff;">${formatINR(totalSaleRev)}</div>
-        <div style="font-size:10px;color:#4a5a7a;margin-top:4px;">${totalTxns} txns · ${activeCustomers.length} customers</div>
-        ${prevSaleRev>0?`<div style="font-size:10px;color:${revenueGrowth>=0?'#4f4':'#f66'};margin-top:2px;">${revenueGrowth>=0?'▲':'▼'}${Math.abs(revenueGrowth)}% vs ${prevYr}</div>`:''}
-      </div>
-      <div style="background:#0a0e1a;border:1px solid #4a1a1a;border-radius:12px;padding:14px 10px;text-align:center;">
-        <div style="font-size:10px;color:#4a5a7a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">📦 Purchase Cost</div>
-        <div style="font-size:18px;font-weight:800;color:#f66;">${formatINR(totalPurchaseCost)}</div>
-        <div style="font-size:10px;color:#4a5a7a;margin-top:4px;">${totalRestocks} restocks · ${totalUnitsRestocked} units</div>
-        ${totalPurchaseCostPrev>0?`<div style="font-size:10px;color:${(costGrowth||0)<=0?'#4f4':'#f66'};margin-top:2px;">${(costGrowth||0)>=0?'▲':'▼'}${Math.abs(costGrowth||0)}% vs ${prevYr}</div>`:''}
-      </div>
-      <div style="background:#0a0e1a;border:1px solid #2a4a1a;border-radius:12px;padding:14px 10px;text-align:center;">
-        <div style="font-size:10px;color:#4a5a7a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🏪 Stock Value</div>
-        <div style="font-size:18px;font-weight:800;color:#FFD700;">${formatINR(inventoryValue)}</div>
-        <div style="font-size:10px;color:#4a5a7a;margin-top:4px;">${inventoryItems.length} items tracked</div>
       </div>
     </div>
 
-    <!-- Sales vs Cost visual bar -->
-    <div class="card" style="padding:16px;margin-bottom:16px;">
-      <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:12px;">⚖️ Sales vs Purchase Cost — ${yr}</div>
-      ${(totalSaleRev+totalPurchaseCost)>0?`
-      <div style="margin-bottom:8px;">
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:#4a5a7a;margin-bottom:4px;">
-          <span>💰 Sales Revenue</span><span style="color:#4a8aff;font-weight:700;">${formatINR(totalSaleRev)}</span>
-        </div>
-        <div style="height:14px;background:#0a0e1a;border-radius:7px;overflow:hidden;">
-          <div style="height:100%;width:${Math.min(totalSaleRev/(Math.max(totalSaleRev,totalPurchaseCost))*100,100).toFixed(1)}%;background:linear-gradient(90deg,#4a8aff,#2a5adf);border-radius:7px;"></div>
-        </div>
+    <!-- SECTION 2: FOUR MAIN NUMBERS -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div style="background:#0a0e1a;border:1px solid #1a3a1a;border-radius:16px;padding:18px 14px;">
+        <div style="font-size:22px;margin-bottom:4px;">💰</div>
+        <div style="font-size:22px;font-weight:900;color:#22c55e;line-height:1;">${formatINR(yearProfit)}</div>
+        <div style="font-size:12px;color:#4a5a7a;margin-top:4px;font-weight:600;">Total Profit (${yr})</div>
+        <div style="font-size:11px;color:#2d4a2d;margin-top:2px;">Money earned after expenses</div>
       </div>
-      <div style="margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:#4a5a7a;margin-bottom:4px;">
-          <span>📦 Purchase Cost</span><span style="color:#f66;font-weight:700;">${formatINR(totalPurchaseCost)}</span>
-        </div>
-        <div style="height:14px;background:#0a0e1a;border-radius:7px;overflow:hidden;">
-          <div style="height:100%;width:${Math.min(totalPurchaseCost/(Math.max(totalSaleRev,totalPurchaseCost))*100,100).toFixed(1)}%;background:linear-gradient(90deg,#f66,#a33);border-radius:7px;"></div>
-        </div>
+      <div style="background:#0a0e1a;border:1px solid #1a2a4a;border-radius:16px;padding:18px 14px;">
+        <div style="font-size:22px;margin-bottom:4px;">🛒</div>
+        <div style="font-size:22px;font-weight:900;color:#4a8aff;line-height:1;">${formatINR(totalYearSales)}</div>
+        <div style="font-size:12px;color:#4a5a7a;margin-top:4px;font-weight:600;">Total Sales (${yr})</div>
+        <div style="font-size:11px;color:#1e2d4a;margin-top:2px;">Total money collected</div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;background:${plBg};border:1px solid ${plBorder};border-radius:8px;padding:8px 12px;">
-        <span style="font-size:12px;font-weight:700;color:#4a5a7a;">${plIcon} ${plLabel}</span>
-        <span style="font-size:14px;font-weight:800;color:${plColor};">${isProfit?'+':''}${formatINR(Math.abs(grossProfit))}</span>
-      </div>`:`<div style="color:#4a5a7a;text-align:center;padding:20px;">No data for ${yr}</div>`}
+      <div style="background:#0a0e1a;border:1px solid #3a1a1a;border-radius:16px;padding:18px 14px;">
+        <div style="font-size:22px;margin-bottom:4px;">📦</div>
+        <div style="font-size:22px;font-weight:900;color:#f87171;line-height:1;">${formatINR(totalYearCost)}</div>
+        <div style="font-size:12px;color:#4a5a7a;margin-top:4px;font-weight:600;">Total Purchases (${yr})</div>
+        <div style="font-size:11px;color:#3a1a1a;margin-top:2px;">Stock bought this year</div>
+      </div>
+      <div style="background:#0a0e1a;border:1px solid #2a2a0a;border-radius:16px;padding:18px 14px;">
+        <div style="font-size:22px;margin-bottom:4px;">🏪</div>
+        <div style="font-size:22px;font-weight:900;color:#fbbf24;line-height:1;">${formatINR(inventoryValue)}</div>
+        <div style="font-size:12px;color:#4a5a7a;margin-top:4px;font-weight:600;">Current Stock Value</div>
+        <div style="font-size:11px;color:#2a2a0a;margin-top:2px;">Value of unsold items</div>
+      </div>
     </div>
 
-    <!-- Month chart + table side by side -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:16px;">
-      <!-- Bar chart -->
-      <div class="card" style="padding:16px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:6px;">
-          <div style="font-size:13px;font-weight:800;color:#e8eaf0;">📊 Monthly P&L — ${yr}</div>
-          <div style="display:flex;gap:10px;">
-            <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#7a8aaa;"><span style="width:8px;height:8px;background:#4a8aff;border-radius:2px;display:inline-block;"></span>Sales</span>
-            <span style="display:flex;align-items:center;gap:4px;font-size:10px;color:#7a8aaa;"><span style="width:8px;height:8px;background:#f66;border-radius:2px;display:inline-block;"></span>Cost</span>
+    <!-- SECTION 3: THIS MONTH SUMMARY -->
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:16px;padding:18px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <span style="font-size:18px;">📅</span>
+        <span style="font-size:15px;font-weight:800;color:#e8eaf0;">This Month — ${MONTHS[thisMonth]} ${thisYear}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="background:#0d1525;border-radius:12px;padding:12px 8px;text-align:center;">
+          <div style="font-size:16px;font-weight:900;color:#4a8aff;">${formatINR(totalMonthSales)}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">💸 Sales</div>
+        </div>
+        <div style="background:#0d1525;border-radius:12px;padding:12px 8px;text-align:center;">
+          <div style="font-size:16px;font-weight:900;color:#f87171;">${formatINR(totalMonthCost)}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">🛍 Expenses</div>
+        </div>
+        <div style="background:#0d1525;border-radius:12px;padding:12px 8px;text-align:center;border:1px solid ${monthProfit>=0?'#1a3a1a':'#3a1a1a'};">
+          <div style="font-size:16px;font-weight:900;color:${monthProfit>=0?'#22c55e':'#ef4444'};">${monthProfit>=0?'+':''}${formatINR(monthProfit)}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">✨ Profit</div>
+        </div>
+      </div>
+      ${salesGrowth!==null ? `<div style="margin-top:10px;display:flex;align-items:center;gap:6px;font-size:12px;color:#4a5a7a;border-top:1px solid #1e2a45;padding-top:10px;">
+        <span style="font-size:16px;">${salesGrowth>=0?'⬆️':'⬇️'}</span>
+        <span>Sales are <strong style="color:${salesGrowth>=0?'#22c55e':'#ef4444'};">${salesGrowth>=0?'+':''}${salesGrowth}%</strong> compared to ${MONTHS[prevMonth]}</span>
+      </div>` : ''}
+    </div>
+
+    <!-- SECTION 4: TOP SELLING ITEMS -->
+    ${topItems.length>0 ? `<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:16px;padding:18px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <span style="font-size:18px;">🏆</span>
+        <span style="font-size:15px;font-weight:800;color:#e8eaf0;">Best Selling Items</span>
+        <span style="font-size:11px;color:#4a5a7a;margin-left:auto;">${yr}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${topItems.map((x,i)=>{
+          const medals=['🥇','🥈','🥉','4️⃣','5️⃣'];
+          const bgColors=['#1a1200','#0d1525','#0d1525','#0d1525','#0d1525'];
+          const borderColors=['#b45309','#1e2a45','#1e2a45','#1e2a45','#1e2a45'];
+          return `<div style="background:${bgColors[i]};border:1px solid ${borderColors[i]};border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:22px;flex-shrink:0;">${medals[i]}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:800;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.name}</div>
+              <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Sold: ${x.unitsSold} ${x.unit}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:15px;font-weight:900;color:#22c55e;">+${formatINR(x.profit)}</div>
+              <div style="font-size:10px;color:#4a5a7a;">profit</div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>` : ''}
+
+    <!-- SECTION 5: ITEMS NEEDING ATTENTION -->
+    ${lossItems.length>0 ? `<div style="background:#120508;border:2px solid #7f1d1d;border-radius:16px;padding:18px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <span style="font-size:18px;">⚠️</span>
+        <span style="font-size:15px;font-weight:800;color:#fca5a5;">Attention Needed</span>
+      </div>
+      <div style="font-size:12px;color:#7f1d1d;margin-bottom:12px;background:#1a0508;border-radius:8px;padding:8px 12px;">These items are costing you money. You are selling them for less than what you paid.</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${lossItems.map(x=>`<div style="background:#0a0205;border:1px solid #7f1d1d;border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:22px;flex-shrink:0;">🔴</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:800;color:#fca5a5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.name}</div>
+            <div style="font-size:11px;color:#7f1d1d;margin-top:2px;">Selling price is lower than purchase cost</div>
           </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:15px;font-weight:900;color:#ef4444;">${formatINR(x.profit)}</div>
+            <div style="font-size:10px;color:#7f1d1d;">loss</div>
+          </div>
+        </div>`).join("")}
+      </div>
+    </div>` : ''}
+
+    <!-- SECTION 6: LOW STOCK ALERTS -->
+    ${(lowStockItems.length>0||outOfStock.length>0) ? `<div style="background:#0a0a00;border:2px solid #854d0e;border-radius:16px;padding:18px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <span style="font-size:18px;">📦</span>
+        <span style="font-size:15px;font-weight:800;color:#fde68a;">Low Stock Alerts</span>
+        <span style="font-size:12px;color:#854d0e;margin-left:auto;background:#1a0e00;border-radius:20px;padding:3px 10px;font-weight:700;">${lowStockItems.length+outOfStock.length} items</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${outOfStock.slice(0,3).map(x=>`<div style="background:#0a0000;border:1px solid #991b1b;border-radius:12px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:16px;">🚫</span>
+            <span style="font-size:13px;font-weight:700;color:#fca5a5;">${x.name}</span>
+          </div>
+          <span style="font-size:12px;font-weight:800;color:#ef4444;background:#1a0000;border-radius:8px;padding:3px 8px;">OUT OF STOCK</span>
+        </div>`).join("")}
+        ${lowStockItems.slice(0,5).map(x=>`<div style="background:#0a0800;border:1px solid #854d0e;border-radius:12px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:16px;">⚠️</span>
+            <span style="font-size:13px;font-weight:700;color:#fde68a;">${x.name}</span>
+          </div>
+          <span style="font-size:12px;font-weight:800;color:#f59e0b;background:#1a1000;border-radius:8px;padding:3px 8px;">${invGetStock(x.name)} ${x.unit||'units'} left</span>
+        </div>`).join("")}
+      </div>
+    </div>` : ''}
+
+    <!-- SECTION 7: CUSTOMER SUMMARY -->
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:16px;padding:18px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <span style="font-size:18px;">👥</span>
+        <span style="font-size:15px;font-weight:800;color:#e8eaf0;">Customers</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:${bestCust?'12px':'0'};">
+        <div style="background:#0d1525;border-radius:12px;padding:14px;text-align:center;">
+          <div style="font-size:28px;font-weight:900;color:#4a8aff;">${sorted.length}</div>
+          <div style="font-size:12px;color:#4a5a7a;margin-top:4px;font-weight:600;">Total Customers</div>
         </div>
-        <div style="display:flex;gap:3px;align-items:flex-end;padding:0 2px;">${barChart}</div>
-      </div>
-      <!-- Monthly table -->
-      <div class="card" style="padding:16px;">
-        <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:12px;">📅 Month-by-Month</div>
-        <div style="overflow-x:auto;">
-          <table style="width:100%;border-collapse:collapse;font-size:12px;">
-            <thead><tr style="border-bottom:1px solid #1e2a45;">
-              <th style="padding:5px 10px;color:#4a5a7a;font-size:10px;text-align:left;text-transform:uppercase;">Month</th>
-              <th style="padding:5px 10px;color:#4a8aff;font-size:10px;text-align:left;text-transform:uppercase;">Sales</th>
-              <th style="padding:5px 10px;color:#f66;font-size:10px;text-align:left;text-transform:uppercase;">Cost</th>
-              <th style="padding:5px 10px;color:#4a5a7a;font-size:10px;text-align:left;text-transform:uppercase;">P&L</th>
-              <th style="padding:5px 10px;color:#4a5a7a;font-size:10px;text-align:left;text-transform:uppercase;"></th>
-            </tr></thead>
-            <tbody>${monthlyTable}</tbody>
-            <tfoot><tr style="border-top:2px solid #1e2a45;">
-              <td style="padding:8px 10px;font-weight:800;color:#e8eaf0;">Total</td>
-              <td style="padding:8px 10px;font-weight:800;color:#4a8aff;">${formatINR(totalSaleRev)}</td>
-              <td style="padding:8px 10px;font-weight:800;color:#f66;">${formatINR(totalPurchaseCost)}</td>
-              <td style="padding:8px 10px;font-weight:800;color:${plColor};">${isProfit?'+':''}${formatINR(Math.abs(grossProfit))}</td>
-              <td></td>
-            </tr></tfoot>
-          </table>
+        <div style="background:#0d1525;border-radius:12px;padding:14px;text-align:center;">
+          <div style="font-size:28px;font-weight:900;color:#a78bfa;">${activeThisMonth.length}</div>
+          <div style="font-size:12px;color:#4a5a7a;margin-top:4px;font-weight:600;">Visited This Month</div>
         </div>
       </div>
+      ${bestCust ? `<div style="background:linear-gradient(135deg,#1a1200,#0d1525);border:1px solid #b45309;border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;">
+        <span style="font-size:28px;">👑</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:11px;color:#b45309;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Best Customer This Month</div>
+          <div style="font-size:15px;font-weight:900;color:#fde68a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${bestCust.name}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:16px;font-weight:900;color:#fbbf24;">${formatINR(bestCust._ms)}</div>
+          <div style="font-size:10px;color:#b45309;">purchased</div>
+        </div>
+      </div>` : ''}
     </div>
 
-    <!-- Item-level P&L -->
-    <div class="card" style="padding:16px;margin-bottom:16px;">
-      <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:4px;">🏷 Per-Item P&L — ${yr}</div>
-      <div style="font-size:11px;color:#4a5a7a;margin-bottom:12px;">Sorted by profit · Only items with cost or sales data shown</div>
-      ${itemTable}
-    </div>
-
-    <!-- Top profit / loss items -->
-    ${(topItems.length>0||lossItems.length>0)?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:16px;">
-      ${topItems.length>0?`<div class="card" style="padding:16px;">
-        <div style="font-size:13px;font-weight:800;color:#4f4;margin-bottom:10px;">🏆 Top Profit Items</div>
-        ${topItems.map((x,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #0d1220;">
-          <span style="font-size:12px;color:#e8eaf0;">#${i+1} ${x.name}</span>
-          <span style="font-size:12px;font-weight:800;color:#4f4;">+${formatINR(x.profit)}</span>
-        </div>`).join("")}
-      </div>`:''}
-      ${lossItems.length>0?`<div class="card" style="padding:16px;">
-        <div style="font-size:13px;font-weight:800;color:#f66;margin-bottom:10px;">⚠️ Loss-Making Items</div>
-        ${lossItems.map((x,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #0d1220;">
-          <span style="font-size:12px;color:#e8eaf0;">#${i+1} ${x.name}</span>
-          <span style="font-size:12px;font-weight:800;color:#f66;">${formatINR(x.profit)}</span>
-        </div>`).join("")}
-      </div>`:''}
-    </div>`:''}
-
-    <!-- Customer stats -->
-    <div class="card" style="padding:16px;margin-bottom:16px;">
-      <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:12px;">👥 Customer Overview — ${yr}</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
-        ${[
-          {l:'Active',v:activeCustomers.length,c:'#4a8aff'},
-          {l:'Transactions',v:totalTxns,c:'#e8eaf0'},
-          {l:'Avg/Customer',v:activeCustomers.length?formatINR(Math.round(totalSaleRev/activeCustomers.length)):'₹0',c:'#FFD700'},
-          {l:'Avg/Txn',v:totalTxns?formatINR(Math.round(totalSaleRev/totalTxns)):'₹0',c:'#b080ff'},
-        ].map(s=>`<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px 8px;text-align:center;">
-          <div style="font-size:15px;font-weight:800;color:${s.c};">${s.v}</div>
-          <div style="font-size:9px;color:#4a5a7a;margin-top:3px;text-transform:uppercase;">${s.l}</div>
-        </div>`).join("")}
+    <!-- SECTION 8: SIMPLE MONTHLY TREND -->
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:16px;padding:18px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+        <span style="font-size:18px;">📈</span>
+        <span style="font-size:15px;font-weight:800;color:#e8eaf0;">Monthly Sales Trend — ${yr}</span>
       </div>
+      <div style="display:flex;gap:2px;align-items:flex-end;padding:0 2px;margin-bottom:8px;">${monthBars}</div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#3a4a6a;padding:0 2px;">
+        <span>Green = profitable month</span>
+        <span>Red = loss month</span>
+      </div>
+      ${totalTxns>0 ? `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <div style="background:#0d1525;border-radius:10px;padding:10px 14px;flex:1;min-width:100px;text-align:center;">
+          <div style="font-size:18px;font-weight:900;color:#e8eaf0;">${totalTxns}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Total Bills (${yr})</div>
+        </div>
+        <div style="background:#0d1525;border-radius:10px;padding:10px 14px;flex:1;min-width:100px;text-align:center;">
+          <div style="font-size:18px;font-weight:900;color:#a78bfa;">${activeYearCustomers.length}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Active Customers</div>
+        </div>
+        <div style="background:#0d1525;border-radius:10px;padding:10px 14px;flex:1;min-width:100px;text-align:center;">
+          <div style="font-size:18px;font-weight:900;color:#fbbf24;">${activeYearCustomers.length>0?formatINR(Math.round(totalYearSales/activeYearCustomers.length)):'₹0'}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Avg per Customer</div>
+        </div>
+      </div>` : ''}
     </div>
+
   </div>`;
 }
+
 // ─── COMPARE MODE ─────────────────────────────────────────────
 let cmpMode       = "day";  // "day" | "month" | "year" | "years"
 let cmpWeekOffset = 0;
@@ -4523,6 +4577,10 @@ function renderSettings(){
       row("🗑","Delete Purchase History","Clear history for one, multiple or all customers","openHistoryManager()","›",true)
     )}
 
+    ${section("🧾 Billing & Receipts",
+      row("🧾","Billing Settings",`Auto WhatsApp: ${getBillSetting('billAutoWhatsApp')?'On':'Off'} · Auto Print: ${getBillSetting('billAutoPrint')?'On':'Off'} · Paper: ${getBillSetting('billPaperSize')||'80mm'}`,"openBillingSettingsModal()")
+    )}
+
     <div style="text-align:center;padding:20px 0;font-size:12px;color:#2a3a5a;">ShopChampion Pro · Your data is secure</div>
   </div>`;
 }
@@ -4692,7 +4750,7 @@ async function _hmDeleteSelected(){
   let cleared=0, records=0;
   sel.forEach(id=>{
     const c=customers.find(x=>x.id===id);
-    if(c){ records+=(c.purchases||[]).length; c.purchases=[]; cleared++; }
+    if(c){ records+=(c.purchases||[]).length; c.purchases=[]; c.totalSpend=0; cleared++; }
   });
   await saveCustomers();
   notify(`✅ Cleared history for ${cleared} customer${cleared!==1?'s':''} (${records} records deleted)`);
@@ -4703,7 +4761,7 @@ async function _hmDeleteSelected(){
 async function _hmDeleteAll(){
   const total=customers.reduce((s,c)=>s+(c.purchases||[]).length,0);
   if(!confirm(`⚠️ Delete ALL purchase history for ALL ${customers.length} customers?\n\n${total} records will be permanently erased.\n\nCustomers stay. History goes.\n\nThis CANNOT be undone.`)) return;
-  customers.forEach(c=>{ c.purchases=[]; });
+  customers.forEach(c=>{ c.purchases=[]; c.totalSpend=0; });
   await saveCustomers();
   notify(`🔥 All purchase history deleted (${total} records)`);
   closeModal();
@@ -5300,7 +5358,7 @@ function openPurchaseModal(id){
     <button class="btn" onclick="savePurchaseModal('${id}')" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-weight:800;">Add Purchase →</button>`);
 }
 function pmPts(){const a=parseFloat(document.getElementById("m-amt").value)||0,b=document.getElementById("m-pts");if(a){b.style.display="block";b.innerHTML=`Points: <strong style="color:#FFD700;">+${getPoints(a).toLocaleString()}</strong>`;}else b.style.display="none";}
-function savePurchaseModal(id){const a=parseFloat(document.getElementById("m-amt").value||"0");if(!a||a<=0){notify("❌ Amount must be greater than ₹0","error");return;}addPurchase(id,{amount:a,bill:document.getElementById("m-bill").value,notes:document.getElementById("m-notes").value,date:document.getElementById("m-date").value});closeModal();}
+function savePurchaseModal(id){const a=parseFloat(document.getElementById("m-amt").value||"0");if(!a||a<=0){notify("❌ Amount must be greater than ₹0","error");return;}addPurchase(id,{amount:a,bill:document.getElementById("m-bill").value,notes:document.getElementById("m-notes").value,date:document.getElementById("m-date").value});}
 
 // ─── BULK PURCHASE MODAL ─────────────────────────────────────────────────────
 function openBulkPurchaseModal(id) {
@@ -5392,7 +5450,7 @@ async function saveBulkPurchase(custId) {
 }
 // ─── END BULK PURCHASE ────────────────────────────────────────────────────────
 
-async function addPurchase(custId,{amount,bill,date,notes,soldItems}){
+async function _origAddPurchaseBase(custId,{amount,bill,date,notes,soldItems}){
   const amt=parseFloat(amount);if(!amt||amt<=0)return;
   const c=customers.find(x=>x.id===custId);if(!c)return;
   c.totalSpend+=amt;
@@ -5507,6 +5565,7 @@ function showProfile(id){
     ${hist}
     <div style="display:flex;gap:8px;margin-top:16px;">
       <button class="btn" onclick="closeModal();openPurchaseModal('${c.id}')" style="background:#1a3a60;color:#5af;border:1px solid #1a4a80;flex:1;padding:12px;font-weight:800;">+ Add Purchase</button>
+      <button class="btn" onclick="closeModal();showCustomerBillHistory('${c.id}')" style="background:#1a2a20;color:#4f4;border:1px solid #1a4a2a;flex:1;padding:12px;font-weight:800;">🧾 Bills</button>
       ${(()=>{const pb=(c.borrows||[]).filter(b=>b.status==="pending");const owed=pb.reduce((s,b)=>s+Number(b.amount),0);return pb.length?`<button class="btn" onclick="closeModal();showBorrowDetails('${c.id}')" style="background:#2a1500;color:#f84;border:1px solid #5a2a00;flex:1;padding:12px;font-weight:800;">📦 Owes ${formatINR(owed)}</button>`:''})()}
       <button class="btn" onclick="closeModal();openEditModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #1a4a1a;flex:1;padding:12px;font-weight:800;">✏️ Edit</button>
     </div>`);
@@ -7703,6 +7762,500 @@ function invCustApply(){
     </div>`;
   }).join('');
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+// SHOPCHAMPION — BILLING SYSTEM
+// Thermal Print · PDF Download · WhatsApp · Firebase Bills
+// ═══════════════════════════════════════════════════════════════
+
+// ─── BILLING SETTINGS (defaults merged into appSettings) ──────
+const BILLING_DEFAULTS = {
+  billAutoWhatsApp: false,
+  billAutoPrint: false,
+  billShowGST: false,
+  billGSTNumber: "",
+  billFooter: "Thank you! Visit Again 🙏",
+  billPaperSize: "80mm",  // "58mm" | "80mm" | "a4"
+  billPrefix: "B",
+};
+
+function getBillSetting(key) {
+  return appSettings[key] !== undefined ? appSettings[key] : BILLING_DEFAULTS[key];
+}
+function setBillSetting(key, val) {
+  appSettings[key] = val;
+  try { localStorage.setItem(storageKey("app_settings"), JSON.stringify(appSettings)); } catch {}
+  saveSettingsToCloud();
+}
+
+// ─── BILL NUMBER GENERATOR ─────────────────────────────────────
+function generateBillNumber() {
+  const prefix = getBillSetting("billPrefix") || "B";
+  return prefix + Date.now().toString().slice(-6);
+}
+
+// ─── BILLS FIRESTORE COLLECTION ───────────────────────────────
+function billsRef() {
+  if (!db || !authPhone) return null;
+  return db.collection("users").doc(authPhone).collection("bills");
+}
+
+// ─── SAVE BILL TO FIREBASE ────────────────────────────────────
+async function saveBillToFirebase(billObj) {
+  const ref = billsRef();
+  if (!ref) {
+    // Fallback: save to localStorage
+    try {
+      const stored = JSON.parse(localStorage.getItem(storageKey("bills")) || "[]");
+      stored.unshift(billObj);
+      localStorage.setItem(storageKey("bills"), JSON.stringify(stored.slice(0, 500)));
+    } catch {}
+    return billObj;
+  }
+  try {
+    await ref.add({ ...billObj, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  } catch (e) {
+    console.warn("Bill save error:", e.message);
+    // Also save locally as fallback
+    try {
+      const stored = JSON.parse(localStorage.getItem(storageKey("bills")) || "[]");
+      stored.unshift(billObj);
+      localStorage.setItem(storageKey("bills"), JSON.stringify(stored.slice(0, 500)));
+    } catch {}
+  }
+  return billObj;
+}
+
+// ─── LOAD BILLS FOR CUSTOMER ──────────────────────────────────
+async function loadCustomerBills(customerId) {
+  // Try Firebase first
+  const ref = billsRef();
+  if (ref) {
+    try {
+      const snap = await ref.where("customerId", "==", customerId).orderBy("createdAt", "desc").limit(50).get();
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) {
+      console.warn("Bills load error:", e.message);
+    }
+  }
+  // Fallback: localStorage
+  try {
+    const stored = JSON.parse(localStorage.getItem(storageKey("bills")) || "[]");
+    return stored.filter(b => b.customerId === customerId);
+  } catch { return []; }
+}
+
+// ─── LOAD SINGLE BILL BY ID ───────────────────────────────────
+async function loadBillById(billId) {
+  const ref = billsRef();
+  if (ref) {
+    try {
+      const snap = await ref.where("billId", "==", billId).limit(1).get();
+      if (!snap.empty) return { id: snap.docs[0].id, ...snap.docs[0].data() };
+    } catch (e) {
+      console.warn("Bill fetch error:", e.message);
+    }
+  }
+  try {
+    const stored = JSON.parse(localStorage.getItem(storageKey("bills")) || "[]");
+    return stored.find(b => b.billId === billId) || null;
+  } catch { return null; }
+}
+
+// ─── CREATE BILL OBJECT FROM PURCHASE ─────────────────────────
+function createBillObject({ custId, soldItems, amount, billNum, notes, date }) {
+  const c = customers.find(x => x.id === custId);
+  if (!c) return null;
+
+  // Build items array from soldItems (inventory mode) or single amount
+  let items = [];
+  if (soldItems && soldItems.length > 0) {
+    items = soldItems.map(si => ({
+      name: si.name,
+      qty: si.qty,
+      unit: (inventoryItems.find(x => x.name === si.name) || {}).unit || "unit",
+      rate: si.pricePerUnit || 0,
+      amount: (si.qty || 0) * (si.pricePerUnit || 0),
+    }));
+  } else {
+    // Standard mode: single line
+    items = [{ name: notes || "Purchase", qty: 1, unit: "", rate: amount, amount: amount }];
+  }
+
+  const subtotal = items.reduce((s, i) => s + i.amount, 0) || amount;
+  const total = subtotal;
+
+  return {
+    billId: billNum || generateBillNumber(),
+    customerId: custId,
+    customerName: c.name,
+    customerPhone: c.phone || "",
+    items,
+    subtotal,
+    total,
+    notes: notes || "",
+    createdAt: date || new Date().toISOString(),
+    purchaseId: billNum || "",
+  };
+}
+
+// ─── WHATSAPP SEND ────────────────────────────────────────────
+function sendBillWhatsApp(bill) {
+  const shopName = appSettings.shopName || "Shop Champion";
+  const itemLines = bill.items.map(i => {
+    if (i.qty && i.unit && i.rate > 0) {
+      return `  ${i.name}\n  ${i.qty} ${i.unit} × ₹${i.rate} = ₹${i.amount}`;
+    }
+    return `  ${i.name}: ₹${i.amount}`;
+  }).join("\n");
+
+  const dateStr = bill.createdAt
+    ? new Date(bill.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+  const text = `🧾 *${shopName}*\n\nBill No: *${bill.billId}*\nDate: ${dateStr}\nCustomer: ${bill.customerName}\n\n${itemLines}\n\n*TOTAL: ₹${bill.total.toLocaleString("en-IN")}*\n\n${getBillSetting("billFooter") || "Thank you! Visit Again 🙏"}`;
+
+  const phone = bill.customerPhone ? bill.customerPhone.replace(/\D/g, "") : "";
+  const fullPhone = phone ? (phone.length === 10 ? "91" + phone : phone) : "";
+  const url = fullPhone
+    ? `https://wa.me/${fullPhone}?text=${encodeURIComponent(text)}`
+    : `https://wa.me/?text=${encodeURIComponent(text)}`;
+  window.open(url, "_blank");
+}
+
+// ─── PDF DOWNLOAD ─────────────────────────────────────────────
+async function downloadBillPDF(bill) {
+  // Lazy-load jsPDF + html2canvas
+  await ensurePDFLibs();
+  const el = document.getElementById("sc-bill-print-area");
+  if (!el) { notify("❌ Bill preview not found", "error"); return; }
+  try {
+    const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+    const img = canvas.toDataURL("image/png");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const imgW = pageW - 20;
+    const ratio = canvas.height / canvas.width;
+    pdf.addImage(img, "PNG", 10, 10, imgW, imgW * ratio);
+    pdf.save(`Bill-${bill.billId}.pdf`);
+    notify("📄 PDF downloaded!");
+  } catch (e) {
+    notify("❌ PDF error: " + e.message, "error");
+  }
+}
+
+async function ensurePDFLibs() {
+  if (window.jspdf && window.html2canvas) return;
+  await Promise.all([
+    !window.jspdf ? loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js") : Promise.resolve(),
+    !window.html2canvas ? loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js") : Promise.resolve(),
+  ]);
+}
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) { res(); return; }
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = res;
+    s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+// ─── PRINT BILL ───────────────────────────────────────────────
+function printBill() {
+  window.print();
+}
+
+// ─── REPRINT BILL ─────────────────────────────────────────────
+async function reprintBill(billId) {
+  notify("🔍 Loading bill...");
+  const bill = await loadBillById(billId);
+  if (!bill) {
+    notify("❌ Bill not found: " + billId, "error");
+    return;
+  }
+  showBillModal(bill);
+}
+
+// ─── BILL HTML RENDERER (for modal + print) ───────────────────
+function renderBillHTML(bill) {
+  const shopName = appSettings.shopName || "Shop Champion";
+  const shopIcon = appSettings.appIcon || "";
+  const gstNum   = getBillSetting("billGSTNumber");
+  const showGST  = getBillSetting("billShowGST") && gstNum;
+  const footer   = getBillSetting("billFooter") || "Thank you! Visit Again 🙏";
+  const paperSize = getBillSetting("billPaperSize") || "80mm";
+  const billWidth = paperSize === "58mm" ? "200px" : paperSize === "80mm" ? "280px" : "100%";
+
+  const dateStr = bill.createdAt
+    ? new Date(bill.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+    : new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const timeStr = bill.createdAt
+    ? new Date(bill.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+    : new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+  const itemRows = bill.items.map(item => {
+    const hasRate = item.rate > 0 && item.qty !== 1;
+    return `
+      <tr>
+        <td style="padding:3px 0;font-size:13px;color:#111;vertical-align:top;">${item.name}${hasRate ? `<br><span style="font-size:10px;color:#666;">${item.qty} ${item.unit} × ₹${item.rate}</span>` : ""}</td>
+        <td style="padding:3px 0;font-size:13px;color:#111;text-align:right;vertical-align:top;white-space:nowrap;">₹${item.amount.toLocaleString("en-IN")}</td>
+      </tr>`;
+  }).join("");
+
+  return `
+  <div id="sc-bill-print-area" style="background:#fff;color:#111;font-family:'Courier New',Courier,monospace;width:${billWidth};max-width:100%;margin:0 auto;padding:14px 12px;box-sizing:border-box;">
+    <!-- Shop Header -->
+    <div style="text-align:center;margin-bottom:10px;border-bottom:1px dashed #999;padding-bottom:10px;">
+      ${shopIcon ? `<img src="${shopIcon}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;margin-bottom:6px;" />` : ""}
+      <div style="font-size:18px;font-weight:900;letter-spacing:1px;color:#111;text-transform:uppercase;">${shopName}</div>
+      ${showGST ? `<div style="font-size:10px;color:#555;margin-top:2px;">GST: ${gstNum}</div>` : ""}
+    </div>
+
+    <!-- Bill Info -->
+    <div style="margin-bottom:10px;border-bottom:1px dashed #999;padding-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#555;">
+        <span><strong style="color:#111;">Bill No:</strong> ${bill.billId}</span>
+        <span>${dateStr}</span>
+      </div>
+      <div style="font-size:11px;color:#555;margin-top:3px;">
+        <strong style="color:#111;">Time:</strong> ${timeStr}
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#111;margin-top:5px;">
+        Customer: ${bill.customerName}${bill.customerPhone ? ` · 📞 ${bill.customerPhone}` : ""}
+      </div>
+    </div>
+
+    <!-- Items -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:10px;">
+      <thead>
+        <tr style="border-bottom:1px solid #ccc;">
+          <th style="text-align:left;font-size:10px;color:#666;padding-bottom:4px;font-weight:700;text-transform:uppercase;">Item</th>
+          <th style="text-align:right;font-size:10px;color:#666;padding-bottom:4px;font-weight:700;text-transform:uppercase;">Amt</th>
+        </tr>
+      </thead>
+      <tbody>${itemRows}</tbody>
+    </table>
+
+    <!-- Total -->
+    <div style="border-top:2px solid #111;padding-top:8px;margin-top:4px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:15px;font-weight:900;color:#111;letter-spacing:1px;">TOTAL</span>
+        <span style="font-size:18px;font-weight:900;color:#111;">₹${bill.total.toLocaleString("en-IN")}</span>
+      </div>
+    </div>
+
+    ${bill.notes ? `<div style="margin-top:8px;font-size:10px;color:#666;border-top:1px dashed #ccc;padding-top:6px;">Note: ${bill.notes}</div>` : ""}
+
+    <!-- Footer -->
+    <div style="margin-top:12px;text-align:center;border-top:1px dashed #999;padding-top:8px;">
+      <div style="font-size:11px;color:#555;">${footer}</div>
+      <div style="font-size:9px;color:#999;margin-top:4px;">Powered by ShopChampion</div>
+    </div>
+  </div>`;
+}
+
+// ─── SHOW BILL MODAL ──────────────────────────────────────────
+function showBillModal(bill) {
+  const hasPhone = !!(bill.customerPhone && bill.customerPhone.trim());
+  const paperSize = getBillSetting("billPaperSize") || "80mm";
+
+  const html = `
+  ${modalHeader("🧾 Bill — " + bill.billId)}
+
+  <!-- Bill Preview -->
+  <div style="background:#f5f5f5;border-radius:12px;padding:12px;margin-bottom:16px;max-height:55vh;overflow-y:auto;">
+    ${renderBillHTML(bill)}
+  </div>
+
+  <!-- Paper Size Selector -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+    <span style="font-size:12px;color:#4a5a7a;font-weight:700;">📄 Paper:</span>
+    ${["58mm","80mm","a4"].map(sz => `
+      <button onclick="setBillSetting('billPaperSize','${sz}');showBillModal(window._currentBill)" style="cursor:pointer;border-radius:8px;padding:5px 12px;border:2px solid ${paperSize===sz?'#22c55e':'#1e2a45'};background:${paperSize===sz?'#052a14':'#0a0e1a'};color:${paperSize===sz?'#22c55e':'#4a5a7a'};font-size:12px;font-weight:700;">${sz}</button>
+    `).join("")}
+  </div>
+
+  <!-- Action Buttons -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+    <button onclick="printBill()" style="cursor:pointer;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);border:none;border-radius:12px;color:#fff;padding:14px 10px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;">
+      🖨️ Print
+    </button>
+    <button onclick="downloadBillPDF(window._currentBill)" style="cursor:pointer;background:linear-gradient(135deg,#3a1a6e,#7a3aaa);border:none;border-radius:12px;color:#fff;padding:14px 10px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;">
+      📄 Download PDF
+    </button>
+    <button onclick="sendBillWhatsApp(window._currentBill)" style="cursor:pointer;background:linear-gradient(135deg,#1a3a1a,#25d366 90%);border:none;border-radius:12px;color:#fff;padding:14px 10px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;${!hasPhone?'opacity:0.6;':''}">
+      💬 WhatsApp
+    </button>
+    <button onclick="closeModal();safeRenderTab(currentTab);" style="cursor:pointer;background:#1a2540;border:1px solid #2a3560;border-radius:12px;color:#7a8aaa;padding:14px 10px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;">
+      ✕ Close
+    </button>
+  </div>
+  ${!hasPhone ? `<div style="font-size:11px;color:#b45309;text-align:center;margin-top:-4px;">💡 Add phone number to customer profile to enable WhatsApp</div>` : ""}`;
+
+  // Store bill reference for button handlers
+  window._currentBill = bill;
+  showWideModal(html);
+}
+
+// ─── ENHANCED addPurchase with billing ────────────────────────
+async function addPurchase(custId, { amount, bill, date, notes, soldItems }) {
+  const amt = parseFloat(amount); if (!amt || amt <= 0) return;
+  const c = customers.find(x => x.id === custId); if (!c) return;
+
+  // Run original logic (totalSpend update, push to c.purchases, notify, voice, save)
+  c.totalSpend += amt;
+  c.purchases = [{ bill, amount: amt, date: date || new Date().toISOString(), notes, soldItems: soldItems || [] }, ...(c.purchases || [])];
+  notify(`✅ ${formatINR(amt)} added for ${c.name}`);
+  const _sortedV = getSorted();
+  const _rankedV = _sortedV.find(x => x.id === custId);
+  speakPurchaseAnnouncement(c.name, formatINR(amt), _rankedV ? _rankedV.rank : "?");
+  try { await saveOneCustomer(c); } catch (e) { notify("⚠️ Firebase error: " + e.message); }
+
+  // ── NEW: Generate & save bill, then show modal ───────────────
+  const billObj = createBillObject({ custId, soldItems, amount: amt, billNum: bill, notes, date: date || new Date().toISOString() });
+  if (billObj) {
+    saveBillToFirebase(billObj); // fire-and-forget; don't block UI
+    // Auto-send WhatsApp if enabled
+    if (getBillSetting("billAutoWhatsApp") && c.phone) {
+      setTimeout(() => sendBillWhatsApp(billObj), 500);
+    }
+    // Show bill modal (unless auto-print, in which case also print)
+    showBillModal(billObj);
+    if (getBillSetting("billAutoPrint")) {
+      setTimeout(() => printBill(), 300);
+    }
+  } else {
+    if (useLocalOnly) safeRenderTab(currentTab);
+  }
+}
+
+// ─── CUSTOMER BILLS HISTORY IN PROFILE ────────────────────────
+async function showCustomerBillHistory(custId) {
+  const c = customers.find(x => x.id === custId);
+  if (!c) return;
+
+  document.getElementById("modal-container").innerHTML = `
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" style="max-width:520px;">
+    ${modalHeader("🧾 Bills — " + c.name)}
+    <div style="text-align:center;padding:30px;color:#4a5a7a;font-size:13px;">⏳ Loading bills...</div>
+  </div></div>`;
+
+  const bills = await loadCustomerBills(custId);
+
+  const billsHtml = bills.length === 0
+    ? `<div style="text-align:center;padding:30px;color:#4a5a7a;font-size:14px;">No bills found.<br><span style="font-size:12px;">Bills are saved when you add a purchase.</span></div>`
+    : bills.map(b => {
+        const dateStr = b.createdAt
+          ? (b.createdAt.toDate ? b.createdAt.toDate().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+             : new Date(b.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }))
+          : "—";
+        return `
+        <div onclick="closeModal();setTimeout(()=>reprintBill('${b.billId}'),100)" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #0d1220;cursor:pointer;border-radius:10px;transition:background 0.15s;" onmouseover="this.style.background='#0d1525'" onmouseleave="this.style.background=''">
+          <div style="width:36px;height:36px;background:#1a2a45;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🧾</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:800;color:#e8eaf0;">${b.billId}</div>
+            <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${dateStr} · ${b.items ? b.items.length + " item" + (b.items.length !== 1 ? "s" : "") : ""}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:16px;font-weight:900;color:#22c55e;">₹${(b.total || 0).toLocaleString("en-IN")}</div>
+            <div style="font-size:10px;color:#4a5a7a;margin-top:2px;">tap to view</div>
+          </div>
+        </div>`;
+      }).join("");
+
+  document.getElementById("modal-container").innerHTML = `
+  <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" style="max-width:520px;">
+    ${modalHeader("🧾 Bills — " + c.name)}
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;overflow:hidden;max-height:65vh;overflow-y:auto;">
+      ${billsHtml}
+    </div>
+    <button onclick="closeModal()" style="width:100%;margin-top:14px;background:#1a2540;border:1px solid #2a3560;border-radius:12px;color:#7a8aaa;padding:12px;cursor:pointer;font-size:14px;font-weight:700;">Close</button>
+  </div></div>`;
+}
+
+// ─── BILLING SETTINGS MODAL ────────────────────────────────────
+function openBillingSettingsModal() {
+  const autoWA  = getBillSetting("billAutoWhatsApp");
+  const autoPr  = getBillSetting("billAutoPrint");
+  const showGST = getBillSetting("billShowGST");
+  const gstNum  = getBillSetting("billGSTNumber") || "";
+  const footer  = getBillSetting("billFooter") || "Thank you! Visit Again 🙏";
+  const paper   = getBillSetting("billPaperSize") || "80mm";
+  const prefix  = getBillSetting("billPrefix") || "B";
+
+  function toggle(key, val, label, desc) {
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #1a2035;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;color:#e8eaf0;">${label}</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${desc}</div>
+      </div>
+      <div onclick="setBillSetting('${key}',${!val});openBillingSettingsModal()" style="cursor:pointer;width:48px;height:26px;border-radius:13px;background:${val ? '#22c55e' : '#1e2a45'};position:relative;flex-shrink:0;transition:background 0.2s;">
+        <div style="position:absolute;top:3px;${val ? 'right:3px' : 'left:3px'};width:20px;height:20px;border-radius:50%;background:#fff;transition:all 0.2s;"></div>
+      </div>
+    </div>`;
+  }
+
+  showWideModal(`
+  ${modalHeader("🧾 Billing Settings")}
+  <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;overflow:hidden;margin-bottom:14px;">
+    ${toggle("billAutoWhatsApp", autoWA, "Auto Send WhatsApp", "Automatically send bill on WhatsApp after each purchase")}
+    ${toggle("billAutoPrint",    autoPr, "Auto Print Bill",    "Automatically print bill after each purchase")}
+    ${toggle("billShowGST",      showGST,"Show GST Number",    "Display GST number on the bill")}
+  </div>
+
+  <div style="margin-bottom:14px;">
+    <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">📄 Paper Size</label>
+    <div style="display:flex;gap:8px;">
+      ${["58mm","80mm","a4"].map(sz => `<button onclick="setBillSetting('billPaperSize','${sz}');openBillingSettingsModal()" style="cursor:pointer;flex:1;padding:10px;border-radius:10px;border:2px solid ${paper===sz?'#22c55e':'#1e2a45'};background:${paper===sz?'#052a14':'#0a0e1a'};color:${paper===sz?'#22c55e':'#4a5a7a'};font-size:13px;font-weight:700;">${sz}</button>`).join("")}
+    </div>
+  </div>
+
+  <div style="margin-bottom:14px;">
+    <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">🔢 Bill Number Prefix</label>
+    <input id="bill-prefix-input" class="input" value="${prefix}" placeholder="B" style="margin-bottom:0;" oninput="setBillSetting('billPrefix',this.value||'B')" />
+  </div>
+
+  ${showGST ? `
+  <div style="margin-bottom:14px;">
+    <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">🏷 GST Number</label>
+    <input id="bill-gst-input" class="input" value="${gstNum}" placeholder="22AAAAA0000A1Z5" oninput="setBillSetting('billGSTNumber',this.value)" />
+  </div>` : ""}
+
+  <div style="margin-bottom:16px;">
+    <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">📝 Bill Footer Message</label>
+    <input id="bill-footer-input" class="input" value="${footer}" placeholder="Thank you! Visit Again 🙏" oninput="setBillSetting('billFooter',this.value)" />
+  </div>
+
+  <button onclick="closeModal()" style="width:100%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);border:none;border-radius:12px;color:#fff;padding:13px;font-size:15px;font-weight:800;cursor:pointer;">✅ Save Settings</button>
+  `);
+}
+
+// ─── PRINT CSS INJECTION ──────────────────────────────────────
+(function injectBillPrintCSS() {
+  const style = document.createElement("style");
+  style.id = "sc-bill-print-css";
+  style.textContent = `
+  @media print {
+    body > *:not(#modal-container) { display: none !important; }
+    #modal-container { display: block !important; position: static !important; }
+    #modal-container .modal-overlay { position: static !important; background: none !important; padding: 0 !important; }
+    #modal-container .modal-box { box-shadow: none !important; border: none !important; background: #fff !important; max-width: 100% !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; }
+    .modal-title, .modal-box > div:last-child, .modal-box > button { display: none !important; }
+    #sc-bill-print-area { display: block !important; margin: 0 auto !important; }
+    @page { margin: 4mm; size: auto; }
+  }`;
+  document.head.appendChild(style);
+})();
+
+
 
 // ═══════════════════════════════════════════════════════════════
 
