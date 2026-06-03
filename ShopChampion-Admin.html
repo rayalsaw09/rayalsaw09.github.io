@@ -6262,12 +6262,14 @@ function cpPurchaseCard(p,custId){
     :"";
   const amtColor=isBorrow?(isPending?(isOverdue?'#f44':'#f84'):'#4f4'):'#e8eaf0';
   const borderStyle=isBorrow?`border-left:3px solid ${isPending?(isOverdue?'#f44':'#f84'):'#4f4'};`:'';
-  return `<div class="purchase-card" style="${borderStyle}padding:12px 16px;">
+  const clickHandler = !isBorrow ? `onclick="reprintBill('${p.bill}')" style="${borderStyle}padding:12px 16px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"` : `style="${borderStyle}padding:12px 16px;"`;
+  return `<div class="purchase-card" ${clickHandler}>
     <div style="flex:1;">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-weight:800;font-size:16px;color:${amtColor};">${formatINR(p.amount)}</span>
         ${statusBadge}
         ${(!isBorrow&&isSubFeatureAllowed(8))?`<span style="font-size:11px;font-weight:700;color:#5af;background:#0a1a2a;border-radius:6px;padding:2px 8px;">Visit #${p.visitNum}</span>`:""}
+        ${!isBorrow?`<span style="font-size:10px;color:#4a5a7a;margin-left:auto;">🧾 tap to view bill</span>`:""}
       </div>
       <div style="font-size:12px;color:#556;margin-top:4px;">${isBorrow?'📦 Borrow':'Bill'}: <strong style="color:#7a8aaa;">${p.bill}</strong>${isSubFeatureAllowed(10)?` &nbsp;·&nbsp; 📅 ${new Date(p.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} <span style="font-size:11px;color:#4a5a7a;">⏱ ${new Date(p.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true})}</span>`:" "}</div>
       ${isBorrow&&p.due?`<div style="font-size:11px;color:${isOverdue?'#f44':'#7a8aaa'};margin-top:2px;">Due: ${new Date(p.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${isOverdue?' ⚠️':''}</div>`:''}
@@ -6275,11 +6277,11 @@ function cpPurchaseCard(p,custId){
       ${isBorrow&&p.notes?`<div style="font-size:12px;color:#7a8aaa;margin-top:3px;">Item: ${p.notes}</div>`:''}
       ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${p.soldItems.map(si=>si._deleted?`<span style="background:#1a0a0a;border:1px solid #4a2020;border-radius:6px;padding:2px 8px;font-size:11px;color:#884444;text-decoration:line-through;">📦 ${si.qty} ${si.name}</span><span style="background:#2a0a0a;border:1px solid #4a1a1a;border-radius:6px;padding:2px 6px;font-size:10px;color:#f66;">🗑 deleted from inventory</span>`:`<span style="background:#0a1628;border:1px solid #2a3560;border-radius:6px;padding:2px 8px;font-size:11px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||"unit"} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
     </div>
-    <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:12px;">
+    <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:12px;" onclick="event.stopPropagation()">
       ${isBorrow
         ?(isPending?`<button onclick="bwMarkReturned('${custId}','${p.bill}');openCustomerPage('${custId}');" style="cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:11px;font-weight:700;">✓ Returned</button>`:'')
         :`<div style="color:#5af;font-size:13px;font-weight:700;">+${getPoints(p.amount)} pts</div>`}
-      <button onclick="deletePurchase('${custId}','${p.bill}','${encodeURIComponent(p.date)}');openCustomerPage('${custId}');" style="background:none;border:none;color:#f66;cursor:pointer;font-size:11px;">🗑 delete</button>
+      <button onclick="event.stopPropagation();deletePurchase('${custId}','${p.bill}','${encodeURIComponent(p.date)}');openCustomerPage('${custId}');" style="background:none;border:none;color:#f66;cursor:pointer;font-size:11px;">🗑 delete</button>
     </div>
   </div>`;
 }
@@ -6296,11 +6298,13 @@ function phPurchaseCardHTML(p,custId){
     :"";
   const amtColor=isBorrow?(isPending?(isOverdue?'#f44':'#f84'):'#4f4'):'#e8eaf0';
   const borderStyle=isBorrow?`border-left:3px solid ${isPending?(isOverdue?'#f44':'#f84'):'#4f4'};`:'';
-  return `<div class="purchase-card" style="${borderStyle}">
+  const phClickHandler = !isBorrow ? `onclick="reprintBill('${p.bill}')" style="${borderStyle}cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"` : `style="${borderStyle}"`;
+  return `<div class="purchase-card" ${phClickHandler}>
     <div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-weight:700;color:${amtColor};">${formatINR(p.amount)}</span>
         ${statusBadge}
+        ${!isBorrow?`<span style="font-size:10px;color:#4a5a7a;margin-left:auto;">🧾 tap to view</span>`:""}
       </div>
       <div style="font-size:11px;color:#556;margin-top:2px;">${isBorrow?'📦 Borrow':'Bill'}: ${p.bill}${isSubFeatureAllowed(10)?` · ${new Date(p.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} <span style="font-size:10px;color:#4a5a7a;">⏱ ${new Date(p.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true})}</span>`:" "}</div>
       ${isBorrow&&p.due?`<div style="font-size:10px;color:${isOverdue?'#f44':'#7a8aaa'};">Due: ${new Date(p.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${isOverdue?' ⚠️':''}</div>`:''}
@@ -6309,11 +6313,11 @@ function phPurchaseCardHTML(p,custId){
       ${isBorrow&&p.notes?`<div style="font-size:11px;color:#7a8aaa;">Item: ${p.notes}</div>`:''}
       ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;">${p.soldItems.map(si=>si._deleted?`<span style="background:#1a0a0a;border:1px solid #4a2020;border-radius:5px;padding:2px 7px;font-size:10px;color:#884444;text-decoration:line-through;">📦 ${si.qty} ${si.name}</span><span style="background:#2a0a0a;border:1px solid #4a1a1a;border-radius:5px;padding:2px 5px;font-size:10px;color:#f66;">🗑 deleted from inventory</span>`:`<span style="background:#0a1628;border:1px solid #2a3560;border-radius:5px;padding:2px 7px;font-size:10px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||""} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
     </div>
-    <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+    <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;" onclick="event.stopPropagation()">
       ${isBorrow
         ?(isPending?`<button onclick="bwMarkReturned('${custId}','${p.bill}');closeModal();" style="cursor:pointer;padding:4px 9px;border-radius:7px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:11px;font-weight:700;">✓ Returned</button>`:'')
         :`<div style="color:#5af;font-size:13px;font-weight:700;">+${getPoints(p.amount)} pts</div>`}
-      <button onclick="deletePurchase('${custId}','${p.bill}','${encodeURIComponent(p.date)}');closeModal();" style="background:none;border:none;color:#f66;cursor:pointer;font-size:11px;">🗑 delete</button>
+      <button onclick="event.stopPropagation();deletePurchase('${custId}','${p.bill}','${encodeURIComponent(p.date)}');closeModal();" style="background:none;border:none;color:#f66;cursor:pointer;font-size:11px;">🗑 delete</button>
     </div>
   </div>`;
 }
@@ -7209,7 +7213,8 @@ function renderInventoryTab(){
       <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:16px;">➕ Add / Restock Item</div>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Item / Product Name *</label>
       <input class="input" id="inv-name" list="inv-existing-names" placeholder="e.g. Basmati Rice 5kg..."
-        oninput="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var costEl=document.getElementById('inv-cost');var sellEl=document.getElementById('inv-sell-price');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(costEl&&!costEl.value){var costs=(ex.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);if(costs.length)costEl.value=Number(costs[costs.length-1].costPerUnit).toFixed(2);}if(sellEl&&!sellEl.value&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);}})(this)"
+        oninput="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var costEl=document.getElementById('inv-cost');var sellEl=document.getElementById('inv-sell-price');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(costEl){var costs=(ex.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);if(costs.length)costEl.value=Number(costs[costs.length-1].costPerUnit).toFixed(2);}if(sellEl&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);}})(this)"
+        onchange="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var costEl=document.getElementById('inv-cost');var sellEl=document.getElementById('inv-sell-price');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(costEl){var costs=(ex.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);if(costs.length)costEl.value=Number(costs[costs.length-1].costPerUnit).toFixed(2);}if(sellEl&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);}})(this)"
         value="${invPrefillName ? invPrefillName : ''}"
         style="margin-bottom:12px;" />
       <datalist id="inv-existing-names">${inventoryItems.map(x=>`<option value="${x.name.replace(/"/g,'&quot;')}">`).join("")}</datalist>
