@@ -5,15 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Shop Champion — Live Leaderboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700;900&family=Nunito:wght@400;600;700;800;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
-<link rel="manifest" href="/manifest-display.json" />
+<link rel="manifest" href="manifest-display.json" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="SC Display" />
 <meta name="theme-color" content="#FFD700" />
 <script>
-  if ('serviceWorker' in navigator) {
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js');
+      try { navigator.serviceWorker.register('./sw.js'); } catch(e){ console.warn('[SW] skipped:', e.message); }
     });
   }
 </script>
@@ -973,7 +973,7 @@ window.addEventListener('resize', () => {
 function startClock() {
   const el = document.getElementById('clock');
   function tick() { if (el) el.textContent = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
-  tick(); setInterval(tick, 1000);
+  tick(); if(window._tickTimer) clearInterval(window._tickTimer); window._tickTimer = setInterval(tick, 1000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

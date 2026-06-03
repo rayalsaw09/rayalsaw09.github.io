@@ -5,15 +5,15 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>ShopChampion — Seller Panel</title>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="manifest" href="/manifest-seller.json" />
+<link rel="manifest" href="manifest-seller.json" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="SC Seller" />
 <meta name="theme-color" content="#FFD700" />
 <script>
-  if ('serviceWorker' in navigator) {
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js');
+      try { navigator.serviceWorker.register('./sw.js'); } catch(e){ console.warn('[SW] skipped:', e.message); }
     });
   }
 </script>
@@ -619,7 +619,7 @@ async function sbFetch(path, opts = {}) {
   if (!res.ok) {
     const errText = await res.text();
     if (errText.includes("42501") || errText.includes("row-level security")) {
-      throw new Error("RLS Policy Error — run in Supabase SQL Editor:\nALTER TABLE licenses DISABLE ROW LEVEL SECURITY;\nOR reset setup and enter your service_role key.");
+      throw new Error("Authentication Error — make sure you entered your Supabase Service Role Key (not the anon key). Find it in: Supabase Dashboard → Project Settings → API → service_role secret.");
     }
     throw new Error(errText);
   }

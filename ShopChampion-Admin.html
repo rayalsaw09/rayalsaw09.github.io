@@ -6,39 +6,49 @@
 <title>Shop Champion — Admin</title>
 <meta name="app-version" content="v5.1" />
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
-<link rel="manifest" href="/manifest.json" />
-<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="ShopChampion" />
 <meta name="theme-color" content="#FFD700" />
 <script>
-  if ('serviceWorker' in navigator) {
+  // Service Workers require http/https — skip entirely when opened as a local file
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', async () => {
-      // Force update all registered SWs
-      const regs = await navigator.serviceWorker.getRegistrations();
-      for (const reg of regs) await reg.update();
-      // Register latest SW
-      const reg = await navigator.serviceWorker.register('/sw.js');
-      // When a new SW activates, reload the page to get fresh code
-      reg.addEventListener('updatefound', () => {
-        const newSW = reg.installing;
-        if(!newSW) return;
-        newSW.addEventListener('statechange', () => {
-          if(newSW.state === 'activated'){
-            // Show a non-intrusive banner instead of hard reload
+      try {
+        // Force update all registered SWs
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) await reg.update();
+        // Register latest SW
+        const reg = await navigator.serviceWorker.register('./sw.js');
+        // When a new SW activates, show a non-intrusive update banner
+        reg.addEventListener('updatefound', () => {
+          const newSW = reg.installing;
+          if(!newSW) return;
+          newSW.addEventListener('statechange', () => {
+            if(newSW.state === 'activated'){
+              const banner = document.createElement('div');
+              banner.innerHTML = '🔄 App updated! <button onclick="location.reload()" style="margin-left:10px;background:#FFD700;border:none;border-radius:6px;padding:4px 12px;font-weight:700;cursor:pointer;">Reload</button>';
+              banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#1a2a00;color:#FFD700;text-align:center;padding:10px;font-size:13px;z-index:99999;font-family:Nunito,sans-serif;';
+              document.body.appendChild(banner);
+            }
+          });
+        });
+        // Listen for SW_UPDATED message
+        navigator.serviceWorker.addEventListener('message', e => {
+          if(e.data && e.data.type === 'SW_UPDATED'){
+            const existing = document.getElementById('sw-update-banner');
+            if (existing) return;
             const banner = document.createElement('div');
-            banner.innerHTML = '🔄 App updated! <button onclick="location.reload()" style="margin-left:10px;background:#FFD700;border:none;border-radius:6px;padding:4px 12px;font-weight:700;cursor:pointer;">Reload</button>';
-            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#1a2a00;color:#FFD700;text-align:center;padding:10px;font-size:13px;z-index:99999;font-family:Nunito,sans-serif;';
+            banner.id = 'sw-update-banner';
+            banner.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;border-radius:12px;padding:10px 18px;font-size:13px;font-weight:700;z-index:9999;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px #0008;white-space:nowrap;';
+            banner.innerHTML = '🔄 App updated! <button onclick="location.reload()" style="background:#2a5a2a;border:none;color:#4f4;border-radius:8px;padding:5px 12px;cursor:pointer;font-weight:700;">Reload</button><button onclick="this.parentElement.remove()" style="background:none;border:none;color:#4a6a4a;cursor:pointer;font-size:16px;">✕</button>';
             document.body.appendChild(banner);
           }
         });
-      });
-    });
-    // Listen for SW_UPDATED message
-    navigator.serviceWorker.addEventListener('message', e => {
-      if(e.data && e.data.type === 'SW_UPDATED'){
-        location.reload();
+      } catch(err) {
+        console.warn('[SW] Registration skipped:', err.message);
       }
     });
   }
@@ -1205,12 +1215,28 @@ const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free P
 const ADMIN_PASS = "1234";
 const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","festivals","inventory","settings"];
 const TABS_ICON = ["🏆","👥","💳","📊","⚖️","🎉","📦","⚙️"];
-function getTabs(){ return TABS_BASE.map((k,i)=>TABS_ICON[i]+" "+t(k)); }
+function getTabs(){
+  return TABS_BASE.map((k,i)=>{
+    let label = TABS_ICON[i]+" "+t(k);
+    // FIX 21: Low stock badge on inventory tab (index 6)
+    if(i===6 && inventoryItems && inventoryItems.length>0){
+      const oos = inventoryItems.filter(x=>invGetStock(x.name)<=0).length;
+      const low = inventoryItems.filter(x=>{const s=invGetStock(x.name);return s>0&&s<=3;}).length;
+      if(oos>0) label += ` <span style="background:#f66;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;">${oos}</span>`;
+      else if(low>0) label += ` <span style="background:#FFD700;color:#1a0a00;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;">${low}</span>`;
+    }
+    return label;
+  });
+}
 
 // ─── HELPERS ─────────────────────────────────────────────────
 function getPoints(n) { return Math.floor(n / 10); }
 function formatINR(n) { return "₹" + Number(n).toLocaleString("en-IN"); }
 function autoId() { return "SC" + Math.random().toString(36).substr(2,6).toUpperCase(); }
+function escHtml(s) {
+  if (s == null) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
 function getInitials(name) { return name.split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2); }
 function avatarColor(name) {
   return ["#1a3a5c","#2d1b4e","#1a3a2a","#3a1a1a","#2a2a1a"][name.charCodeAt(0)%5];
@@ -1384,7 +1410,7 @@ function ptRestoreState() {
       const _showVisits1 = !_isPro1||isSubFeatureAllowed(8);
       const _showLastVisit1 = !_isPro1||isSubFeatureAllowed(10);
       const _showRank1 = !_isPro1||isSubFeatureAllowed(0);
-      pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank1?` &middot; Rank #${c.rank||"?"}`:""} ${_showVisits1?`&middot; 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit1?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc1};font-weight:700;">${_lv1}</span></div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
+      pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank1?` &middot; Rank #${c.rank||"?"}`:""} ${_showVisits1?`&middot; 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit1?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc1};font-weight:700;">${_lv1}</span></div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
     }
   }
   // Restore date mode - only restore manual picker if it was open
@@ -1415,7 +1441,7 @@ function ptRestoreState() {
       const pending=(c.borrows||[]).filter(b=>b.status==="pending");
       const owed=pending.reduce((s,b)=>s+Number(b.amount),0);
       pr.style.cssText="display:flex;align-items:center;gap:12px;background:#0a0e1a;border-radius:10px;padding:12px;margin-bottom:14px;";
-      pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} spend &middot; ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':"No pending borrows"}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
+      pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} spend &middot; ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':"No pending borrows"}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
     }
   }
   ptPts();
@@ -2210,7 +2236,17 @@ function rankBadge(rank) {
 }
 
 // ─── NOTIFICATIONS ────────────────────────────────────────────
-function notify(msg){const el=document.getElementById("notification");el.textContent=msg;el.style.display="block";clearTimeout(notifTimeout);notifTimeout=setTimeout(()=>el.style.display="none",4000);}
+function notify(msg, type){
+  const el=document.getElementById("notification");
+  el.textContent=msg;
+  el.style.display="block";
+  // FIX 22: Visual type differentiation
+  if(type==="error"){el.style.borderColor="#f6640060";el.style.background="linear-gradient(135deg,#2a0808,#1a0404)";}
+  else if(type==="success"){el.style.borderColor="#4f460060";el.style.background="linear-gradient(135deg,#081a08,#0a1a0a)";}
+  else{el.style.borderColor="#FFD70066";el.style.background="linear-gradient(135deg,#1a2a00,#0d2040)";}
+  clearTimeout(notifTimeout);
+  notifTimeout=setTimeout(()=>el.style.display="none",4000);
+}
 
 // ─── CONFETTI ─────────────────────────────────────────────────
 let cFrame,cTimeout;
@@ -2470,7 +2506,17 @@ function showForgotPassword() {
 
 // ── Step 3: Verify OTP — REMOVED (no OTP flow) ──
 // Kept as stub to avoid any legacy calls
-function verifyOTPAndProceed() {}
+function verifyOTPAndProceed() {
+  // OTP verification is handled via Firebase phone auth flow
+  // This stub prevents silent failures if called from legacy UI paths
+  const code = (document.getElementById("otp-input") || {}).value || "";
+  if (!code) { notify("❌ Please enter the OTP code", "error"); return; }
+  if (window._confirmationResult) {
+    window._confirmationResult.confirm(code).catch(e => notify("❌ Invalid OTP: " + e.message, "error"));
+  } else {
+    notify("❌ OTP session expired — please request a new code", "error");
+  }
+}
 
 // ── Step 4 (now Step 3): Set new password ──
 async function setNewPassword() {
@@ -2601,7 +2647,8 @@ function onLoginSuccess(phone) {
   updateAppHeader();
   // Periodically check if account has been blocked by seller
   checkIfBlocked(phone);
-  setInterval(() => checkIfBlocked(phone), 60000);
+  if (window._blockCheckTimer) clearInterval(window._blockCheckTimer);
+  window._blockCheckTimer = setInterval(() => checkIfBlocked(phone), 60000);
 }
 
 async function checkIfBlocked(phone) {
@@ -2691,6 +2738,11 @@ function _tab2RestoreFields(saved) {
 }
 
 function safeRenderTab(i) {
+  // DEBOUNCE: coalesce rapid successive calls (e.g. Firestore onSnapshot + inventory update firing together)
+  if (window._renderDebounceTimer) clearTimeout(window._renderDebounceTimer);
+  window._renderDebounceTimer = setTimeout(() => _safeRenderTabImmediate(i), 40);
+}
+function _safeRenderTabImmediate(i) {
   // If the user has focus inside any input/textarea in the tab, skip re-render
   // to prevent auto-resetting fields like the shop name input.
   const active = document.activeElement;
@@ -2821,7 +2873,7 @@ function safeRenderTab(i) {
 }
 // ─── TABS ─────────────────────────────────────────────────────
 function renderTabs(){const TABS=getTabs();document.getElementById("tab-bar").innerHTML=TABS.map((tab,i)=>`<button class="tab-btn${currentTab===i?" active":""}" onclick="switchTab(${i})">${tab}</button>`).join("");}
-function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}currentTab=i;renderTabs();renderTab(i);}
+function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}if(i!==6)invPrefillName="";currentTab=i;renderTabs();renderTab(i);}
 function renderTab(i){
   const el=document.getElementById("tab-content"),s=getSorted();
   // Reset position/overflow before rendering
@@ -3103,10 +3155,13 @@ function custLoadMore() {
 }
 
 function refreshCustSearch(q){
-  custPage = CUST_BATCH; // reset to first batch on new search
-  renderTab(1);
-  // Restore focus to search box
-  setTimeout(()=>{const el=document.getElementById("cust-search");if(el){el.focus();const v=el.value;el.value="";el.value=v;}},10);
+  // DEBOUNCE: don't re-render on every keystroke — wait 180ms after user stops typing
+  if (window._custSrchTimer) clearTimeout(window._custSrchTimer);
+  window._custSrchTimer = setTimeout(() => {
+    custPage = CUST_BATCH;
+    renderTab(1);
+    setTimeout(()=>{const el=document.getElementById("cust-search");if(el){el.focus();const v=el.value;el.value="";el.value=v;}},10);
+  }, 180);
 }
 
 // ─── PURCHASE TAB ─────────────────────────────────────────────
@@ -3379,7 +3434,7 @@ function ptFilterCustomers(){
     <div onclick="ptSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">
       ${avatarEl(c,34)}
       <div>
-        <div style="font-weight:700;font-size:13px;color:#e8eaf0;">${c.name}</div>
+        <div style="font-weight:700;font-size:13px;color:#e8eaf0;">${escHtml(c.name)}</div>
         <div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span> · ${formatINR(c.totalSpend)}</div>
       </div>
     </div>`).join("");
@@ -3401,7 +3456,7 @@ function ptSelectCustomer(id){
   const _showVisits2 = !_isPro2||isSubFeatureAllowed(8);
   const _showLastVisit2 = !_isPro2||isSubFeatureAllowed(10);
   const _showRank2 = !_isPro2||isSubFeatureAllowed(0);
-  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank2?` · Rank #${c.rank}`:""}${_showVisits2?` · 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit2?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank2?` · Rank #${c.rank}`:""}${_showVisits2?` · 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit2?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
   ptPts();
 }
 
@@ -3474,7 +3529,7 @@ function bptFilterCustomers(){
   const matches=getSorted().filter(c=>c.name.toLowerCase().includes(q)||(c.phone&&c.phone.includes(q))||c.id.toLowerCase().includes(q)).slice(0,8);
   if(!matches.length){dd.style.display="none";return;}
   dd.style.display="block";
-  dd.innerHTML=matches.map(c=>`<div onclick="bptSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">${avatarEl(c,34)}<div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${c.name}</div><div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span> · ${formatINR(c.totalSpend)}</div></div></div>`).join("");
+  dd.innerHTML=matches.map(c=>`<div onclick="bptSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">${avatarEl(c,34)}<div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span> · ${formatINR(c.totalSpend)}</div></div></div>`).join("");
 }
 
 function bptSelectCustomer(id){
@@ -3492,7 +3547,7 @@ function bptSelectCustomer(id){
   const _showVisits3 = !_isPro3||isSubFeatureAllowed(8);
   const _showLastVisit3 = !_isPro3||isSubFeatureAllowed(10);
   const _showRank3 = !_isPro3||isSubFeatureAllowed(0);
-  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank3?` · Rank #${c.rank||"?"}`:""} ${_showVisits3?`· 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit3?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc3};font-weight:700;">${_lv3}</span></div>`:""}</div><button onclick="bptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank3?` · Rank #${c.rank||"?"}`:""} ${_showVisits3?`· 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit3?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc3};font-weight:700;">${_lv3}</span></div>`:""}</div><button onclick="bptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
 }
 
 function bptClearCustomer(){
@@ -3561,7 +3616,7 @@ function bwFilterCustomers(){
   dd.style.display="block";
   dd.innerHTML=matches.map(c=>`<div onclick="bwSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">
     ${avatarEl(c,34)}
-    <div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${c.name}</div>
+    <div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${escHtml(c.name)}</div>
     <div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span></div></div>
   </div>`).join("");
 }
@@ -3576,7 +3631,7 @@ function bwSelectCustomer(id){
   const pending=(c.borrows||[]).filter(b=>b.status==="pending");
   const owed=pending.reduce((s,b)=>s+Number(b.amount),0);
   pr.style.display="flex";pr.style.alignItems="center";pr.style.gap="12px";
-  pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${c.name}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} spend · ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':'No pending borrows'}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} spend · ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':'No pending borrows'}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
 }
 
 function bwClearCustomer(){
@@ -4980,7 +5035,7 @@ function openAddModal(){
     <input class="input" id="m-name" placeholder="e.g. Rahul Sharma" style="margin-bottom:14px;" />
 
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Phone Number <span style="color:#556;font-weight:400;">(optional)</span></label>
-    <input class="input" id="m-phone" placeholder="e.g. 9876543210" style="margin-bottom:14px;" />
+    <input class="input" id="m-phone" placeholder="e.g. 9876543210" maxlength="10" inputmode="numeric" pattern="[0-9]*" style="margin-bottom:14px;" />
 
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Customer ID</label>
     <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:4px;">
@@ -4996,21 +5051,33 @@ function handleAddPhoto(inp){
   const f=inp.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=e=>{
-    tempPhoto=e.target.result;
-    const box=document.getElementById("add-photo-box");
-    if(box) box.innerHTML=`<img src="${tempPhoto}" /><input type="file" id="add-photo-file" accept="image/*" style="display:none;" onchange="handleAddPhoto(this)" />`;
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=200,scale=Math.min(MAX/img.width,MAX/img.height,1);
+      const cv=document.createElement('canvas');
+      cv.width=Math.round(img.width*scale);cv.height=Math.round(img.height*scale);
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      tempPhoto=cv.toDataURL('image/jpeg',0.75);
+      const box=document.getElementById("add-photo-box");
+      if(box) box.innerHTML=`<img src="${tempPhoto}" /><input type="file" id="add-photo-file" accept="image/*" style="display:none;" onchange="handleAddPhoto(this)" />`;
+    };
+    img.src=e.target.result;
   };
   r.readAsDataURL(f);
 }
 
 async function saveNewCustomer(){
   const name=document.getElementById("m-name")?.value.trim();
-  if(!name){notify("❌ Name is required");return;}
+  if(!name){notify("❌ Name is required","error");return;}
   let rawId=document.getElementById("m-id")?.value.trim();
   const id=rawId?rawId.toUpperCase():autoId();
-  if(idExists(id,null)){notify("❌ ID already exists — try another or click 🎲 Auto");return;}
-  if(rawId && isDeletedId(id)){notify("❌ This ID was used by a deleted customer and cannot be reused. Please choose a different ID or click 🎲 Auto");return;}
+  if(idExists(id,null)){notify("❌ ID already exists — try another or click 🎲 Auto","error");return;}
+  if(rawId && isDeletedId(id)){notify("❌ This ID was used by a deleted customer and cannot be reused. Please choose a different ID or click 🎲 Auto","error");return;}
   const phone=document.getElementById("m-phone")?.value.trim()||"";
+  // FIX 30: Duplicate phone check
+  if(phone && customers.some(c=>c.phone && c.phone===phone)){
+    if(!confirm(`⚠️ A customer with phone ${phone} already exists (${customers.find(c=>c.phone===phone).name}). Add anyway?`)) return;
+  }
   const newC={id,name,phone,photo:tempPhoto||"",totalSpend:0,purchases:[]};
   customers.push(newC);
   closeModal();tempPhoto="";
@@ -5253,7 +5320,16 @@ function handleEditPhoto(inp){
   const f=inp.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=e=>{
-    tempPhoto=e.target.result;
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=200,scale=Math.min(MAX/img.width,MAX/img.height,1);
+      const cv=document.createElement('canvas');
+      cv.width=Math.round(img.width*scale);cv.height=Math.round(img.height*scale);
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      tempPhoto=cv.toDataURL('image/jpeg',0.75);
+    };
+    img.src=e.target.result;
+    tempPhoto=e.target.result; // fallback until compressed
     const box=document.getElementById("edit-photo-box");
     if(box) box.innerHTML=`<img src="${tempPhoto}" /><input type="file" id="edit-photo-file" accept="image/*" style="display:none;" onchange="handleEditPhoto(this)" />`;
   };
@@ -5291,7 +5367,26 @@ function openPhotoModal(id){
     ${tempPhoto?`<button class="btn" onclick="savePhoto('${id}','')" style="background:#3a1a1a;color:#f66;border:1px solid #4a1515;width:100%;padding:8px;margin-bottom:8px;font-size:12px;">Remove Photo</button>`:""}
     <button class="btn" onclick="closeModal()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;width:100%;padding:8px;font-size:12px;">Cancel</button>`);
 }
-function handlePhotoFile(inp,id){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>savePhoto(id,e.target.result);r.readAsDataURL(f);}
+function handlePhotoFile(inp,id){
+  const f=inp.files[0];if(!f)return;
+  // FIX: Compress image to max 200x200 before saving — prevents Firestore doc bloat
+  const img=new Image();
+  const reader=new FileReader();
+  reader.onload=e=>{
+    img.onload=()=>{
+      const MAX=200;
+      const scale=Math.min(MAX/img.width,MAX/img.height,1);
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.round(img.width*scale);
+      canvas.height=Math.round(img.height*scale);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      const compressed=canvas.toDataURL('image/jpeg',0.75);
+      savePhoto(id,compressed);
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(f);
+}
 async function savePhoto(id,photo){
   const c=customers.find(x=>x.id===id);if(!c)return;
   c.photo=photo||"";closeModal();
@@ -5547,7 +5642,7 @@ function showProfile(id){
     <div style="display:flex;gap:16px;align-items:center;margin-bottom:20px;">
       ${avatarEl(c,64)}
       <div>
-        <div style="font-size:22px;font-weight:800;color:#e8eaf0;">${c.name}</div>
+        <div style="font-size:22px;font-weight:800;color:#e8eaf0;">${escHtml(c.name)}</div>
         <div style="font-size:13px;color:#7a8aaa;margin-top:2px;">${c.phone?"📞 "+c.phone:"<em>No phone</em>"} · <span style="font-family:monospace;">${c.id}</span></div>
         <div style="margin-top:6px;font-size:13px;color:#7a8aaa;">Rank #${c.rank}</div>
       </div>
@@ -5954,7 +6049,7 @@ function openCustomerPage(id){
     <div class="card" style="padding:20px;margin-bottom:14px;display:flex;gap:18px;align-items:center;">
       ${avatarEl(c,72)}
       <div style="flex:1;min-width:0;">
-        <div style="font-size:24px;font-weight:800;color:#e8eaf0;">${c.name}</div>
+        <div style="font-size:24px;font-weight:800;color:#e8eaf0;">${escHtml(c.name)}</div>
         <div style="font-size:13px;color:#7a8aaa;margin-top:3px;">${c.phone?"📞 "+c.phone:"<em style='color:#2a3a5a;'>No phone</em>"} &nbsp;·&nbsp; <span style="font-family:monospace;font-size:11px;">${c.id}</span></div>
         <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;">
           <span style="background:#1a2e50;border:1px solid #2a4a7a;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;color:#7ab3ff;">Rank #${c.rank}</span>
@@ -6320,7 +6415,7 @@ async function loadFreeTabs() {
 }
 
 // Poll every 30s so changes in Seller Panel reflect live
-setInterval(loadFreeTabs, 5000);
+setInterval(loadFreeTabs, 60000); // FIX: was 5000ms — reduced to 60s to avoid Supabase hammering
 
 let licenseStatus = null; // null | "pro" | "free" | "expired"
 let licensePlan   = "free";
@@ -6675,6 +6770,7 @@ function applyLicenseOverlay(i) {
 
 let inventoryItems = [];
 let invView = "stock"; // "stock" | "add" | "log" | "detail" | "category"
+let invPrefillName = ""; // pre-fill name when Restock button is clicked
 let invSelectedCat = ""; // currently selected category pill
 let invSearchQuery = ""; // search box text
 let invCatPageName = ""; // category being viewed on category page
@@ -6689,6 +6785,15 @@ function invCollection(){
 
 // Save to Firestore (primary) + localStorage (cache)
 function saveInventory(){
+  // DEBOUNCE: coalesce rapid saves (e.g. editing selling price + unit in quick succession)
+  if (window._invSaveTimer) clearTimeout(window._invSaveTimer);
+  window._invSaveTimer = setTimeout(_doSaveInventory, 300);
+  // Always update localStorage immediately for instant cache
+  const now = Date.now();
+  try{ localStorage.setItem(invKey("items"), JSON.stringify(inventoryItems)); } catch(e){}
+  try{ localStorage.setItem(invKey("items_ts"), String(now)); } catch(e){}
+}
+function _doSaveInventory(){
   const now = Date.now();
   // Always write to Firestore first — this is the source of truth
   if(db && authPhone){
@@ -6701,9 +6806,7 @@ function saveInventory(){
   } else {
     console.warn("[Inv] saveInventory called but db=",!!db,"authPhone=",authPhone);
   }
-  // localStorage as cache for same-origin fast load
-  try{ localStorage.setItem(invKey("items"), JSON.stringify(inventoryItems)); } catch(e){}
-  try{ localStorage.setItem(invKey("items_ts"), String(now)); } catch(e){}
+  // localStorage already updated in saveInventory() wrapper above
 }
 
 // Load from Firestore first, fallback to localStorage
@@ -7067,7 +7170,7 @@ function renderInventoryTab(){
 
   const tabBtn=(v,label,color)=>{
     const a=invView===v;
-    return `<button onclick="invView='${v}';invSelectedCat='';safeRenderTab(currentTab)" style="cursor:pointer;flex:1;padding:10px;border-radius:10px;border:2px solid ${a?color:'#1e2a45'};background:${a?'#0a0e1a':'transparent'};color:${a?color:'#4a5a7a'};font-size:13px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;">${label}</button>`;
+    return `<button onclick="if('${v}'!=='add')invPrefillName='';invView='${v}';invSelectedCat='';safeRenderTab(currentTab)" style="cursor:pointer;flex:1;padding:10px;border-radius:10px;border:2px solid ${a?color:'#1e2a45'};background:${a?'#0a0e1a':'transparent'};color:${a?color:'#4a5a7a'};font-size:13px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;">${label}</button>`;
   };
 
   const nav = `<div style="display:flex;gap:8px;margin-bottom:16px;">
@@ -7106,11 +7209,12 @@ function renderInventoryTab(){
       <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:16px;">➕ Add / Restock Item</div>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Item / Product Name *</label>
       <input class="input" id="inv-name" list="inv-existing-names" placeholder="e.g. Basmati Rice 5kg..."
-        oninput="(function(){var n=this.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');if(catEl&&!catEl.value)catEl.value=ex.category||'General';if(unitEl&&!unitEl.value)unitEl.value=ex.unit||'';}})()"
+        oninput="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var costEl=document.getElementById('inv-cost');var sellEl=document.getElementById('inv-sell-price');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(costEl&&!costEl.value){var costs=(ex.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);if(costs.length)costEl.value=Number(costs[costs.length-1].costPerUnit).toFixed(2);}if(sellEl&&!sellEl.value&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);}})(this)"
+        value="${invPrefillName ? invPrefillName : ''}"
         style="margin-bottom:12px;" />
       <datalist id="inv-existing-names">${inventoryItems.map(x=>`<option value="${x.name.replace(/"/g,'&quot;')}">`).join("")}</datalist>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Category</label>
-      <input class="input" id="inv-category" list="inv-category-list" placeholder="e.g. Grocery, Dairy, Snacks..." style="margin-bottom:12px;" />
+      <input class="input" id="inv-category" list="inv-category-list" placeholder="e.g. Grocery, Dairy, Snacks..." value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex?ex.category||'General':'';})()}" style="margin-bottom:12px;" />
       <datalist id="inv-category-list">${existingCats.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">`).join("")}</datalist>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div>
@@ -7119,18 +7223,18 @@ function renderInventoryTab(){
         </div>
         <div>
           <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Unit</label>
-          <input class="input" id="inv-unit" list="inv-units" placeholder="kg / pcs / litre..." />
+          <input class="input" id="inv-unit" list="inv-units" placeholder="kg / pcs / litre..." value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex?ex.unit||'':'';})()}" />
           <datalist id="inv-units"><option value="kg"><option value="pcs"><option value="litre"><option value="box"><option value="dozen"><option value="packet"><option value="bottle"><option value="bag"></datalist>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div>
           <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Cost per Unit (₹)</label>
-          <input class="input" type="number" id="inv-cost" min="0" step="0.01" placeholder="0.00" />
+          <input class="input" type="number" id="inv-cost" min="0" step="0.01" placeholder="0.00" value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);if(!ex)return '';var costs=(ex.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);return costs.length?Number(costs[costs.length-1].costPerUnit).toFixed(2):'';})()}" />
         </div>
         <div>
           <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Selling Price / Unit (₹) <span style="color:#4f4;font-size:10px;">★ auto-fill</span></label>
-          <input class="input" type="number" id="inv-sell-price" min="0" step="0.01" placeholder="0.00" style="color:#FFD700;" />
+          <input class="input" type="number" id="inv-sell-price" min="0" step="0.01" placeholder="0.00" value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex&&ex.sellingPrice>0?Number(ex.sellingPrice).toFixed(2):'';})()}" style="color:#FFD700;" />
         </div>
       </div>
       <div style="margin-bottom:12px;">
@@ -7186,7 +7290,7 @@ function renderInventoryTab(){
       const searchBarHtml = `<div style="position:relative;margin-bottom:14px;">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none;">🔍</span>
         <input id="inv-search-box" class="input" placeholder="Search categories..." value="${(invSearchQuery||'').replace(/"/g,'&quot;')}"
-          oninput="invSearchQuery=this.value;safeRenderTab(currentTab);"
+          oninput="invSearchQuery=this.value;if(window._invSrchTimer)clearTimeout(window._invSrchTimer);window._invSrchTimer=setTimeout(()=>safeRenderTab(currentTab),200);"
           style="padding-left:36px;margin-bottom:0;" />
         ${invSearchQuery ? `<button onclick="invSearchQuery='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:20px;cursor:pointer;line-height:1;">×</button>` : ""}
       </div>`;
@@ -7414,7 +7518,7 @@ function renderInventoryCategoryPage(catName){
               <div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px;flex-wrap:wrap;gap:6px;">
                 <div style="font-size:11px;color:#4a5a7a;">Restocked: ${lastAdded} · <span style="color:#4a8aff;">Tap for buyers →</span></div>
                 <div style="display:flex;gap:5px;" onclick="event.stopPropagation()">
-                  <button onclick="invView='add';document.addEventListener('inv-rendered',function h(){var el=document.getElementById('inv-name');if(el){el.value='${item.name.replace(/'/g,"\\\\'")}';document.removeEventListener('inv-rendered',h);}});safeRenderTab(currentTab)" style="background:#1a2a4a;border:none;border-radius:7px;color:#7ab3ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">➕ Restock</button>
+                  <button onclick="invPrefillName='${item.name.replace(/'/g,"\\'")}'.replace(/\\'/g,"'");invView='add';safeRenderTab(currentTab)" style="background:#1a2a4a;border:none;border-radius:7px;color:#7ab3ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">➕ Restock</button>
                   <button onclick="invEditSellPrice('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a08;border:none;border-radius:7px;color:#FFD700;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">₹ Sell Price</button>
                   <button onclick="invEditCategory('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a0a2a;border:none;border-radius:7px;color:#b080ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🏷 Cat</button>
                   <button onclick="invEditUnit('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a3a;border:none;border-radius:7px;color:#aaa;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">✏️ Unit</button>
@@ -7441,7 +7545,7 @@ function renderInventoryCategoryPage(catName){
     <div style="position:relative;margin-bottom:14px;">
       <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;">🔍</span>
       <input id="inv-cat-search-box" class="input" placeholder="Search in ${catName}..." value="${(invCatPageSearch||"").replace(/"/g,"&quot;")}"
-        oninput="invCatPageSearch=this.value;safeRenderTab(currentTab);"
+        oninput="invCatPageSearch=this.value;if(window._invCatSrchTimer)clearTimeout(window._invCatSrchTimer);window._invCatSrchTimer=setTimeout(()=>safeRenderTab(currentTab),200);"
         style="padding-left:36px;margin-bottom:0;" />
       ${invCatPageSearch?`<button onclick="invCatPageSearch='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:18px;cursor:pointer;line-height:1;">×</button>`:""}
     </div>
@@ -7744,7 +7848,7 @@ function invCustApply(){
       <div style="display:flex;align-items:center;gap:12px;">
         ${avatarEl(c,38)}
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${c.name}</div>
+          <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${escHtml(c.name)}</div>
           <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${c.visits.length} purchase${c.visits.length!==1?'s':''} · Last: ${lastDate}</div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
@@ -7792,7 +7896,10 @@ function setBillSetting(key, val) {
 // ─── BILL NUMBER GENERATOR ─────────────────────────────────────
 function generateBillNumber() {
   const prefix = getBillSetting("billPrefix") || "B";
-  return prefix + Date.now().toString().slice(-6);
+  // FIX 27: Add random suffix to prevent duplicate bill numbers on rapid submission
+  const ts = Date.now().toString().slice(-6);
+  const rnd = Math.random().toString(36).substr(2,2).toUpperCase();
+  return prefix + ts + rnd;
 }
 
 // ─── BILLS FIRESTORE COLLECTION ───────────────────────────────
@@ -8260,6 +8367,16 @@ function openBillingSettingsModal() {
 // ═══════════════════════════════════════════════════════════════
 
 window.addEventListener("load", async () => {
+  // FIX 29: Offline/online visual indicator
+  window.addEventListener('online', () => {
+    updateDbStatus("🔥 Firebase · live", "#4f4");
+    notify("✅ Back online!");
+    if(db && authPhone && !fbUnsubscribe) startFirestoreListener();
+  });
+  window.addEventListener('offline', () => {
+    updateDbStatus("📵 Offline — changes saved locally", "#FFD700");
+    notify("📵 You're offline — data saves locally", "error");
+  });
   loadLicense();
   loadFreeTabs(); // load free/pro feature config from Supabase
   if (licenseKey && licenseStatus === "pro") {
