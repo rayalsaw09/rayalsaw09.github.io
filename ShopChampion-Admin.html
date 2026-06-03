@@ -1685,7 +1685,7 @@ function saveDisplaySettings() {
   saveSettingsToCloud();
 }
 
-let appSettings = {shopName:"Shop Champion", appIcon:""};
+let appSettings = {shopName:"Shop Champion", appIcon:"", autoPriceMode:"auto"};
 try { const as=localStorage.getItem(storageKey("app_settings")); if(as) appSettings={...appSettings,...JSON.parse(as)}; } catch {}
 function saveAppSettings() {
   try { localStorage.setItem(storageKey("app_settings"),JSON.stringify(appSettings)); } catch {}
@@ -3639,10 +3639,30 @@ function bwShowItemStock(input){
     const stk = invGetStock(name);
     hint.textContent = '📦 Stock: '+stk+' '+(item.unit||'unit');
     hint.style.color = stk<=0?'#f66':stk<=5?'#FFD700':'#4f4';
-    // Auto-fill price if empty
-    if(priceEl && !priceEl.value){
-      const p = bwGetLastSellPrice(name);
-      if(p>0){ priceEl.value = p.toFixed(2); bwUpdateTotal(); }
+    // Auto-fill price from inventory selling price, then last sale price
+    const bwPriceMode = getAutoPriceMode();
+    let bwAutoPrice = 0;
+    if(item.sellingPrice && Number(item.sellingPrice)>0){
+      bwAutoPrice = Number(item.sellingPrice);
+    } else {
+      bwAutoPrice = bwGetLastSellPrice(name);
+    }
+    if(priceEl){
+      if(bwAutoPrice>0){
+        priceEl.value = bwAutoPrice.toFixed(2);
+        bwUpdateTotal();
+      }
+      if(bwPriceMode==="auto" && bwAutoPrice>0){
+        priceEl.readOnly = true;
+        priceEl.style.opacity = "0.6";
+        priceEl.style.cursor = "not-allowed";
+        priceEl.title = "Price auto-set from inventory (change in Settings → Item Price Fill)";
+      } else {
+        priceEl.readOnly = false;
+        priceEl.style.opacity = "1";
+        priceEl.style.cursor = "";
+        priceEl.title = "";
+      }
     }
   } else {
     hint.textContent = name ? '⚠️ Not in inventory' : '';
@@ -4341,7 +4361,8 @@ function renderSettings(){
     ${section("Shop",
       row("🏪","Shop Name & Icon",appSettings.shopName||"Not set","openShopNameModal()") +
       row("🔊","Voice Announcement",voiceOn?"Enabled":"Disabled","openVoiceModal()") +
-      row("📦","Purchase Mode",getPurchaseMode()==="inventory"?"📦 Inventory Mode — items × price":"🛒 Standard Mode — manual amount","openPurchaseModeModal()")
+      row("📦","Purchase Mode",getPurchaseMode()==="inventory"?"📦 Inventory Mode — items × price":"🛒 Standard Mode — manual amount","openPurchaseModeModal()") +
+      row("💰","Item Price Fill",getAutoPriceMode()==="auto"?"🔒 Auto — fills & locks from inventory price":"✏️ Manual — pre-fills but user can edit","openAutoPriceModeModal()")
     )}
 
     ${section("Data",
@@ -5762,7 +5783,7 @@ function cpPurchaseCard(p,custId){
       ${isBorrow&&p.due?`<div style="font-size:11px;color:${isOverdue?'#f44':'#7a8aaa'};margin-top:2px;">Due: ${new Date(p.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${isOverdue?' ⚠️':''}</div>`:''}
       ${p.notes&&!isBorrow?`<div style="font-size:12px;color:#7a8aaa;margin-top:3px;">📝 ${p.notes}</div>`:''}
       ${isBorrow&&p.notes?`<div style="font-size:12px;color:#7a8aaa;margin-top:3px;">Item: ${p.notes}</div>`:''}
-      ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${p.soldItems.map(si=>`<span style="background:#0a1628;border:1px solid #2a3560;border-radius:6px;padding:2px 8px;font-size:11px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||"unit"} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
+      ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${p.soldItems.map(si=>si._deleted?`<span style="background:#1a0a0a;border:1px solid #4a2020;border-radius:6px;padding:2px 8px;font-size:11px;color:#884444;text-decoration:line-through;">📦 ${si.qty} ${si.name}</span><span style="background:#2a0a0a;border:1px solid #4a1a1a;border-radius:6px;padding:2px 6px;font-size:10px;color:#f66;">🗑 deleted from inventory</span>`:`<span style="background:#0a1628;border:1px solid #2a3560;border-radius:6px;padding:2px 8px;font-size:11px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||"unit"} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
     </div>
     <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:12px;">
       ${isBorrow
@@ -5796,7 +5817,7 @@ function phPurchaseCardHTML(p,custId){
       ${isSubFeatureAllowed(8)?`<div style="font-size:11px;color:#5af;">Visit #${p.visitNum}</div>`:""}
       ${p.notes&&!isBorrow?`<div style="font-size:11px;color:#7a8aaa;">${p.notes}</div>`:''}
       ${isBorrow&&p.notes?`<div style="font-size:11px;color:#7a8aaa;">Item: ${p.notes}</div>`:''}
-      ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;">${p.soldItems.map(si=>`<span style="background:#0a1628;border:1px solid #2a3560;border-radius:5px;padding:2px 7px;font-size:10px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||""} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
+      ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;">${p.soldItems.map(si=>si._deleted?`<span style="background:#1a0a0a;border:1px solid #4a2020;border-radius:5px;padding:2px 7px;font-size:10px;color:#884444;text-decoration:line-through;">📦 ${si.qty} ${si.name}</span><span style="background:#2a0a0a;border:1px solid #4a1a1a;border-radius:5px;padding:2px 5px;font-size:10px;color:#f66;">🗑 deleted from inventory</span>`:`<span style="background:#0a1628;border:1px solid #2a3560;border-radius:5px;padding:2px 7px;font-size:10px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||""} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
     </div>
     <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
       ${isBorrow
@@ -6398,10 +6419,65 @@ function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellin
 }
 
 function invDeleteItem(name){
-  if(!confirm("Delete \""+name+"\" and all its history?")) return;
+  // Count how many customer purchases contain this item
+  let affectedCount = 0;
+  let affectedNames = [];
+  customers.forEach(c=>{
+    const hit = (c.purchases||[]).some(p=>(p.soldItems||[]).some(si=>si.name===name));
+    if(hit){ affectedCount++; affectedNames.push(c.name); }
+  });
+
+  const affectedHtml = affectedCount > 0
+    ? `<div style="background:#2a0808;border:1px solid #5a1010;border-radius:10px;padding:12px 14px;margin:14px 0 0 0;font-size:13px;color:#f99;">
+        ⚠️ This item appears in purchases of <b style="color:#ffd700;">${affectedCount} customer${affectedCount>1?'s':''}</b>
+        (${affectedNames.slice(0,3).join(', ')}${affectedNames.length>3?' +more':''}).<br>
+        <span style="color:#f66;font-weight:700;">Those purchase records will have this item removed.</span>
+       </div>`
+    : '';
+
+  showModal(`
+    <div style="text-align:center;padding:8px 0 4px 0;">
+      <div style="font-size:44px;margin-bottom:8px;">🗑️</div>
+      <div style="font-size:19px;font-weight:800;color:#f44;margin-bottom:6px;">Delete Item?</div>
+      <div style="font-size:14px;color:#b0bcd0;">You are about to permanently delete</div>
+      <div style="font-size:16px;font-weight:800;color:#ffd700;margin:6px 0;">"${name}"</div>
+      <div style="font-size:13px;color:#7a8aaa;">This will remove it from inventory and all stock logs.</div>
+      ${affectedHtml}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button onclick="closeModal()" style="flex:1;padding:13px;background:#1a2540;border:none;border-radius:12px;color:#7a8aaa;font-size:14px;font-weight:700;cursor:pointer;">Cancel</button>
+      <button onclick="_confirmInvDelete('${name.replace(/'/g,"\\'")}');closeModal();" style="flex:1;padding:13px;background:linear-gradient(135deg,#8b0000,#cc2200);border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;">🗑 Yes, Delete</button>
+    </div>
+  `);
+}
+
+function _confirmInvDelete(name){
+  // Remove from inventory
   inventoryItems = inventoryItems.filter(x=>x.name!==name);
   saveInventory();
+  // Cascade: mark soldItem entries as _deleted in all customer purchases, deduct from totalSpend
+  let customersTouched = false;
+  customers.forEach(c=>{
+    (c.purchases||[]).forEach(p=>{
+      if(p.soldItems && p.soldItems.some(si=>si.name===name && !si._deleted)){
+        p.soldItems.forEach(si=>{
+          if(si.name===name && !si._deleted){
+            const deduct = (Number(si.qty)||0) * (Number(si.pricePerUnit)||0);
+            si._deleted = true;
+            // Deduct from bill amount and customer totalSpend
+            p.amount = Math.max(0, (Number(p.amount)||0) - deduct);
+            c.totalSpend = Math.max(0, (Number(c.totalSpend)||0) - deduct);
+          }
+        });
+        customersTouched = true;
+      }
+    });
+  });
+  if(customersTouched) saveCustomers();
+  // Reset view back to stock list
+  invView="stock"; invDetailItem=null;
   safeRenderTab(currentTab);
+  notify("🗑 \""+name+"\" deleted from inventory"+(customersTouched?" · customer history updated":""));
 }
 
 function invEditUnit(name){
@@ -6443,6 +6519,14 @@ function invGetStockValue(itemName){
 }
 
 // ── Purchase tab: item row helpers ──────────────────────────────
+function getAutoPriceMode(){
+  return (appSettings.autoPriceMode||"auto");
+}
+function setAutoPriceMode(mode){
+  appSettings.autoPriceMode = mode;
+  try{localStorage.setItem(storageKey("app_settings"),JSON.stringify(appSettings));}catch(e){}
+  try{localStorage.setItem("sc_app_settings",JSON.stringify(appSettings));}catch(e){}
+}
 function getPurchaseMode(){
   return localStorage.getItem(storageKey("purchase_mode"))||"standard";
 }
@@ -6536,15 +6620,30 @@ function ptShowItemStock(input){
     hint.style.color = stock<=0?"#f66":stock<=5?"#FFD700":"#4f4";
     // Auto-fill price from saved selling price, then fall back to last sale price
     const priceEl = row.querySelector(".pt-item-price");
-    if(priceEl && !priceEl.value){
-      let autoPrice = 0;
-      if(item.sellingPrice && Number(item.sellingPrice)>0){
-        autoPrice = Number(item.sellingPrice);
-      } else {
-        const logs = (item.salesLog||[]).filter(e=>Number(e.pricePerUnit||0)>0);
-        if(logs.length) autoPrice = Number(logs[logs.length-1].pricePerUnit);
+    const priceMode = getAutoPriceMode();
+    let autoPrice = 0;
+    if(item.sellingPrice && Number(item.sellingPrice)>0){
+      autoPrice = Number(item.sellingPrice);
+    } else {
+      const logs = (item.salesLog||[]).filter(e=>Number(e.pricePerUnit||0)>0);
+      if(logs.length) autoPrice = Number(logs[logs.length-1].pricePerUnit);
+    }
+    if(priceEl){
+      if(autoPrice>0){
+        priceEl.value = autoPrice.toFixed(2);
+        ptUpdateTotal();
       }
-      if(autoPrice>0){ priceEl.value=autoPrice.toFixed(2); ptUpdateTotal(); }
+      if(priceMode==="auto" && autoPrice>0){
+        priceEl.readOnly = true;
+        priceEl.style.opacity = "0.6";
+        priceEl.style.cursor = "not-allowed";
+        priceEl.title = "Price auto-set from inventory (change in Settings → Item Price Fill)";
+      } else {
+        priceEl.readOnly = false;
+        priceEl.style.opacity = "1";
+        priceEl.style.cursor = "";
+        priceEl.title = "";
+      }
     }
   } else {
     hint.textContent = name?"⚠️ Not in inventory — will be created on save":"";
@@ -6830,6 +6929,41 @@ function openPurchaseModeModal(){
   modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
 }
 
+
+// ─── AUTO PRICE MODE MODAL ────────────────────────────────────
+function openAutoPriceModeModal(){
+  const cur = getAutoPriceMode();
+  const modal = document.createElement("div");
+  modal.id="apm-modal-overlay";
+  modal.style.cssText="position:fixed;inset:0;background:#000a;z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
+  modal.innerHTML=`
+    <div style="background:#0d1220;border:1px solid #1e2a45;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:560px;padding-bottom:max(24px,env(safe-area-inset-bottom));">
+      <div style="font-size:17px;font-weight:800;color:#e8eaf0;margin-bottom:6px;">💰 Item Price Fill</div>
+      <div style="font-size:12px;color:#4a5a7a;margin-bottom:20px;">How should prices be filled when you select an item in Purchase or Borrow?</div>
+      <div onclick="setAutoPriceMode('auto');document.getElementById('apm-modal-overlay').remove();safeRenderTab(currentTab);"
+           style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:2px solid ${cur==='auto'?'#4f4':'#1e2a45'};background:${cur==='auto'?'#081a08':'#080c18'};cursor:pointer;margin-bottom:12px;">
+        <span style="font-size:28px;">🔒</span>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:15px;color:${cur==='auto'?'#4f4':'#e8eaf0'};">Auto (Recommended)</div>
+          <div style="font-size:12px;color:#4a5a7a;margin-top:3px;">Price is automatically filled from inventory selling price. Field is locked — just enter qty and done.</div>
+        </div>
+        ${cur==='auto'?'<span style="font-size:20px;color:#4f4;">✓</span>':""}
+      </div>
+      <div onclick="setAutoPriceMode('manual');document.getElementById('apm-modal-overlay').remove();safeRenderTab(currentTab);"
+           style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:2px solid ${cur==='manual'?'#4a8aff':'#1e2a45'};background:${cur==='manual'?'#0a1628':'#080c18'};cursor:pointer;margin-bottom:20px;">
+        <span style="font-size:28px;">✏️</span>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:15px;color:${cur==='manual'?'#7ab3ff':'#e8eaf0'};">Manual</div>
+          <div style="font-size:12px;color:#4a5a7a;margin-top:3px;">Price is pre-filled from inventory as a suggestion, but you can edit it freely for each sale.</div>
+        </div>
+        ${cur==='manual'?'<span style="font-size:20px;color:#4a8aff;">✓</span>':""}
+      </div>
+      <button onclick="document.getElementById('apm-modal-overlay').remove()" style="width:100%;padding:13px;background:#1a2540;border:none;border-radius:12px;color:#7a8aaa;font-size:14px;font-weight:700;cursor:pointer;">Close</button>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
+}
+
 // ─── INVENTORY CATEGORY PAGE ────────────────────────────────────
 function renderInventoryCategoryPage(catName){
   const catItems = inventoryItems.filter(x=>(x.category||"General")===catName);
@@ -6934,11 +7068,8 @@ function renderInventoryItemDetail(itemName){
   const item = inventoryItems.find(x=>x.name===itemName);
   if(!item) return `<div style="padding:32px;text-align:center;color:#4a5a7a;">Item not found</div>`;
 
-  // Gather all sales log entries for this item with customer info
-  const salesLog = (item.salesLog||[]).slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
-
-  // Also scan customer purchase history for more detail
-  const custMap = {}; // custId → {name, totalQty, totalSpend, visits:[]}
+  // ── Customer map ──
+  const custMap = {};
   customers.forEach(c=>{
     (c.purchases||[]).forEach(p=>{
       (p.soldItems||[]).forEach(si=>{
@@ -6951,81 +7082,156 @@ function renderInventoryItemDetail(itemName){
       });
     });
   });
-
-  const custs = Object.values(custMap).sort((a,b)=>b.totalQty-a.totalQty);
+  const custs     = Object.values(custMap).sort((a,b)=>b.totalQty-a.totalQty);
+  const salesLog  = (item.salesLog||[]).slice();
   const totalSold = salesLog.reduce((s,e)=>s+Number(e.qty),0);
-  const totalRevenue = custs.reduce((s,c)=>s+c.totalSpend,0);
-  const unit = item.unit||"unit";
-  const stk = invGetStock(itemName);
-  const stkColor = stk<=0?"#f66":stk<=3?"#FFD700":"#4f4";
+  const unit      = item.unit||"unit";
+  const stk       = invGetStock(itemName);
+  const stkColor  = stk<=0?"#f66":stk<=3?"#FFD700":"#4f4";
+
+  // ── Build unified timeline ──
+  const timeline = [];
+  (item.stock||[]).forEach(e=>timeline.push({type:'restock', date:e.date, qty:Number(e.qty), costPerUnit:Number(e.costPerUnit||0), notes:e.notes||""}));
+  (item.salesLog||[]).forEach(e=>{
+    const cust = customers.find(c=>c.id===e.custId);
+    timeline.push({type:'sale', date:e.date, qty:Number(e.qty), pricePerUnit:Number(e.pricePerUnit||0), custName:e.custName||(cust&&cust.name)||"", custId:e.custId||""});
+  });
+  timeline.sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  const restockCount = (item.stock||[]).length;
+
+  // ── Tab state ──
+  if(window._invDetailTab===undefined) window._invDetailTab='history';
+  const activeTab = window._invDetailTab;
+
+  const tabBtn = (id, label, count, color) => {
+    const isActive = activeTab===id;
+    return `<button onclick="window._invDetailTab='${id}';safeRenderTab(window.currentTab)"
+      style="flex:1;padding:10px 6px;border:none;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;transition:all 0.15s;
+             background:${isActive?'#0a0e1a':'transparent'};
+             color:${isActive?color:'#4a5a7a'};
+             border-bottom:2px solid ${isActive?color:'transparent'};">${label}
+      <span style="font-size:10px;font-weight:600;opacity:0.7;">(${count})</span></button>`;
+  };
+
+  // ── History tab ──
+  const historyTabHtml = timeline.length===0
+    ? `<div class="card" style="padding:32px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:8px;">📭</div>
+        <div style="color:#4a5a7a;font-size:13px;">No history yet.</div>
+      </div>`
+    : `<div style="display:flex;flex-direction:column;gap:6px;">
+        ${timeline.map((e,i)=>{
+          const isRestock = e.type==='restock';
+          const d = new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+          const t = new Date(e.date).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+          const icon    = isRestock ? '📦' : '🛒';
+          const badge   = isRestock ? `+${e.qty}` : `-${e.qty}`;
+          const badgeBg = isRestock ? '#0a1f0a' : '#1f0a0a';
+          const badgeBd = isRestock ? '#1a4a1a' : '#4a1a1a';
+          const badgeC  = isRestock ? '#4f4'    : '#f66';
+          const label   = isRestock ? 'Restocked' : 'Sold';
+          const labelC  = isRestock ? '#4f4'      : '#f66';
+          const isFirst = i===0;
+          const borderExtra = isFirst ? `border-color:${isRestock?'#1a4a1a':'#4a1a1a'};` : '';
+
+          let rightHtml = '';
+          if(isRestock){
+            rightHtml = e.costPerUnit>0
+              ? `<div style="font-size:12px;font-weight:700;color:#FFD700;">₹${e.costPerUnit.toFixed(2)}/${unit}</div><div style="font-size:10px;color:#4a5a7a;">₹${(e.qty*e.costPerUnit).toLocaleString('en-IN')} total</div>`
+              : `<div style="font-size:11px;color:#4a5a7a;">No cost</div>`;
+          } else {
+            rightHtml = e.pricePerUnit>0
+              ? `<div style="font-size:12px;font-weight:700;color:#4f4;">₹${e.pricePerUnit.toFixed(2)}/${unit}</div><div style="font-size:10px;color:#4a5a7a;">₹${(e.qty*e.pricePerUnit).toLocaleString('en-IN')}</div>`
+              : `<div style="font-size:11px;color:#4a5a7a;">No price</div>`;
+          }
+
+          return `<div class="card" style="padding:11px 14px;display:flex;align-items:center;gap:11px;${borderExtra}">
+            <div style="background:${badgeBg};border:1px solid ${badgeBd};border-radius:8px;min-width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:${badgeC};flex-shrink:0;padding:0 4px;">${badge}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
+                <span style="font-size:10px;font-weight:800;color:${labelC};background:${badgeBg};border:1px solid ${badgeBd};border-radius:5px;padding:1px 6px;">${icon} ${label}</span>
+                ${isFirst?`<span style="font-size:10px;color:#7ab3ff;background:#0a1020;border:1px solid #1a2a40;border-radius:5px;padding:1px 5px;">Latest</span>`:''}
+              </div>
+              <div style="font-size:12px;font-weight:700;color:#e8eaf0;">${d} <span style="color:#4a5a7a;font-size:11px;">· ${t}</span></div>
+              ${!isRestock && e.custName ? `<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">👤 ${e.custName}</div>` : ''}
+              ${isRestock && e.notes ? `<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">📝 ${e.notes}</div>` : ''}
+            </div>
+            <div style="text-align:right;flex-shrink:0;">${rightHtml}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+
+  // ── Customers tab ──
+  const customersTabHtml = custs.length===0
+    ? `<div class="card" style="padding:32px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:8px;">🤷</div>
+        <div style="color:#4a5a7a;font-size:13px;">No customer purchases linked yet.<br><span style="font-size:11px;">Use Inventory Mode to record item-linked sales.</span></div>
+      </div>`
+    : `<div style="display:flex;flex-direction:column;gap:8px;">
+        ${custs.map(c=>{
+          const lastVisit = c.visits.slice().sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+          const lastDate  = lastVisit?new Date(lastVisit.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}):"—";
+          return `<div class="card" style="padding:14px 16px;cursor:pointer;" onclick="showProfile('${c.id}')">
+            <div style="display:flex;align-items:center;gap:12px;">
+              ${avatarEl(c,38)}
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${c.name}</div>
+                <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${c.visits.length} purchase${c.visits.length!==1?"s":""} · Last: ${lastDate}</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-size:15px;font-weight:800;color:#f66;">-${c.totalQty} ${unit}</div>
+                ${c.totalSpend>0?`<div style="font-size:11px;color:#4f4;margin-top:2px;">₹${c.totalSpend.toLocaleString("en-IN")}</div>`:""}
+              </div>
+            </div>
+            ${c.visits.length>0?`<div style="margin-top:10px;border-top:1px solid #1e2a45;padding-top:10px;display:flex;flex-direction:column;gap:5px;">
+              ${c.visits.slice(0,3).map(v=>`<div style="display:flex;justify-content:space-between;align-items:center;">
+                <div style="font-size:11px;color:#4a5a7a;">${new Date(v.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${v.bill?" · "+v.bill:""}</div>
+                <div style="font-size:12px;font-weight:700;color:#e8eaf0;">${v.qty} ${unit}${v.ppu>0?" @ ₹"+v.ppu+"/"+unit:""}</div>
+              </div>`).join("")}
+              ${c.visits.length>3?`<div style="font-size:11px;color:#4a5a7a;text-align:center;">+${c.visits.length-3} more visits</div>`:""}
+            </div>`:""}
+          </div>`;
+        }).join("")}
+      </div>`;
 
   return `<div style="padding:16px 14px;max-width:600px;margin:0 auto;">
+
+    <!-- Header -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-      <button onclick="invView='stock';invDetailItem=null;safeRenderTab(currentTab)" style="background:#1a2540;border:none;border-radius:9px;color:#7ab3ff;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;">← Back</button>
+      <button onclick="invView='stock';invDetailItem=null;window._invDetailTab='history';safeRenderTab(currentTab)" style="background:#1a2540;border:none;border-radius:9px;color:#7ab3ff;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;">← Back</button>
       <div style="font-size:17px;font-weight:800;color:#FFD700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${itemName}</div>
     </div>
 
-    <!-- Item summary bar -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
-      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;text-align:center;">
-        <div style="font-size:16px;font-weight:800;color:${stkColor};">${stk<=0?"OUT":stk}</div>
+    <!-- Stat pills -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:16px;">
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:9px 4px;text-align:center;">
+        <div style="font-size:15px;font-weight:800;color:${stkColor};">${stk<=0?"OUT":stk}</div>
         <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">${unit} left</div>
       </div>
-      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;text-align:center;">
-        <div style="font-size:16px;font-weight:800;color:#f66;">${totalSold}</div>
-        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Total Sold</div>
+      <div style="background:#0a1a0a;border:1px solid #1e3a1e;border-radius:10px;padding:9px 4px;text-align:center;">
+        <div style="font-size:15px;font-weight:800;color:#4f4;">${restockCount}</div>
+        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Restocked</div>
       </div>
-      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;text-align:center;">
-        <div style="font-size:16px;font-weight:800;color:#4a8aff;">${custs.length}</div>
-        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Customers</div>
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:9px 4px;text-align:center;">
+        <div style="font-size:15px;font-weight:800;color:#f66;">${totalSold}</div>
+        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Sold</div>
       </div>
-      <div style="background:#081a08;border:1px solid #FFD70030;border-radius:10px;padding:10px;text-align:center;cursor:pointer;" onclick="invEditSellPrice('${itemName.replace(/'/g,"\\'")}');safeRenderTab(currentTab)">
-        <div style="font-size:13px;font-weight:800;color:#FFD700;">${item.sellingPrice>0?"₹"+Number(item.sellingPrice).toFixed(2):"Set ✏️"}</div>
-        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Sell Price</div>
-      </div>
-      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;text-align:center;">
-        <div style="font-size:13px;font-weight:800;color:#4f4;">${totalRevenue>0?"₹"+totalRevenue.toLocaleString("en-IN"):"—"}</div>
-        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Revenue</div>
+      <div style="background:#081a08;border:1px solid #FFD70030;border-radius:10px;padding:9px 4px;text-align:center;cursor:pointer;" onclick="invEditSellPrice('${itemName.replace(/'/g,"\\'")}');safeRenderTab(currentTab)">
+        <div style="font-size:12px;font-weight:800;color:#FFD700;">${item.sellingPrice>0?"₹"+Number(item.sellingPrice).toFixed(2):"Set ✏️"}</div>
+        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Price</div>
       </div>
     </div>
 
-    <!-- Customers who bought -->
-    <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:10px;">👥 Customers Who Bought</div>
-    ${custs.length===0
-      ? `<div class="card" style="padding:28px;text-align:center;">
-          <div style="font-size:32px;margin-bottom:8px;">🤷</div>
-          <div style="color:#4a5a7a;font-size:13px;">No customer purchases linked yet.<br><span style="font-size:11px;">Use Inventory Mode to record item-linked sales.</span></div>
-        </div>`
-      : `<div style="display:flex;flex-direction:column;gap:8px;">
-          ${custs.map(c=>{
-            const lastVisit = c.visits.sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
-            const lastDate = lastVisit ? new Date(lastVisit.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "—";
-            return `<div class="card" style="padding:14px 16px;cursor:pointer;" onclick="showProfile('${c.id}')">
-              <div style="display:flex;align-items:center;gap:12px;">
-                ${avatarEl(c,38)}
-                <div style="flex:1;min-width:0;">
-                  <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${c.name}</div>
-                  <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">
-                    ${c.visits.length} purchase${c.visits.length!==1?"s":""} · Last: ${lastDate}
-                  </div>
-                </div>
-                <div style="text-align:right;flex-shrink:0;">
-                  <div style="font-size:15px;font-weight:800;color:#f66;">-${c.totalQty} ${unit}</div>
-                  ${c.totalSpend>0?`<div style="font-size:11px;color:#4f4;margin-top:2px;">₹${c.totalSpend.toLocaleString("en-IN")}</div>`:""}
-                </div>
-              </div>
-              <!-- Visit history for this item -->
-              ${c.visits.length>0?`<div style="margin-top:10px;border-top:1px solid #1e2a45;padding-top:10px;display:flex;flex-direction:column;gap:5px;">
-                ${c.visits.slice(0,3).map(v=>`<div style="display:flex;justify-content:space-between;align-items:center;">
-                  <div style="font-size:11px;color:#4a5a7a;">${new Date(v.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${v.bill?" · "+v.bill:""}</div>
-                  <div style="font-size:12px;font-weight:700;color:#e8eaf0;">${v.qty} ${unit}${v.ppu>0?" @ ₹"+v.ppu+"/"+unit:""}</div>
-                </div>`).join("")}
-                ${c.visits.length>3?`<div style="font-size:11px;color:#4a5a7a;text-align:center;">+${c.visits.length-3} more visits</div>`:""}
-              </div>`:""}
-            </div>`;
-          }).join("")}
-        </div>`
-    }
+    <!-- Tab switcher -->
+    <div style="display:flex;gap:4px;background:#050810;border-radius:12px;padding:4px;margin-bottom:14px;">
+      ${tabBtn('history','📋 All History',timeline.length,'#e8eaf0')}
+      ${tabBtn('customers','👥 Customers',custs.length,'#4a8aff')}
+    </div>
+
+    <!-- Active tab content -->
+    ${activeTab==='history' ? historyTabHtml : customersTabHtml}
+
   </div>`;
 }
 
@@ -7041,57 +7247,157 @@ window.addEventListener("load", async () => {
 </script>
 
 <script>
-window.__SC_NAV_STACK=[];
-window.__SC_DIRTY=false;
+// ═══════════════════════════════════════════════════════════════
+// SHOPCHAMPION — TALLY-STYLE NAVIGATION & EXIT SYSTEM
+// ═══════════════════════════════════════════════════════════════
 
-document.addEventListener('input',()=>window.__SC_DIRTY=true,true);
-document.addEventListener('change',()=>window.__SC_DIRTY=true,true);
+window.__SC_NAV_STACK = [];   // each entry: {tab, invView, invCatPageName, invDetailItem}
+window.__SC_DIRTY = false;
 
+document.addEventListener('input',  ()=>window.__SC_DIRTY=true, true);
+document.addEventListener('change', ()=>window.__SC_DIRTY=true, true);
+
+/* ── Capture current full navigation state ── */
+function _scGetState(){
+  return {
+    tab:           window.currentTab,
+    invView:       (typeof invView!=='undefined')       ? invView        : 'stock',
+    invCatPageName:(typeof invCatPageName!=='undefined')? invCatPageName : '',
+    invDetailItem: (typeof invDetailItem!=='undefined') ? invDetailItem  : null
+  };
+}
+
+/* ── Apply a saved navigation state ── */
+function _scApplyState(s){
+  if(typeof invView!=='undefined')        invView        = s.invView        || 'stock';
+  if(typeof invCatPageName!=='undefined') invCatPageName = s.invCatPageName || '';
+  if(typeof invDetailItem!=='undefined')  invDetailItem  = s.invDetailItem  || null;
+  window.__SC_DIRTY = false;
+  if(typeof renderTab==='function') renderTab(s.tab);
+}
+
+/* ── Track last committed state to diff against ── */
+window.__SC_LAST_STATE = null;
+
+function _scPushIfChanged(){
+  const last = window.__SC_LAST_STATE;
+  const cur  = _scGetState();
+  if(!last){ window.__SC_LAST_STATE = cur; return; }
+  const changed = last.tab !== cur.tab
+    || last.invView        !== cur.invView
+    || last.invCatPageName !== cur.invCatPageName
+    || last.invDetailItem  !== cur.invDetailItem;
+  if(changed){
+    window.__SC_NAV_STACK.push(last);
+    window.__SC_LAST_STATE = cur;
+  }
+}
+
+/* ── Wrap renderTab to push nav stack on every navigation ── */
 (function(){
- const _renderTab = window.renderTab;
- if(typeof _renderTab==='function'){
-   window.renderTab=function(tab){
-      if(window.currentTab && window.currentTab!==tab){
-         window.__SC_NAV_STACK.push(window.currentTab);
-      }
-      return _renderTab.apply(this,arguments);
-   }
- }
-
- window.shopChampionBack=function(){
-    if(window.__SC_DIRTY){
-      const ok=confirm('Unsaved changes detected. Leave this screen?');
-      if(!ok) return;
-    }
-
-    if(window.__SC_NAV_STACK.length){
-      const prev=window.__SC_NAV_STACK.pop();
-      window.__SC_DIRTY=false;
-      if(typeof window.renderTab==='function'){
-        window.renderTab(prev);
-        return;
-      }
-    }
-
-    if(!window.__LAST_BACK__) {
-       window.__LAST_BACK__=Date.now();
-       alert('Press back again to exit');
-       return;
-    }
-
-    if(Date.now()-window.__LAST_BACK__ > 2000){
-       window.__LAST_BACK__=Date.now();
-       alert('Press back again to exit');
-    }
- };
-
- window.addEventListener('popstate', function(e){
-    window.shopChampionBack();
-    history.pushState({sc:true},'');
- });
-
- history.pushState({sc:true},'');
+  const _renderTab = window.renderTab;
+  if(typeof _renderTab==='function'){
+    window.renderTab = function(tab){
+      _scPushIfChanged();
+      return _renderTab.apply(this, arguments);
+    };
+  }
 })();
+
+/* ── Also wrap safeRenderTab (used by inventory inline buttons) ── */
+(function(){
+  const _orig = window.safeRenderTab;
+  if(typeof _orig==='function'){
+    window.safeRenderTab = function(i){
+      _scPushIfChanged();
+      return _orig.apply(this, arguments);
+    };
+  }
+})();
+
+/* ── Tally-style custom confirm modal ── */
+function _scShowExitModal(title, message, onConfirm, onCancel){
+  // Remove existing if any
+  const existing = document.getElementById('_sc_exit_modal');
+  if(existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = '_sc_exit_modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);';
+
+  overlay.innerHTML = `
+    <div style="background:#0e1726;border:1.5px solid #2a3a5a;border-radius:18px;max-width:380px;width:100%;padding:30px 24px 22px;box-shadow:0 20px 60px rgba(0,0,0,0.8);text-align:center;animation:_scSlideUp 0.18s ease;">
+      <div style="font-size:40px;margin-bottom:10px;">⚠️</div>
+      <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:8px;">${title}</div>
+      <div style="font-size:14px;color:#8a9bbf;line-height:1.5;margin-bottom:22px;">${message}</div>
+      <div style="display:flex;gap:10px;">
+        <button id="_sc_exit_cancel" style="flex:1;padding:13px;background:#1a2540;border:1.5px solid #2a3a5a;border-radius:12px;color:#7a8aaa;font-size:14px;font-weight:700;cursor:pointer;">Stay</button>
+        <button id="_sc_exit_confirm" style="flex:1;padding:13px;background:linear-gradient(135deg,#cc3300,#8b0000);border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;">${title.includes('Exit')?'Yes, Exit':'Leave'}</button>
+      </div>
+    </div>
+    <style>@keyframes _scSlideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}</style>
+  `;
+
+  document.body.appendChild(overlay);
+  document.getElementById('_sc_exit_confirm').onclick = ()=>{ overlay.remove(); onConfirm(); };
+  document.getElementById('_sc_exit_cancel').onclick  = ()=>{ overlay.remove(); if(onCancel) onCancel(); };
+}
+
+/* ── Tally-style exit confirmation ── */
+function _scShowTallyExit(){
+  _scShowExitModal(
+    'Exit ShopChampion?',
+    'Any unsaved changes will be lost.<br>Are you sure you want to close the app?',
+    ()=>{
+      // Try to close PWA/window
+      if(window.navigator && window.navigator.app && window.navigator.app.exitApp){
+        window.navigator.app.exitApp();
+      } else {
+        window.close();
+        // If window.close() fails (browser blocks it), show message
+        setTimeout(()=>{
+          const m = document.getElementById('_sc_exit_modal');
+          if(!m){
+            _scShowExitModal('Close the tab','Please close this tab manually to exit.', ()=>{}, null);
+          }
+        }, 300);
+      }
+    }
+  );
+}
+
+/* ── Main back handler ── */
+window.shopChampionBack = function(){
+  // If there's a dirty-state (unsaved form input), warn first
+  if(window.__SC_DIRTY && window.__SC_NAV_STACK.length){
+    _scShowExitModal(
+      'Unsaved Changes',
+      'You have unsaved changes on this screen.<br>Are you sure you want to go back?',
+      ()=>{
+        const prev = window.__SC_NAV_STACK.pop();
+        _scApplyState(prev);
+      }
+    );
+    return;
+  }
+
+  // If we have a nav history, go one step back
+  if(window.__SC_NAV_STACK.length){
+    const prev = window.__SC_NAV_STACK.pop();
+    _scApplyState(prev);
+    return;
+  }
+
+  // Nothing to go back to — show Tally-style exit warning
+  _scShowTallyExit();
+};
+
+window.addEventListener('popstate', function(e){
+  window.shopChampionBack();
+  history.pushState({sc:true}, '');
+});
+
+history.pushState({sc:true}, '');
 </script>
 
 </body>
