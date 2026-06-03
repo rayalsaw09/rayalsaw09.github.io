@@ -1213,13 +1213,13 @@ async function scHashPassword(phone, password) {
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
 const ADMIN_PASS = "1234";
-const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","festivals","inventory","settings"];
-const TABS_ICON = ["🏆","👥","💳","📊","⚖️","🎉","📦","⚙️"];
+const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","inventory","settings"];
+const TABS_ICON = ["🏆","👥","💳","📊","⚖️","📦","⚙️"];
 function getTabs(){
   return TABS_BASE.map((k,i)=>{
     let label = TABS_ICON[i]+" "+t(k);
     // FIX 21: Low stock badge on inventory tab (index 6)
-    if(i===6 && inventoryItems && inventoryItems.length>0){
+    if(i===5 && inventoryItems && inventoryItems.length>0){
       const oos = inventoryItems.filter(x=>invGetStock(x.name)<=0).length;
       const low = inventoryItems.filter(x=>{const s=invGetStock(x.name);return s>0&&s<=3;}).length;
       if(oos>0) label += ` <span style="background:#f66;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;">${oos}</span>`;
@@ -1597,8 +1597,8 @@ window.addEventListener('appinstalled', () => {
 });
 
 // ── Mobile Bottom Nav ──────────────────────────────────────────
-const MOBILE_MAIN_TABS = [0, 1, 2, 6]; // leaderboard, customers, purchase, inventory
-const MOBILE_MORE_TABS = [3, 4, 5, 7];    // analytics, compare, festivals, settings
+const MOBILE_MAIN_TABS = [0, 1, 2, 5]; // leaderboard, customers, purchase, inventory
+const MOBILE_MORE_TABS = [3, 4, 6];    // analytics, compare, settings
 
 function mobileTab(i) {
   closeMoreMenu();
@@ -1766,7 +1766,7 @@ function _loadVoices() {
 if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => {
     _voiceCache = window.speechSynthesis.getVoices();
-    if (currentTab === 7) safeRenderTab(7); // refresh dropdown
+    if (currentTab === 6) safeRenderTab(6); // refresh dropdown
   };
   // Try immediate load (Chrome sometimes has them ready)
   _loadVoices();
@@ -2716,7 +2716,6 @@ function updateSyncStatus(){
 // IDs of every input/textarea on the Purchase tab (tab 2) that should survive re-renders
 const _TAB2_FIELD_IDS = [
   "pt-search","pt-sel","pt-amt","pt-bill","pt-notes","pt-date","pt-date-val",
-  "bpt-search","bpt-sel","bpt-amounts","bpt-date","bpt-notes",
   "bw-search","bw-sel","bw-amt","bw-date","bw-due"
 ];
 
@@ -2751,7 +2750,7 @@ function _safeRenderTabImmediate(i) {
     (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
   // Exception: partial re-render for inventory search boxes (they need to filter without losing focus)
   const isInvSearch = active && (active.id === 'inv-search-box' || active.id === 'inv-cat-search-box');
-  if (i === 6 && isInvSearch) {
+  if (i === 5 && isInvSearch) {
     // Only re-render the results portion, not the whole tab, so the input keeps focus
     if (active.id === 'inv-search-box') {
       const q = (invSearchQuery || '').trim().toLowerCase();
@@ -2835,7 +2834,7 @@ function _safeRenderTabImmediate(i) {
     }
     return;
   }
-  if (i === 6 && userIsTyping && !isInvSearch) {
+  if (i === 5 && userIsTyping && !isInvSearch) {
     return; // Don't re-render settings tab while user is editing any field
   }
   if (i === 2) {
@@ -2854,11 +2853,6 @@ function _safeRenderTabImmediate(i) {
 
     // Restore every field that had a value
     _tab2RestoreFields(savedFields);
-
-    // Re-run preview if amounts were restored
-    if (savedFields["bpt-amounts"]) {
-      try { bptPreview(); } catch(e) {}
-    }
 
     // Restore the static clock badge after re-render
     const disp = document.getElementById("pt-clock-display");
@@ -2883,9 +2877,8 @@ function renderTab(i){
   else if(i===2){el.innerHTML=renderPurchaseTab(s);if(getPurchaseMode()==="inventory"){const list=document.getElementById("pt-items-list");if(list&&list.children.length===0)ptAddItemRow();}}
   else if(i===3)el.innerHTML=renderAnalytics(s);
   else if(i===4)el.innerHTML=renderCompare();
-  else if(i===5)el.innerHTML=renderFestivals(s);
-  else if(i===6)el.innerHTML=renderInventoryTab();
-  else if(i===7)el.innerHTML=renderSettings();
+  else if(i===5)el.innerHTML=renderInventoryTab();
+  else if(i===6)el.innerHTML=renderSettings();
   // License gate — show overlay on top, don't replace content
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
 }
@@ -2983,7 +2976,6 @@ function renderLeaderboard(sorted){
       </div>
       <div style="text-align:right;font-size:13px;color:${zeroDay?'#2a3a4a':'#5a7aaa'};">🪙 ${c.points>0?c.points.toLocaleString():"—"}</div>
       <div style="text-align:right;display:flex;gap:6px;justify-content:flex-end;">
-        <button class="btn" onclick="event.stopPropagation();openBulkPurchaseModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:5px 10px;font-size:12px;" title="Add multiple purchases at once">+ Bulk</button>
         <button class="btn" onclick="event.stopPropagation();openPurchaseModal('${c.id}')" style="background:#1a2a45;color:#5af;border:1px solid #1a3a60;padding:5px 12px;font-size:12px;">+ Purchase</button>
       </div>
     </div>`;
@@ -3273,47 +3265,13 @@ function renderPurchaseTab(sorted){
       }).join("")}
     </div>` : `<div class="card" style="padding:24px;text-align:center;color:#4a5a7a;font-size:13px;">✅ No outstanding borrows</div>`}`;
 
-  const bulkPurchaseForm = `
-    <div class="card" style="padding:24px;">
-      <div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#6aaa8a;line-height:1.8;">
-        💡 Select a customer, then enter all amounts separated by commas:<br>
-        <span style="color:#FFD700;font-family:monospace;">50, 90, 70, 150, 300, 400</span>
-      </div>
-      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Search Customer</label>
-      <input class="input" id="bpt-search" dir="ltr" placeholder="🔍 Search by name, phone or ID..." oninput="bptFilterCustomers()" style="margin-bottom:8px;text-align:left;" />
-      <div id="bpt-dropdown" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;max-height:200px;overflow-y:auto;margin-bottom:10px;"></div>
-      <div id="bpt-prev" style="display:none;background:#0a0e1a;border-radius:10px;padding:12px;margin-bottom:14px;"></div>
-      <input type="hidden" id="bpt-sel" />
-
-      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Purchase Amounts (₹) <span style="color:#f66;">*</span></label>
-      <textarea id="bpt-amounts" placeholder="e.g. 50, 90, 70, 150, 300, 400" rows="3"
-        style="width:100%;box-sizing:border-box;background:#080c18;border:1px solid #2a3560;border-radius:10px;color:#e8eaf0;padding:12px;font-size:18px;font-weight:700;font-family:monospace;resize:vertical;margin-bottom:14px;"
-        oninput="bptPreview()"></textarea>
-
-      <div id="bpt-preview" style="margin-bottom:14px;"></div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
-        <div>
-          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Date</label>
-          <input class="input" type="date" id="bpt-date" value="${new Date().toISOString().slice(0,10)}" />
-        </div>
-        <div>
-          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Notes (optional)</label>
-          <input class="input" id="bpt-notes" placeholder="e.g. Notebook import" />
-        </div>
-      </div>
-
-      <button class="btn" id="bpt-sub" onclick="bptSubmit()" style="background:linear-gradient(135deg,#00c853,#1a8a3a);color:#fff;width:100%;padding:14px;font-size:15px;font-weight:800;">⚡ Add All Purchases →</button>
-    </div>`;
-
   return `<div style="max-width:520px;">
     <h2 style="margin:0 0 16px;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">💳 Purchase</h2>
     <div style="display:flex;gap:8px;margin-bottom:18px;">
       ${tabBtn("purchase","🧾 Add Purchase","#FFD700")}
-      ${tabBtn("bulkpurchase","⚡ Bulk Purchase","#4f4")}
       ${tabBtn("borrow",`📦 Borrow${totalOwed>0?" ("+pendingBorrows.length+")":""}`,  "#f84")}
     </div>
-    ${ptView==="purchase" ? purchaseForm : ptView==="bulkpurchase" ? bulkPurchaseForm : borrowForm}
+    ${ptView==="purchase" ? purchaseForm : borrowForm}
   </div>`;
 }
 
@@ -4604,7 +4562,7 @@ function renderSettings(){
     )}
 
     ${section("Appearance",
-      row("🎨","Theme",themeIcon,"toggleTheme();renderTab(7)") +
+      row("🎨","Theme",themeIcon,"toggleTheme();renderTab(6)") +
       row("🌐","Language",`Current: ${curLangName}`,"toggleLangMenu()") +
       row("🔡","Text Size","Adjust app font size","openTextSizeModal()")
     )}
@@ -4979,7 +4937,7 @@ function applyVoicePreset(i){
 }
 
 
-function setDisplayCount(n){displaySettings.showCount=n;saveDisplaySettings();renderTab(7);notify("✅ Count updated");}
+function setDisplayCount(n){displaySettings.showCount=n;saveDisplaySettings();renderTab(6);notify("✅ Count updated");}
 
 function saveShopName(){
   const val=document.getElementById("shop-name-input")?.value.trim();
@@ -4997,7 +4955,7 @@ function handleIconUpload(inp){
     appSettings.appIcon=e.target.result;
     saveAppSettings();
     updateAppHeader();
-    renderTab(7);
+    renderTab(6);
     notify("✅ App icon updated!");
   };
   r.readAsDataURL(f);
@@ -5007,7 +4965,7 @@ function removeAppIcon(){
   appSettings.appIcon="";
   saveAppSettings();
   updateAppHeader();
-  renderTab(7);
+  renderTab(6);
   notify("🗑 Icon removed");
 }
 
