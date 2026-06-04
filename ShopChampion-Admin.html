@@ -1175,7 +1175,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <span class="bnav-icon">💳</span>
       <span class="bnav-label">Purchase</span>
     </button>
-    <button class="bnav-btn" id="bnav-6" onclick="mobileTab(6)">
+    <button class="bnav-btn" id="bnav-5" onclick="mobileTab(5)">
       <span class="bnav-icon">📦</span>
       <span class="bnav-label">Inventory</span>
     </button>
@@ -1433,11 +1433,12 @@ function ptRestoreState() {
   // Restore selected customer
   if (window._ptState.selId) {
     set("pt-sel",    window._ptState.selId);
-    set("pt-search", window._ptState.selName);
+    const srchRow=document.getElementById("pt-search-row");
+    if(srchRow) srchRow.style.display="none";
     const pr = document.getElementById("pt-prev");
     const c  = window._ptState.selData;
     if (pr && c) {
-      pr.style.cssText="display:flex;align-items:center;gap:12px;background:#0a0e1a;border-radius:10px;padding:12px;margin-bottom:14px;";
+      pr.style.cssText="display:flex;align-items:center;gap:12px;";
       const _lp1=[...(c.purchases||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
       const _lv1=_lp1?timeSince(_lp1.date):"Never";
       const _dd1=_lp1?Math.floor((Date.now()-new Date(_lp1.date))/86400000):9999;
@@ -1470,14 +1471,15 @@ function ptRestoreState() {
   set("bw-due",  window._ptState.bwDue);
   if (window._ptState.bwSelId) {
     set("bw-sel",    window._ptState.bwSelId);
-    set("bw-search", window._ptState.bwSelName);
+    const srchRowBw=document.getElementById("bw-search-row");
+    if(srchRowBw) srchRowBw.style.display="none";
     const pr = document.getElementById("bw-prev");
     const c  = window._ptState.bwSelData;
     if (pr && c) {
       const pending=(c.borrows||[]).filter(b=>b.status==="pending");
       const owed=pending.reduce((s,b)=>s+Number(b.amount),0);
-      pr.style.cssText="display:flex;align-items:center;gap:12px;background:#0a0e1a;border-radius:10px;padding:12px;margin-bottom:14px;";
-      pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} spend &middot; ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':"No pending borrows"}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
+      pr.style.cssText="display:flex;align-items:center;gap:12px;";
+      pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)} spend &middot; ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':"No pending borrows"}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:20px;padding:4px 8px;">&times;</button>`;
     }
   }
   ptPts();
@@ -3249,9 +3251,14 @@ function renderPurchaseTab(sorted){
         <button onclick="setPurchaseMode('inventory');safeRenderTab(currentTab)" style="background:#0a1a08;border:1px solid #1a4a1a;border-radius:7px;color:#4f4;font-size:11px;font-weight:700;cursor:pointer;padding:5px 10px;">📦 Inventory</button>
       </div>`}
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Search Customer</label>
-      <input class="input" id="pt-search" dir="ltr" placeholder="🔍 Search by name, phone or ID..." oninput="ptFilterCustomers()" style="margin-bottom:8px;text-align:left;" />
-      <div id="pt-dropdown" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;max-height:200px;overflow-y:auto;margin-bottom:10px;"></div>
-      <div id="pt-prev" style="display:none;background:#0a0e1a;border-radius:10px;padding:12px;margin-bottom:14px;"></div>
+      <div id="pt-cust-widget" style="background:#0a0e1a;border:2px solid #1e2a45;border-radius:12px;overflow:hidden;margin-bottom:14px;">
+        <div id="pt-prev" style="display:none;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #1e2a45;background:#080c18;"></div>
+        <div id="pt-search-row" style="display:flex;align-items:center;gap:8px;padding:4px 6px;">
+          <input class="input" id="pt-search" dir="ltr" placeholder="Search by name, phone or ID..." oninput="ptFilterCustomers()" style="margin:0;border:none;background:transparent;flex:1;font-size:14px;" />
+          <button id="pt-search-clear" onclick="ptClearCustomer()" style="display:none;background:#3a1a1a;border:none;border-radius:8px;color:#f66;cursor:pointer;width:32px;height:32px;font-size:16px;flex-shrink:0;">✕</button>
+        </div>
+        <div id="pt-dropdown" style="display:none;border-top:1px solid #1e2a45;max-height:220px;overflow-y:auto;"></div>
+      </div>
       <input type="hidden" id="pt-sel" />
       ${invMode?"":`<label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Purchase Amount (₹)</label>
       <input class="input" type="number" id="pt-amt" min="0" step="0.01" placeholder="0.00" inputmode="decimal" style="margin-bottom:14px;font-size:18px;font-weight:700;" oninput="ptPts()" />`}
@@ -3285,9 +3292,14 @@ function renderPurchaseTab(sorted){
     <div class="card" style="padding:24px;margin-bottom:16px;">
       <div style="font-size:13px;font-weight:700;color:#f84;margin-bottom:16px;">📋 Record a new borrow</div>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Search Customer</label>
-      <input class="input" id="bw-search" dir="ltr" placeholder="🔍 Search by name, phone or ID..." oninput="bwFilterCustomers()" style="margin-bottom:8px;text-align:left;" />
-      <div id="bw-dropdown" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;max-height:200px;overflow-y:auto;margin-bottom:10px;"></div>
-      <div id="bw-prev" style="display:none;background:#0a0e1a;border-radius:10px;padding:12px;margin-bottom:14px;"></div>
+      <div id="bw-cust-widget" style="background:#0a0e1a;border:2px solid #1e2a45;border-radius:12px;overflow:hidden;margin-bottom:14px;">
+        <div id="bw-prev" style="display:none;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #1e2a45;background:#080c18;"></div>
+        <div id="bw-search-row" style="display:flex;align-items:center;gap:8px;padding:4px 6px;">
+          <input class="input" id="bw-search" dir="ltr" placeholder="Search by name, phone or ID..." oninput="bwFilterCustomers()" style="margin:0;border:none;background:transparent;flex:1;font-size:14px;" />
+          <button id="bw-search-clear" onclick="bwClearCustomer()" style="display:none;background:#3a1a1a;border:none;border-radius:8px;color:#f66;cursor:pointer;width:32px;height:32px;font-size:16px;flex-shrink:0;">✕</button>
+        </div>
+        <div id="bw-dropdown" style="display:none;border-top:1px solid #1e2a45;max-height:220px;overflow-y:auto;"></div>
+      </div>
       <input type="hidden" id="bw-sel" />
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">🛒 Items Borrowed</label>
       ${bwDataList}
@@ -3447,6 +3459,8 @@ function ptApplyDateMode(m,s){}
 function ptFilterCustomers(){
   const q=document.getElementById("pt-search").value.toLowerCase().trim();
   const dd=document.getElementById("pt-dropdown");
+  const clrBtn=document.getElementById("pt-search-clear");
+  if(clrBtn) clrBtn.style.display = q ? "flex" : "none";
   if(!q){dd.style.display="none";return;}
   const sorted=getSorted();
   const matches=sorted.filter(c=>
@@ -3454,15 +3468,20 @@ function ptFilterCustomers(){
     (c.phone&&tallyMatch(c.phone,q))||
     tallyMatch(c.id,q)
   ).slice(0,8);
-  if(!matches.length){dd.style.display="none";return;}
+  if(!matches.length){
+    dd.style.display="block";
+    dd.innerHTML=`<div style="padding:18px;text-align:center;color:#4a5a7a;font-size:13px;">No customers match "<b style="color:#e8eaf0;">${q}</b>"</div>`;
+    return;
+  }
   dd.style.display="block";
   dd.innerHTML=matches.map(c=>`
-    <div onclick="ptSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">
-      ${avatarEl(c,34)}
-      <div>
-        <div style="font-weight:700;font-size:13px;color:#e8eaf0;">${tallyHighlight(c.name,q)}</div>
-        <div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span> · ${formatINR(c.totalSpend)}</div>
+    <div onclick="ptSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;border-bottom:1px solid #0f1628;" onmouseover="this.style.background='#0d1a30'" onmouseout="this.style.background='transparent'">
+      ${avatarEl(c,36)}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:14px;color:#e8eaf0;">${tallyHighlight(c.name,q)}</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span> · ${formatINR(c.totalSpend)}</div>
       </div>
+      <span style="color:#4a8aff;font-size:18px;flex-shrink:0;">›</span>
     </div>`).join("");
 }
 
@@ -3470,10 +3489,14 @@ function ptSelectCustomer(id){
   const c=getSorted().find(x=>x.id===id);if(!c)return;
   window._ptState.selId=id; window._ptState.selName=c.name; window._ptState.selData=c;
   document.getElementById("pt-sel").value=id;
-  document.getElementById("pt-search").value=c.name;
+  document.getElementById("pt-search").value="";
   document.getElementById("pt-dropdown").style.display="none";
+  const clrBtn=document.getElementById("pt-search-clear");
+  if(clrBtn) clrBtn.style.display="none";
+  const srchRow=document.getElementById("pt-search-row");
+  if(srchRow) srchRow.style.display="none";
   const pr=document.getElementById("pt-prev");
-  pr.style.display="flex";pr.style.alignItems="center";pr.style.gap="12px";
+  pr.style.display="flex";
   const _lp2=[...(c.purchases||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
   const _lv2=_lp2?timeSince(_lp2.date):"Never";
   const _dd2=_lp2?Math.floor((Date.now()-new Date(_lp2.date))/86400000):9999;
@@ -3482,7 +3505,7 @@ function ptSelectCustomer(id){
   const _showVisits2 = !_isPro2||isSubFeatureAllowed(8);
   const _showLastVisit2 = !_isPro2||isSubFeatureAllowed(10);
   const _showRank2 = !_isPro2||isSubFeatureAllowed(0);
-  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank2?` · Rank #${c.rank}`:""}${_showVisits2?` · 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit2?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank2?` · Rank #${c.rank}`:""}${_showVisits2?` · 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit2?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:20px;padding:4px 8px;">✕</button>`;
   ptPts();
 }
 
@@ -3492,6 +3515,11 @@ function ptClearCustomer(){
   document.getElementById("pt-search").value="";
   document.getElementById("pt-prev").style.display="none";
   document.getElementById("pt-dropdown").style.display="none";
+  const clrBtn=document.getElementById("pt-search-clear");
+  if(clrBtn) clrBtn.style.display="none";
+  const srchRow=document.getElementById("pt-search-row");
+  if(srchRow) srchRow.style.display="flex";
+  setTimeout(()=>{const el=document.getElementById("pt-search");if(el)el.focus();},50);
   ptPts();
 }
 function ptPts(){const a=parseFloat(document.getElementById("pt-amt").value)||0,s=document.getElementById("pt-sel").value,b=document.getElementById("pt-pts");if(a&&s){b.style.display="block";b.innerHTML=`Points: <strong style="color:#FFD700;">+${getPoints(a).toLocaleString()}</strong> pts`;}else b.style.display="none";}
@@ -3636,14 +3664,21 @@ async function bptSubmit(){
 function bwFilterCustomers(){
   const q=document.getElementById("bw-search").value.toLowerCase().trim();
   const dd=document.getElementById("bw-dropdown");
+  const clrBtn=document.getElementById("bw-search-clear");
+  if(clrBtn) clrBtn.style.display = q ? "flex" : "none";
   if(!q){dd.style.display="none";return;}
   const matches=getSorted().filter(c=>tallyMatch(c.name,q)||(c.phone&&tallyMatch(c.phone,q))||tallyMatch(c.id,q)).slice(0,8);
-  if(!matches.length){dd.style.display="none";return;}
+  if(!matches.length){
+    dd.style.display="block";
+    dd.innerHTML=`<div style="padding:18px;text-align:center;color:#4a5a7a;font-size:13px;">No customers match "<b style="color:#e8eaf0;">${q}</b>"</div>`;
+    return;
+  }
   dd.style.display="block";
-  dd.innerHTML=matches.map(c=>`<div onclick="bwSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">
-    ${avatarEl(c,34)}
-    <div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${tallyHighlight(c.name,q)}</div>
-    <div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span></div></div>
+  dd.innerHTML=matches.map(c=>`<div onclick="bwSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;border-bottom:1px solid #0f1628;" onmouseover="this.style.background='#0d1a30'" onmouseout="this.style.background='transparent'">
+    ${avatarEl(c,36)}
+    <div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:#e8eaf0;">${tallyHighlight(c.name,q)}</div>
+    <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span></div></div>
+    <span style="color:#f84;font-size:18px;flex-shrink:0;">›</span>
   </div>`).join("");
 }
 
@@ -3651,13 +3686,17 @@ function bwSelectCustomer(id){
   const c=getSorted().find(x=>x.id===id);if(!c)return;
   window._ptState.bwSelId=id; window._ptState.bwSelName=c.name; window._ptState.bwSelData=c;
   document.getElementById("bw-sel").value=id;
-  document.getElementById("bw-search").value=c.name;
+  document.getElementById("bw-search").value="";
   document.getElementById("bw-dropdown").style.display="none";
+  const clrBtn=document.getElementById("bw-search-clear");
+  if(clrBtn) clrBtn.style.display="none";
+  const srchRow=document.getElementById("bw-search-row");
+  if(srchRow) srchRow.style.display="none";
   const pr=document.getElementById("bw-prev");
   const pending=(c.borrows||[]).filter(b=>b.status==="pending");
   const owed=pending.reduce((s,b)=>s+Number(b.amount),0);
-  pr.style.display="flex";pr.style.alignItems="center";pr.style.gap="12px";
-  pr.innerHTML=`${avatarEl(c,40)}<div><div style="font-weight:700;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;">${formatINR(c.totalSpend)} spend · ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':'No pending borrows'}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  pr.style.display="flex";
+  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)} spend · ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':'No pending borrows'}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:20px;padding:4px 8px;">✕</button>`;
 }
 
 function bwClearCustomer(){
@@ -3666,6 +3705,11 @@ function bwClearCustomer(){
   document.getElementById("bw-search").value="";
   document.getElementById("bw-prev").style.display="none";
   document.getElementById("bw-dropdown").style.display="none";
+  const clrBtn=document.getElementById("bw-search-clear");
+  if(clrBtn) clrBtn.style.display="none";
+  const srchRow=document.getElementById("bw-search-row");
+  if(srchRow) srchRow.style.display="flex";
+  setTimeout(()=>{const el=document.getElementById("bw-search");if(el)el.focus();},50);
 }
 
 function bwGetLastSellPrice(itemName){
