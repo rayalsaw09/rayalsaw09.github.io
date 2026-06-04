@@ -420,7 +420,7 @@ if (typeof SC_FIREBASE_CONFIG=== 'undefined') window.SC_FIREBASE_CONFIG = {};
 
   /* ── 24/7 Idle Banner: fullscreen behind everything, above leaderboard ── */
   #ad-idle-banner { position:fixed;inset:0;z-index:100;background:#000;display:none;align-items:center;justify-content:center; }
-  #ad-idle-img { width:100%;height:100%;object-fit:cover; }
+  #ad-idle-img { width:100%;height:100%;object-fit:cover;transition:transform 0.3s ease; }
 
   /* ── Video Ad: fullscreen above idle banner ── */
   #ad-fullscreen { position:fixed;inset:0;background:#000;z-index:200;display:none;align-items:center;justify-content:center;flex-direction:column; }
@@ -1017,6 +1017,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let _idleBannerUrl = "";        // direct image URL for always-on banner
 let _adSchedule    = null;      // { from: "HH:MM", to: "HH:MM" } or null
+let _bannerFit     = "cover";   // cover | contain | stretch
+let _bannerBg      = "#000000"; // background color
+let _bannerScale   = 100;       // percent
+let _bannerX       = 50;        // 0-100 horizontal position
+let _bannerY       = 50;        // 0-100 vertical position
 let _videoAds      = [];        // active video ads from payload
 let _videoAdIndex  = 0;
 let _videoAdTimer  = null;      // setInterval for checking when to play next
@@ -1037,11 +1042,48 @@ function _inSchedule() {
 function showIdleBanner() {
   if (!_idleBannerUrl) return;
   if (!_inSchedule()) { hideIdleBanner(); return; }
-  const el = document.getElementById("ad-idle-banner");
+  const el  = document.getElementById("ad-idle-banner");
   const img = document.getElementById("ad-idle-img");
   if (!el || !img) return;
+  el.style.background = _bannerBg || "#000";
+
+  if (_bannerFit === "stretch") {
+    img.style.width = "100%"; img.style.height = "100%";
+    img.style.objectFit = "fill"; img.style.position = "static";
+    img.style.transform = "none"; img.style.left = ""; img.style.top = "";
+  } else {
+    img.style.position = "absolute";
+    img.style.objectFit = "fill";
+    img.onload = () => _applyBannerTransform(img, el);
+    img.style.width = ""; img.style.height = "";
+    img.style.left = "0"; img.style.top = "0";
+  }
   img.src = _idleBannerUrl;
   el.style.display = "flex";
+}
+
+function _applyBannerTransform(img, el) {
+  const cw = el.offsetWidth  || window.innerWidth;
+  const ch = el.offsetHeight || window.innerHeight;
+  const iw = img.naturalWidth  || 1;
+  const ih = img.naturalHeight || 1;
+  const fit = _bannerFit || "cover";
+  let baseW, baseH;
+  if (fit === "cover") {
+    const r = Math.max(cw / iw, ch / ih);
+    baseW = iw * r; baseH = ih * r;
+  } else {
+    const r = Math.min(cw / iw, ch / ih);
+    baseW = iw * r; baseH = ih * r;
+  }
+  const scale = (_bannerScale != null ? _bannerScale : 100) / 100;
+  const sw = baseW * scale, sh = baseH * scale;
+  const xPct = _bannerX != null ? _bannerX : 50;
+  const yPct = _bannerY != null ? _bannerY : 50;
+  const px = (xPct / 100) * (cw - sw) + sw / 2;
+  const py = (yPct / 100) * (ch - sh) + sh / 2;
+  img.style.width  = sw + "px"; img.style.height = sh + "px";
+  img.style.transform = `translate(${px - sw/2}px, ${py - sh/2}px)`;
 }
 
 function hideIdleBanner() {
@@ -1150,8 +1192,13 @@ function endVideoAd() {
 function applyAdsFromPayload(payload) {
   // Read display settings
   if (payload && payload.adDisplaySettings) {
-    _idleBannerUrl = payload.adDisplaySettings.idleBannerUrl || "";
-    _adSchedule    = payload.adDisplaySettings.schedule || null;
+    _idleBannerUrl    = payload.adDisplaySettings.idleBannerUrl || "";
+    _adSchedule       = payload.adDisplaySettings.schedule || null;
+    _bannerFit        = payload.adDisplaySettings.bannerFit  || "cover";
+    _bannerBg         = payload.adDisplaySettings.bannerBg   || "#000000";
+    _bannerScale      = payload.adDisplaySettings.bannerScale != null ? payload.adDisplaySettings.bannerScale : 100;
+    _bannerX          = payload.adDisplaySettings.bannerX    != null ? payload.adDisplaySettings.bannerX    : 50;
+    _bannerY          = payload.adDisplaySettings.bannerY    != null ? payload.adDisplaySettings.bannerY    : 50;
   }
 
   // Read video/image/text ads

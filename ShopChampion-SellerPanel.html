@@ -385,37 +385,101 @@
 
     <!-- ══ TAB 1: 24/7 BANNER ══ -->
     <div id="adtab-banner">
-      <div style="background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:18px;margin-bottom:14px;">
+      <!-- URL Input -->
+      <div style="background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:16px;margin-bottom:12px;">
         <div style="font-size:12px;color:#7ab3ff;font-weight:800;margin-bottom:4px;">📸 Always-On Banner Image</div>
-        <div style="font-size:11px;color:#4a5a7a;margin-bottom:12px;">This image fills the entire display screen 24/7. When a video ad plays, it temporarily takes over — then banner returns automatically.</div>
-
-        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Direct Image URL <span style="color:#4a5a7a;">(use imgbb.com or imgur.com — NOT Google Drive)</span></label>
+        <div style="font-size:11px;color:#4a5a7a;margin-bottom:10px;">Fills the display screen 24/7. Edit position, size &amp; fit below, then push to your shops.</div>
         <div style="display:flex;gap:8px;margin-bottom:8px;">
-          <input class="input" id="ds-idle-banner-url" placeholder="https://i.ibb.co/xxxxx/your-banner.jpg" style="flex:1;font-size:13px;" />
-          <button class="btn" onclick="previewIdleBanner()" style="background:#1a2540;border:1px solid #2a3a5a;color:#7ab3ff;padding:8px 14px;font-size:12px;white-space:nowrap;">👁 Preview</button>
+          <input class="input" id="ds-idle-banner-url" placeholder="https://i.ibb.co/xxxxx/your-banner.jpg" style="flex:1;font-size:13px;" oninput="bannerEditorLoadImage()" />
+          <button class="btn" onclick="bannerEditorLoadImage()" style="background:#1a2540;border:1px solid #2a3a5a;color:#7ab3ff;padding:8px 14px;font-size:12px;white-space:nowrap;">👁 Load</button>
         </div>
-        <div style="font-size:11px;color:#f84;margin-bottom:10px;padding:8px;background:#1a0800;border-radius:8px;border:1px solid #3a1500;">
+        <div style="font-size:11px;color:#f84;padding:7px 10px;background:#1a0800;border-radius:8px;border:1px solid #3a1500;">
           ⚠️ <strong>Google Drive links do NOT work.</strong> Upload to <a href="https://imgbb.com" target="_blank" style="color:#FFD700;">imgbb.com</a> → copy the "Direct link" ending in .jpg or .png
         </div>
-        <div id="ds-idle-preview" style="display:none;margin-bottom:12px;border-radius:10px;overflow:hidden;max-height:160px;background:#000;border:1px solid #2a3a5a;">
-          <img id="ds-idle-preview-img" src="" style="width:100%;max-height:160px;object-fit:contain;" />
+      </div>
+
+      <!-- LIVE PREVIEW EDITOR -->
+      <div id="banner-editor-wrap" style="display:none;background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:16px;margin-bottom:12px;">
+        <div style="font-size:12px;color:#FFD700;font-weight:800;margin-bottom:12px;">🖥️ Live Display Preview — drag to reposition</div>
+
+        <!-- Screen mockup -->
+        <div style="position:relative;margin:0 auto 14px;border-radius:12px;overflow:hidden;border:2px solid #2a3a5a;background:#000;" id="banner-screen">
+          <div style="padding-top:56.25%;position:relative;width:100%;">
+            <div id="banner-canvas" style="position:absolute;inset:0;overflow:hidden;background:#111;">
+              <img id="banner-prev-img" src="" alt="" style="position:absolute;transform-origin:center center;cursor:move;user-select:none;-webkit-user-drag:none;" draggable="false" />
+            </div>
+            <div style="position:absolute;bottom:6px;right:8px;font-size:9px;color:rgba(255,255,255,0.3);pointer-events:none;font-family:monospace;">16:9 TV Display</div>
+          </div>
         </div>
 
-        <div style="border-top:1px solid #1e2a45;padding-top:14px;margin-top:4px;">
-          <div style="font-size:12px;color:#7ab3ff;font-weight:800;margin-bottom:8px;">🕐 Ad Active Hours <span style="font-size:11px;color:#4a5a7a;font-weight:400;">(blank = always on, 24/7)</span></div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:12px;color:#4a5a7a;">From</span>
-              <input type="time" id="ds-schedule-from" class="input" style="width:120px;font-size:13px;padding:7px 10px;" />
+        <!-- Controls -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div>
+            <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;font-weight:700;">FIT MODE</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button onclick="setBannerFit('cover')" id="bfit-cover" style="flex:1;min-width:60px;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:800;border:2px solid #FFD700;background:#1a1400;color:#FFD700;cursor:pointer;">Fill</button>
+              <button onclick="setBannerFit('contain')" id="bfit-contain" style="flex:1;min-width:60px;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:700;border:1px solid #2a3a5a;background:transparent;color:#4a5a7a;cursor:pointer;">Fit</button>
+              <button onclick="setBannerFit('stretch')" id="bfit-stretch" style="flex:1;min-width:60px;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:700;border:1px solid #2a3a5a;background:transparent;color:#4a5a7a;cursor:pointer;">Stretch</button>
             </div>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <span style="font-size:12px;color:#4a5a7a;">To</span>
-              <input type="time" id="ds-schedule-to" class="input" style="width:120px;font-size:13px;padding:7px 10px;" />
-            </div>
-            <button class="btn" onclick="document.getElementById('ds-schedule-from').value='';document.getElementById('ds-schedule-to').value='';" style="background:#1a2540;border:1px solid #2a3a5a;color:#f84;font-size:12px;padding:7px 12px;">✕ 24/7</button>
           </div>
-          <div style="font-size:11px;color:#4a5a7a;">Outside these hours, the display screen returns to showing the leaderboard normally.</div>
+          <div>
+            <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;font-weight:700;">BG COLOR</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <button onclick="setBannerBg('#000000')" style="flex:1;padding:6px;border-radius:8px;border:1px solid #2a3a5a;background:#000;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">⬛ Black</button>
+              <button onclick="setBannerBg('#ffffff')" style="flex:1;padding:6px;border-radius:8px;border:1px solid #2a3a5a;background:#fff;color:#000;font-size:11px;font-weight:700;cursor:pointer;">⬜ White</button>
+              <input type="color" id="banner-bg-picker" value="#000000" onchange="setBannerBg(this.value)" style="width:36px;height:32px;border-radius:8px;border:1px solid #2a3a5a;padding:2px;cursor:pointer;background:#0a0e1a;" title="Custom color" />
+            </div>
+          </div>
         </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="font-size:11px;color:#4a5a7a;margin-bottom:4px;font-weight:700;">SCALE <span id="banner-scale-val" style="color:#7ab3ff;">100%</span></div>
+          <input type="range" id="banner-scale-slider" min="10" max="300" value="100" oninput="onBannerScaleSlider()" style="width:100%;accent-color:#FFD700;" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div>
+            <div style="font-size:11px;color:#4a5a7a;margin-bottom:4px;font-weight:700;">HORIZONTAL <span id="banner-x-val" style="color:#7ab3ff;">50%</span></div>
+            <input type="range" id="banner-x-slider" min="0" max="100" value="50" oninput="onBannerPosSlider()" style="width:100%;accent-color:#FFD700;" />
+          </div>
+          <div>
+            <div style="font-size:11px;color:#4a5a7a;margin-bottom:4px;font-weight:700;">VERTICAL <span id="banner-y-val" style="color:#7ab3ff;">50%</span></div>
+            <input type="range" id="banner-y-slider" min="0" max="100" value="50" oninput="onBannerPosSlider()" style="width:100%;accent-color:#FFD700;" />
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;font-weight:700;">QUICK POSITION</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-width:180px;">
+            <button onclick="snapBanner(0,0)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">↖</button>
+            <button onclick="snapBanner(50,0)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">⬆</button>
+            <button onclick="snapBanner(100,0)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">↗</button>
+            <button onclick="snapBanner(0,50)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">⬅</button>
+            <button onclick="snapBanner(50,50)" style="padding:7px;border-radius:7px;border:2px solid #FFD700;background:#1a1400;color:#FFD700;font-size:15px;cursor:pointer;">✛</button>
+            <button onclick="snapBanner(100,50)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">➡</button>
+            <button onclick="snapBanner(0,100)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">↙</button>
+            <button onclick="snapBanner(50,100)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">⬇</button>
+            <button onclick="snapBanner(100,100)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">↘</button>
+          </div>
+        </div>
+
+        <button onclick="resetBannerEditor()" style="background:#1a0a0a;border:1px solid #3a1515;border-radius:8px;color:#f84;font-size:11px;font-weight:700;padding:6px 14px;cursor:pointer;">↺ Reset to Default</button>
+      </div>
+
+      <!-- Schedule -->
+      <div style="background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:16px;margin-bottom:12px;">
+        <div style="font-size:12px;color:#7ab3ff;font-weight:800;margin-bottom:8px;">🕐 Ad Active Hours <span style="font-size:11px;color:#4a5a7a;font-weight:400;">(blank = always on, 24/7)</span></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;color:#4a5a7a;">From</span>
+            <input type="time" id="ds-schedule-from" class="input" style="width:120px;font-size:13px;padding:7px 10px;" />
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;color:#4a5a7a;">To</span>
+            <input type="time" id="ds-schedule-to" class="input" style="width:120px;font-size:13px;padding:7px 10px;" />
+          </div>
+          <button class="btn" onclick="document.getElementById('ds-schedule-from').value='';document.getElementById('ds-schedule-to').value='';" style="background:#1a2540;border:1px solid #2a3a5a;color:#f84;font-size:12px;padding:7px 12px;">✕ 24/7</button>
+        </div>
+        <div style="font-size:11px;color:#4a5a7a;">Outside these hours, the display screen returns to showing the leaderboard normally.</div>
       </div>
 
       <!-- Push targets -->
@@ -1778,15 +1842,177 @@ function renderBannerShopList() {
 }
 
 // ── Preview idle banner ──
-function previewIdleBanner() {
+// ══════════════════════════════════════════════════════════════
+// BANNER EDITOR — live preview with drag/scale/fit/position
+// ══════════════════════════════════════════════════════════════
+let _bannerFit = 'cover';
+let _bannerBg  = '#000000';
+let _bannerScale = 100;   // percent
+let _bannerX = 50;        // 0-100
+let _bannerY = 50;        // 0-100
+let _bannerDragging = false;
+let _bannerDragStartX = 0, _bannerDragStartY = 0;
+let _bannerDragImgX = 0, _bannerDragImgY = 0;
+
+function bannerEditorLoadImage() {
   const url = document.getElementById('ds-idle-banner-url').value.trim();
-  const prev = document.getElementById('ds-idle-preview');
-  const img  = document.getElementById('ds-idle-preview-img');
-  if (!url) { spNotify('⚠️ Enter an image URL first'); return; }
+  if (!url) return;
+  const wrap = document.getElementById('banner-editor-wrap');
+  const img  = document.getElementById('banner-prev-img');
+  img.onload = () => {
+    wrap.style.display = 'block';
+    applyBannerPreview();
+    initBannerDrag();
+  };
+  img.onerror = () => {
+    wrap.style.display = 'none';
+    spNotify('❌ Image failed — use a direct .jpg/.png link (not Google Drive)');
+  };
   img.src = url;
-  prev.style.display = 'block';
-  img.onerror = () => { spNotify('❌ Image failed — use a direct .jpg/.png link (not Google Drive)'); img.src=''; prev.style.display='none'; };
 }
+
+function applyBannerPreview() {
+  const canvas = document.getElementById('banner-canvas');
+  const img    = document.getElementById('banner-prev-img');
+  if (!canvas || !img) return;
+  canvas.style.background = _bannerBg;
+
+  if (_bannerFit === 'stretch') {
+    img.style.position = 'absolute';
+    img.style.inset = '0';
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.transform = 'none';
+    img.style.objectFit = 'fill';
+    img.style.left = '0'; img.style.top = '0';
+    return;
+  }
+
+  // cover / contain — use transform for scale + position
+  const cw = canvas.offsetWidth  || canvas.getBoundingClientRect().width  || 300;
+  const ch = canvas.offsetHeight || canvas.getBoundingClientRect().height || 169;
+  const iw = img.naturalWidth  || 1;
+  const ih = img.naturalHeight || 1;
+
+  let baseW, baseH;
+  if (_bannerFit === 'cover') {
+    const r = Math.max(cw / iw, ch / ih);
+    baseW = iw * r;
+    baseH = ih * r;
+  } else { // contain
+    const r = Math.min(cw / iw, ch / ih);
+    baseW = iw * r;
+    baseH = ih * r;
+  }
+
+  const scaledW = baseW * _bannerScale / 100;
+  const scaledH = baseH * _bannerScale / 100;
+
+  // Convert 0-100 to pixel offsets centred in canvas
+  const px = (_bannerX / 100) * (cw - scaledW) + scaledW / 2;
+  const py = (_bannerY / 100) * (ch - scaledH) + scaledH / 2;
+
+  img.style.width  = scaledW + 'px';
+  img.style.height = scaledH + 'px';
+  img.style.objectFit = 'fill';
+  img.style.left = '0'; img.style.top = '0';
+  img.style.transform = `translate(${px - scaledW/2}px, ${py - scaledH/2}px)`;
+}
+
+function initBannerDrag() {
+  const canvas = document.getElementById('banner-canvas');
+  const img    = document.getElementById('banner-prev-img');
+  if (!canvas || !img || img._dragInit) return;
+  img._dragInit = true;
+
+  function startDrag(ex, ey) {
+    if (_bannerFit === 'stretch') return;
+    _bannerDragging = true;
+    _bannerDragStartX = ex;
+    _bannerDragStartY = ey;
+    _bannerDragImgX = _bannerX;
+    _bannerDragImgY = _bannerY;
+  }
+  function moveDrag(ex, ey) {
+    if (!_bannerDragging) return;
+    const cw = canvas.offsetWidth  || 300;
+    const ch = canvas.offsetHeight || 169;
+    const dx = ((ex - _bannerDragStartX) / cw) * 100;
+    const dy = ((ey - _bannerDragStartY) / ch) * 100;
+    _bannerX = Math.max(0, Math.min(100, _bannerDragImgX - dx));
+    _bannerY = Math.max(0, Math.min(100, _bannerDragImgY - dy));
+    document.getElementById('banner-x-slider').value = _bannerX;
+    document.getElementById('banner-y-slider').value = _bannerY;
+    document.getElementById('banner-x-val').textContent = Math.round(_bannerX) + '%';
+    document.getElementById('banner-y-val').textContent = Math.round(_bannerY) + '%';
+    applyBannerPreview();
+  }
+  function endDrag() { _bannerDragging = false; }
+
+  img.addEventListener('mousedown',  e => { e.preventDefault(); startDrag(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+  window.addEventListener('mouseup',   endDrag);
+  img.addEventListener('touchstart', e => { e.preventDefault(); startDrag(e.touches[0].clientX, e.touches[0].clientY); }, {passive:false});
+  window.addEventListener('touchmove', e => { if (_bannerDragging) { e.preventDefault(); moveDrag(e.touches[0].clientX, e.touches[0].clientY); } }, {passive:false});
+  window.addEventListener('touchend',  endDrag);
+}
+
+function setBannerFit(fit) {
+  _bannerFit = fit;
+  ['cover','contain','stretch'].forEach(f => {
+    const btn = document.getElementById('bfit-' + f);
+    if (!btn) return;
+    if (f === fit) { btn.style.border='2px solid #FFD700'; btn.style.background='#1a1400'; btn.style.color='#FFD700'; btn.style.fontWeight='800'; }
+    else { btn.style.border='1px solid #2a3a5a'; btn.style.background='transparent'; btn.style.color='#4a5a7a'; btn.style.fontWeight='700'; }
+  });
+  applyBannerPreview();
+}
+
+function setBannerBg(color) {
+  _bannerBg = color;
+  const picker = document.getElementById('banner-bg-picker');
+  if (picker) picker.value = color;
+  applyBannerPreview();
+}
+
+function onBannerScaleSlider() {
+  _bannerScale = parseFloat(document.getElementById('banner-scale-slider').value);
+  document.getElementById('banner-scale-val').textContent = Math.round(_bannerScale) + '%';
+  applyBannerPreview();
+}
+
+function onBannerPosSlider() {
+  _bannerX = parseFloat(document.getElementById('banner-x-slider').value);
+  _bannerY = parseFloat(document.getElementById('banner-y-slider').value);
+  document.getElementById('banner-x-val').textContent = Math.round(_bannerX) + '%';
+  document.getElementById('banner-y-val').textContent = Math.round(_bannerY) + '%';
+  applyBannerPreview();
+}
+
+function snapBanner(x, y) {
+  _bannerX = x; _bannerY = y;
+  document.getElementById('banner-x-slider').value = x;
+  document.getElementById('banner-y-slider').value = y;
+  document.getElementById('banner-x-val').textContent = x + '%';
+  document.getElementById('banner-y-val').textContent = y + '%';
+  applyBannerPreview();
+}
+
+function resetBannerEditor() {
+  _bannerFit = 'cover'; _bannerBg = '#000000'; _bannerScale = 100; _bannerX = 50; _bannerY = 50;
+  setBannerFit('cover');
+  setBannerBg('#000000');
+  document.getElementById('banner-scale-slider').value = 100;
+  document.getElementById('banner-x-slider').value = 50;
+  document.getElementById('banner-y-slider').value = 50;
+  document.getElementById('banner-scale-val').textContent = '100%';
+  document.getElementById('banner-x-val').textContent = '50%';
+  document.getElementById('banner-y-val').textContent = '50%';
+  applyBannerPreview();
+}
+
+// Keep for backward compat
+function previewIdleBanner() { bannerEditorLoadImage(); }
 
 // ── Push banner settings to selected shops via Firebase ──
 async function saveAndPushBannerSettings() {
@@ -1802,6 +2028,11 @@ async function saveAndPushBannerSettings() {
 
   const displaySettings = {
     idleBannerUrl,
+    bannerFit:   _bannerFit,
+    bannerBg:    _bannerBg,
+    bannerScale: _bannerScale,
+    bannerX:     _bannerX,
+    bannerY:     _bannerY,
     schedule: (schedFrom && schedTo) ? { from: schedFrom, to: schedTo } : null,
     updatedAt: new Date().toISOString(),
   };
