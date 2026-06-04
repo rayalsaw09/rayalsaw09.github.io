@@ -383,6 +383,44 @@
       <div class="stat"><div class="stat-num" id="ad-stat-shops">—</div><div class="stat-label">Shops</div></div>
       <div class="stat"><div class="stat-num" id="ad-stat-rev" style="color:#FFD700;">—</div><div class="stat-label">Monthly Rev</div></div>
     </div>
+
+    <!-- ── Display Settings ── -->
+    <div style="background:#060d1a;border:1px solid #1e2a45;border-radius:14px;padding:16px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:800;color:#7ab3ff;margin-bottom:12px;display:flex;align-items:center;gap:8px;">🖼️ Display Settings <span style="font-size:11px;color:#4a5a7a;font-weight:400;">(pushed to all shops)</span></div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <!-- Idle Banner URL -->
+        <div>
+          <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:5px;">📸 Idle Banner Image URL <span style="color:#4a5a7a;">(shown on screen when no ad is playing)</span></label>
+          <div style="display:flex;gap:8px;">
+            <input class="input" id="ds-idle-banner-url" placeholder="https://imgbb.com/... (JPG/PNG direct link)" style="flex:1;font-size:13px;" />
+            <button class="btn" onclick="previewIdleBanner()" style="background:#1a2540;border:1px solid #2a3a5a;color:#7ab3ff;padding:8px 14px;font-size:12px;white-space:nowrap;">👁 Preview</button>
+          </div>
+          <div id="ds-idle-preview" style="margin-top:8px;display:none;border-radius:8px;overflow:hidden;max-height:120px;">
+            <img id="ds-idle-preview-img" src="" style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;" />
+          </div>
+        </div>
+        <!-- Ad Schedule -->
+        <div>
+          <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:5px;">🕐 Ad Schedule <span style="color:#4a5a7a;">(leave blank = run 24/7)</span></label>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:12px;color:#4a5a7a;">From</span>
+              <input type="time" id="ds-schedule-from" class="input" style="width:120px;font-size:13px;padding:7px 10px;" />
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:12px;color:#4a5a7a;">To</span>
+              <input type="time" id="ds-schedule-to" class="input" style="width:120px;font-size:13px;padding:7px 10px;" />
+            </div>
+            <button class="btn" onclick="document.getElementById('ds-schedule-from').value='';document.getElementById('ds-schedule-to').value='';" style="background:#1a2540;border:1px solid #2a3a5a;color:#f84;font-size:12px;padding:7px 12px;">✕ Clear (24/7)</button>
+          </div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:5px;">💡 Example: 10:00 → 21:00 means ads run only between 10 AM and 9 PM</div>
+        </div>
+        <!-- Save + Push button -->
+        <button class="btn" onclick="saveAndPushDisplaySettings()" style="background:linear-gradient(135deg,#1a3a5a,#0a1e3a);border:1px solid #2a5a8a;color:#7ab3ff;padding:11px;font-size:13px;font-weight:800;width:100%;">
+          📡 Save & Push Display Settings to All Active Shops
+        </button>
+      </div>
+    </div>
     <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;">
       <button onclick="setAdFilter('all')" id="adf-all" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:800;border:2px solid #FFD700;background:#1a1400;color:#FFD700;white-space:nowrap;flex-shrink:0;">All</button>
       <button onclick="setAdFilter('active')" id="adf-active" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">✅ Active</button>
@@ -432,6 +470,10 @@
     <div style="margin-top:6px;">🔑 <strong style="color:#e8eaf0;">Service Role Key</strong> (used here in Seller Panel) → Supabase Dashboard → Project Settings → API → <strong style="color:#FFD700;">service_role</strong>. Keep it secret — never put it in the customer app file.</div>
     <div style="margin-top:6px;">⚡ <strong style="color:#e8eaf0;">Disable</strong> a customer instantly by clicking the red button — their app locks within seconds on next load.</div>
     <div>⚡ <strong style="color:#e8eaf0;">Re-enable</strong> when they pay — app unlocks immediately.</div>
+    <div style="margin-top:10px;padding:10px;background:#0d1220;border:1px solid #2a3560;border-radius:8px;">
+      🔥 <strong style="color:#7ab3ff;">Firestore Rules for Shop Activity:</strong> Go to Firebase Console → Firestore → Rules and make sure the <code style="color:#FFD700;">users</code> collection is readable. Add this rule:<br>
+      <code style="color:#4f4;font-size:11px;display:block;margin-top:6px;">match /users/{phone}/{document=**} { allow read: if true; }</code>
+    </div>
   </div>
 </div>
 
@@ -534,7 +576,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="./config.js"></script>
 <script>
-// ── Config (credentials loaded from /config.js) ──
+// ── Config (credentials loaded from /config.js, with safe fallbacks) ──
+// If config.js failed to load (e.g. opened standalone), define empty stubs so no ReferenceError
+if (typeof SC_SUPABASE_URL  === 'undefined') window.SC_SUPABASE_URL  = '';
+if (typeof SC_SUPABASE_ANON === 'undefined') window.SC_SUPABASE_ANON = '';
+if (typeof SC_FIREBASE_CONFIG === 'undefined') window.SC_FIREBASE_CONFIG = {};
 let SB_URL = SC_SUPABASE_URL;
 let SB_ANON = SC_SUPABASE_ANON;
 let SB_SERVICE_KEY = "";
@@ -1678,7 +1724,55 @@ function escHtml(s) {
 // ── Init ──
 // ══════════════════════════════════════════════════════════════
 // AD MANAGER — Full ad system for ShopChampion display screens
-// Ads stored in Supabase table: sc_ads
+// ── Display Settings (Idle Banner + Schedule) ──
+function previewIdleBanner() {
+  const url = document.getElementById('ds-idle-banner-url').value.trim();
+  const prev = document.getElementById('ds-idle-preview');
+  const img  = document.getElementById('ds-idle-preview-img');
+  if (!url) { spNotify('⚠️ Enter an image URL first'); return; }
+  img.src = url;
+  prev.style.display = 'block';
+}
+
+async function saveAndPushDisplaySettings() {
+  const idleBannerUrl = document.getElementById('ds-idle-banner-url').value.trim();
+  const schedFrom = document.getElementById('ds-schedule-from').value;
+  const schedTo   = document.getElementById('ds-schedule-to').value;
+
+  const displaySettings = {
+    idleBannerUrl,
+    schedule: (schedFrom && schedTo) ? { from: schedFrom, to: schedTo } : null,
+    updatedAt: new Date().toISOString(),
+  };
+
+  // Collect all shops that have active ads
+  const activeShopIds = [...new Set(
+    allAds.filter(a => a.status === 'active').flatMap(a => a.shop_ids || [])
+  )];
+
+  if (!activeShopIds.length) {
+    spNotify('⚠️ No shops with active ads found. Push an ad to shops first.');
+    return;
+  }
+
+  saInitFirebase();
+  if (!saDb) { spNotify('❌ Firebase not initialized.'); return; }
+
+  let ok = 0, fail = 0;
+  await Promise.all(activeShopIds.map(async phone => {
+    try {
+      const ref = saDb.collection('users').doc(phone).collection('display').doc('leaderboard');
+      await ref.set({ adDisplaySettings: displaySettings }, { merge: true });
+      ok++;
+    } catch(e) { fail++; console.warn('DisplaySettings push failed for', phone, e); }
+  }));
+
+  spNotify(fail === 0
+    ? `✅ Display settings pushed to ${ok} shop${ok!==1?'s':''}!`
+    : `⚠️ Pushed to ${ok}, failed ${fail} shops.`);
+}
+
+// ── Ads stored in Supabase table: sc_ads ──
 // ══════════════════════════════════════════════════════════════
 
 let allAds = [];
@@ -1928,7 +2022,136 @@ async function deleteAd(id) {
 
 // ── Push ad to display (saved in Firebase under shopId/ads) ──
 async function pushAdToDisplay(adId) {
-  spNotify('📺 Ad pushed to display screens!');
+  const ad = allAds.find(a => a.id === adId);
+  if (!ad) { spNotify('❌ Ad not found'); return; }
+
+  // Build shop list from allUsers (Supabase) for checkboxes
+  const shopList = (typeof allUsers !== 'undefined' ? allUsers : [])
+    .filter(u => u.phone)
+    .map(u => ({ phone: u.phone, name: u.name || u.phone }));
+
+  const currentShopIds = ad.shop_ids || [];
+
+  const checkboxHtml = shopList.length
+    ? shopList.map(s => `
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;cursor:pointer;">
+          <input type="checkbox" value="${s.phone}" ${currentShopIds.includes(s.phone)?'checked':''} 
+            style="width:16px;height:16px;accent-color:#FFD700;" />
+          <div>
+            <div style="font-weight:700;color:#e8eaf0;font-size:13px;">${s.name}</div>
+            <div style="font-size:11px;color:#4a5a7a;">📞 ${s.phone}</div>
+          </div>
+        </label>`).join('')
+    : `<div style="color:#f84;text-align:center;padding:20px;font-size:13px;">⚠️ No shops found. Make sure users are loaded.</div>`;
+
+  showWideModal(`
+    ${modalHeader('📺 Push Ad to Shops')}
+    <div style="margin-bottom:12px;background:#0d1220;border:1px solid #1e2a45;border-radius:10px;padding:12px;">
+      <div style="font-weight:800;color:#FFD700;font-size:14px;">${ad.title||'Untitled Ad'}</div>
+      <div style="font-size:12px;color:#4a5a7a;margin-top:3px;">${ad.advertiser||''} · ${ad.type||'text'} · ${ad.duration_sec||15}s</div>
+    </div>
+    <div style="font-size:12px;color:#7a8aaa;margin-bottom:8px;font-weight:700;">SELECT SHOPS TO PUSH TO:</div>
+    <div id="push-shop-list" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;">
+      ${checkboxHtml}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn" onclick="closeModal()" style="flex:1;background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:13px;">Cancel</button>
+      <button class="btn" onclick="confirmPushAd('${adId}')" style="flex:2;background:linear-gradient(135deg,#1a5a1a,#0a3a0a);color:#4f4;border:1px solid #2a5a2a;padding:13px;font-size:15px;font-weight:800;">
+        📺 Push to Selected Shops
+      </button>
+    </div>
+  `);
+}
+
+async function confirmPushAd(adId) {
+  const ad = allAds.find(a => a.id === adId);
+  if (!ad) return;
+
+  // Collect selected shop phones from checkboxes
+  const checkboxes = document.querySelectorAll('#push-shop-list input[type=checkbox]:checked');
+  const selectedPhones = Array.from(checkboxes).map(cb => cb.value);
+
+  if (!selectedPhones.length) {
+    spNotify('⚠️ Please select at least one shop');
+    return;
+  }
+
+  // Show loading state
+  const pushBtn = document.querySelector('#ad-modal-container button[onclick*="confirmPushAd"]');
+  if (pushBtn) { pushBtn.disabled = true; pushBtn.textContent = '⏳ Pushing...'; }
+
+  // Build the ad object to embed in Firebase payload
+  const adPayload = {
+    id:           ad.id,
+    title:        ad.title        || '',
+    advertiser:   ad.advertiser   || '',
+    type:         ad.type         || 'text',
+    content_url:  ad.content_url  || '',
+    text_content: ad.text_content || '',
+    text_bg:      ad.text_bg      || '#1a0a00',
+    duration_sec: ad.duration_sec || 15,
+    interval_min: ad.interval_min || 5,
+    position:     ad.position     || 'both',
+    status:       'active',
+  };
+
+  // Ensure Firebase is initialized
+  saInitFirebase();
+  if (!saDb) {
+    spNotify('❌ Firebase not initialized. Check config.js.');
+    return;
+  }
+
+  let successCount = 0;
+  let errorCount = 0;
+  const errors = [];
+
+  // Push to each selected shop's Firebase leaderboard doc (merge so we don't overwrite leaderboard)
+  await Promise.all(selectedPhones.map(async phone => {
+    try {
+      const docRef = saDb.collection('users').doc(phone).collection('display').doc('leaderboard');
+      const snap = await docRef.get();
+
+      // Merge: update existing ads array or create it
+      let existingAds = [];
+      if (snap.exists) {
+        existingAds = snap.data().ads || [];
+      }
+      // Replace if ad already exists, otherwise append
+      const idx = existingAds.findIndex(a => a.id === adPayload.id);
+      if (idx >= 0) existingAds[idx] = adPayload;
+      else existingAds.push(adPayload);
+
+      await docRef.set({ ads: existingAds }, { merge: true });
+      successCount++;
+    } catch(e) {
+      errorCount++;
+      errors.push(phone + ': ' + e.message);
+      console.error('[PushAd] Error pushing to', phone, e);
+    }
+  }));
+
+  // Update shop_ids and status in Supabase
+  try {
+    const allShopIds = [...new Set([...(ad.shop_ids||[]), ...selectedPhones])];
+    await sbFetch(`/rest/v1/sc_ads?id=eq.${adId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'active', shop_ids: allShopIds }),
+      prefer: 'return=minimal'
+    });
+  } catch(e) {
+    console.warn('[PushAd] Supabase update failed:', e.message);
+  }
+
+  closeModal();
+  loadAds();
+
+  if (errorCount === 0) {
+    spNotify(`✅ Ad pushed to ${successCount} shop${successCount !== 1 ? 's' : ''}! Display screens will update live.`);
+  } else {
+    spNotify(`⚠️ Pushed to ${successCount} shops, ${errorCount} failed. Check console.`);
+    console.warn('[PushAd] Errors:', errors);
+  }
 }
 
 // ── Notify helper ──
@@ -2029,42 +2252,93 @@ async function loadShopActivity() {
   document.getElementById("sa-shop-list").innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:40px;font-size:14px;">⏳ Loading shop data from Firebase...</div>`;
 
   try {
-    // Get list of all shops (users) from Firestore
-    const usersSnap = await saDb.collection("users").get();
+    // Build shop phone list from Supabase allUsers (guaranteed available after login)
+    // Also merge in any phones from Firebase users collection that aren't in Supabase
+    let shopPhones = [];
+    if (typeof allUsers !== "undefined" && allUsers.length) {
+      shopPhones = allUsers.map(u => u.phone).filter(Boolean);
+    }
+    // Also pull from Firebase users collection to catch any shops not yet in Supabase
+    try {
+      const usersSnap = await saDb.collection("users").get();
+      usersSnap.docs.forEach(d => {
+        if (!shopPhones.includes(d.id)) shopPhones.push(d.id);
+      });
+    } catch(e) {
+      console.warn("[ShopActivity] Firebase users collection read failed:", e.message);
+    }
+
+    if (!shopPhones.length) {
+      document.getElementById("sa-shop-list").innerHTML = `<div style="color:#f66;text-align:center;padding:30px;font-size:13px;">⚠️ No shops found.<br><span style="color:#4a5a7a;font-size:11px;margin-top:6px;display:block;">No users found in Supabase. Make sure users are registered.</span></div>`;
+      return;
+    }
+
     saAllShops = [];
-
-    const promises = usersSnap.docs.map(async userDoc => {
-      const phone = userDoc.id;
+    const promises = shopPhones.map(async phone => {
       let shopName = phone;
-      // Try to get shop name from merged Supabase users table
-      const supaRow = (typeof mergedRows !== "undefined") ? mergedRows.find(r => r.phone === phone) : null;
-      if (supaRow && supaRow.name) shopName = supaRow.name;
+      // Try to get shop name from Supabase users (mergedData contains {user:{phone,name,...}, ...})
+      if (typeof mergedData !== "undefined" && mergedData.length) {
+        const supaRow = mergedData.find(r => r.user && r.user.phone === phone);
+        if (supaRow && supaRow.user && supaRow.user.name) shopName = supaRow.user.name;
+      }
 
-      // Get all customers for this shop
-      const custSnap = await saDb.collection("users").doc(phone).collection("customers").get();
       const allPurchases = [];
-      custSnap.docs.forEach(custDoc => {
-        const c = custDoc.data();
-        (c.purchases || []).forEach(p => {
+
+      // PRIMARY: Read from bills subcollection (where Admin app saves bills)
+      try {
+        const billsSnap = await saDb.collection("users").doc(phone).collection("bills").get();
+        billsSnap.docs.forEach(billDoc => {
+          const b = billDoc.data();
+          const dateStr = b.createdAt
+            ? (typeof b.createdAt.toDate === "function"
+                ? b.createdAt.toDate().toISOString().slice(0, 10)
+                : String(b.createdAt).slice(0, 10))
+            : "";
           allPurchases.push({
-            custName: c.name || "Unknown",
-            custId: c.id || custDoc.id,
-            custPhone: c.phone || "",
-            bill: p.bill || "—",
-            amount: Number(p.amount || 0),
-            date: p.date || "",
-            notes: p.notes || "",
-            items: p.items || [],
+            custName:  b.customerName  || "Unknown",
+            custId:    b.customerId    || billDoc.id,
+            custPhone: b.customerPhone || "",
+            bill:      b.billId        || billDoc.id,
+            amount:    Number(b.total  || b.subtotal || 0),
+            date:      dateStr,
+            notes:     b.notes        || "",
+            items:     b.items        || [],
           });
         });
-      });
+      } catch(billErr) {
+        console.warn("[ShopActivity] bills read error for", phone, billErr.message);
+      }
+
+      // FALLBACK: Also check customers subcollection for embedded purchases[] (legacy format)
+      try {
+        const custSnap = await saDb.collection("users").doc(phone).collection("customers").get();
+        custSnap.docs.forEach(custDoc => {
+          const c = custDoc.data();
+          (c.purchases || []).forEach(p => {
+            allPurchases.push({
+              custName:  c.name         || "Unknown",
+              custId:    c.id           || custDoc.id,
+              custPhone: c.phone        || "",
+              bill:      p.bill         || "—",
+              amount:    Number(p.amount || 0),
+              date:      p.date         || "",
+              notes:     p.notes        || "",
+              items:     p.items        || [],
+            });
+          });
+        });
+      } catch(custErr) {
+        console.warn("[ShopActivity] customers read error for", phone, custErr.message);
+      }
+
       saAllShops.push({ phone, name: shopName, purchases: allPurchases });
     });
 
     await Promise.all(promises);
     renderShopList();
   } catch(e) {
-    document.getElementById("sa-shop-list").innerHTML = `<div style="color:#f66;text-align:center;padding:30px;font-size:13px;">❌ Error: ${escHtml(e.message)}<br><span style="color:#4a5a7a;font-size:11px;margin-top:6px;display:block;">Make sure Firebase is configured in config.js and Firestore rules allow reads.</span></div>`;
+    document.getElementById("sa-shop-list").innerHTML = `<div style="color:#f66;text-align:center;padding:30px;font-size:13px;">❌ Error: ${escHtml(e.message)}<br><span style="color:#4a5a7a;font-size:11px;margin-top:6px;display:block;">Make sure Firebase is configured in config.js and Firestore rules allow reading the <code>users</code> collection and its subcollections.</span></div>`;
+    console.error("[ShopActivity] loadShopActivity error:", e);
   }
 }
 
@@ -2137,8 +2411,10 @@ function renderShopList() {
 function openShopDetail(phone, fromStr, toStr) {
   saCurrentShop = saAllShops.find(s => s.phone === phone);
   if (!saCurrentShop) return;
-  const supaRow = (typeof mergedRows !== "undefined") ? mergedRows.find(r => r.phone === phone) : null;
-  const name = (supaRow && supaRow.name) ? supaRow.name : phone;
+  const supaRow = (typeof mergedData !== "undefined" && mergedData.length)
+    ? mergedData.find(r => r.user && r.user.phone === phone)
+    : null;
+  const name = (supaRow && supaRow.user && supaRow.user.name) ? supaRow.user.name : phone;
   document.getElementById("sa-detail-title").textContent = "🏪 " + name;
   document.getElementById("sa-detail-from").value = fromStr;
   document.getElementById("sa-detail-to").value = toStr;

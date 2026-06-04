@@ -20,6 +20,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="./config.js"></script>
+<script>
+// Safe fallbacks if config.js failed to load (e.g. opened standalone)
+if (typeof SC_SUPABASE_URL   === 'undefined') window.SC_SUPABASE_URL   = '';
+if (typeof SC_SUPABASE_ANON  === 'undefined') window.SC_SUPABASE_ANON  = '';
+if (typeof SC_FIREBASE_CONFIG=== 'undefined') window.SC_FIREBASE_CONFIG = {};
+</script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; font-family: 'Nunito', sans-serif; }
@@ -531,6 +537,12 @@
   <span id="ad-banner-label">AD</span>
 </div>
 
+<!-- ── IDLE BANNER (shown when no ad is playing) ── -->
+<div id="ad-idle-banner" style="display:none;position:fixed;inset:0;z-index:100;background:#000;align-items:center;justify-content:center;flex-direction:column;">
+  <img id="ad-idle-img" src="" alt="" style="max-width:100%;max-height:100%;object-fit:contain;display:none;" />
+  <div id="ad-idle-text" style="display:none;color:#FFD700;font-size:28px;font-weight:900;text-align:center;padding:40px;">Advertisement</div>
+</div>
+
 <!-- ── FULLSCREEN AD ── -->
 <div id="ad-fullscreen">
   <div id="ad-countdown"></div>
@@ -602,9 +614,12 @@ function avatarColor(name) {
 // ── FIREBASE CONFIG (loaded from /config.js) ──
 let fbDb = null;
 try {
-  if (!firebase.apps.length) firebase.initializeApp(SC_FIREBASE_CONFIG);
-  else firebase.app();
-  fbDb = firebase.firestore();
+  const _fbCfg = (typeof SC_FIREBASE_CONFIG !== 'undefined' && SC_FIREBASE_CONFIG) ? SC_FIREBASE_CONFIG : {};
+  if (Object.keys(_fbCfg).length) {
+    if (!firebase.apps.length) firebase.initializeApp(_fbCfg);
+    else firebase.app();
+    fbDb = firebase.firestore();
+  }
 } catch(e) { console.warn("Firebase init failed:", e.message); }
 
 // ── STATE ──
@@ -717,6 +732,7 @@ function startFirebaseDisplay() {
       window._displayFields = payload.displayFields || window._displayFields || {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false};
       if (isNew) {
         showLeaderboard(payload);
+        applyAdsFromPayload(payload);
         document.getElementById('refresh-label').textContent = 'Updated ' + new Date().toLocaleTimeString();
       } else {
         document.getElementById('refresh-label').textContent = 'Live · ' + new Date().toLocaleTimeString();
@@ -799,6 +815,7 @@ async function fetchData(initial) {
       window._displayFields = payload.displayFields || window._displayFields || {name:true,userId:true,points:true,amount:true,visits:false,highestPurchase:false};
     if (isNew || initial) {
       showLeaderboard(payload);
+      applyAdsFromPayload(payload);
       document.getElementById('refresh-label').textContent = 'Updated ' + new Date().toLocaleTimeString();
     } else {
       document.getElementById('refresh-label').textContent = 'Live · ' + new Date().toLocaleTimeString();
@@ -998,7 +1015,43 @@ document.addEventListener('DOMContentLoaded', () => {
 let _adQueue = [];         // all active ads
 let _adIndex = 0;          // current ad index
 let _adTimer = null;       // interval timer
-let _adRunning = false;    // fullscreen running flag
+let _adRunning = false;    // fullscreen ad running flag
+let _idleBannerUrl = "";   // full-screen idle image shown when no ad plays
+let _adSchedule = null;    // { from: "HH:MM", to: "HH:MM" } or null = always on
+
+// ── Check if current time is within ad schedule ──
+function _isAdScheduleActive() {
+  if (!_adSchedule || !_adSchedule.from || !_adSchedule.to) return true; // no schedule = always on
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const [fh, fm] = _adSchedule.from.split(":").map(Number);
+  const [th, tm] = _adSchedule.to.split(":").map(Number);
+  const fromMin = fh * 60 + fm;
+  const toMin   = th * 60 + tm;
+  if (fromMin <= toMin) return nowMin >= fromMin && nowMin < toMin;
+  // overnight schedule (e.g. 22:00 – 06:00)
+  return nowMin >= fromMin || nowMin < toMin;
+}
+
+// ── Show / hide idle banner ──
+function showIdleBanner() {
+  const overlay = document.getElementById("ad-idle-banner");
+  if (!overlay) return;
+  if (_idleBannerUrl) {
+    const img = document.getElementById("ad-idle-img");
+    const txt = document.getElementById("ad-idle-text");
+    img.src = _idleBannerUrl;
+    img.style.display = "block";
+    txt.style.display = "none";
+    overlay.style.display = "flex";
+  }
+  // If no idle banner URL configured, just hide — don't show blank overlay
+}
+
+function hideIdleBanner() {
+  const overlay = document.getElementById("ad-idle-banner");
+  if (overlay) overlay.style.display = "none";
+}
 
 // ── Load ads from Supabase ──
 async function loadDisplayAds() {
@@ -1015,6 +1068,8 @@ async function loadDisplayAds() {
     if (_adQueue.length > 0) {
       startAdEngine();
       console.log("📺 Ad engine started with", _adQueue.length, "ads");
+    } else {
+      showIdleBanner();
     }
   } catch(e) {
     console.warn("Ads not loaded:", e.message);
@@ -1024,13 +1079,27 @@ async function loadDisplayAds() {
 // ── Start ad engine ──
 function startAdEngine() {
   if (_adTimer) clearInterval(_adTimer);
-  if (_adQueue.length === 0) return;
+  if (_adQueue.length === 0) { showIdleBanner(); return; }
 
-  // Show first banner immediately
-  showBannerAd(_adQueue[_adIndex % _adQueue.length]);
+  // Show first banner immediately (if schedule allows)
+  if (_isAdScheduleActive()) {
+    hideIdleBanner();
+    showBannerAd(_adQueue[_adIndex % _adQueue.length]);
+  } else {
+    showIdleBanner();
+  }
 
-  // Rotate banner every 30 seconds
+  // Rotate banner every 30 seconds; also re-check schedule
   _adTimer = setInterval(() => {
+    if (!_isAdScheduleActive()) {
+      // Outside schedule — hide ads, show idle banner
+      const banner = document.getElementById("ad-banner");
+      if (banner) banner.classList.remove("show");
+      document.body.classList.remove("ad-active");
+      if (!_adRunning) showIdleBanner();
+      return;
+    }
+    hideIdleBanner();
     _adIndex = (_adIndex + 1) % _adQueue.length;
     const ad = _adQueue[_adIndex];
     showBannerAd(ad);
@@ -1054,7 +1123,6 @@ function showBannerAd(ad) {
 
   if (!banner) return;
 
-  // Set content
   bannerText.textContent = ad.title || "Advertisement";
   bannerSub.textContent = ad.advertiser || "";
 
@@ -1065,7 +1133,6 @@ function showBannerAd(ad) {
     bannerImg.style.display = "none";
   }
 
-  // Show banner if position allows
   if (ad.position === "fullscreen") return; // fullscreen only
   banner.classList.add("show");
   document.body.classList.add("ad-active");
@@ -1077,6 +1144,7 @@ function showFullscreenAd(ad) {
   if (ad.position === "banner") return; // banner only
 
   _adRunning = true;
+  hideIdleBanner(); // hide idle banner while ad plays
   localStorage.setItem("sc_ad_last_full_" + ad.id, Date.now().toString());
 
   const fs = document.getElementById("ad-fullscreen");
@@ -1086,12 +1154,10 @@ function showFullscreenAd(ad) {
   const fsCountdown = document.getElementById("ad-countdown");
   const fsAdvertiser = document.getElementById("ad-advertiser-tag");
 
-  // Reset all
   fsImg.style.display = "none";
   fsVideo.style.display = "none";
   fsText.style.display = "none";
 
-  // Set content by type
   if (ad.type === "image" && ad.content_url) {
     fsImg.src = ad.content_url;
     fsImg.style.display = "block";
@@ -1107,15 +1173,30 @@ function showFullscreenAd(ad) {
     fsText.style.color = "#FFD700";
     fs.style.background = ad.text_bg || "#1a0800";
   } else {
-    // Nothing to show
     _adRunning = false;
+    showIdleBanner(); // nothing to show → back to idle
     return;
   }
 
   fsAdvertiser.textContent = ad.advertiser ? "📢 " + ad.advertiser : "";
   fs.classList.add("show");
 
-  // Countdown
+  // For video ads: use actual video ended event + fallback timer
+  if (ad.type === "video") {
+    const onEnded = () => {
+      fsVideo.removeEventListener("ended", onEnded);
+      hideFullscreenAd();
+    };
+    fsVideo.addEventListener("ended", onEnded);
+    // Fallback: if video doesn't fire ended (e.g. YouTube iframe), use duration
+    const fallbackSec = parseInt(ad.duration_sec) || 30;
+    setTimeout(() => {
+      if (_adRunning) hideFullscreenAd();
+    }, (fallbackSec + 2) * 1000);
+    return; // don't start countdown timer for video
+  }
+
+  // Countdown for image / text ads
   let remaining = parseInt(ad.duration_sec) || 15;
   fsCountdown.textContent = "⏱ " + remaining + "s";
   const countTimer = setInterval(() => {
@@ -1128,26 +1209,38 @@ function showFullscreenAd(ad) {
   }, 1000);
 }
 
-// ── Hide fullscreen ──
+// ── Hide fullscreen → return to idle banner ──
 function hideFullscreenAd() {
   const fs = document.getElementById("ad-fullscreen");
   if (fs) fs.classList.remove("show");
   const fsVideo = document.getElementById("ad-fs-video");
   if (fsVideo) { fsVideo.pause(); fsVideo.src = ""; }
   _adRunning = false;
+  // After video/ad finishes → show idle banner again until next rotation
+  showIdleBanner();
 }
 
 // ── Also receive ads from push payload ──
 function applyAdsFromPayload(payload) {
+  // Read display settings (idle banner + schedule)
+  if (payload.adDisplaySettings) {
+    _idleBannerUrl = payload.adDisplaySettings.idleBannerUrl || "";
+    _adSchedule = payload.adDisplaySettings.schedule || null;
+  }
+
   if (payload && payload.ads && Array.isArray(payload.ads)) {
     _adQueue = payload.ads.filter(a => a.status === "active");
-    if (_adQueue.length > 0 && !_adTimer) startAdEngine();
-    else if (_adQueue.length === 0) {
-      // Hide banner if no ads
+    if (_adQueue.length > 0) {
+      if (!_adTimer) startAdEngine();
+    } else {
+      // No ads — hide bottom banner, show idle banner
       const banner = document.getElementById("ad-banner");
       if (banner) banner.classList.remove("show");
       document.body.classList.remove("ad-active");
+      showIdleBanner();
     }
+  } else {
+    showIdleBanner();
   }
 }
 
