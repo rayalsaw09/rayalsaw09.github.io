@@ -2759,7 +2759,7 @@ function doLogout() {
   // Reset in-memory state so next account starts clean
   customers = [];
   inventoryItems = [];
-  invView = "stock"; invSelectedCat = ""; invSearchQuery = ""; invCatPageName = ""; invCatPageSearch = "";
+  invView = "stock"; invSelectedCat = ""; invSearchQuery = ""; invCatPageName = ""; invCatPageSearch = ""; invRestockSearch = ""; invRestockSelected = null;
   syncBinId = ""; syncApiKey = "";
   displaySettings = { showCount:10 }; // reset to safe default with correct key
   appSettings = { shopName:"ShopChampion", currency:"₹", pointsPerRupee:1, redeemRate:100, welcomeBonus:0 };
@@ -6865,7 +6865,9 @@ function applyLicenseOverlay(i) {
 // Data: inventorySales = [{date, itemName, qty, custName}]  (auto-logged on ptSubmit)
 
 let inventoryItems = [];
-let invView = "stock"; // "stock" | "add" | "log" | "detail" | "category"
+let invView = "stock"; // "stock" | "add" | "restock" | "log" | "detail" | "category"
+let invRestockSearch = ""; // search query for restock tab
+let invRestockSelected = null; // selected item name for restock
 let invPrefillName = ""; // pre-fill name when Restock button is clicked
 let invSelectedCat = ""; // currently selected category pill
 let invSearchQuery = ""; // search box text
@@ -7360,13 +7362,14 @@ function renderInventoryTab(){
 
   const tabBtn=(v,label,color)=>{
     const a=invView===v;
-    return `<button onclick="if('${v}'!=='add')invPrefillName='';invView='${v}';invSelectedCat='';safeRenderTab(currentTab)" style="cursor:pointer;flex:1;padding:10px;border-radius:10px;border:2px solid ${a?color:'#1e2a45'};background:${a?'#0a0e1a':'transparent'};color:${a?color:'#4a5a7a'};font-size:13px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;">${label}</button>`;
+    return `<button onclick="if('${v}'!=='add'&&'${v}'!=='restock')invPrefillName='';if('${v}'!=='restock'){invRestockSearch='';invRestockSelected=null;}invView='${v}';invSelectedCat='';safeRenderTab(currentTab)" style="cursor:pointer;flex:1;padding:8px 2px;border-radius:10px;border:2px solid ${a?color:'#1e2a45'};background:${a?'#0a0e1a':'transparent'};color:${a?color:'#4a5a7a'};font-size:11px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;">${label}</button>`;
   };
 
-  const nav = `<div style="display:flex;gap:8px;margin-bottom:16px;">
+  const nav = `<div style="display:flex;gap:6px;margin-bottom:16px;">
     ${tabBtn("stock","📦 Stock","#4f4")}
-    ${tabBtn("add","➕ Add Stock","#FFD700")}
-    ${tabBtn("log","📋 Sales Log","#4a8aff")}
+    ${tabBtn("add","➕ Add New","#FFD700")}
+    ${tabBtn("restock","🔄 Restock","#4a8aff")}
+    ${tabBtn("log","📋 Sales Log","#b47aff")}
   </div>`;
 
   // Summary cards
@@ -7396,14 +7399,15 @@ function renderInventoryTab(){
   if(invView==="add"){
     const existingCats = [...new Set(inventoryItems.map(x=>x.category||"General"))].sort();
     body = `<div class="card" style="padding:22px;">
-      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:16px;">➕ Add / Restock Item</div>
+      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:16px;">➕ Add New Item</div>
+      <div style="font-size:12px;color:#4a5a7a;margin-bottom:14px;padding:10px 12px;background:#0d1220;border-radius:8px;border:1px solid #1e2a45;">Use this tab to add a <b style="color:#FFD700;">brand new product</b> to inventory. To add stock to an existing item, use the <b style="color:#4a8aff;">🔄 Restock</b> tab.</div>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Item / Product Name *</label>
-      <input class="input" id="inv-name" list="inv-existing-names" placeholder="e.g. Basmati Rice 5kg..."
+      <input class="input" id="inv-name" placeholder="e.g. Basmati Rice 5kg..."
         oninput="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var costEl=document.getElementById('inv-cost');var sellEl=document.getElementById('inv-sell-price');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(costEl){var costs=(ex.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);if(costs.length)costEl.value=Number(costs[costs.length-1].costPerUnit).toFixed(2);}if(sellEl&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);}})(this)"
         onchange="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var costEl=document.getElementById('inv-cost');var sellEl=document.getElementById('inv-sell-price');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(costEl){var costs=(ex.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);if(costs.length)costEl.value=Number(costs[costs.length-1].costPerUnit).toFixed(2);}if(sellEl&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);}})(this)"
         value="${invPrefillName ? invPrefillName : ''}"
         style="margin-bottom:12px;" />
-      <datalist id="inv-existing-names">${inventoryItems.map(x=>`<option value="${x.name.replace(/"/g,'&quot;')}">`).join("")}</datalist>
+      
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Category</label>
       <input class="input" id="inv-category" list="inv-category-list" placeholder="e.g. Grocery, Dairy, Snacks..." value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex?ex.category||'General':'';})()}" style="margin-bottom:12px;" />
       <datalist id="inv-category-list">${existingCats.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">`).join("")}</datalist>
@@ -7436,6 +7440,109 @@ function renderInventoryTab(){
       <input class="input" id="inv-notes" placeholder="Supplier, batch info..." style="margin-bottom:18px;" />
       <button class="btn" onclick="invSubmitAdd()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">Add to Inventory →</button>
     </div>`;
+  }
+  else if(invView==="restock"){
+    // ── Restock view: search existing items, see stock, fill qty/cost ──
+    if(!inventoryItems.length){
+      body = `<div class="card" style="padding:32px;text-align:center;">
+        <div style="font-size:40px;margin-bottom:12px;">📦</div>
+        <div style="font-size:15px;font-weight:700;color:#e8eaf0;margin-bottom:8px;">No items to restock</div>
+        <div style="font-size:13px;color:#7a8aaa;margin-bottom:20px;">Add your first product using the ➕ Add New tab</div>
+      </div>`;
+    } else if(!invRestockSelected){
+      // Step 1: Search & select item
+      const q2 = (invRestockSearch||"").trim().toLowerCase();
+      const matches = q2
+        ? inventoryItems.filter(x=>x.name.toLowerCase().includes(q2)||(x.category||"").toLowerCase().includes(q2))
+        : inventoryItems;
+      const itemRows = matches.map(item=>{
+        const stk = invGetStock(item.name);
+        const stColor = stk<=0?"#e03030":stk<=3?"#cc8800":"#1a8a3a";
+        const stLabel = stk<=0?"Out of stock":stk<=3?"Low stock":"In stock";
+        return `<div onclick="invRestockSelected='${item.name.replace(/'/g,"\\'").replace(/"/g,"&quot;")}';invRestockSearch='';safeRenderTab(currentTab)"
+          style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid #0f1628;cursor:pointer;transition:background 0.15s;"
+          onmouseover="this.style.background='#0a1628'" onmouseout="this.style.background='transparent'">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;color:#e8eaf0;font-size:14px;">${item.name}</div>
+            <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${item.category||"General"}${item.unit?" · "+item.unit:""}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-weight:800;font-size:14px;color:${stColor};">${stk} ${item.unit||"unit"}</div>
+            <div style="font-size:10px;color:${stColor};margin-top:1px;">${stLabel}</div>
+          </div>
+          <span style="color:#4a8aff;font-size:20px;font-weight:300;flex-shrink:0;">›</span>
+        </div>`;
+      }).join("");
+
+      body = `<div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:14px 16px;border-bottom:1px solid #1e2a45;">
+          <div style="font-size:13px;font-weight:800;color:#4a8aff;margin-bottom:10px;">🔄 Select item to restock</div>
+          <div style="position:relative;">
+            <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;">🔍</span>
+            <input class="input" id="inv-restock-search" placeholder="Search items..."
+              value="${(invRestockSearch||'').replace(/"/g,'&quot;')}"
+              oninput="invRestockSearch=this.value;if(window._invRSTimer)clearTimeout(window._invRSTimer);window._invRSTimer=setTimeout(()=>safeRenderTab(currentTab),180);"
+              style="padding-left:34px;margin-bottom:0;" />
+            ${invRestockSearch?`<button onclick="invRestockSearch='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:20px;cursor:pointer;line-height:1;">×</button>`:""}
+          </div>
+        </div>
+        ${matches.length===0
+          ? `<div style="padding:32px;text-align:center;color:#4a5a7a;font-size:13px;">No items match "<b style="color:#e8eaf0;">${invRestockSearch}</b>"</div>`
+          : itemRows
+        }
+      </div>`;
+    } else {
+      // Step 2: Restock form for selected item
+      const selItem = inventoryItems.find(x=>x.name===invRestockSelected);
+      const curStock = selItem ? invGetStock(selItem.name) : 0;
+      const stColor = curStock<=0?"#e03030":curStock<=3?"#cc8800":"#1a8a3a";
+      const lastCosts = selItem ? (selItem.stock||[]).filter(e=>Number(e.costPerUnit||0)>0) : [];
+      const lastCost = lastCosts.length ? Number(lastCosts[lastCosts.length-1].costPerUnit).toFixed(2) : "";
+      const lastSell = selItem&&selItem.sellingPrice>0 ? Number(selItem.sellingPrice).toFixed(2) : "";
+
+      body = `<div class="card" style="padding:22px;">
+        <button onclick="invRestockSelected=null;safeRenderTab(currentTab)" style="background:#1a2540;border:none;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;margin-bottom:16px;">← Back to items</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding:14px;background:#0a1628;border-radius:12px;border:1px solid #1e3a5a;">
+          <div>
+            <div style="font-size:15px;font-weight:800;color:#e8eaf0;">${invRestockSelected}</div>
+            <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${selItem?selItem.category||"General":""}${selItem&&selItem.unit?" · "+selItem.unit:""}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:16px;font-weight:800;color:${stColor};">${curStock} ${selItem?selItem.unit||"unit":""}</div>
+            <div style="font-size:10px;color:${stColor};margin-top:1px;">Current stock</div>
+          </div>
+        </div>
+        <div style="font-size:14px;font-weight:800;color:#4a8aff;margin-bottom:14px;">🔄 Add Stock for this item</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Quantity to Add *</label>
+            <input class="input" type="number" id="inv-qty" min="0.01" step="0.01" placeholder="0" style="text-align:center;font-size:18px;font-weight:700;" />
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Unit</label>
+            <input class="input" id="inv-unit" list="inv-units" placeholder="kg / pcs / litre..." value="${selItem?selItem.unit||"":""}"/>
+            <datalist id="inv-units"><option value="kg"><option value="pcs"><option value="litre"><option value="box"><option value="dozen"><option value="packet"><option value="bottle"><option value="bag"></datalist>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div>
+            <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Cost per Unit (₹)</label>
+            <input class="input" type="number" id="inv-cost" min="0" step="0.01" placeholder="0.00" value="${lastCost}" />
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Selling Price / Unit (₹) <span style="color:#4f4;font-size:10px;">★ auto-fill</span></label>
+            <input class="input" type="number" id="inv-sell-price" min="0" step="0.01" placeholder="0.00" value="${lastSell}" style="color:#FFD700;" />
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Date</label>
+          <input class="input" type="date" id="inv-date" value="${new Date().toISOString().slice(0,10)}" />
+        </div>
+        <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Notes (optional)</label>
+        <input class="input" id="inv-notes" placeholder="Supplier, batch info..." style="margin-bottom:18px;" />
+        <button class="btn" onclick="invSubmitRestock()" style="background:linear-gradient(135deg,#4a8aff,#2255cc);color:#fff;width:100%;padding:14px;font-size:15px;font-weight:800;">🔄 Restock Item →</button>
+      </div>`;
+    }
   }
   else if(invView==="log"){
     const allSales = [];
@@ -7562,7 +7669,7 @@ function renderInventoryTab(){
       <div style="font-size:18px;font-weight:800;color:#FFD700;">📦 Inventory</div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button onclick="if(db&&authPhone){if(invUnsubscribe){try{invUnsubscribe();}catch(e){}}invUnsubscribe=null;loadInventoryFromFirestore(()=>{safeRenderTab(currentTab);});}" title="Sync from cloud" style="background:#0a1628;border:1px solid #1e3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 10px;font-size:14px;">🔄</button>
-        ${invView==="stock"?`<button onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;">➕ Add Stock</button>`:""}
+        ${invView==="stock"?`<button onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;">➕ Add New</button>`:""}
       </div>
     </div>
     ${nav}
@@ -7583,6 +7690,24 @@ function invSubmitAdd(){
   if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
   invAddStock(name, unit, qty, cost, date, notes, category, sellPrice);
+}
+
+function invSubmitRestock(){
+  if(!invRestockSelected){notify("❌ No item selected","error");return;}
+  const qty=parseFloat(document.getElementById("inv-qty").value||"0");
+  const unit=(document.getElementById("inv-unit").value||"").trim();
+  const cost=parseFloat(document.getElementById("inv-cost").value||"0");
+  const sellPrice=parseFloat(document.getElementById("inv-sell-price").value||"0");
+  const date=document.getElementById("inv-date").value||new Date().toISOString().slice(0,10);
+  const notes=(document.getElementById("inv-notes").value||"").trim();
+  if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
+  // Get existing item's category
+  const selItem = inventoryItems.find(x=>x.name===invRestockSelected);
+  const category = selItem ? (selItem.category||"General") : "General";
+  invAddStock(invRestockSelected, unit||( selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice);
+  // After restock, reset selection so user can pick another item
+  invRestockSelected = null;
+  invRestockSearch = "";
 }
 
 // ─── PURCHASE MODE MODAL ──────────────────────────────────────
@@ -7709,7 +7834,7 @@ function renderInventoryCategoryPage(catName){
               <div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px;flex-wrap:wrap;gap:6px;">
                 <div style="font-size:11px;color:#4a5a7a;">Restocked: ${lastAdded} · <span style="color:#4a8aff;">Tap for buyers →</span></div>
                 <div style="display:flex;gap:5px;" onclick="event.stopPropagation()">
-                  <button onclick="invPrefillName='${item.name.replace(/'/g,"\\'").replace(/"/g,"&quot;")}';invView='add';safeRenderTab(currentTab)" style="background:#1a2a4a;border:none;border-radius:7px;color:#7ab3ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">➕ Restock</button>
+                  <button onclick="invRestockSelected='${item.name.replace(/'/g,"\\'").replace(/"/g,"&quot;")}';invRestockSearch='';invView='restock';safeRenderTab(currentTab)" style="background:#1a2a4a;border:none;border-radius:7px;color:#7ab3ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">➕ Restock</button>
                   <button onclick="invEditSellPrice('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a08;border:none;border-radius:7px;color:#FFD700;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">₹ Sell Price</button>
                   <button onclick="invEditCategory('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a0a2a;border:none;border-radius:7px;color:#b080ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🏷 Cat</button>
                   <button onclick="invEditUnit('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a3a;border:none;border-radius:7px;color:#aaa;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">✏️ Unit</button>
@@ -8661,6 +8786,8 @@ function _scGetState(){
   return {
     tab:           window.currentTab,
     invView:       (typeof invView!=='undefined')       ? invView        : 'stock',
+    invRestockSearch: (typeof invRestockSearch!=='undefined') ? invRestockSearch : '',
+    invRestockSelected: (typeof invRestockSelected!=='undefined') ? invRestockSelected : null,
     invCatPageName:(typeof invCatPageName!=='undefined')? invCatPageName : '',
     invDetailItem: (typeof invDetailItem!=='undefined') ? invDetailItem  : null
   };
@@ -8669,6 +8796,8 @@ function _scGetState(){
 /* ── Apply a saved navigation state ── */
 function _scApplyState(s){
   if(typeof invView!=='undefined')        invView        = s.invView        || 'stock';
+  if(typeof invRestockSearch!=='undefined')  invRestockSearch  = s.invRestockSearch  || '';
+  if(typeof invRestockSelected!=='undefined') invRestockSelected = s.invRestockSelected || null;
   if(typeof invCatPageName!=='undefined') invCatPageName = s.invCatPageName || '';
   if(typeof invDetailItem!=='undefined')  invDetailItem  = s.invDetailItem  || null;
   window.__SC_DIRTY = false;
