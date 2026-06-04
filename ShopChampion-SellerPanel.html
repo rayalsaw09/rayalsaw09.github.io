@@ -393,6 +393,39 @@
   </div>
 
 
+    <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="shop-activity-section">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div class="section-title">🏪 Shop Activity</div>
+      <button class="btn" onclick="loadShopActivity()" style="background:#1a2540;border:1px solid #2a3a5a;color:#7ab3ff;padding:7px 14px;font-size:12px;">🔄 Refresh</button>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+      <input type="date" id="sa-date-from" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderShopList()" />
+      <span style="color:#4a5a7a;font-size:13px;">to</span>
+      <input type="date" id="sa-date-to" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderShopList()" />
+      <button onclick="saSetToday()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">Today</button>
+      <button onclick="saSetLast7()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">Last 7 days</button>
+      <button onclick="saSetThisMonth()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">This Month</button>
+    </div>
+    <div id="sa-shop-list"><div style="text-align:center;color:#4a5a7a;padding:40px;font-size:14px;">Click Refresh to load shop data.</div></div>
+  </div>
+
+  <!-- Shop Detail Modal -->
+  <div class="modal-overlay" id="sa-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;">
+    <div class="modal-box" style="width:100%;max-width:700px;margin-top:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div id="sa-detail-title" style="font-size:17px;font-weight:800;color:#FFD700;"></div>
+        <button onclick="document.getElementById('sa-detail-modal').style.display='none'" style="background:#1a2540;border:none;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:13px;font-weight:700;">✕ Close</button>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+        <input type="date" id="sa-detail-from" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderShopBills()" />
+        <span style="color:#4a5a7a;">to</span>
+        <input type="date" id="sa-detail-to" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderShopBills()" />
+      </div>
+      <div id="sa-detail-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;"></div>
+      <div id="sa-detail-bills"></div>
+    </div>
+  </div>
+
     <div style="margin-top:20px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:16px;font-size:12px;color:#4a5a7a;line-height:1.9;">
     <div style="color:#FFD700;font-weight:700;margin-bottom:6px;">📌 How to paste your Supabase credentials into the customer app:</div>
     <div>Open <strong style="color:#e8eaf0;">ShopChampion-Admin.html</strong> in a text editor → find <code style="color:#FFD700;">SC_SUPABASE_URL</code> and <code style="color:#FFD700;">SC_SUPABASE_ANON</code> near the top of the &lt;script&gt; → replace with your Supabase URL and anon key → save → distribute that file to customers.</div>
@@ -497,6 +530,8 @@
 
   </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="./config.js"></script>
 <script>
 // ── Config (credentials loaded from /config.js) ──
@@ -1936,6 +1971,231 @@ function modalHeader(title) {
   </div>`;
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+//  SHOP ACTIVITY — reads from Firebase Firestore
+//  Data path: users/{shopPhone}/customers → each customer.purchases[]
+// ═══════════════════════════════════════════════════════════════
+
+let saDb = null;           // Firebase Firestore instance
+let saAllShops = [];       // [{phone, name, purchases:[]}]
+let saCurrentShop = null;  // shop being viewed in modal
+
+function saInitFirebase() {
+  if (saDb) return;
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(SC_FIREBASE_CONFIG);
+    saDb = firebase.firestore();
+  } catch(e) {
+    console.warn("[ShopActivity] Firebase init failed:", e.message);
+  }
+}
+
+function saToday() {
+  return new Date().toISOString().slice(0, 10);
+}
+function saSetToday() {
+  const d = saToday();
+  document.getElementById("sa-date-from").value = d;
+  document.getElementById("sa-date-to").value = d;
+  renderShopList();
+}
+function saSetLast7() {
+  const to = new Date();
+  const from = new Date(); from.setDate(from.getDate() - 6);
+  document.getElementById("sa-date-from").value = from.toISOString().slice(0,10);
+  document.getElementById("sa-date-to").value = to.toISOString().slice(0,10);
+  renderShopList();
+}
+function saSetThisMonth() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  document.getElementById("sa-date-from").value = from.toISOString().slice(0,10);
+  document.getElementById("sa-date-to").value = now.toISOString().slice(0,10);
+  renderShopList();
+}
+
+async function loadShopActivity() {
+  saInitFirebase();
+  if (!saDb) {
+    document.getElementById("sa-shop-list").innerHTML = `<div style="color:#f66;text-align:center;padding:30px;">❌ Firebase not initialized. Check config.js.</div>`;
+    return;
+  }
+  // Set default date range to today if empty
+  const fromEl = document.getElementById("sa-date-from");
+  const toEl = document.getElementById("sa-date-to");
+  if (!fromEl.value) { saSetThisMonth(); return; } // saSetThisMonth calls renderShopList
+
+  document.getElementById("sa-shop-list").innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:40px;font-size:14px;">⏳ Loading shop data from Firebase...</div>`;
+
+  try {
+    // Get list of all shops (users) from Firestore
+    const usersSnap = await saDb.collection("users").get();
+    saAllShops = [];
+
+    const promises = usersSnap.docs.map(async userDoc => {
+      const phone = userDoc.id;
+      let shopName = phone;
+      // Try to get shop name from merged Supabase users table
+      const supaRow = (typeof mergedRows !== "undefined") ? mergedRows.find(r => r.phone === phone) : null;
+      if (supaRow && supaRow.name) shopName = supaRow.name;
+
+      // Get all customers for this shop
+      const custSnap = await saDb.collection("users").doc(phone).collection("customers").get();
+      const allPurchases = [];
+      custSnap.docs.forEach(custDoc => {
+        const c = custDoc.data();
+        (c.purchases || []).forEach(p => {
+          allPurchases.push({
+            custName: c.name || "Unknown",
+            custId: c.id || custDoc.id,
+            custPhone: c.phone || "",
+            bill: p.bill || "—",
+            amount: Number(p.amount || 0),
+            date: p.date || "",
+            notes: p.notes || "",
+            items: p.items || [],
+          });
+        });
+      });
+      saAllShops.push({ phone, name: shopName, purchases: allPurchases });
+    });
+
+    await Promise.all(promises);
+    renderShopList();
+  } catch(e) {
+    document.getElementById("sa-shop-list").innerHTML = `<div style="color:#f66;text-align:center;padding:30px;font-size:13px;">❌ Error: ${escHtml(e.message)}<br><span style="color:#4a5a7a;font-size:11px;margin-top:6px;display:block;">Make sure Firebase is configured in config.js and Firestore rules allow reads.</span></div>`;
+  }
+}
+
+function saFilterPurchases(purchases, fromStr, toStr) {
+  const from = fromStr ? new Date(fromStr + "T00:00:00") : null;
+  const to   = toStr   ? new Date(toStr   + "T23:59:59") : null;
+  return purchases.filter(p => {
+    if (!p.date) return false;
+    const d = new Date(p.date);
+    if (from && d < from) return false;
+    if (to   && d > to)   return false;
+    return true;
+  });
+}
+
+function renderShopList() {
+  const fromStr = document.getElementById("sa-date-from").value;
+  const toStr   = document.getElementById("sa-date-to").value;
+  const el = document.getElementById("sa-shop-list");
+
+  if (!saAllShops.length) {
+    el.innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:40px;font-size:14px;">No shops found. Click Refresh to load.</div>`;
+    return;
+  }
+
+  let totalBills = 0, totalRevenue = 0, totalCustomers = 0;
+  const rows = saAllShops.map(shop => {
+    const filtered = saFilterPurchases(shop.purchases, fromStr, toStr);
+    const revenue = filtered.reduce((s, p) => s + p.amount, 0);
+    const uniqueCusts = new Set(filtered.map(p => p.custId)).size;
+    totalBills += filtered.length;
+    totalRevenue += revenue;
+    totalCustomers += uniqueCusts;
+    return { shop, filtered, revenue, uniqueCusts };
+  }).sort((a, b) => b.revenue - a.revenue);
+
+  const formatINR2 = n => "₹" + Number(n).toLocaleString("en-IN");
+
+  // Summary row
+  const summary = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+    <div class="stat"><div class="stat-num">${saAllShops.length}</div><div class="stat-label">Total Shops</div></div>
+    <div class="stat"><div class="stat-num" style="color:#4f4;">${formatINR2(totalRevenue)}</div><div class="stat-label">Total Revenue</div></div>
+    <div class="stat"><div class="stat-num" style="color:#7ab3ff;">${totalBills}</div><div class="stat-label">Total Bills</div></div>
+  </div>`;
+
+  const shopCards = rows.map(({shop, filtered, revenue, uniqueCusts}) => {
+    const lastBill = filtered.sort((a,b) => new Date(b.date)-new Date(a.date))[0];
+    const lastDate = lastBill ? new Date(lastBill.date).toLocaleDateString("en-IN", {day:"numeric",month:"short",year:"numeric"}) : "—";
+    return `<div onclick="openShopDetail('${shop.phone.replace(/'/g,"\\'")}','${fromStr}','${toStr}')"
+      style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid #0f1628;cursor:pointer;transition:background .15s;"
+      onmouseover="this.style.background='#0d1a30'" onmouseout="this.style.background='transparent'">
+      <div style="width:42px;height:42px;border-radius:12px;background:#1a2a4a;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🏪</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${escHtml(shop.name)}</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">📞 ${shop.phone} · Last bill: ${lastDate}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-weight:800;font-size:14px;color:#4f4;">${formatINR2(revenue)}</div>
+        <div style="font-size:11px;color:#7ab3ff;margin-top:2px;">👥 ${uniqueCusts} cust · 🧾 ${filtered.length} bills</div>
+      </div>
+      <span style="color:#4a8aff;font-size:20px;">›</span>
+    </div>`;
+  }).join("");
+
+  el.innerHTML = summary + `<div style="background:#080c18;border:1px solid #1e2a45;border-radius:12px;overflow:hidden;">
+    ${rows.length ? shopCards : '<div style="padding:30px;text-align:center;color:#4a5a7a;font-size:13px;">No activity in selected date range.</div>'}
+  </div>`;
+}
+
+function openShopDetail(phone, fromStr, toStr) {
+  saCurrentShop = saAllShops.find(s => s.phone === phone);
+  if (!saCurrentShop) return;
+  const supaRow = (typeof mergedRows !== "undefined") ? mergedRows.find(r => r.phone === phone) : null;
+  const name = (supaRow && supaRow.name) ? supaRow.name : phone;
+  document.getElementById("sa-detail-title").textContent = "🏪 " + name;
+  document.getElementById("sa-detail-from").value = fromStr;
+  document.getElementById("sa-detail-to").value = toStr;
+  document.getElementById("sa-detail-modal").style.display = "flex";
+  renderShopBills();
+}
+
+function renderShopBills() {
+  if (!saCurrentShop) return;
+  const fromStr = document.getElementById("sa-detail-from").value;
+  const toStr   = document.getElementById("sa-detail-to").value;
+  const filtered = saFilterPurchases(saCurrentShop.purchases, fromStr, toStr)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const formatINR2 = n => "₹" + Number(n).toLocaleString("en-IN");
+  const totalRev = filtered.reduce((s, p) => s + p.amount, 0);
+  const uniqueCusts = new Set(filtered.map(p => p.custId)).size;
+  const avgBill = filtered.length ? Math.round(totalRev / filtered.length) : 0;
+
+  document.getElementById("sa-detail-stats").innerHTML = `
+    <div class="stat"><div class="stat-num" style="color:#4f4;">${formatINR2(totalRev)}</div><div class="stat-label">Revenue</div></div>
+    <div class="stat"><div class="stat-num" style="color:#7ab3ff;">${filtered.length}</div><div class="stat-label">Bills</div></div>
+    <div class="stat"><div class="stat-num" style="color:#FFD700;">${formatINR2(avgBill)}</div><div class="stat-label">Avg Bill</div></div>`;
+
+  if (!filtered.length) {
+    document.getElementById("sa-detail-bills").innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:30px;font-size:13px;">No bills in this date range.</div>`;
+    return;
+  }
+
+  const billsHtml = filtered.map(p => {
+    const dateStr = p.date ? new Date(p.date).toLocaleString("en-IN", {day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
+    const itemsList = (p.items || []).length
+      ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #1a2040;">${p.items.map(i=>`<span style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:6px;padding:2px 8px;font-size:11px;color:#7ab3ff;margin-right:4px;display:inline-block;margin-bottom:2px;">${escHtml(i.name||i)}${i.qty?' ×'+i.qty:''}</span>`).join("")}</div>`
+      : "";
+    return `<div style="background:#080c18;border:1px solid #1a2040;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="font-weight:700;font-size:13px;color:#e8eaf0;">${escHtml(p.custName)}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${p.custPhone ? "📞 "+p.custPhone+" · " : ""}Bill: <span style="font-family:monospace;color:#7ab3ff;">${escHtml(p.bill)}</span> · ${dateStr}</div>
+          ${p.notes ? `<div style="font-size:11px;color:#7a8aaa;margin-top:2px;">📝 ${escHtml(p.notes)}</div>` : ""}
+        </div>
+        <div style="font-weight:800;font-size:16px;color:#4f4;flex-shrink:0;">${formatINR2(p.amount)}</div>
+      </div>
+      ${itemsList}
+    </div>`;
+  }).join("");
+
+  document.getElementById("sa-detail-bills").innerHTML = billsHtml;
+}
+
+// Hook into openMain to init shop section
+const _origOpenMain3 = openMain;
+openMain = function() {
+  _origOpenMain3();
+  saInitFirebase();
+  saSetThisMonth();
+};
 // Load ads when panel opens
 const _origOpenMain2 = openMain;
 openMain = function() {
