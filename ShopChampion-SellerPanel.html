@@ -374,35 +374,36 @@
        ═══════════════════════════════════════════ -->
   <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="ads-section">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-      <div class="section-title">📺 Ad Manager</div>
-      <button class="btn" onclick="openCreateAdModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 18px;font-size:13px;font-weight:800;">+ Create Ad</button>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
-      <div class="stat"><div class="stat-num" id="ad-stat-total">—</div><div class="stat-label">Total Ads</div></div>
-      <div class="stat"><div class="stat-num" id="ad-stat-active" style="color:#4f4;">—</div><div class="stat-label">Active</div></div>
-      <div class="stat"><div class="stat-num" id="ad-stat-shops">—</div><div class="stat-label">Shops</div></div>
-      <div class="stat"><div class="stat-num" id="ad-stat-rev" style="color:#FFD700;">—</div><div class="stat-label">Monthly Rev</div></div>
+      <div class="section-title">📺 Ad Display</div>
     </div>
 
-    <!-- ── Display Settings ── -->
-    <div style="background:#060d1a;border:1px solid #1e2a45;border-radius:14px;padding:16px;margin-bottom:16px;">
-      <div style="font-size:13px;font-weight:800;color:#7ab3ff;margin-bottom:12px;display:flex;align-items:center;gap:8px;">🖼️ Display Settings <span style="font-size:11px;color:#4a5a7a;font-weight:400;">(pushed to all shops)</span></div>
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <!-- Idle Banner URL -->
-        <div>
-          <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:5px;">📸 Idle Banner Image URL <span style="color:#4a5a7a;">(shown on screen when no ad is playing)</span></label>
-          <div style="display:flex;gap:8px;">
-            <input class="input" id="ds-idle-banner-url" placeholder="https://imgbb.com/... (JPG/PNG direct link)" style="flex:1;font-size:13px;" />
-            <button class="btn" onclick="previewIdleBanner()" style="background:#1a2540;border:1px solid #2a3a5a;color:#7ab3ff;padding:8px 14px;font-size:12px;white-space:nowrap;">👁 Preview</button>
-          </div>
-          <div id="ds-idle-preview" style="margin-top:8px;display:none;border-radius:8px;overflow:hidden;max-height:120px;">
-            <img id="ds-idle-preview-img" src="" style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;" />
-          </div>
+    <!-- ── TAB SWITCHER ── -->
+    <div style="display:flex;gap:0;margin-bottom:20px;background:#060d1a;border:1px solid #1e2a45;border-radius:12px;padding:4px;">
+      <button id="adtab-banner-btn" onclick="switchAdTab('banner')" style="flex:1;padding:10px;border-radius:9px;border:none;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:13px;cursor:pointer;">🖼️ 24/7 Banner</button>
+      <button id="adtab-video-btn" onclick="switchAdTab('video')" style="flex:1;padding:10px;border-radius:9px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:13px;cursor:pointer;">🎬 Video Ads</button>
+    </div>
+
+    <!-- ══ TAB 1: 24/7 BANNER ══ -->
+    <div id="adtab-banner">
+      <div style="background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:18px;margin-bottom:14px;">
+        <div style="font-size:12px;color:#7ab3ff;font-weight:800;margin-bottom:4px;">📸 Always-On Banner Image</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-bottom:12px;">This image fills the entire display screen 24/7. When a video ad plays, it temporarily takes over — then banner returns automatically.</div>
+
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Direct Image URL <span style="color:#4a5a7a;">(use imgbb.com or imgur.com — NOT Google Drive)</span></label>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input class="input" id="ds-idle-banner-url" placeholder="https://i.ibb.co/xxxxx/your-banner.jpg" style="flex:1;font-size:13px;" />
+          <button class="btn" onclick="previewIdleBanner()" style="background:#1a2540;border:1px solid #2a3a5a;color:#7ab3ff;padding:8px 14px;font-size:12px;white-space:nowrap;">👁 Preview</button>
         </div>
-        <!-- Ad Schedule -->
-        <div>
-          <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:5px;">🕐 Ad Schedule <span style="color:#4a5a7a;">(leave blank = run 24/7)</span></label>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="font-size:11px;color:#f84;margin-bottom:10px;padding:8px;background:#1a0800;border-radius:8px;border:1px solid #3a1500;">
+          ⚠️ <strong>Google Drive links do NOT work.</strong> Upload to <a href="https://imgbb.com" target="_blank" style="color:#FFD700;">imgbb.com</a> → copy the "Direct link" ending in .jpg or .png
+        </div>
+        <div id="ds-idle-preview" style="display:none;margin-bottom:12px;border-radius:10px;overflow:hidden;max-height:160px;background:#000;border:1px solid #2a3a5a;">
+          <img id="ds-idle-preview-img" src="" style="width:100%;max-height:160px;object-fit:contain;" />
+        </div>
+
+        <div style="border-top:1px solid #1e2a45;padding-top:14px;margin-top:4px;">
+          <div style="font-size:12px;color:#7ab3ff;font-weight:800;margin-bottom:8px;">🕐 Ad Active Hours <span style="font-size:11px;color:#4a5a7a;font-weight:400;">(blank = always on, 24/7)</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
             <div style="display:flex;align-items:center;gap:6px;">
               <span style="font-size:12px;color:#4a5a7a;">From</span>
               <input type="time" id="ds-schedule-from" class="input" style="width:120px;font-size:13px;padding:7px 10px;" />
@@ -411,23 +412,42 @@
               <span style="font-size:12px;color:#4a5a7a;">To</span>
               <input type="time" id="ds-schedule-to" class="input" style="width:120px;font-size:13px;padding:7px 10px;" />
             </div>
-            <button class="btn" onclick="document.getElementById('ds-schedule-from').value='';document.getElementById('ds-schedule-to').value='';" style="background:#1a2540;border:1px solid #2a3a5a;color:#f84;font-size:12px;padding:7px 12px;">✕ Clear (24/7)</button>
+            <button class="btn" onclick="document.getElementById('ds-schedule-from').value='';document.getElementById('ds-schedule-to').value='';" style="background:#1a2540;border:1px solid #2a3a5a;color:#f84;font-size:12px;padding:7px 12px;">✕ 24/7</button>
           </div>
-          <div style="font-size:11px;color:#4a5a7a;margin-top:5px;">💡 Example: 10:00 → 21:00 means ads run only between 10 AM and 9 PM</div>
+          <div style="font-size:11px;color:#4a5a7a;">Outside these hours, the display screen returns to showing the leaderboard normally.</div>
         </div>
-        <!-- Save + Push button -->
-        <button class="btn" onclick="saveAndPushDisplaySettings()" style="background:linear-gradient(135deg,#1a3a5a,#0a1e3a);border:1px solid #2a5a8a;color:#7ab3ff;padding:11px;font-size:13px;font-weight:800;width:100%;">
-          📡 Save & Push Display Settings to All Active Shops
+      </div>
+
+      <!-- Push targets -->
+      <div style="background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:12px;color:#7ab3ff;font-weight:800;margin-bottom:8px;">📡 Push to Shops</div>
+        <div id="ds-shop-checkboxes" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;margin-bottom:10px;">
+          <div style="color:#4a5a7a;font-size:13px;">Loading shops...</div>
+        </div>
+        <button class="btn" onclick="saveAndPushBannerSettings()" style="background:linear-gradient(135deg,#1a5a1a,#0a3a0a);border:1px solid #2a5a2a;color:#4f4;padding:12px;font-size:13px;font-weight:800;width:100%;">
+          📡 Push Banner to Selected Shops
         </button>
       </div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;">
-      <button onclick="setAdFilter('all')" id="adf-all" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:800;border:2px solid #FFD700;background:#1a1400;color:#FFD700;white-space:nowrap;flex-shrink:0;">All</button>
-      <button onclick="setAdFilter('active')" id="adf-active" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">✅ Active</button>
-      <button onclick="setAdFilter('paused')" id="adf-paused" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">⏸ Paused</button>
-      <button onclick="setAdFilter('scheduled')" id="adf-scheduled" class="btn" style="border-radius:20px;padding:7px 16px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">🕐 Scheduled</button>
+
+    <!-- ══ TAB 2: VIDEO ADS ══ -->
+    <div id="adtab-video" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:12px;color:#7a8aaa;">Video ads play fullscreen over the banner, then banner returns. Supports MP4 direct links.</div>
+        <button class="btn" onclick="openCreateAdModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 16px;font-size:12px;font-weight:800;white-space:nowrap;">+ Add Video Ad</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">
+        <div class="stat"><div class="stat-num" id="ad-stat-total">—</div><div class="stat-label">Total Ads</div></div>
+        <div class="stat"><div class="stat-num" id="ad-stat-active" style="color:#4f4;">—</div><div class="stat-label">Active</div></div>
+        <div class="stat"><div class="stat-num" id="ad-stat-rev" style="color:#FFD700;">—</div><div class="stat-label">Monthly Rev</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;">
+        <button onclick="setAdFilter('all')" id="adf-all" class="btn" style="border-radius:20px;padding:6px 14px;font-size:12px;font-weight:800;border:2px solid #FFD700;background:#1a1400;color:#FFD700;white-space:nowrap;flex-shrink:0;">All</button>
+        <button onclick="setAdFilter('active')" id="adf-active" class="btn" style="border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">✅ Active</button>
+        <button onclick="setAdFilter('paused')" id="adf-paused" class="btn" style="border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">⏸ Paused</button>
+      </div>
+      <div id="ads-list"><div style="text-align:center;color:#4a5a7a;padding:40px 0;font-size:14px;">No video ads yet. Click + Add Video Ad to get started.</div></div>
     </div>
-    <div id="ads-list"><div style="text-align:center;color:#4a5a7a;padding:40px 0;font-size:14px;">No ads yet. Click + Create Ad to get started.</div></div>
   </div>
 
 
@@ -1725,6 +1745,39 @@ function escHtml(s) {
 // ══════════════════════════════════════════════════════════════
 // AD MANAGER — Full ad system for ShopChampion display screens
 // ── Display Settings (Idle Banner + Schedule) ──
+// ── Ad Tab Switcher ──
+function switchAdTab(tab) {
+  const isBanner = tab === 'banner';
+  document.getElementById('adtab-banner').style.display = isBanner ? 'block' : 'none';
+  document.getElementById('adtab-video').style.display  = isBanner ? 'none' : 'block';
+  document.getElementById('adtab-banner-btn').style.background = isBanner ? 'linear-gradient(135deg,#FFD700,#FFA500)' : 'transparent';
+  document.getElementById('adtab-banner-btn').style.color      = isBanner ? '#1a0a00' : '#4a5a7a';
+  document.getElementById('adtab-video-btn').style.background  = isBanner ? 'transparent' : 'linear-gradient(135deg,#1a3a6a,#0a1e3a)';
+  document.getElementById('adtab-video-btn').style.color       = isBanner ? '#4a5a7a' : '#7ab3ff';
+  if (!isBanner) loadAds();
+  else renderBannerShopList();
+}
+
+// ── Render shop checkbox list for banner push ──
+function renderBannerShopList() {
+  const container = document.getElementById('ds-shop-checkboxes');
+  if (!container) return;
+  const shops = (typeof allUsers !== 'undefined' ? allUsers : []).filter(u => u.phone);
+  if (!shops.length) {
+    container.innerHTML = '<div style="color:#f84;font-size:12px;">No shops found. Make sure customers are loaded.</div>';
+    return;
+  }
+  container.innerHTML = shops.map(s => `
+    <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;cursor:pointer;">
+      <input type="checkbox" value="${s.phone}" checked style="width:15px;height:15px;accent-color:#FFD700;" />
+      <div>
+        <div style="font-weight:700;color:#e8eaf0;font-size:13px;">${s.name||s.phone}</div>
+        <div style="font-size:11px;color:#4a5a7a;">📞 ${s.phone}</div>
+      </div>
+    </label>`).join('');
+}
+
+// ── Preview idle banner ──
 function previewIdleBanner() {
   const url = document.getElementById('ds-idle-banner-url').value.trim();
   const prev = document.getElementById('ds-idle-preview');
@@ -1732,12 +1785,20 @@ function previewIdleBanner() {
   if (!url) { spNotify('⚠️ Enter an image URL first'); return; }
   img.src = url;
   prev.style.display = 'block';
+  img.onerror = () => { spNotify('❌ Image failed — use a direct .jpg/.png link (not Google Drive)'); img.src=''; prev.style.display='none'; };
 }
 
-async function saveAndPushDisplaySettings() {
+// ── Push banner settings to selected shops via Firebase ──
+async function saveAndPushBannerSettings() {
   const idleBannerUrl = document.getElementById('ds-idle-banner-url').value.trim();
   const schedFrom = document.getElementById('ds-schedule-from').value;
   const schedTo   = document.getElementById('ds-schedule-to').value;
+
+  if (!idleBannerUrl) { spNotify('⚠️ Enter a banner image URL first'); return; }
+
+  const checkboxes = document.querySelectorAll('#ds-shop-checkboxes input[type=checkbox]:checked');
+  const selectedPhones = Array.from(checkboxes).map(cb => cb.value);
+  if (!selectedPhones.length) { spNotify('⚠️ Select at least one shop'); return; }
 
   const displaySettings = {
     idleBannerUrl,
@@ -1745,31 +1806,22 @@ async function saveAndPushDisplaySettings() {
     updatedAt: new Date().toISOString(),
   };
 
-  // Collect all shops that have active ads
-  const activeShopIds = [...new Set(
-    allAds.filter(a => a.status === 'active').flatMap(a => a.shop_ids || [])
-  )];
-
-  if (!activeShopIds.length) {
-    spNotify('⚠️ No shops with active ads found. Push an ad to shops first.');
-    return;
-  }
-
   saInitFirebase();
-  if (!saDb) { spNotify('❌ Firebase not initialized.'); return; }
+  if (!saDb) { spNotify('❌ Firebase not initialized. Check config.js.'); return; }
 
+  spNotify('⏳ Pushing banner...');
   let ok = 0, fail = 0;
-  await Promise.all(activeShopIds.map(async phone => {
+  await Promise.all(selectedPhones.map(async phone => {
     try {
       const ref = saDb.collection('users').doc(phone).collection('display').doc('leaderboard');
       await ref.set({ adDisplaySettings: displaySettings }, { merge: true });
       ok++;
-    } catch(e) { fail++; console.warn('DisplaySettings push failed for', phone, e); }
+    } catch(e) { fail++; console.warn('Banner push failed for', phone, e); }
   }));
 
   spNotify(fail === 0
-    ? `✅ Display settings pushed to ${ok} shop${ok!==1?'s':''}!`
-    : `⚠️ Pushed to ${ok}, failed ${fail} shops.`);
+    ? `✅ Banner pushed to ${ok} shop${ok!==1?'s':''}! Display screens update live.`
+    : `⚠️ Pushed to ${ok}, failed ${fail}.`);
 }
 
 // ── Ads stored in Supabase table: sc_ads ──
@@ -2477,6 +2529,8 @@ const _origOpenMain2 = openMain;
 openMain = function() {
   _origOpenMain2();
   loadAds();
+  // Pre-populate shop list for banner tab (after allUsers is loaded)
+  setTimeout(renderBannerShopList, 1500);
 };
 
 loadConfig();
