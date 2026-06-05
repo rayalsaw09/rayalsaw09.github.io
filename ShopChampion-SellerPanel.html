@@ -666,6 +666,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script src="./config.js"></script>
 <script>
 // ── Config (credentials loaded from /config.js, with safe fallbacks) ──
@@ -2945,9 +2946,45 @@ function scShowAdModal(ad) {
       </div>
 
       <div id="sca-field-media">
-        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Media URL (direct link to image/video)</label>
-        <input class="input" id="sca-media-url" placeholder="https://i.ibb.co/xxx/banner.jpg" value="${escHtml(ad?.mediaUrl||ad?.content_url||'')}" />
-        <div style="font-size:10px;color:#4a5a7a;margin-top:3px;">For images: upload to <a href="https://imgbb.com" target="_blank" style="color:#FFD700;">imgbb.com</a>. For video: direct .mp4 link.</div>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Media File</label>
+
+        <!-- Upload Zone -->
+        <div id="sca-upload-zone" onclick="document.getElementById('sca-file-input').click()"
+          style="border:2px dashed #2a3a5a;border-radius:12px;padding:20px;text-align:center;cursor:pointer;background:#060d1a;transition:border-color 0.2s;margin-bottom:8px;"
+          ondragover="event.preventDefault();this.style.borderColor='#FFD700'"
+          ondragleave="this.style.borderColor='#2a3a5a'"
+          ondrop="event.preventDefault();this.style.borderColor='#2a3a5a';scaHandleFileDrop(event)">
+          <div id="sca-upload-icon" style="font-size:32px;margin-bottom:6px;">📁</div>
+          <div id="sca-upload-label" style="font-size:13px;color:#7ab3ff;font-weight:700;">Click or drag file here</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:4px;">Images: JPG, PNG, WEBP, GIF &nbsp;·&nbsp; Video: MP4, WEBM</div>
+        </div>
+        <input type="file" id="sca-file-input" accept="image/*,video/mp4,video/webm" style="display:none" onchange="scaHandleFileSelect(this)" />
+
+        <!-- Upload Progress -->
+        <div id="sca-upload-progress" style="display:none;margin-bottom:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span id="sca-upload-filename" style="font-size:11px;color:#7ab3ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;"></span>
+            <span id="sca-upload-pct" style="font-size:12px;font-weight:800;color:#FFD700;">0%</span>
+          </div>
+          <div style="height:6px;background:#1e2a45;border-radius:4px;overflow:hidden;">
+            <div id="sca-upload-bar" style="height:100%;background:linear-gradient(90deg,#FFD700,#FFA500);width:0%;border-radius:4px;transition:width 0.2s;"></div>
+          </div>
+        </div>
+
+        <!-- Preview -->
+        <div id="sca-media-preview" style="display:none;margin-bottom:8px;border-radius:10px;overflow:hidden;border:1px solid #1e2a45;background:#000;max-height:160px;">
+          <img id="sca-preview-img" src="" style="width:100%;max-height:160px;object-fit:contain;display:none;" />
+          <video id="sca-preview-vid" src="" controls style="width:100%;max-height:160px;display:none;" playsinline></video>
+        </div>
+
+        <!-- URL input (fallback / paste) -->
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input class="input" id="sca-media-url" placeholder="Or paste a direct URL (https://...)" value="${escHtml(ad?.mediaUrl||ad?.content_url||'')}"
+            style="flex:1;font-size:12px;" oninput="scaPreviewUrl(this.value)" />
+        </div>
+        <div style="font-size:10px;color:#4a5a7a;margin-top:3px;">
+          Images: <a href="https://imgbb.com" target="_blank" style="color:#FFD700;">imgbb.com</a> (free hosting) &nbsp;·&nbsp; Video: must be a direct .mp4/.webm link or upload above
+        </div>
       </div>
 
       <div>
@@ -3025,9 +3062,11 @@ function scShowAdModal(ad) {
       </div>
     </div>
   `);
-}
-
-function scaToggleTypeFields(type) {
+  // Auto-preview existing media when editing
+  if (ad?.mediaUrl || ad?.content_url) {
+    setTimeout(() => scaPreviewUrl(ad.mediaUrl || ad.content_url), 100);
+  }
+}(type) {
   const videoOpts = document.getElementById('sca-video-options');
   if (videoOpts) videoOpts.style.display = type === 'video' ? 'block' : 'none';
 }
@@ -3198,6 +3237,136 @@ async function scConfirmPush(adId) {
   spNotify(fail === 0
     ? `✅ Pushed to ${ok} shop${ok!==1?'s':''}! Apps update live.`
     : `⚠️ Pushed to ${ok}, failed ${fail}. Check console.`
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SHOPCHAMPION — AD MEDIA UPLOAD ENGINE
+// Uploads via Firebase Storage → gets public download URL
+// ═══════════════════════════════════════════════════════════════
+
+let _scStorage = null;
+
+function scGetStorage() {
+  if (_scStorage) return _scStorage;
+  try {
+    saInitFirebase(); // ensures firebase app is initialized
+    _scStorage = firebase.storage();
+  } catch(e) { _scStorage = null; }
+  return _scStorage;
+}
+
+function scaHandleFileDrop(e) {
+  const file = e.dataTransfer?.files?.[0];
+  if (file) scaUploadFile(file);
+}
+
+function scaHandleFileSelect(input) {
+  const file = input?.files?.[0];
+  if (file) scaUploadFile(file);
+  input.value = ''; // reset so same file can be re-selected
+}
+
+function scaPreviewUrl(url) {
+  if (!url) { scaHidePreview(); return; }
+  const isVideo = /\.(mp4|webm|ogg|mov)(\?|$)/i.test(url);
+  const preview = document.getElementById('sca-media-preview');
+  const img = document.getElementById('sca-preview-img');
+  const vid = document.getElementById('sca-preview-vid');
+  if (!preview) return;
+  if (isVideo) {
+    img.style.display = 'none'; img.src = '';
+    vid.src = url; vid.style.display = 'block';
+  } else {
+    vid.style.display = 'none'; vid.src = '';
+    img.src = url; img.style.display = 'block';
+    img.onerror = () => scaHidePreview();
+  }
+  preview.style.display = 'block';
+}
+
+function scaHidePreview() {
+  const preview = document.getElementById('sca-media-preview');
+  if (preview) preview.style.display = 'none';
+}
+
+async function scaUploadFile(file) {
+  const maxImageMB = 10, maxVideoMB = 200;
+  const isVideo = file.type.startsWith('video/');
+  const maxMB = isVideo ? maxVideoMB : maxImageMB;
+
+  if (file.size > maxMB * 1024 * 1024) {
+    spNotify(`⚠️ File too large. Max ${maxMB}MB for ${isVideo ? 'video' : 'image'}.`);
+    return;
+  }
+
+  // Update upload zone UI
+  const zone = document.getElementById('sca-upload-zone');
+  const icon = document.getElementById('sca-upload-icon');
+  const lbl  = document.getElementById('sca-upload-label');
+  const prog = document.getElementById('sca-upload-progress');
+  const fname = document.getElementById('sca-upload-filename');
+  const pct   = document.getElementById('sca-upload-pct');
+  const bar   = document.getElementById('sca-upload-bar');
+
+  if (zone) zone.style.borderColor = '#FFD700';
+  if (icon) icon.textContent = isVideo ? '🎬' : '🖼️';
+  if (lbl)  lbl.textContent = 'Uploading…';
+  if (prog) prog.style.display = 'block';
+  if (fname) fname.textContent = file.name;
+  if (pct)  pct.textContent = '0%';
+  if (bar)  bar.style.width = '0%';
+
+  const storage = scGetStorage();
+  if (!storage) {
+    // Fallback: read as data URL (works locally, large files will be slow)
+    spNotify('⚠️ Firebase Storage not ready — using local preview only. Paste a hosted URL for push to work.');
+    const reader = new FileReader();
+    reader.onload = e => {
+      const url = e.target.result;
+      const urlInput = document.getElementById('sca-media-url');
+      if (urlInput) urlInput.value = url;
+      scaPreviewUrl(url);
+      if (lbl) lbl.textContent = '✅ File loaded (local only)';
+      if (zone) zone.style.borderColor = '#4f4';
+    };
+    reader.readAsDataURL(file);
+    return;
+  }
+
+  // Upload to Firebase Storage
+  const ext = file.name.split('.').pop().toLowerCase();
+  const path = `ads/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const ref = storage.ref(path);
+  const task = ref.put(file);
+
+  task.on('state_changed',
+    snapshot => {
+      const p = Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100);
+      if (pct) pct.textContent = p + '%';
+      if (bar) bar.style.width = p + '%';
+    },
+    err => {
+      spNotify('❌ Upload failed: ' + err.message);
+      if (lbl) lbl.textContent = '❌ Upload failed';
+      if (zone) zone.style.borderColor = '#f66';
+      if (prog) prog.style.display = 'none';
+    },
+    async () => {
+      const downloadUrl = await task.snapshot.ref.getDownloadURL();
+      const urlInput = document.getElementById('sca-media-url');
+      if (urlInput) urlInput.value = downloadUrl;
+      scaPreviewUrl(downloadUrl);
+      if (lbl)  lbl.textContent = '✅ Uploaded!';
+      if (zone) zone.style.borderColor = '#4f4';
+      if (icon) icon.textContent = '✅';
+      setTimeout(() => {
+        if (prog) prog.style.display = 'none';
+        if (zone) zone.style.borderColor = '#2a3a5a';
+        if (lbl)  lbl.textContent = 'Click or drag to replace';
+        if (icon) icon.textContent = isVideo ? '🎬' : '🖼️';
+      }, 2000);
+    }
   );
 }
 
