@@ -271,6 +271,17 @@ if (typeof SC_FIREBASE_CONFIG=== 'undefined') window.SC_FIREBASE_CONFIG = {};
     background: var(--bg);
   }
 
+  /* Top/Bottom Banner Zones */
+  #sc-top-banner, #sc-bottom-banner {
+    flex-shrink: 0;
+    overflow: hidden;
+    max-height: 120px;
+    width: 100%;
+  }
+  #sc-top-banner img, #sc-bottom-banner img {
+    width: 100%; max-height: 120px; object-fit: cover; display: block;
+  }
+
   /* Header */
   #lb-header {
     flex-shrink: 0;
@@ -501,6 +512,12 @@ if (typeof SC_FIREBASE_CONFIG=== 'undefined') window.SC_FIREBASE_CONFIG = {};
     <div class="w-title">CONNECTED</div>
     <div class="w-sub">Waiting for Admin to push data.<br>Open the <strong style="color:var(--text);">Admin app</strong> and click <strong style="color:var(--text);">⬆ Push to Display</strong>.<br><br><span id="waiting-phone" style="color:var(--accent);font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;letter-spacing:2px;"></span></div>
   </div>
+
+  <!-- TOP BANNER AD ZONE -->
+  <div id="sc-top-banner" style="display:none;flex-shrink:0;overflow:hidden;max-height:120px;position:relative;">
+    <img id="sc-top-banner-img" src="" alt="" style="width:100%;max-height:120px;object-fit:cover;display:block;" />
+  </div>
+
   <div id="lb-header">
     <div style="display:flex;align-items:center;gap:14px;">
       <div id="lb-icon" style="font-size:36px;display:flex;align-items:center;">🏆</div>
@@ -525,6 +542,11 @@ if (typeof SC_FIREBASE_CONFIG=== 'undefined') window.SC_FIREBASE_CONFIG = {};
       </div>
       <div id="clock"></div>
     </div>
+  </div>
+
+  <!-- BOTTOM BANNER AD ZONE -->
+  <div id="sc-bottom-banner" style="display:none;flex-shrink:0;overflow:hidden;max-height:120px;position:relative;">
+    <img id="sc-bottom-banner-img" src="" alt="" style="width:100%;max-height:120px;object-fit:cover;display:block;" />
   </div>
 </div>
 
@@ -1176,7 +1198,7 @@ function playVideoAd(ad) {
   }, 1000);
 }
 
-// ── End video ad → return to idle banner ──
+// ── End video ad → return to leaderboard ──
 function endVideoAd() {
   const fs = document.getElementById("ad-fullscreen");
   if (fs) fs.classList.remove("show");
@@ -1184,8 +1206,8 @@ function endVideoAd() {
   if (fsVideo) { fsVideo.pause(); fsVideo.src = ""; }
   _videoPlaying = false;
   _videoAdIndex = (_videoAdIndex + 1) % Math.max(1, _videoAds.length);
-  // Return to banner
-  showIdleBanner();
+  // Return to leaderboard: hide fullscreen banner (leaderboard continues behind ad)
+  hideIdleBanner();
 }
 
 // ── Apply ads + settings from Firebase payload ──
@@ -1202,14 +1224,42 @@ function applyAdsFromPayload(payload) {
   }
 
   // Read video/image/text ads
-  if (payload && payload.ads && Array.isArray(payload.ads)) {
-    _videoAds = payload.ads.filter(a => a.status === "active");
-  }
+  const allAds = (payload && payload.ads && Array.isArray(payload.ads)) ? payload.ads : [];
+  const activeAds = allAds.filter(a => a.status === "active");
 
-  // Show banner immediately
+  // Separate by type/position — normalize fields so playVideoAd() works
+  _videoAds = activeAds
+    .filter(a => a.type === 'video' &&
+      (a.target === 'display' || a.target === 'both' || !a.target))
+    .map(a => ({
+      ...a,
+      content_url:  a.content_url  || a.mediaUrl || '',
+      interval_min: a.interval_min || a.frequency || 5,
+      duration_sec: a.duration_sec || a.duration  || 15,
+    }));
+
+  // Top banner: position = 'display-top' or target includes display
+  const topBanners = activeAds.filter(a =>
+    (a.type === 'banner' || a.type === 'image') &&
+    (a.position === 'display-top') &&
+    (a.target === 'display' || a.target === 'both' || !a.target)
+  );
+
+  // Bottom banner
+  const bottomBanners = activeAds.filter(a =>
+    (a.type === 'banner' || a.type === 'image') &&
+    (a.position === 'display-bottom') &&
+    (a.target === 'display' || a.target === 'both' || !a.target)
+  );
+
+  // Render top/bottom banners
+  scRenderTopBanner(topBanners);
+  scRenderBottomBanner(bottomBanners);
+
+  // Show idle fullscreen banner immediately (if set)
   showIdleBanner();
 
-  // Start video ad engine if there are ads
+  // Start video ad engine if there are video ads
   if (_videoAds.length > 0) {
     startVideoAdEngine();
   }
@@ -1217,6 +1267,68 @@ function applyAdsFromPayload(payload) {
   // Hide old bottom banner (no longer used)
   const oldBanner = document.getElementById("ad-banner");
   if (oldBanner) oldBanner.classList.remove("show");
+}
+
+// ── Top Banner ──
+let _topBannerTimer = null;
+let _topBannerIdx = 0;
+function scRenderTopBanner(banners) {
+  const el = document.getElementById('sc-top-banner');
+  const img = document.getElementById('sc-top-banner-img');
+  if (!el || !img) return;
+  if (!banners.length) { el.style.display = 'none'; return; }
+  const url = banners[0].mediaUrl || banners[0].content_url || '';
+  if (!url) { el.style.display = 'none'; return; }
+  img.src = url;
+  img.onerror = () => { el.style.display = 'none'; };
+  el.style.display = 'block';
+
+  // Rotate if multiple
+  if (banners.length > 1) {
+    if (_topBannerTimer) clearInterval(_topBannerTimer);
+    _topBannerTimer = setInterval(() => {
+      _topBannerIdx = (_topBannerIdx + 1) % banners.length;
+      const nurl = banners[_topBannerIdx].mediaUrl || banners[_topBannerIdx].content_url || '';
+      if (nurl) img.src = nurl;
+    }, (banners[0].frequency || 10) * 1000);
+  }
+}
+
+// ── Bottom Banner ──
+let _bottomBannerTimer = null;
+let _bottomBannerIdx = 0;
+function scRenderBottomBanner(banners) {
+  const el = document.getElementById('sc-bottom-banner');
+  const img = document.getElementById('sc-bottom-banner-img');
+  if (!el || !img) return;
+  if (!banners.length) { el.style.display = 'none'; return; }
+  const url = banners[0].mediaUrl || banners[0].content_url || '';
+  if (!url) { el.style.display = 'none'; return; }
+  img.src = url;
+  img.onerror = () => { el.style.display = 'none'; };
+  el.style.display = 'block';
+
+  if (banners.length > 1) {
+    if (_bottomBannerTimer) clearInterval(_bottomBannerTimer);
+    _bottomBannerTimer = setInterval(() => {
+      _bottomBannerIdx = (_bottomBannerIdx + 1) % banners.length;
+      const nurl = banners[_bottomBannerIdx].mediaUrl || banners[_bottomBannerIdx].content_url || '';
+      if (nurl) img.src = nurl;
+    }, (banners[0].frequency || 10) * 1000);
+  }
+}
+
+// Override endVideoAd to return to leaderboard (not just idle banner)
+function endVideoAdAndReturnToLeaderboard() {
+  const fs = document.getElementById("ad-fullscreen");
+  if (fs) fs.classList.remove("show");
+  const fsVideo = document.getElementById("ad-fs-video");
+  if (fsVideo) { fsVideo.pause(); fsVideo.src = ""; }
+  _videoPlaying = false;
+  _videoAdIndex = (_videoAdIndex + 1) % Math.max(1, _videoAds.length);
+  // Return to leaderboard (not fullscreen banner)
+  hideIdleBanner();
+  // Leaderboard continues automatically since it's already visible behind the ad
 }
 
 // ── Also try loading from Supabase directly ──

@@ -370,147 +370,155 @@
   </div>
 
 <!-- ═══════════════════════════════════════════
-       AD MANAGER
+       AD CONTROL CENTER (CENTRALIZED)
        ═══════════════════════════════════════════ -->
   <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="ads-section">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-      <div class="section-title">📺 Ad Display</div>
+      <div class="section-title">📡 Ad Control Center</div>
+      <button class="btn" onclick="scOpenCreateAd()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:9px 18px;font-size:13px;font-weight:800;">+ Create Ad</button>
     </div>
 
-    <!-- ── TAB SWITCHER ── -->
-    <div style="display:flex;gap:0;margin-bottom:20px;background:#060d1a;border:1px solid #1e2a45;border-radius:12px;padding:4px;">
-      <button id="adtab-banner-btn" onclick="switchAdTab('banner')" style="flex:1;padding:10px;border-radius:9px;border:none;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:13px;cursor:pointer;">🖼️ 24/7 Banner</button>
-      <button id="adtab-video-btn" onclick="switchAdTab('video')" style="flex:1;padding:10px;border-radius:9px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:13px;cursor:pointer;">🎬 Video Ads</button>
+    <!-- ── Stats Row ── -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
+      <div class="stat"><div class="stat-num" id="sc-stat-total">—</div><div class="stat-label">Total Ads</div></div>
+      <div class="stat"><div class="stat-num" id="sc-stat-active" style="color:#4f4;">—</div><div class="stat-label">Active</div></div>
+      <div class="stat"><div class="stat-num" id="sc-stat-views" style="color:#7ab3ff;">—</div><div class="stat-label">Total Views</div></div>
+      <div class="stat"><div class="stat-num" id="sc-stat-rev" style="color:#FFD700;">—</div><div class="stat-label">Monthly Rev</div></div>
     </div>
 
-    <!-- ══ TAB 1: 24/7 BANNER ══ -->
-    <div id="adtab-banner">
-      <!-- URL Input -->
-      <div style="background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:16px;margin-bottom:12px;">
-        <div style="font-size:12px;color:#7ab3ff;font-weight:800;margin-bottom:4px;">📸 Always-On Banner Image</div>
-        <div style="font-size:11px;color:#4a5a7a;margin-bottom:10px;">Fills the display screen 24/7. Edit position, size &amp; fit below, then push to your shops.</div>
-        <div style="display:flex;gap:8px;margin-bottom:8px;">
-          <input class="input" id="ds-idle-banner-url" placeholder="https://i.ibb.co/xxxxx/your-banner.jpg" style="flex:1;font-size:13px;" oninput="bannerEditorLoadImage()" />
-          <button class="btn" onclick="bannerEditorLoadImage()" style="background:#1a2540;border:1px solid #2a3a5a;color:#7ab3ff;padding:8px 14px;font-size:12px;white-space:nowrap;">👁 Load</button>
-        </div>
-        <div style="font-size:11px;color:#f84;padding:7px 10px;background:#1a0800;border-radius:8px;border:1px solid #3a1500;">
-          ⚠️ <strong>Google Drive links do NOT work.</strong> Upload to <a href="https://imgbb.com" target="_blank" style="color:#FFD700;">imgbb.com</a> → copy the "Direct link" ending in .jpg or .png
-        </div>
-      </div>
-
-      <!-- LIVE PREVIEW EDITOR -->
-      <div id="banner-editor-wrap" style="display:none;background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:16px;margin-bottom:12px;">
-        <div style="font-size:12px;color:#FFD700;font-weight:800;margin-bottom:12px;">🖥️ Live Display Preview — drag to reposition</div>
-
-        <!-- Screen mockup -->
-        <div style="position:relative;margin:0 auto 14px;border-radius:12px;overflow:hidden;border:2px solid #2a3a5a;background:#000;" id="banner-screen">
-          <div style="padding-top:56.25%;position:relative;width:100%;">
-            <div id="banner-canvas" style="position:absolute;inset:0;overflow:hidden;background:#111;">
-              <img id="banner-prev-img" src="" alt="" style="position:absolute;transform-origin:center center;cursor:move;user-select:none;-webkit-user-drag:none;" draggable="false" />
-            </div>
-            <div style="position:absolute;bottom:6px;right:8px;font-size:9px;color:rgba(255,255,255,0.3);pointer-events:none;font-family:monospace;">16:9 TV Display</div>
-          </div>
-        </div>
-
-        <!-- Controls -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-          <div>
-            <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;font-weight:700;">FIT MODE</div>
-            <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button onclick="setBannerFit('cover')" id="bfit-cover" style="flex:1;min-width:60px;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:800;border:2px solid #FFD700;background:#1a1400;color:#FFD700;cursor:pointer;">Fill</button>
-              <button onclick="setBannerFit('contain')" id="bfit-contain" style="flex:1;min-width:60px;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:700;border:1px solid #2a3a5a;background:transparent;color:#4a5a7a;cursor:pointer;">Fit</button>
-              <button onclick="setBannerFit('stretch')" id="bfit-stretch" style="flex:1;min-width:60px;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:700;border:1px solid #2a3a5a;background:transparent;color:#4a5a7a;cursor:pointer;">Stretch</button>
-            </div>
-          </div>
-          <div>
-            <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;font-weight:700;">BG COLOR</div>
-            <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              <button onclick="setBannerBg('#000000')" style="flex:1;padding:6px;border-radius:8px;border:1px solid #2a3a5a;background:#000;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">⬛ Black</button>
-              <button onclick="setBannerBg('#ffffff')" style="flex:1;padding:6px;border-radius:8px;border:1px solid #2a3a5a;background:#fff;color:#000;font-size:11px;font-weight:700;cursor:pointer;">⬜ White</button>
-              <input type="color" id="banner-bg-picker" value="#000000" onchange="setBannerBg(this.value)" style="width:36px;height:32px;border-radius:8px;border:1px solid #2a3a5a;padding:2px;cursor:pointer;background:#0a0e1a;" title="Custom color" />
-            </div>
-          </div>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <div style="font-size:11px;color:#4a5a7a;margin-bottom:4px;font-weight:700;">SCALE <span id="banner-scale-val" style="color:#7ab3ff;">100%</span></div>
-          <input type="range" id="banner-scale-slider" min="10" max="300" value="100" oninput="onBannerScaleSlider()" style="width:100%;accent-color:#FFD700;" />
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-          <div>
-            <div style="font-size:11px;color:#4a5a7a;margin-bottom:4px;font-weight:700;">HORIZONTAL <span id="banner-x-val" style="color:#7ab3ff;">50%</span></div>
-            <input type="range" id="banner-x-slider" min="0" max="100" value="50" oninput="onBannerPosSlider()" style="width:100%;accent-color:#FFD700;" />
-          </div>
-          <div>
-            <div style="font-size:11px;color:#4a5a7a;margin-bottom:4px;font-weight:700;">VERTICAL <span id="banner-y-val" style="color:#7ab3ff;">50%</span></div>
-            <input type="range" id="banner-y-slider" min="0" max="100" value="50" oninput="onBannerPosSlider()" style="width:100%;accent-color:#FFD700;" />
-          </div>
-        </div>
-
-        <div style="margin-bottom:12px;">
-          <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;font-weight:700;">QUICK POSITION</div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-width:180px;">
-            <button onclick="snapBanner(0,0)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">↖</button>
-            <button onclick="snapBanner(50,0)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">⬆</button>
-            <button onclick="snapBanner(100,0)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">↗</button>
-            <button onclick="snapBanner(0,50)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">⬅</button>
-            <button onclick="snapBanner(50,50)" style="padding:7px;border-radius:7px;border:2px solid #FFD700;background:#1a1400;color:#FFD700;font-size:15px;cursor:pointer;">✛</button>
-            <button onclick="snapBanner(100,50)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">➡</button>
-            <button onclick="snapBanner(0,100)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">↙</button>
-            <button onclick="snapBanner(50,100)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">⬇</button>
-            <button onclick="snapBanner(100,100)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">↘</button>
-          </div>
-        </div>
-
-        <button onclick="resetBannerEditor()" style="background:#1a0a0a;border:1px solid #3a1515;border-radius:8px;color:#f84;font-size:11px;font-weight:700;padding:6px 14px;cursor:pointer;">↺ Reset to Default</button>
-      </div>
-
-      <!-- Schedule -->
-      <div style="background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:16px;margin-bottom:12px;">
-        <div style="font-size:12px;color:#7ab3ff;font-weight:800;margin-bottom:8px;">🕐 Ad Active Hours <span style="font-size:11px;color:#4a5a7a;font-weight:400;">(blank = always on, 24/7)</span></div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span style="font-size:12px;color:#4a5a7a;">From</span>
-            <input type="time" id="ds-schedule-from" class="input" style="width:120px;font-size:13px;padding:7px 10px;" />
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span style="font-size:12px;color:#4a5a7a;">To</span>
-            <input type="time" id="ds-schedule-to" class="input" style="width:120px;font-size:13px;padding:7px 10px;" />
-          </div>
-          <button class="btn" onclick="document.getElementById('ds-schedule-from').value='';document.getElementById('ds-schedule-to').value='';" style="background:#1a2540;border:1px solid #2a3a5a;color:#f84;font-size:12px;padding:7px 12px;">✕ 24/7</button>
-        </div>
-        <div style="font-size:11px;color:#4a5a7a;">Outside these hours, the display screen returns to showing the leaderboard normally.</div>
-      </div>
-
-      <!-- Push targets -->
-      <div style="background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:14px;margin-bottom:14px;">
-        <div style="font-size:12px;color:#7ab3ff;font-weight:800;margin-bottom:8px;">📡 Push to Shops</div>
-        <div id="ds-shop-checkboxes" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;margin-bottom:10px;">
-          <div style="color:#4a5a7a;font-size:13px;">Loading shops...</div>
-        </div>
-        <button class="btn" onclick="saveAndPushBannerSettings()" style="background:linear-gradient(135deg,#1a5a1a,#0a3a0a);border:1px solid #2a5a2a;color:#4f4;padding:12px;font-size:13px;font-weight:800;width:100%;">
-          📡 Push Banner to Selected Shops
-        </button>
-      </div>
+    <!-- ── Tab Strip ── -->
+    <div style="display:flex;gap:0;margin-bottom:16px;background:#060d1a;border:1px solid #1e2a45;border-radius:12px;padding:3px;">
+      <button id="sctab-all-btn" onclick="scSetTab('all')" style="flex:1;padding:9px;border-radius:9px;border:none;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:12px;cursor:pointer;">📋 All Ads</button>
+      <button id="sctab-banner-btn" onclick="scSetTab('banner')" style="flex:1;padding:9px;border-radius:9px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:12px;cursor:pointer;">🖼️ Banners</button>
+      <button id="sctab-video-btn" onclick="scSetTab('video')" style="flex:1;padding:9px;border-radius:9px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:12px;cursor:pointer;">🎬 Video</button>
+      <button id="sctab-display-btn" onclick="scSetTab('display')" style="flex:1;padding:9px;border-radius:9px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:12px;cursor:pointer;">📺 Display</button>
     </div>
 
-    <!-- ══ TAB 2: VIDEO ADS ══ -->
-    <div id="adtab-video" style="display:none;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <div style="font-size:12px;color:#7a8aaa;">Video ads play fullscreen over the banner, then banner returns. Supports MP4 direct links.</div>
-        <button class="btn" onclick="openCreateAdModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 16px;font-size:12px;font-weight:800;white-space:nowrap;">+ Add Video Ad</button>
+    <!-- ── Status Filter ── -->
+    <div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;">
+      <button onclick="scSetStatusFilter('all')" id="scf-all" class="btn" style="border-radius:20px;padding:5px 12px;font-size:11px;font-weight:800;border:2px solid #FFD700;background:#1a1400;color:#FFD700;white-space:nowrap;flex-shrink:0;">All</button>
+      <button onclick="scSetStatusFilter('active')" id="scf-active" class="btn" style="border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">✅ Active</button>
+      <button onclick="scSetStatusFilter('paused')" id="scf-paused" class="btn" style="border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">⏸ Paused</button>
+      <button onclick="scSetStatusFilter('scheduled')" id="scf-scheduled" class="btn" style="border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">🕐 Scheduled</button>
+    </div>
+
+    <!-- ── Ads List ── -->
+    <div id="sc-ads-list"></div>
+
+    <!-- ══════════════════════════════════════════
+         DISPLAY APP SETTINGS (24/7 Banner + Schedule)
+         (kept from original ad system)
+    ══════════════════════════════════════════ -->
+    <div id="sctab-display-content" style="display:none;margin-top:16px;">
+      <!-- ── TAB SWITCHER ── -->
+      <div style="display:flex;gap:0;margin-bottom:16px;background:#060d1a;border:1px solid #1e2a45;border-radius:12px;padding:4px;">
+        <button id="adtab-banner-btn" onclick="switchAdTab('banner')" style="flex:1;padding:10px;border-radius:9px;border:none;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:13px;cursor:pointer;">🖼️ 24/7 Banner</button>
+        <button id="adtab-video-btn" onclick="switchAdTab('video')" style="flex:1;padding:10px;border-radius:9px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:13px;cursor:pointer;">🎬 Old Video Ads</button>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">
-        <div class="stat"><div class="stat-num" id="ad-stat-total">—</div><div class="stat-label">Total Ads</div></div>
-        <div class="stat"><div class="stat-num" id="ad-stat-active" style="color:#4f4;">—</div><div class="stat-label">Active</div></div>
-        <div class="stat"><div class="stat-num" id="ad-stat-rev" style="color:#FFD700;">—</div><div class="stat-label">Monthly Rev</div></div>
+
+      <div id="adtab-banner">
+        <div style="background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:12px;color:#7ab3ff;font-weight:800;margin-bottom:4px;">📸 Always-On Banner Image</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-bottom:10px;">Fills the display screen 24/7. Edit position, size &amp; fit below, then push to your shops.</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <input class="input" id="ds-idle-banner-url" placeholder="https://i.ibb.co/xxxxx/your-banner.jpg" style="flex:1;font-size:13px;" oninput="bannerEditorLoadImage()" />
+            <button class="btn" onclick="bannerEditorLoadImage()" style="background:#1a2540;border:1px solid #2a3a5a;color:#7ab3ff;padding:8px 14px;font-size:12px;white-space:nowrap;">👁 Load</button>
+          </div>
+          <div style="font-size:11px;color:#f84;padding:7px 10px;background:#1a0800;border-radius:8px;border:1px solid #3a1500;">
+            ⚠️ <strong>Google Drive links do NOT work.</strong> Upload to <a href="https://imgbb.com" target="_blank" style="color:#FFD700;">imgbb.com</a> → copy the "Direct link" ending in .jpg or .png
+          </div>
+        </div>
+        <div id="banner-editor-wrap" style="display:none;background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:12px;color:#FFD700;font-weight:800;margin-bottom:12px;">🖥️ Live Display Preview — drag to reposition</div>
+          <div style="position:relative;margin:0 auto 14px;border-radius:12px;overflow:hidden;border:2px solid #2a3a5a;background:#000;" id="banner-screen">
+            <div style="padding-top:56.25%;position:relative;width:100%;">
+              <div id="banner-canvas" style="position:absolute;inset:0;overflow:hidden;background:#111;">
+                <img id="banner-prev-img" src="" alt="" style="position:absolute;transform-origin:center center;cursor:move;user-select:none;-webkit-user-drag:none;" draggable="false" />
+              </div>
+              <div style="position:absolute;bottom:6px;right:8px;font-size:9px;color:rgba(255,255,255,0.3);pointer-events:none;font-family:monospace;">16:9 TV Display</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div>
+              <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;font-weight:700;">FIT MODE</div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                <button onclick="setBannerFit('cover')" id="bfit-cover" style="flex:1;min-width:60px;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:800;border:2px solid #FFD700;background:#1a1400;color:#FFD700;cursor:pointer;">Fill</button>
+                <button onclick="setBannerFit('contain')" id="bfit-contain" style="flex:1;min-width:60px;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:700;border:1px solid #2a3a5a;background:transparent;color:#4a5a7a;cursor:pointer;">Fit</button>
+                <button onclick="setBannerFit('stretch')" id="bfit-stretch" style="flex:1;min-width:60px;padding:6px 8px;border-radius:8px;font-size:11px;font-weight:700;border:1px solid #2a3a5a;background:transparent;color:#4a5a7a;cursor:pointer;">Stretch</button>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;font-weight:700;">BG COLOR</div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                <button onclick="setBannerBg('#000000')" style="flex:1;padding:6px;border-radius:8px;border:1px solid #2a3a5a;background:#000;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">⬛ Black</button>
+                <button onclick="setBannerBg('#ffffff')" style="flex:1;padding:6px;border-radius:8px;border:1px solid #2a3a5a;background:#fff;color:#000;font-size:11px;font-weight:700;cursor:pointer;">⬜ White</button>
+                <input type="color" id="banner-bg-picker" value="#000000" onchange="setBannerBg(this.value)" style="width:36px;height:32px;border-radius:8px;border:1px solid #2a3a5a;padding:2px;cursor:pointer;background:#0a0e1a;" title="Custom color" />
+              </div>
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px;color:#4a5a7a;margin-bottom:4px;font-weight:700;">SCALE <span id="banner-scale-val" style="color:#7ab3ff;">100%</span></div>
+            <input type="range" id="banner-scale-slider" min="10" max="300" value="100" oninput="onBannerScaleSlider()" style="width:100%;accent-color:#FFD700;" />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div>
+              <div style="font-size:11px;color:#4a5a7a;margin-bottom:4px;font-weight:700;">HORIZONTAL <span id="banner-x-val" style="color:#7ab3ff;">50%</span></div>
+              <input type="range" id="banner-x-slider" min="0" max="100" value="50" oninput="onBannerPosSlider()" style="width:100%;accent-color:#FFD700;" />
+            </div>
+            <div>
+              <div style="font-size:11px;color:#4a5a7a;margin-bottom:4px;font-weight:700;">VERTICAL <span id="banner-y-val" style="color:#7ab3ff;">50%</span></div>
+              <input type="range" id="banner-y-slider" min="0" max="100" value="50" oninput="onBannerPosSlider()" style="width:100%;accent-color:#FFD700;" />
+            </div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;font-weight:700;">QUICK POSITION</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-width:180px;">
+              <button onclick="snapBanner(0,0)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">↖</button>
+              <button onclick="snapBanner(50,0)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">⬆</button>
+              <button onclick="snapBanner(100,0)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">↗</button>
+              <button onclick="snapBanner(0,50)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">⬅</button>
+              <button onclick="snapBanner(50,50)" style="padding:7px;border-radius:7px;border:2px solid #FFD700;background:#1a1400;color:#FFD700;font-size:15px;cursor:pointer;">✛</button>
+              <button onclick="snapBanner(100,50)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">➡</button>
+              <button onclick="snapBanner(0,100)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">↙</button>
+              <button onclick="snapBanner(50,100)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">⬇</button>
+              <button onclick="snapBanner(100,100)" style="padding:7px;border-radius:7px;border:1px solid #2a3a5a;background:#0a0e1a;color:#7a8aaa;font-size:15px;cursor:pointer;">↘</button>
+            </div>
+          </div>
+          <button onclick="resetBannerEditor()" style="background:#1a0a0a;border:1px solid #3a1515;border-radius:8px;color:#f84;font-size:11px;font-weight:700;padding:6px 14px;cursor:pointer;">↺ Reset to Default</button>
+        </div>
+        <div style="background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:12px;color:#7ab3ff;font-weight:800;margin-bottom:8px;">🕐 Ad Active Hours <span style="font-size:11px;color:#4a5a7a;font-weight:400;">(blank = always on, 24/7)</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;color:#4a5a7a;">From</span><input type="time" id="ds-schedule-from" class="input" style="width:120px;font-size:13px;padding:7px 10px;" /></div>
+            <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;color:#4a5a7a;">To</span><input type="time" id="ds-schedule-to" class="input" style="width:120px;font-size:13px;padding:7px 10px;" /></div>
+            <button class="btn" onclick="document.getElementById('ds-schedule-from').value='';document.getElementById('ds-schedule-to').value='';" style="background:#1a2540;border:1px solid #2a3a5a;color:#f84;font-size:12px;padding:7px 12px;">✕ 24/7</button>
+          </div>
+          <div style="font-size:11px;color:#4a5a7a;">Outside these hours, the display screen returns to showing the leaderboard normally.</div>
+        </div>
+        <div style="background:#060d1a;border:1px solid #2a3a5a;border-radius:14px;padding:14px;margin-bottom:14px;">
+          <div style="font-size:12px;color:#7ab3ff;font-weight:800;margin-bottom:8px;">📡 Push to Shops</div>
+          <div id="ds-shop-checkboxes" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;margin-bottom:10px;"><div style="color:#4a5a7a;font-size:13px;">Loading shops...</div></div>
+          <button class="btn" onclick="saveAndPushBannerSettings()" style="background:linear-gradient(135deg,#1a5a1a,#0a3a0a);border:1px solid #2a5a2a;color:#4f4;padding:12px;font-size:13px;font-weight:800;width:100%;">📡 Push Banner to Selected Shops</button>
+        </div>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;">
-        <button onclick="setAdFilter('all')" id="adf-all" class="btn" style="border-radius:20px;padding:6px 14px;font-size:12px;font-weight:800;border:2px solid #FFD700;background:#1a1400;color:#FFD700;white-space:nowrap;flex-shrink:0;">All</button>
-        <button onclick="setAdFilter('active')" id="adf-active" class="btn" style="border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">✅ Active</button>
-        <button onclick="setAdFilter('paused')" id="adf-paused" class="btn" style="border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">⏸ Paused</button>
+
+      <div id="adtab-video" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="font-size:12px;color:#7a8aaa;">Old video ads system (use New Ads above for full control)</div>
+          <button class="btn" onclick="openCreateAdModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 16px;font-size:12px;font-weight:800;white-space:nowrap;">+ Add Video Ad</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">
+          <div class="stat"><div class="stat-num" id="ad-stat-total">—</div><div class="stat-label">Total Ads</div></div>
+          <div class="stat"><div class="stat-num" id="ad-stat-active" style="color:#4f4;">—</div><div class="stat-label">Active</div></div>
+          <div class="stat"><div class="stat-num" id="ad-stat-rev" style="color:#FFD700;">—</div><div class="stat-label">Monthly Rev</div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;">
+          <button onclick="setAdFilter('all')" id="adf-all" class="btn" style="border-radius:20px;padding:6px 14px;font-size:12px;font-weight:800;border:2px solid #FFD700;background:#1a1400;color:#FFD700;white-space:nowrap;flex-shrink:0;">All</button>
+          <button onclick="setAdFilter('active')" id="adf-active" class="btn" style="border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">✅ Active</button>
+          <button onclick="setAdFilter('paused')" id="adf-paused" class="btn" style="border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;white-space:nowrap;flex-shrink:0;">⏸ Paused</button>
+        </div>
+        <div id="ads-list"><div style="text-align:center;color:#4a5a7a;padding:40px 0;font-size:14px;">No video ads yet.</div></div>
       </div>
-      <div id="ads-list"><div style="text-align:center;color:#4a5a7a;padding:40px 0;font-size:14px;">No video ads yet. Click + Add Video Ad to get started.</div></div>
     </div>
   </div>
 
@@ -2760,9 +2768,415 @@ const _origOpenMain2 = openMain;
 openMain = function() {
   _origOpenMain2();
   loadAds();
+  scLoadCentralAds();
   // Pre-populate shop list for banner tab (after allUsers is loaded)
   setTimeout(renderBannerShopList, 1500);
 };
+
+// ═══════════════════════════════════════════════════════════════
+// SHOPCHAMPION — CENTRALIZED AD CONTROL CENTER
+// Firebase Collection: sc_central_ads (stored in Firestore)
+// Also pushed to users/{phone}/display/leaderboard.ads
+// ═══════════════════════════════════════════════════════════════
+
+let scCentralAds = [];
+let scAdTab = 'all';
+let scAdStatusFilter = 'all';
+let scEditingAdId = null;
+
+// ── Load from Supabase sc_central_ads table ──
+async function scLoadCentralAds() {
+  try {
+    const data = await sbFetch("/rest/v1/sc_central_ads?select=*&order=created_at.desc");
+    scCentralAds = data || [];
+  } catch(e) {
+    // Table may not exist yet — silently use empty
+    scCentralAds = [];
+  }
+  scRenderAdStats();
+  scRenderAdsList();
+}
+
+function scRenderAdStats() {
+  const total  = scCentralAds.length;
+  const active = scCentralAds.filter(a => a.status === 'active').length;
+  const views  = scCentralAds.reduce((s,a) => s + (a.views||0), 0);
+  const rev    = scCentralAds.reduce((s,a) => s + (a.monthly_rate||0), 0);
+  const setEl = (id, v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+  setEl('sc-stat-total', total);
+  setEl('sc-stat-active', active);
+  setEl('sc-stat-views', views.toLocaleString());
+  setEl('sc-stat-rev', '₹' + rev.toLocaleString());
+}
+
+function scSetTab(tab) {
+  scAdTab = tab;
+  // Update tab buttons
+  ['all','banner','video','display'].forEach(t => {
+    const btn = document.getElementById('sctab-'+t+'-btn');
+    if (!btn) return;
+    const active = t === tab;
+    btn.style.background = active ? 'linear-gradient(135deg,#FFD700,#FFA500)' : 'transparent';
+    btn.style.color = active ? '#1a0a00' : '#4a5a7a';
+    btn.style.fontWeight = active ? '800' : '700';
+  });
+  // Show/hide display settings panel
+  const disp = document.getElementById('sctab-display-content');
+  if (disp) disp.style.display = tab === 'display' ? 'block' : 'none';
+  scRenderAdsList();
+}
+
+function scSetStatusFilter(f) {
+  scAdStatusFilter = f;
+  ['all','active','paused','scheduled'].forEach(k => {
+    const btn = document.getElementById('scf-'+k);
+    if (!btn) return;
+    const on = k === f;
+    btn.style.borderColor = on ? '#FFD700' : '#1e2a45';
+    btn.style.background  = on ? '#1a1400' : 'transparent';
+    btn.style.color       = on ? '#FFD700' : '#4a5a7a';
+    btn.style.fontWeight  = on ? '800' : '600';
+  });
+  scRenderAdsList();
+}
+
+function scRenderAdsList() {
+  const container = document.getElementById('sc-ads-list');
+  if (!container) return;
+
+  let filtered = scCentralAds;
+  if (scAdTab === 'banner') filtered = filtered.filter(a => a.type === 'banner' || a.type === 'image');
+  else if (scAdTab === 'video') filtered = filtered.filter(a => a.type === 'video');
+  else if (scAdTab === 'display') { container.innerHTML = ''; return; }
+
+  if (scAdStatusFilter !== 'all') filtered = filtered.filter(a => a.status === scAdStatusFilter);
+
+  if (!filtered.length) {
+    container.innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:40px 0;font-size:14px;">No ads yet. Click + Create Ad to get started.</div>`;
+    return;
+  }
+  container.innerHTML = filtered.map(ad => scAdCardHTML(ad)).join('');
+}
+
+function scAdCardHTML(ad) {
+  const statusColor = ad.status==='active'?'#4f4':ad.status==='paused'?'#f84':'#5af';
+  const statusBg    = ad.status==='active'?'#0a1a0a':ad.status==='paused'?'#1a0a00':'#0a0e1a';
+  const typeIcon    = ad.type==='banner'||ad.type==='image' ? '🖼️' : ad.type==='video' ? '🎬' : '📢';
+  const targetLabel = ad.target==='admin' ? '🖥️ Admin' : ad.target==='display' ? '📺 Display' : '🌐 Both';
+  const posLabel    = ad.position==='purchase-right' ? 'Purchase Right' : ad.position==='display-top' ? 'Display Top' : ad.position==='display-bottom' ? 'Display Bottom' : ad.position || '—';
+  return `
+  <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:14px;padding:14px;margin-bottom:10px;">
+    <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;">
+      <div style="width:60px;height:44px;border-radius:8px;background:#131d35;border:1px solid #1e2a45;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden;">
+        ${(ad.type==='banner'||ad.type==='image')&&ad.mediaUrl ? `<img src="${ad.mediaUrl}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='🖼️'" />` : typeIcon}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:800;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ad.name||'Untitled'}</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${typeIcon} ${ad.type||'—'} · ${targetLabel} · ${posLabel}</div>
+        <div style="font-size:11px;color:#4a5a7a;">⏱ Every ${ad.frequency||5}min · ⏳ ${ad.duration||15}s${ad.fullscreen?' · ⛶ Fullscreen':''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="background:${statusBg};border:1px solid ${statusColor};color:${statusColor};border-radius:20px;padding:3px 10px;font-size:10px;font-weight:800;margin-bottom:4px;">${ad.status||'draft'}</div>
+        ${ad.monthly_rate?`<div style="font-size:12px;font-weight:800;color:#FFD700;">₹${(ad.monthly_rate||0).toLocaleString()}/mo</div>`:''}
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button onclick="scToggleAdStatus('${ad.id}','${ad.status}')" class="btn" style="flex:1;padding:7px;font-size:11px;background:${ad.status==='active'?'#1a0a00':'#0a1a0a'};color:${ad.status==='active'?'#f84':'#4f4'};border:1px solid ${ad.status==='active'?'#4a1515':'#1a4a1a'};">
+        ${ad.status==='active'?'⏸ Pause':'▶ Activate'}
+      </button>
+      <button onclick="scOpenEditAd('${ad.id}')" class="btn" style="flex:1;padding:7px;font-size:11px;background:#1a2540;color:#7ab3ff;border:1px solid #2a3560;">✏️ Edit</button>
+      <button onclick="scPushAd('${ad.id}')" class="btn" style="flex:1;padding:7px;font-size:11px;background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;">📡 Push</button>
+      <button onclick="scDeleteAd('${ad.id}')" class="btn" style="padding:7px 10px;font-size:11px;background:#1a0808;color:#f66;border:1px solid #3a1515;">🗑</button>
+    </div>
+  </div>`;
+}
+
+// ── Create/Edit Ad Modal ──
+function scOpenCreateAd() { scEditingAdId = null; scShowAdModal(null); }
+function scOpenEditAd(id) { scEditingAdId = id; scShowAdModal(scCentralAds.find(a=>a.id===id)||null); }
+
+function scShowAdModal(ad) {
+  const isEdit = !!ad;
+  showWideModal(`
+    ${modalHeader(isEdit ? '✏️ Edit Ad' : '📡 Create New Ad')}
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <div>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Ad Name *</label>
+        <input class="input" id="sca-name" placeholder="e.g. Diwali Sale Banner" value="${escHtml(ad?.name||'')}" />
+      </div>
+
+      <div>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Ad Type *</label>
+        <div style="display:flex;gap:6px;">
+          ${['banner','video'].map(t=>`
+            <button onclick="document.querySelectorAll('.sca-type-btn').forEach(b=>{b.style.borderColor='#1e2a45';b.style.background='transparent';b.style.color='#4a5a7a';});this.style.borderColor='#FFD700';this.style.background='#1a1400';this.style.color='#FFD700';document.getElementById('sca-type').value='${t}';scaToggleTypeFields('${t}')"
+              class="btn sca-type-btn" style="flex:1;padding:10px;border:2px solid ${(ad?.type||'banner')===t?'#FFD700':'#1e2a45'};background:${(ad?.type||'banner')===t?'#1a1400':'transparent'};color:${(ad?.type||'banner')===t?'#FFD700':'#4a5a7a'};font-size:13px;">
+              ${{banner:'🖼️ Banner',video:'🎬 Video'}[t]}
+            </button>`).join('')}
+        </div>
+        <input type="hidden" id="sca-type" value="${ad?.type||'banner'}" />
+      </div>
+
+      <div id="sca-field-media">
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Media URL (direct link to image/video)</label>
+        <input class="input" id="sca-media-url" placeholder="https://i.ibb.co/xxx/banner.jpg" value="${escHtml(ad?.mediaUrl||ad?.content_url||'')}" />
+        <div style="font-size:10px;color:#4a5a7a;margin-top:3px;">For images: upload to <a href="https://imgbb.com" target="_blank" style="color:#FFD700;">imgbb.com</a>. For video: direct .mp4 link.</div>
+      </div>
+
+      <div>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Target App</label>
+        <div style="display:flex;gap:6px;">
+          ${['admin','display','both'].map(t=>`
+            <button onclick="document.querySelectorAll('.sca-target-btn').forEach(b=>{b.style.borderColor='#1e2a45';b.style.background='transparent';b.style.color='#4a5a7a';});this.style.borderColor='#5af';this.style.background='#0a1628';this.style.color='#5af';document.getElementById('sca-target').value='${t}';scaUpdatePositions('${t}')"
+              class="btn sca-target-btn" style="flex:1;padding:8px;border:2px solid ${(ad?.target||'both')===t?'#5af':'#1e2a45'};background:${(ad?.target||'both')===t?'#0a1628':'transparent'};color:${(ad?.target||'both')===t?'#5af':'#4a5a7a'};font-size:12px;">
+              ${{admin:'🖥️ Admin',display:'📺 Display',both:'🌐 Both'}[t]}
+            </button>`).join('')}
+        </div>
+        <input type="hidden" id="sca-target" value="${ad?.target||'both'}" />
+      </div>
+
+      <div>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Position</label>
+        <select class="input" id="sca-position" style="cursor:pointer;">
+          ${[
+            ['purchase-right','🖥️ Admin — Purchase Right Area'],
+            ['display-top','📺 Display — Top Banner'],
+            ['display-bottom','📺 Display — Bottom Banner'],
+          ].map(([v,l])=>`<option value="${v}" ${(ad?.position||'purchase-right')===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Show Every (min)</label>
+          <select class="input" id="sca-frequency">
+            ${[5,10,15,30,60,120].map(v=>`<option value="${v}" ${(ad?.frequency||5)==v?'selected':''}>${v} min</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Duration (sec)</label>
+          <select class="input" id="sca-duration">
+            ${[5,10,15,30,60].map(v=>`<option value="${v}" ${(ad?.duration||15)==v?'selected':''}>${v} sec</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div id="sca-video-options" style="display:${(ad?.type||'banner')==='video'?'block':'none'}">
+        <div style="display:flex;align-items:center;justify-content:space-between;background:#060d1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#e8eaf0;">⛶ Fullscreen Video</div>
+            <div style="font-size:11px;color:#4a5a7a;">Plays fullscreen. Auto-returns to leaderboard/purchase after.</div>
+          </div>
+          <label style="cursor:pointer;position:relative;width:44px;height:24px;flex-shrink:0;">
+            <input type="checkbox" id="sca-fullscreen" ${ad?.fullscreen?'checked':''} style="opacity:0;width:0;height:0;" onchange="document.getElementById('sca-fs-label').textContent=this.checked?'ON':'OFF'" />
+            <span id="sca-fs-toggle" style="position:absolute;inset:0;background:${ad?.fullscreen?'#4f4':'#2a3560'};border-radius:24px;transition:background 0.2s;"></span>
+            <span style="position:absolute;top:3px;left:${ad?.fullscreen?'22px':'3px'};width:18px;height:18px;background:#fff;border-radius:50%;transition:left 0.2s;"></span>
+          </label>
+          <span id="sca-fs-label" style="font-size:12px;font-weight:700;color:${ad?.fullscreen?'#4f4':'#4a5a7a'};margin-left:8px;">${ad?.fullscreen?'ON':'OFF'}</span>
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Status</label>
+        <select class="input" id="sca-status">
+          <option value="active" ${(ad?.status||'active')==='active'?'selected':''}>✅ Active</option>
+          <option value="paused" ${ad?.status==='paused'?'selected':''}>⏸ Paused</option>
+          <option value="scheduled" ${ad?.status==='scheduled'?'selected':''}>🕐 Scheduled</option>
+        </select>
+      </div>
+
+      <div>
+        <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Monthly Rate (₹, optional)</label>
+        <input class="input" id="sca-rate" type="number" placeholder="e.g. 1000" value="${ad?.monthly_rate||''}" />
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button class="btn" onclick="closeModal()" style="flex:1;background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:13px;">Cancel</button>
+        <button class="btn" onclick="scSaveAd()" style="flex:2;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:13px;font-size:14px;font-weight:800;">
+          ${isEdit ? '💾 Save Changes' : '✅ Create Ad'}
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+function scaToggleTypeFields(type) {
+  const videoOpts = document.getElementById('sca-video-options');
+  if (videoOpts) videoOpts.style.display = type === 'video' ? 'block' : 'none';
+}
+
+function scaUpdatePositions(target) {
+  // Could filter position options based on target — keeping simple for now
+}
+
+async function scSaveAd() {
+  const name     = document.getElementById('sca-name')?.value?.trim();
+  const type     = document.getElementById('sca-type')?.value || 'banner';
+  const mediaUrl = document.getElementById('sca-media-url')?.value?.trim() || '';
+  const target   = document.getElementById('sca-target')?.value || 'both';
+  const position = document.getElementById('sca-position')?.value || 'purchase-right';
+  const frequency= parseInt(document.getElementById('sca-frequency')?.value || 5);
+  const duration = parseInt(document.getElementById('sca-duration')?.value || 15);
+  const fullscreen = document.getElementById('sca-fullscreen')?.checked || false;
+  const status   = document.getElementById('sca-status')?.value || 'active';
+  const rate     = parseFloat(document.getElementById('sca-rate')?.value || 0) || 0;
+
+  if (!name) { spNotify('⚠️ Please enter an ad name'); return; }
+
+  const payload = {
+    name, type, mediaUrl, target, position,
+    frequency, duration, fullscreen, status,
+    monthly_rate: rate,
+    views: scEditingAdId ? (scCentralAds.find(a=>a.id===scEditingAdId)?.views||0) : 0,
+    impressions: 0, clicks: 0,
+    updatedAt: new Date().toISOString()
+  };
+
+  try {
+    if (scEditingAdId) {
+      await sbFetch(`/rest/v1/sc_central_ads?id=eq.${scEditingAdId}`, {
+        method: 'PATCH', body: JSON.stringify(payload), prefer: 'return=minimal'
+      });
+      spNotify('✅ Ad updated!');
+    } else {
+      payload.createdAt = new Date().toISOString();
+      payload.id = 'ad_' + Date.now();
+      await sbFetch('/rest/v1/sc_central_ads', {
+        method: 'POST', body: JSON.stringify(payload), prefer: 'return=minimal'
+      });
+      spNotify('✅ Ad created!');
+    }
+    closeModal();
+    scLoadCentralAds();
+  } catch(e) {
+    // Fallback: store in local state
+    if (!scEditingAdId) {
+      payload.id = 'local_' + Date.now();
+      scCentralAds.unshift(payload);
+    } else {
+      const idx = scCentralAds.findIndex(a=>a.id===scEditingAdId);
+      if (idx >= 0) scCentralAds[idx] = {...scCentralAds[idx], ...payload};
+    }
+    closeModal();
+    scRenderAdStats();
+    scRenderAdsList();
+    spNotify('✅ Ad saved locally (sc_central_ads table not found — push will still work)');
+  }
+}
+
+async function scToggleAdStatus(id, current) {
+  const newStatus = current === 'active' ? 'paused' : 'active';
+  try {
+    await sbFetch(`/rest/v1/sc_central_ads?id=eq.${id}`, {
+      method: 'PATCH', body: JSON.stringify({status:newStatus}), prefer: 'return=minimal'
+    });
+  } catch(e) {}
+  // Update local
+  const ad = scCentralAds.find(a => a.id === id);
+  if (ad) ad.status = newStatus;
+  scRenderAdStats();
+  scRenderAdsList();
+  spNotify(newStatus === 'active' ? '✅ Ad activated!' : '⏸ Ad paused');
+}
+
+async function scDeleteAd(id) {
+  if (!confirm('Delete this ad permanently?')) return;
+  try {
+    await sbFetch(`/rest/v1/sc_central_ads?id=eq.${id}`, {method:'DELETE',prefer:'return=minimal'});
+  } catch(e) {}
+  scCentralAds = scCentralAds.filter(a => a.id !== id);
+  scRenderAdStats();
+  scRenderAdsList();
+  spNotify('🗑️ Ad deleted');
+}
+
+// ── Push ad to Firebase (syncs to Admin + Display in real time) ──
+async function scPushAd(adId) {
+  const ad = scCentralAds.find(a => a.id === adId);
+  if (!ad) { spNotify('❌ Ad not found'); return; }
+
+  const shopList = (typeof allUsers !== 'undefined' ? allUsers : [])
+    .filter(u => u.phone)
+    .map(u => ({ phone: u.phone, name: u.name || u.phone }));
+
+  if (!shopList.length) {
+    spNotify('⚠️ No shops loaded. Wait a moment and try again.');
+    return;
+  }
+
+  const checkboxHtml = shopList.map(s => `
+    <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;cursor:pointer;">
+      <input type="checkbox" value="${s.phone}" checked style="width:16px;height:16px;accent-color:#FFD700;" />
+      <div>
+        <div style="font-weight:700;color:#e8eaf0;font-size:13px;">${s.name}</div>
+        <div style="font-size:11px;color:#4a5a7a;">📞 ${s.phone}</div>
+      </div>
+    </label>`).join('');
+
+  showWideModal(`
+    ${modalHeader('📡 Push Ad to Shops')}
+    <div style="margin-bottom:12px;background:#0d1220;border:1px solid #1e2a45;border-radius:10px;padding:12px;">
+      <div style="font-weight:800;color:#FFD700;font-size:14px;">${ad.name||'Untitled'}</div>
+      <div style="font-size:11px;color:#4a5a7a;margin-top:3px;">${ad.type} · ${ad.target} · ${ad.position}</div>
+    </div>
+    <div style="font-size:12px;color:#7a8aaa;margin-bottom:8px;font-weight:700;">SELECT SHOPS TO PUSH TO:</div>
+    <div id="sc-push-shop-list" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;">${checkboxHtml}</div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn" onclick="closeModal()" style="flex:1;background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:13px;">Cancel</button>
+      <button class="btn" onclick="scConfirmPush('${adId}')" style="flex:2;background:linear-gradient(135deg,#1a5a1a,#0a3a0a);color:#4f4;border:1px solid #2a5a2a;padding:13px;font-size:15px;font-weight:800;">📡 Push Now</button>
+    </div>
+  `);
+}
+
+async function scConfirmPush(adId) {
+  const ad = scCentralAds.find(a => a.id === adId);
+  if (!ad) return;
+
+  const checkboxes = document.querySelectorAll('#sc-push-shop-list input[type=checkbox]:checked');
+  const phones = Array.from(checkboxes).map(cb => cb.value);
+  if (!phones.length) { spNotify('⚠️ Select at least one shop'); return; }
+
+  saInitFirebase();
+  if (!saDb) { spNotify('❌ Firebase not ready'); return; }
+
+  const adPayload = {
+    id:          ad.id,
+    name:        ad.name    || '',
+    type:        ad.type    || 'banner',
+    target:      ad.target  || 'both',
+    position:    ad.position|| 'purchase-right',
+    mediaUrl:    ad.mediaUrl|| '',
+    content_url: ad.mediaUrl|| '',
+    frequency:   ad.frequency || 5,
+    duration:    ad.duration  || 15,
+    duration_sec:ad.duration  || 15,
+    interval_min:ad.frequency || 5,
+    fullscreen:  ad.fullscreen || false,
+    status:      'active',
+  };
+
+  let ok = 0, fail = 0;
+  await Promise.all(phones.map(async phone => {
+    try {
+      const docRef = saDb.collection('users').doc(phone).collection('display').doc('leaderboard');
+      const snap = await docRef.get();
+      let existingAds = snap.exists ? (snap.data().ads || []) : [];
+      const idx = existingAds.findIndex(a => a.id === adPayload.id);
+      if (idx >= 0) existingAds[idx] = adPayload;
+      else existingAds.push(adPayload);
+      await docRef.set({ ads: existingAds }, { merge: true });
+      ok++;
+    } catch(e) { fail++; }
+  }));
+
+  closeModal();
+  scLoadCentralAds();
+  spNotify(fail === 0
+    ? `✅ Pushed to ${ok} shop${ok!==1?'s':''}! Apps update live.`
+    : `⚠️ Pushed to ${ok}, failed ${fail}. Check console.`
+  );
+}
 
 loadConfig();
 if (!SELLER_PASS) {

@@ -3345,13 +3345,16 @@ function renderPurchaseTab(sorted){
       }).join("")}
     </div>` : `<div class="card" style="padding:24px;text-align:center;color:#4a5a7a;font-size:13px;">✅ No outstanding borrows</div>`}`;
 
-  return `<div style="max-width:520px;">
-    <h2 style="margin:0 0 16px;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">💳 Purchase</h2>
-    <div style="display:flex;gap:8px;margin-bottom:18px;">
-      ${tabBtn("purchase","🧾 Add Purchase","#FFD700")}
-      ${tabBtn("borrow",`📦 Borrow${totalOwed>0?" ("+pendingBorrows.length+")":""}`,  "#f84")}
+  return `<div style="display:flex;gap:20px;align-items:flex-start;">
+    <div style="flex:0 0 auto;width:min(520px,100%);">
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">💳 Purchase</h2>
+      <div style="display:flex;gap:8px;margin-bottom:18px;">
+        ${tabBtn("purchase","🧾 Add Purchase","#FFD700")}
+        ${tabBtn("borrow",`📦 Borrow${totalOwed>0?" ("+pendingBorrows.length+")":""}`,  "#f84")}
+      </div>
+      ${ptView==="purchase" ? purchaseForm : borrowForm}
     </div>
-    ${ptView==="purchase" ? purchaseForm : borrowForm}
+    <div id="purchase-ad-zone" style="flex:1;min-width:220px;max-width:380px;display:none;"></div>
   </div>`;
 }
 
@@ -8812,6 +8815,270 @@ window.addEventListener("load", async () => {
     validateLicenseOnline().then(() => updateLicenseUI());
   }
 });
+</script>
+
+<!-- ═══════════════════════════════════════════════════════
+     ADMIN APP — CENTRALIZED AD ENGINE
+     ════════════════════════════════════════════════════════ -->
+
+<!-- Floating Video Ad (bottom-right popup) -->
+<div id="sc-floating-video" style="display:none;position:fixed;bottom:20px;right:20px;width:280px;z-index:8000;border-radius:14px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.8);border:2px solid #2a3560;background:#000;">
+  <div style="position:relative;">
+    <video id="sc-float-vid" style="width:100%;display:block;max-height:180px;object-fit:cover;" playsinline muted></video>
+    <button onclick="scCloseFloatingVideo()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.7);border:none;border-radius:50%;width:26px;height:26px;color:#fff;font-size:13px;cursor:pointer;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1;">✕</button>
+    <div id="sc-float-label" style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.8));padding:6px 10px;font-size:10px;color:#FFD700;font-weight:700;"></div>
+  </div>
+</div>
+
+<!-- Fullscreen Video Ad (with state preservation) -->
+<div id="sc-fullscreen-ad" style="display:none;position:fixed;inset:0;z-index:9500;background:#000;flex-direction:column;align-items:center;justify-content:center;">
+  <video id="sc-fs-vid" style="width:100%;height:100%;object-fit:contain;" playsinline></video>
+  <div id="sc-fs-countdown" style="position:absolute;bottom:40px;right:40px;background:rgba(0,0,0,0.75);border:2px solid #FFD700;border-radius:12px;padding:12px 20px;font-size:28px;font-weight:900;color:#FFD700;font-family:'Rajdhani',sans-serif;min-width:80px;text-align:center;"></div>
+  <div id="sc-fs-skip-btn" style="display:none;position:absolute;bottom:40px;left:40px;background:rgba(255,215,0,0.15);border:2px solid #FFD700;border-radius:12px;padding:10px 20px;font-size:14px;font-weight:800;color:#FFD700;cursor:pointer;" onclick="scEndFullscreenAd()">Skip ›</div>
+  <div id="sc-fs-label" style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,0.6);border-radius:8px;padding:6px 14px;font-size:12px;color:#FFD700;font-weight:700;"></div>
+</div>
+
+<style>
+/* ── Purchase Ad Zone Banner ── */
+#purchase-ad-zone .sc-banner-slide { display:none; }
+#purchase-ad-zone .sc-banner-slide.active { display:block; }
+#purchase-ad-zone img { width:100%;border-radius:12px;display:block;object-fit:cover; }
+
+@media (max-width:900px) {
+  #purchase-ad-zone { display:none !important; }
+}
+</style>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// SHOPCHAMPION ADMIN — CENTRALIZED AD ENGINE
+// Uses global `db` and `authPhone` already set by Admin app
+// Listens to: users/{phone}/display/leaderboard
+// ═══════════════════════════════════════════════════════════════
+
+window._scAdState = {
+  bannerAds:    [],
+  videoAds:     [],
+  bannerIndex:  0,
+  bannerTimer:  null,
+  floatTimer:   null,
+  floatLastPlayed: {},
+  fsActive:     false,
+  savedNavState: null,
+  listener:     null,
+};
+
+// ── Initialize after login ──
+function scAdInit() {
+  const s = window._scAdState;
+  if (s.listener) { try { s.listener(); } catch(_) {} s.listener = null; }
+
+  const phone = authPhone || localStorage.getItem('sc_auth_phone') || '';
+  if (!phone || !db) {
+    // db may still be initializing — retry
+    setTimeout(scAdInit, 1500);
+    return;
+  }
+
+  s.listener = db.collection('users').doc(phone)
+    .collection('display').doc('leaderboard')
+    .onSnapshot(snap => {
+      if (!snap.exists) return;
+      scApplyAdPayload(snap.data());
+    }, () => {});
+}
+
+// Hook into onLoginSuccess — deferred to ensure it runs after function is defined
+window.addEventListener('load', function() {
+  const orig = window.onLoginSuccess;
+  if (typeof orig === 'function') {
+    window.onLoginSuccess = function(phone) {
+      orig.apply(this, arguments);
+      setTimeout(scAdInit, 1200);
+    };
+  } else {
+    // Fallback: poll for login state
+    (function pollLogin() {
+      if (authPhone && db) { scAdInit(); return; }
+      setTimeout(pollLogin, 2000);
+    })();
+  }
+});
+
+function scApplyAdPayload(payload) {
+  const ads = (payload.ads || []).filter(a => a.status === 'active');
+  const s = window._scAdState;
+
+  // Split by type and target
+  s.bannerAds = ads.filter(a =>
+    (a.type === 'banner' || a.type === 'image') &&
+    (a.target === 'admin' || a.target === 'both' ||
+     a.position === 'purchase-right' || !a.target)
+  );
+
+  s.videoAds = ads.filter(a =>
+    a.type === 'video' &&
+    (a.target === 'admin' || a.target === 'both' || !a.target)
+  );
+
+  // Render purchase-right banner zone
+  scRenderPurchaseBanners();
+
+  // Start/restart float video engine
+  scStartFloatVideoEngine();
+}
+
+// ── Render banners in the purchase page right zone ──
+function scRenderPurchaseBanners() {
+  const zone = document.getElementById('purchase-ad-zone');
+  if (!zone) return;
+  const s = window._scAdState;
+
+  if (!s.bannerAds.length) { zone.style.display = 'none'; return; }
+
+  zone.style.display = 'block';
+  zone.innerHTML = s.bannerAds.map((ad, i) =>
+    `<div class="sc-banner-slide${i===0?' active':''}" data-idx="${i}" style="border-radius:12px;overflow:hidden;background:#0a0e1a;border:1px solid #1e2a45;">
+      ${ad.mediaUrl||ad.content_url ?
+        `<img src="${ad.mediaUrl||ad.content_url}" alt="${ad.name||ad.title||''}" style="width:100%;border-radius:12px;" onerror="this.closest('.sc-banner-slide').style.display='none'" />`
+        : `<div style="padding:24px;text-align:center;color:#4a5a7a;font-size:13px;">📢 ${ad.name||ad.title||'Ad'}</div>`
+      }
+      ${ad.name||ad.title ? `<div style="padding:6px 10px 8px;font-size:10px;color:#4a5a7a;text-align:center;font-weight:700;">${ad.name||ad.title}</div>` : ''}
+    </div>`
+  ).join('');
+
+  // Start rotation if multiple banners
+  if (s.bannerAds.length > 1) {
+    if (s.bannerTimer) clearInterval(s.bannerTimer);
+    const interval = (s.bannerAds[0].frequency || 10) * 1000;
+    s.bannerTimer = setInterval(() => {
+      const slides = zone.querySelectorAll('.sc-banner-slide');
+      if (!slides.length) return;
+      slides[s.bannerIndex % slides.length].classList.remove('active');
+      s.bannerIndex = (s.bannerIndex + 1) % slides.length;
+      slides[s.bannerIndex].classList.add('active');
+    }, Math.max(3000, interval));
+  }
+}
+
+// ── Floating video engine ──
+function scStartFloatVideoEngine() {
+  const s = window._scAdState;
+  const floatAds = s.videoAds.filter(a => !a.fullscreen);
+  if (!floatAds.length) return;
+
+  if (s.floatTimer) clearInterval(s.floatTimer);
+  s.floatTimer = setInterval(() => {
+    if (s.fsActive) return;
+    floatAds.forEach(ad => {
+      const last = s.floatLastPlayed[ad.id] || 0;
+      const intervalMs = (ad.frequency || ad.interval_min || 5) * 60 * 1000;
+      if (Date.now() - last >= intervalMs) {
+        scPlayFloatingVideo(ad);
+        s.floatLastPlayed[ad.id] = Date.now();
+      }
+    });
+  }, 30000);
+
+  // Also schedule fullscreen video ads
+  const fsAds = s.videoAds.filter(a => a.fullscreen);
+  fsAds.forEach(ad => {
+    const last = s.floatLastPlayed['fs_'+ad.id] || 0;
+    const intervalMs = (ad.frequency || ad.interval_min || 30) * 60 * 1000;
+    if (Date.now() - last >= intervalMs) {
+      setTimeout(() => scPlayFullscreenAd(ad), 5000);
+      s.floatLastPlayed['fs_'+ad.id] = Date.now();
+    }
+  });
+}
+
+function scPlayFloatingVideo(ad) {
+  const box = document.getElementById('sc-floating-video');
+  const vid = document.getElementById('sc-float-vid');
+  const lbl = document.getElementById('sc-float-label');
+  if (!box || !vid) return;
+  const url = ad.mediaUrl || ad.content_url || '';
+  if (!url) return;
+
+  vid.src = url;
+  vid.loop = false;
+  vid.muted = true;
+  vid.play().catch(()=>{});
+  lbl.textContent = ad.name || ad.title || '';
+  box.style.display = 'block';
+
+  const dur = (ad.duration || ad.duration_sec || 30) * 1000;
+  vid.addEventListener('ended', scCloseFloatingVideo, {once:true});
+  setTimeout(scCloseFloatingVideo, dur + 3000);
+}
+
+function scCloseFloatingVideo() {
+  const box = document.getElementById('sc-floating-video');
+  const vid = document.getElementById('sc-float-vid');
+  if (vid) { vid.pause(); vid.src = ''; }
+  if (box) box.style.display = 'none';
+}
+
+function scPlayFullscreenAd(ad) {
+  const s = window._scAdState;
+  if (s.fsActive) return;
+  const url = ad.mediaUrl || ad.content_url || '';
+  if (!url) return;
+
+  // Save current nav state
+  s.savedNavState = typeof _scGetState === 'function' ? _scGetState() : null;
+  s.fsActive = true;
+
+  const fsEl = document.getElementById('sc-fullscreen-ad');
+  const fsVid = document.getElementById('sc-fs-vid');
+  const countdown = document.getElementById('sc-fs-countdown');
+  const skipBtn = document.getElementById('sc-fs-skip-btn');
+  const label = document.getElementById('sc-fs-label');
+
+  fsVid.src = url;
+  fsVid.currentTime = 0;
+  label.textContent = ad.name || ad.title || '';
+  countdown.textContent = '';
+  skipBtn.style.display = 'none';
+  fsEl.style.display = 'flex';
+
+  fsVid.play().catch(() => {});
+
+  // Countdown
+  let remaining = ad.duration || ad.duration_sec || 15;
+  countdown.textContent = remaining;
+  const tick = setInterval(() => {
+    remaining--;
+    countdown.textContent = remaining;
+    if (remaining <= 5) skipBtn.style.display = 'block';
+    if (remaining <= 0) { clearInterval(tick); scEndFullscreenAd(); }
+  }, 1000);
+  window._scFsCountdownInterval = tick;
+
+  fsVid.addEventListener('ended', scEndFullscreenAd, {once:true});
+
+  // Safety fallback
+  const fallback = (ad.duration || ad.duration_sec || 15) + 5;
+  window._scFsFallback = setTimeout(scEndFullscreenAd, fallback * 1000);
+}
+
+function scEndFullscreenAd() {
+  const s = window._scAdState;
+  if (window._scFsCountdownInterval) { clearInterval(window._scFsCountdownInterval); window._scFsCountdownInterval = null; }
+  if (window._scFsFallback) { clearTimeout(window._scFsFallback); window._scFsFallback = null; }
+
+  const fsEl = document.getElementById('sc-fullscreen-ad');
+  const fsVid = document.getElementById('sc-fs-vid');
+  if (fsVid) { fsVid.pause(); fsVid.src = ''; }
+  if (fsEl) fsEl.style.display = 'none';
+
+  s.fsActive = false;
+
+  // Restore exact screen state
+  if (s.savedNavState && typeof _scApplyState === 'function') {
+    _scApplyState(s.savedNavState);
+  }
+}
 </script>
 
 <script>
