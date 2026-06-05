@@ -2784,17 +2784,43 @@ let scAdTab = 'all';
 let scAdStatusFilter = 'all';
 let scEditingAdId = null;
 
-// ── Load from Supabase sc_central_ads table ──
+// ── Storage key for central ads (unique per Supabase project) ──
+function scAdsStorageKey() {
+  const id = (typeof SB_URL !== 'undefined' ? SB_URL : '') ||
+             (typeof SC_SUPABASE_URL !== 'undefined' ? SC_SUPABASE_URL : '') || 'default';
+  // Use a short hash of the URL as key suffix
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffff;
+  return 'sc_central_ads_' + h;
+}
+
+// ── Save ads to localStorage ──
+function scSaveAdsLocal() {
+  try { localStorage.setItem(scAdsStorageKey(), JSON.stringify(scCentralAds)); } catch(_) {}
+}
+
+// ── Load from localStorage (instant, no network needed) ──
 async function scLoadCentralAds() {
+  // 1. Load from localStorage immediately
   try {
-    const data = await sbFetch("/rest/v1/sc_central_ads?select=*&order=created_at.desc");
-    scCentralAds = data || [];
-  } catch(e) {
-    // Table may not exist yet — silently use empty
-    scCentralAds = [];
-  }
+    const raw = localStorage.getItem(scAdsStorageKey());
+    if (raw) scCentralAds = JSON.parse(raw);
+  } catch(_) { scCentralAds = []; }
+
   scRenderAdStats();
   scRenderAdsList();
+
+  // 2. Try Supabase in background (optional sync)
+  try {
+    const data = await sbFetch("/rest/v1/sc_central_ads?select=*&order=created_at.desc");
+    if (data && data.length) {
+      // Merge: Supabase is authoritative if it has records
+      scCentralAds = data;
+      scSaveAdsLocal();
+      scRenderAdStats();
+      scRenderAdsList();
+    }
+  } catch(_) { /* Supabase table may not exist — localStorage is the source of truth */ }
 }
 
 function scRenderAdStats() {
@@ -3033,62 +3059,58 @@ async function scSaveAd() {
     updatedAt: new Date().toISOString()
   };
 
+  if (scEditingAdId) {
+    // Update existing
+    const idx = scCentralAds.findIndex(a => a.id === scEditingAdId);
+    if (idx >= 0) scCentralAds[idx] = { ...scCentralAds[idx], ...payload };
+  } else {
+    // Add new
+    payload.id = 'ad_' + Date.now();
+    payload.createdAt = new Date().toISOString();
+    scCentralAds.unshift(payload);
+  }
+
+  // Save to localStorage immediately
+  scSaveAdsLocal();
+  closeModal();
+  scRenderAdStats();
+  scRenderAdsList();
+  spNotify(scEditingAdId ? '✅ Ad updated!' : '✅ Ad created!');
+
+  // Try Supabase in background
   try {
     if (scEditingAdId) {
       await sbFetch(`/rest/v1/sc_central_ads?id=eq.${scEditingAdId}`, {
         method: 'PATCH', body: JSON.stringify(payload), prefer: 'return=minimal'
       });
-      spNotify('✅ Ad updated!');
     } else {
-      payload.createdAt = new Date().toISOString();
-      payload.id = 'ad_' + Date.now();
       await sbFetch('/rest/v1/sc_central_ads', {
-        method: 'POST', body: JSON.stringify(payload), prefer: 'return=minimal'
+        method: 'POST', body: JSON.stringify(scCentralAds[0]), prefer: 'return=minimal'
       });
-      spNotify('✅ Ad created!');
     }
-    closeModal();
-    scLoadCentralAds();
-  } catch(e) {
-    // Fallback: store in local state
-    if (!scEditingAdId) {
-      payload.id = 'local_' + Date.now();
-      scCentralAds.unshift(payload);
-    } else {
-      const idx = scCentralAds.findIndex(a=>a.id===scEditingAdId);
-      if (idx >= 0) scCentralAds[idx] = {...scCentralAds[idx], ...payload};
-    }
-    closeModal();
-    scRenderAdStats();
-    scRenderAdsList();
-    spNotify('✅ Ad saved locally (sc_central_ads table not found — push will still work)');
-  }
+  } catch(_) { /* Supabase optional */ }
 }
 
 async function scToggleAdStatus(id, current) {
   const newStatus = current === 'active' ? 'paused' : 'active';
-  try {
-    await sbFetch(`/rest/v1/sc_central_ads?id=eq.${id}`, {
-      method: 'PATCH', body: JSON.stringify({status:newStatus}), prefer: 'return=minimal'
-    });
-  } catch(e) {}
-  // Update local
   const ad = scCentralAds.find(a => a.id === id);
   if (ad) ad.status = newStatus;
+  scSaveAdsLocal();
   scRenderAdStats();
   scRenderAdsList();
   spNotify(newStatus === 'active' ? '✅ Ad activated!' : '⏸ Ad paused');
+  // Try Supabase in background
+  try { await sbFetch(`/rest/v1/sc_central_ads?id=eq.${id}`, {method:'PATCH',body:JSON.stringify({status:newStatus}),prefer:'return=minimal'}); } catch(_) {}
 }
 
 async function scDeleteAd(id) {
   if (!confirm('Delete this ad permanently?')) return;
-  try {
-    await sbFetch(`/rest/v1/sc_central_ads?id=eq.${id}`, {method:'DELETE',prefer:'return=minimal'});
-  } catch(e) {}
   scCentralAds = scCentralAds.filter(a => a.id !== id);
+  scSaveAdsLocal();
   scRenderAdStats();
   scRenderAdsList();
   spNotify('🗑️ Ad deleted');
+  try { await sbFetch(`/rest/v1/sc_central_ads?id=eq.${id}`, {method:'DELETE',prefer:'return=minimal'}); } catch(_) {}
 }
 
 // ── Push ad to Firebase (syncs to Admin + Display in real time) ──
@@ -3171,6 +3193,7 @@ async function scConfirmPush(adId) {
   }));
 
   closeModal();
+  scSaveAdsLocal();
   scLoadCentralAds();
   spNotify(fail === 0
     ? `✅ Pushed to ${ok} shop${ok!==1?'s':''}! Apps update live.`

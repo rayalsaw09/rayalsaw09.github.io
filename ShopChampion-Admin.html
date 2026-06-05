@@ -2944,7 +2944,10 @@ function renderTab(i){
   el.style.position="";el.style.overflow="";
   if(i===0)el.innerHTML=renderLeaderboard(getSortedFiltered());
   else if(i===1){const q=document.getElementById("cust-search")?.value||"";el.innerHTML=renderCustomers(s,q);}
-  else if(i===2){el.innerHTML=renderPurchaseTab(s);if(getPurchaseMode()==="inventory"){const list=document.getElementById("pt-items-list");if(list&&list.children.length===0)ptAddItemRow();}}
+  else if(i===2){el.innerHTML=renderPurchaseTab(s);if(getPurchaseMode()==="inventory"){const list=document.getElementById("pt-items-list");if(list&&list.children.length===0)ptAddItemRow();}
+    // ── Re-populate ad zone every time purchase tab renders ──
+    setTimeout(scRenderPurchaseBanners, 0);
+  }
   else if(i===3)el.innerHTML=renderAnalytics(s);
   else if(i===4)el.innerHTML=renderCompare();
   else if(i===5)el.innerHTML=renderInventoryTab();
@@ -8921,7 +8924,10 @@ function scApplyAdPayload(payload) {
     (a.target === 'admin' || a.target === 'both' || !a.target)
   );
 
-  // Render purchase-right banner zone
+  // Cache the full payload so tab switches can replay it
+  s.lastPayload = payload;
+
+  // Render purchase-right banner zone (if tab is currently open)
   scRenderPurchaseBanners();
 
   // Start/restart float video engine
@@ -8931,33 +8937,45 @@ function scApplyAdPayload(payload) {
 // ── Render banners in the purchase page right zone ──
 function scRenderPurchaseBanners() {
   const zone = document.getElementById('purchase-ad-zone');
-  if (!zone) return;
+  if (!zone) return; // Tab not currently open — will be called again when tab opens
   const s = window._scAdState;
 
-  if (!s.bannerAds.length) { zone.style.display = 'none'; return; }
+  if (!s.bannerAds || !s.bannerAds.length) {
+    zone.style.display = 'none';
+    zone.innerHTML = '';
+    return;
+  }
 
+  // Clear old rotation timer
+  if (s.bannerTimer) { clearInterval(s.bannerTimer); s.bannerTimer = null; }
+  s.bannerIndex = 0;
+
+  // Build slides
   zone.style.display = 'block';
-  zone.innerHTML = s.bannerAds.map((ad, i) =>
-    `<div class="sc-banner-slide${i===0?' active':''}" data-idx="${i}" style="border-radius:12px;overflow:hidden;background:#0a0e1a;border:1px solid #1e2a45;">
-      ${ad.mediaUrl||ad.content_url ?
-        `<img src="${ad.mediaUrl||ad.content_url}" alt="${ad.name||ad.title||''}" style="width:100%;border-radius:12px;" onerror="this.closest('.sc-banner-slide').style.display='none'" />`
+  zone.innerHTML = s.bannerAds.map((ad, i) => {
+    const url = ad.mediaUrl || ad.content_url || '';
+    return `<div class="sc-banner-slide${i === 0 ? ' active' : ''}" data-idx="${i}"
+      style="border-radius:12px;overflow:hidden;background:#0a0e1a;border:1px solid #1e2a45;${i !== 0 ? 'display:none;' : ''}">
+      ${url
+        ? `<img src="${url}" alt="${ad.name||ad.title||''}" style="width:100%;display:block;border-radius:12px;" onerror="this.closest('.sc-banner-slide').style.display='none'" />`
         : `<div style="padding:24px;text-align:center;color:#4a5a7a;font-size:13px;">📢 ${ad.name||ad.title||'Ad'}</div>`
       }
-      ${ad.name||ad.title ? `<div style="padding:6px 10px 8px;font-size:10px;color:#4a5a7a;text-align:center;font-weight:700;">${ad.name||ad.title}</div>` : ''}
-    </div>`
-  ).join('');
+      ${(ad.name||ad.title) ? `<div style="padding:6px 10px 8px;font-size:10px;color:#4a5a7a;text-align:center;font-weight:700;">${ad.name||ad.title}</div>` : ''}
+    </div>`;
+  }).join('');
 
   // Start rotation if multiple banners
   if (s.bannerAds.length > 1) {
-    if (s.bannerTimer) clearInterval(s.bannerTimer);
-    const interval = (s.bannerAds[0].frequency || 10) * 1000;
+    const interval = Math.max(3000, (s.bannerAds[0].frequency || 10) * 1000);
     s.bannerTimer = setInterval(() => {
       const slides = zone.querySelectorAll('.sc-banner-slide');
       if (!slides.length) return;
+      slides[s.bannerIndex % slides.length].style.display = 'none';
       slides[s.bannerIndex % slides.length].classList.remove('active');
       s.bannerIndex = (s.bannerIndex + 1) % slides.length;
+      slides[s.bannerIndex].style.display = 'block';
       slides[s.bannerIndex].classList.add('active');
-    }, Math.max(3000, interval));
+    }, interval);
   }
 }
 
