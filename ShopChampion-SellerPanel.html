@@ -3066,7 +3066,9 @@ function scShowAdModal(ad) {
   if (ad?.mediaUrl || ad?.content_url) {
     setTimeout(() => scaPreviewUrl(ad.mediaUrl || ad.content_url), 100);
   }
-}(type) {
+}
+
+function scaToggleTypeFields(type) {
   const videoOpts = document.getElementById('sca-video-options');
   if (videoOpts) videoOpts.style.display = type === 'video' ? 'block' : 'none';
 }
