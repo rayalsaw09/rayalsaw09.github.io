@@ -1536,6 +1536,17 @@ function loadSettingsFromCloud(cb) {
         if (d.purchase_mode)     { try { localStorage.setItem(storageKey("purchase_mode"), d.purchase_mode); } catch {} }
         if (d.sync_data)         { syncBinId = d.sync_data.binId || ""; syncApiKey = d.sync_data.apiKey || ""; }
         if (d.license)           { try { localStorage.setItem(storageKey("license"), JSON.stringify(d.license)); } catch {} }
+        // Read GSTIN proxy URL from global settings (set by SellerPanel)
+        try {
+          const gstinDoc = await db.collection("global_settings").doc("gstin_proxy").get();
+          if (gstinDoc && gstinDoc.exists) {
+            const proxyUrl = (gstinDoc.data().url || "").trim();
+            if (proxyUrl) {
+              appSettings.gstinProxyUrl = proxyUrl;
+              localStorage.setItem("sc_gstin_proxy_url", proxyUrl);
+            }
+          }
+        } catch(e) { /* silent — GSTIN proxy is optional */ }
       }
       if (cb) cb();
     })
@@ -3545,7 +3556,11 @@ async function ptSubmit(){
     if(nameEl&&qtyEl){
       const nm=nameEl.value.trim(),qty=parseFloat(qtyEl.value)||0;
       const ppu=priceEl?parseFloat(priceEl.value)||0:0;
-      if(nm&&qty>0)soldItems.push({name:nm,qty,pricePerUnit:ppu});
+      const gstEl=row.querySelector(".pt-item-gst");
+      const hsnEl=row.querySelector(".pt-item-hsn");
+      const gstRate=gstEl&&gstEl.value!==""?parseFloat(gstEl.value):null;
+      const hsn=hsnEl?hsnEl.value.trim():"";
+      if(nm&&qty>0)soldItems.push({name:nm,qty,pricePerUnit:ppu,gstRate,hsn});
     }
   });
   const isInvMode = getPurchaseMode()==="inventory";
@@ -4775,7 +4790,7 @@ function renderSettings(){
     )}
 
     ${section("🧾 Billing & Receipts",
-      row("🧾","Billing Settings",`Auto WhatsApp: ${getBillSetting('billAutoWhatsApp')?'On':'Off'} · Auto Print: ${getBillSetting('billAutoPrint')?'On':'Off'} · Paper: ${getBillSetting('billPaperSize')||'80mm'}`,"openBillingSettingsModal()")
+      row("🧾","Billing Settings",`Auto WhatsApp: ${getBillSetting('billAutoWhatsApp')?'On':'Off'} · Auto Print: ${getBillSetting('billAutoPrint')?'On':'Off'} · Paper: ${getBillSetting('billPaperSize')||'80mm'} · GST: ${{none:'Off',cgst_sgst:'CGST+SGST',igst:'IGST'}[getBillSetting('billGSTType')||'none']}`,"openBillingSettingsModal()")
     )}
 
     <div style="text-align:center;padding:20px 0;font-size:12px;color:#2a3a5a;">ShopChampion Pro · Your data is secure</div>
@@ -7294,6 +7309,16 @@ function ptAddItemRow(){
           <input class="input pt-item-price" type="number" min="0" step="0.01" placeholder="0.00" style="padding:9px;font-size:14px;text-align:center;font-weight:700;color:#FFD700;" oninput="ptUpdateTotal()" />
         </div>
       </div>
+      <div class="pt-gst-row" style="display:${getBillSetting('billGSTType')!=='none'?'grid':'none'};grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+        <div>
+          <label style="font-size:10px;color:#7a8aaa;display:block;margin-bottom:3px;">HSN/SAC Code</label>
+          <input class="input pt-item-hsn" type="text" placeholder="e.g. 0401" style="padding:9px;font-size:13px;" />
+        </div>
+        <div>
+          <label style="font-size:10px;color:#a78bfa;display:block;margin-bottom:3px;">GST Rate %</label>
+          <input class="input pt-item-gst" type="number" min="0" max="100" step="0.5" placeholder="${getBillSetting('billGSTRate')||18}" style="padding:9px;font-size:14px;text-align:center;color:#a78bfa;font-weight:700;" oninput="ptUpdateTotal()" />
+        </div>
+      </div>
       <div class="pt-stock-hint" style="font-size:11px;color:#4a8aff;margin-top:4px;padding-left:2px;"></div>
       <div class="pt-line-total" style="font-size:12px;color:#4f4;text-align:right;margin-top:4px;font-weight:700;display:none;"></div>
     `;
@@ -8272,7 +8297,116 @@ const BILLING_DEFAULTS = {
   billFooter: "Thank you! Visit Again 🙏",
   billPaperSize: "80mm",  // "58mm" | "80mm" | "a4"
   billPrefix: "B",
+  // ─── GST FIELDS ───────────────────────────────────────────────
+  billGSTType: "none",          // "none" | "cgst_sgst" | "igst"
+  billGSTRate: 18,              // default tax % (applied per-item if no override)
+  billShopAddress: "",          // printed on A4 GST invoice
+  billShopState: "",            // used for CGST+SGST vs IGST label
+  billHSNEnabled: false,        // show HSN column on A4 invoice
+  billShopLegalName: "",        // legal name from GSTIN lookup (auto-filled via proxy)
 };
+
+// ─── GSTIN AUTO-LOOKUP (Proxy pattern — no API key needed by shops) ──────────
+// The proxy URL is set ONCE in the SellerPanel → Settings → GSTIN Proxy URL.
+// It is stored in Firestore under the seller's settings doc and read here
+// at lookup time, so shops never need to be updated when the URL changes.
+
+function getGSTINProxyURL() {
+  // Primary: read from app settings saved by SellerPanel via Firebase
+  const fromSettings = appSettings && appSettings.gstinProxyUrl;
+  if (fromSettings && fromSettings.trim()) return fromSettings.trim();
+  // Fallback: localStorage (cached from last cloud load)
+  try {
+    const cached = localStorage.getItem("sc_gstin_proxy_url");
+    if (cached && cached.trim()) return cached.trim();
+  } catch {}
+  return "";
+}
+
+async function doGSTINLookup() {
+  const gstin = getBillSetting("billGSTNumber");
+  if (!gstin) return;
+
+  const statusEl = document.getElementById("gst-lookup-status");
+  const btnEl    = document.getElementById("gst-lookup-btn");
+  if (!statusEl || !btnEl) return;
+
+  const proxyUrl = getGSTINProxyURL();
+
+  statusEl.style.display = "block";
+
+  if (!proxyUrl) {
+    statusEl.style.color = "#f59e0b";
+    statusEl.textContent = "⚠️ GSTIN lookup not set up yet. Ask your seller to configure the proxy URL in SellerPanel.";
+    return;
+  }
+
+  statusEl.style.color = "#a78bfa";
+  statusEl.textContent = "⏳ Looking up GSTIN...";
+  btnEl.disabled = true;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    const res  = await fetch(`${proxyUrl}?gstin=${encodeURIComponent(gstin)}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      statusEl.style.color = "#ef4444";
+      statusEl.textContent = `❌ Proxy error (HTTP ${res.status}) — contact your seller.`;
+      btnEl.disabled = false;
+      return;
+    }
+
+    const data = await res.json();
+
+    if (!data || data.flag === false) {
+      statusEl.style.color   = "#ef4444";
+      statusEl.textContent   = "❌ " + (data?.message || "GSTIN not found or lookup failed.");
+      btnEl.disabled = false;
+      return;
+    }
+
+    const info = data.data || {};
+    const a    = info.pradr?.addr || {};
+    const addrParts = [a.bno, a.flno, a.bnm, a.st, a.loc, a.dst, a.stcd, a.pncd].filter(Boolean);
+    const address   = addrParts.join(", ");
+    const state     = a.stcd || "";
+    const tradeName = info.tradeNam || info.lgnm || "";
+    const legalName = info.lgnm || "";
+
+    if (address)   { setBillSetting("billShopAddress",   address); }
+    if (state)     { setBillSetting("billShopState",     state);   }
+    if (legalName) { setBillSetting("billShopLegalName", legalName); }
+
+    const addrEl  = document.getElementById("bill-addr-input");
+    const stateEl = document.getElementById("bill-state-input");
+    if (addrEl)  addrEl.value  = address;
+    if (stateEl) stateEl.value = state;
+
+    const currentName = appSettings.shopName || "";
+    if (tradeName && (currentName === "Shop Champion" || currentName === "ShopChampion" || currentName === "")) {
+      if (confirm("Set shop name to \"" + tradeName + "\" from GSTIN?")) {
+        appSettings.shopName = tradeName;
+        try { localStorage.setItem(storageKey("app_settings"), JSON.stringify(appSettings)); } catch {}
+        saveSettingsToCloud();
+        const nameEl = document.getElementById("shop-name-display");
+        if (nameEl) nameEl.textContent = tradeName;
+      }
+    }
+
+    statusEl.style.color = "#22c55e";
+    statusEl.textContent = "✅ Autofilled! Name: " + (legalName || tradeName) + (state ? " · " + state : "");
+  } catch (err) {
+    statusEl.style.color   = "#ef4444";
+    statusEl.textContent   = err.name === "AbortError"
+      ? "❌ Lookup timed out — contact your seller."
+      : "❌ Network error — contact your seller.";
+  }
+  btnEl.disabled = false;
+}
 
 function getBillSetting(key) {
   return appSettings[key] !== undefined ? appSettings[key] : BILLING_DEFAULTS[key];
@@ -8382,23 +8516,54 @@ function createBillObject({ custId, soldItems, amount, billNum, notes, date }) {
   const c = customers.find(x => x.id === custId);
   if (!c) return null;
 
+  const gstType = getBillSetting("billGSTType") || "none";
+  const defaultGSTRate = parseFloat(getBillSetting("billGSTRate")) || 18;
+
   // Build items array from soldItems (inventory mode) or single amount
   let items = [];
   if (soldItems && soldItems.length > 0) {
-    items = soldItems.map(si => ({
-      name: si.name,
-      qty: si.qty,
-      unit: (inventoryItems.find(x => x.name === si.name) || {}).unit || "unit",
-      rate: si.pricePerUnit || 0,
-      amount: (si.qty || 0) * (si.pricePerUnit || 0),
-    }));
+    items = soldItems.map(si => {
+      const invItem = inventoryItems.find(x => x.name === si.name) || {};
+      const lineAmt = (si.qty || 0) * (si.pricePerUnit || 0);
+      const gstRate = (si.gstRate !== undefined && si.gstRate !== null && si.gstRate !== "") ? parseFloat(si.gstRate) : defaultGSTRate;
+      const taxableAmt = gstType !== "none" ? parseFloat((lineAmt / (1 + gstRate / 100)).toFixed(2)) : lineAmt;
+      const taxAmt = gstType !== "none" ? parseFloat((lineAmt - taxableAmt).toFixed(2)) : 0;
+      return {
+        name: si.name,
+        qty: si.qty,
+        unit: invItem.unit || "unit",
+        hsn: invItem.hsn || si.hsn || "",
+        rate: si.pricePerUnit || 0,
+        amount: lineAmt,
+        gstRate: gstType !== "none" ? gstRate : 0,
+        taxableAmt,
+        taxAmt,
+      };
+    });
   } else {
     // Standard mode: single line
-    items = [{ name: notes || "Purchase", qty: 1, unit: "", rate: amount, amount: amount }];
+    const gstRate = defaultGSTRate;
+    const lineAmt = amount;
+    const taxableAmt = gstType !== "none" ? parseFloat((lineAmt / (1 + gstRate / 100)).toFixed(2)) : lineAmt;
+    const taxAmt = gstType !== "none" ? parseFloat((lineAmt - taxableAmt).toFixed(2)) : 0;
+    items = [{ name: notes || "Purchase", qty: 1, unit: "", hsn: "", rate: amount, amount: lineAmt, gstRate: gstType !== "none" ? gstRate : 0, taxableAmt, taxAmt }];
   }
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0) || amount;
+  const taxTotal = items.reduce((s, i) => s + (i.taxAmt || 0), 0);
+  const taxableTotal = items.reduce((s, i) => s + (i.taxableAmt || 0), 0);
   const total = subtotal;
+
+  // Build GST summary by rate
+  const gstSummary = {};
+  if (gstType !== "none") {
+    items.forEach(item => {
+      const r = item.gstRate || 0;
+      if (!gstSummary[r]) gstSummary[r] = { taxable: 0, tax: 0 };
+      gstSummary[r].taxable += item.taxableAmt || 0;
+      gstSummary[r].tax += item.taxAmt || 0;
+    });
+  }
 
   return {
     billId: billNum || generateBillNumber(),
@@ -8407,9 +8572,13 @@ function createBillObject({ custId, soldItems, amount, billNum, notes, date }) {
     customerPhone: c.phone || "",
     items,
     subtotal,
+    taxableTotal: parseFloat(taxableTotal.toFixed(2)),
+    taxTotal: parseFloat(taxTotal.toFixed(2)),
+    gstType,
+    gstSummary,
     total,
     notes: notes || "",
-    createdAt: date ? (date.includes('Z') || date.includes('+') ? date : (date.length === 16 ? date + ':00' : date.length < 19 ? date + ':00' : date)) : new Date().toISOString(),
+    createdAt: date ? (date.includes("Z") || date.includes("+") ? date : (date.length === 16 ? date + ":00" : date.length < 19 ? date + ":00" : date)) : new Date().toISOString(),
     purchaseId: billNum || "",
   };
 }
@@ -8417,16 +8586,39 @@ function createBillObject({ custId, soldItems, amount, billNum, notes, date }) {
 // ─── WHATSAPP SEND ────────────────────────────────────────────
 function sendBillWhatsApp(bill) {
   const shopName = appSettings.shopName || "Shop Champion";
+  const gstNum   = getBillSetting("billGSTNumber");
+  const showGST  = getBillSetting("billShowGST") && gstNum;
+  const gstType  = bill.gstType || "none";
+  const hasGST   = gstType !== "none" && showGST;
+  const isIGST   = gstType === "igst";
+
   const itemLines = bill.items.map(i => {
     if (i.qty && i.unit && i.rate > 0) {
-      return `  ${i.name}\n  ${i.qty} ${i.unit} × ₹${i.rate} = ₹${i.amount}`;
+      const gstLine = hasGST && i.gstRate ? ` (GST ${i.gstRate}%: ₹${(i.taxAmt||0).toLocaleString("en-IN",{minimumFractionDigits:2})})` : "";
+      return `  ${i.name}\n  ${i.qty} ${i.unit} × ₹${i.rate} = ₹${i.amount}${gstLine}`;
     }
     return `  ${i.name}: ₹${i.amount}`;
   }).join("\n");
 
   const dateStr = safeParseBillDate(bill.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
-  const text = `🧾 *${shopName}*\n\nBill No: *${bill.billId}*\nDate: ${dateStr}\nCustomer: ${bill.customerName}\n\n${itemLines}\n\n*TOTAL: ₹${bill.total.toLocaleString("en-IN")}*\n\n${getBillSetting("billFooter") || "Thank you! Visit Again 🙏"}`;
+  // Build GST summary block
+  let gstBlock = "";
+  if (hasGST && bill.taxTotal > 0) {
+    gstBlock += `\n──────────────────`;
+    if (bill.taxableTotal && bill.taxableTotal !== bill.subtotal) {
+      gstBlock += `\nTaxable Amount: ₹${(bill.taxableTotal||0).toLocaleString("en-IN",{minimumFractionDigits:2})}`;
+    }
+    if (isIGST) {
+      gstBlock += `\nIGST: ₹${(bill.taxTotal||0).toLocaleString("en-IN",{minimumFractionDigits:2})}`;
+    } else {
+      gstBlock += `\nCGST: ₹${((bill.taxTotal||0)/2).toLocaleString("en-IN",{minimumFractionDigits:2})}`;
+      gstBlock += `\nSGST: ₹${((bill.taxTotal||0)/2).toLocaleString("en-IN",{minimumFractionDigits:2})}`;
+    }
+  }
+
+  const gstHeader = showGST ? `\nGSTIN: ${gstNum}` : "";
+  const text = `🧾 *${shopName}*${gstHeader}\n\nBill No: *${bill.billId}*\nDate: ${dateStr}\nCustomer: ${bill.customerName}\n\n${itemLines}${gstBlock}\n──────────────────\n*TOTAL: ₹${bill.total.toLocaleString("en-IN")}*\n\n${getBillSetting("billFooter") || "Thank you! Visit Again 🙏"}`;
 
   const phone = bill.customerPhone ? bill.customerPhone.replace(/\D/g, "") : "";
   const fullPhone = phone ? (phone.length === 10 ? "91" + phone : phone) : "";
@@ -8536,27 +8728,186 @@ function renderBillHTML(bill) {
   const footer   = getBillSetting("billFooter") || "Thank you! Visit Again 🙏";
   const paperSize = getBillSetting("billPaperSize") || "80mm";
   const billWidth = paperSize === "58mm" ? "200px" : paperSize === "80mm" ? "280px" : "100%";
+  const shopAddress = getBillSetting("billShopAddress") || "";
+  const hsnEnabled = getBillSetting("billHSNEnabled");
 
   const _billDate = safeParseBillDate(bill.createdAt);
   const dateStr = _billDate.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
   const timeStr = _billDate.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
 
+  const gstType = bill.gstType || "none";
+  const hasGST = gstType !== "none" && showGST;
+  const isIGST = gstType === "igst";
+
+  // ── Item rows ───────────────────────────────────────────────
   const itemRows = bill.items.map(item => {
     const hasRate = item.rate > 0 && item.qty !== 1;
+    if (paperSize === "a4" && hasGST) {
+      // A4 GST invoice: full columns
+      const half = item.gstRate ? item.gstRate / 2 : 0;
+      return `
+        <tr>
+          ${hsnEnabled ? `<td style="padding:4px 6px;font-size:12px;color:#333;">${item.hsn||""}</td>` : ""}
+          <td style="padding:4px 6px;font-size:12px;color:#333;">${item.name}</td>
+          <td style="padding:4px 6px;font-size:12px;color:#333;text-align:center;">${item.qty} ${item.unit||""}</td>
+          <td style="padding:4px 6px;font-size:12px;color:#333;text-align:right;">₹${(item.rate||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
+          <td style="padding:4px 6px;font-size:12px;color:#333;text-align:right;">₹${(item.taxableAmt||item.amount).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
+          ${isIGST
+            ? `<td style="padding:4px 6px;font-size:12px;color:#333;text-align:center;">${item.gstRate||0}%<br><span style="font-size:10px;">₹${(item.taxAmt||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</span></td>`
+            : `<td style="padding:4px 6px;font-size:12px;color:#333;text-align:center;">${half}%<br><span style="font-size:10px;">₹${((item.taxAmt||0)/2).toLocaleString("en-IN",{minimumFractionDigits:2})}</span></td>
+               <td style="padding:4px 6px;font-size:12px;color:#333;text-align:center;">${half}%<br><span style="font-size:10px;">₹${((item.taxAmt||0)/2).toLocaleString("en-IN",{minimumFractionDigits:2})}</span></td>`}
+          <td style="padding:4px 6px;font-size:12px;color:#111;text-align:right;font-weight:700;">₹${(item.amount||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
+        </tr>`;
+    }
+    // Thermal: compact
     return `
       <tr>
-        <td style="padding:3px 0;font-size:13px;color:#111;vertical-align:top;">${item.name}${hasRate ? `<br><span style="font-size:10px;color:#666;">${item.qty} ${item.unit} × ₹${item.rate}</span>` : ""}</td>
+        <td style="padding:3px 0;font-size:13px;color:#111;vertical-align:top;">${item.name}${hasRate ? `<br><span style="font-size:10px;color:#666;">${item.qty} ${item.unit} × ₹${item.rate}</span>` : ""}${hasGST&&item.gstRate ? `<br><span style="font-size:10px;color:#888;">GST ${item.gstRate}%: ₹${(item.taxAmt||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</span>` : ""}</td>
         <td style="padding:3px 0;font-size:13px;color:#111;text-align:right;vertical-align:top;white-space:nowrap;">₹${item.amount.toLocaleString("en-IN")}</td>
       </tr>`;
   }).join("");
 
+  // ── A4 GST Tax Summary Table ────────────────────────────────
+  let gstSummaryRows = "";
+  if (paperSize === "a4" && hasGST && bill.gstSummary) {
+    Object.entries(bill.gstSummary).forEach(([rate, vals]) => {
+      const half = parseFloat(rate) / 2;
+      gstSummaryRows += `
+        <tr>
+          <td style="padding:4px 8px;font-size:11px;color:#444;">${rate}%</td>
+          <td style="padding:4px 8px;font-size:11px;color:#444;text-align:right;">₹${(vals.taxable||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
+          ${isIGST
+            ? `<td style="padding:4px 8px;font-size:11px;color:#444;text-align:right;">₹${(vals.tax||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>`
+            : `<td style="padding:4px 8px;font-size:11px;color:#444;text-align:right;">₹${((vals.tax||0)/2).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
+               <td style="padding:4px 8px;font-size:11px;color:#444;text-align:right;">₹${((vals.tax||0)/2).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>`}
+          <td style="padding:4px 8px;font-size:11px;color:#111;text-align:right;font-weight:700;">₹${(vals.tax||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
+        </tr>`;
+    });
+  }
+
+  // ── Thermal GST totals block ────────────────────────────────
+  const thermalGSTBlock = (hasGST && paperSize !== "a4" && bill.taxTotal > 0) ? `
+    <div style="border-top:1px dashed #ccc;padding-top:6px;margin-top:4px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#555;">
+        <span>Taxable Amount</span><span>₹${(bill.taxableTotal||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</span>
+      </div>
+      ${isIGST ? `<div style="display:flex;justify-content:space-between;font-size:11px;color:#555;">
+        <span>IGST</span><span>₹${(bill.taxTotal||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</span>
+      </div>` : `<div style="display:flex;justify-content:space-between;font-size:11px;color:#555;">
+        <span>CGST</span><span>₹${((bill.taxTotal||0)/2).toLocaleString("en-IN",{minimumFractionDigits:2})}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#555;">
+        <span>SGST</span><span>₹${((bill.taxTotal||0)/2).toLocaleString("en-IN",{minimumFractionDigits:2})}</span>
+      </div>`}
+    </div>` : "";
+
+  // ── A4 layout ───────────────────────────────────────────────
+  if (paperSize === "a4") {
+    const colSpanTotal = (hsnEnabled ? 1 : 0) + (isIGST ? 6 : 7);
+    const colSpanSummaryRate = isIGST ? 2 : 3;
+    return `
+  <div id="sc-bill-print-area" style="background:#fff;color:#111;font-family:Arial,sans-serif;width:100%;max-width:780px;margin:0 auto;padding:24px 28px;box-sizing:border-box;border:1px solid #ddd;">
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;border-bottom:2px solid #111;padding-bottom:12px;">
+      <div>
+        ${shopIcon ? `<img src="${shopIcon}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;margin-bottom:6px;" />` : ""}
+        <div style="font-size:22px;font-weight:900;letter-spacing:1px;text-transform:uppercase;">${shopName}</div>
+        ${shopAddress ? `<div style="font-size:11px;color:#555;margin-top:3px;max-width:260px;line-height:1.5;">${shopAddress.replace(/\n/g,"<br>")}</div>` : ""}
+        ${showGST ? `<div style="font-size:11px;color:#555;margin-top:4px;"><strong>GSTIN:</strong> ${gstNum}</div>` : ""}
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:18px;font-weight:900;color:#1a5aaa;letter-spacing:1px;margin-bottom:8px;">TAX INVOICE</div>
+        <div style="font-size:12px;color:#555;"><strong style="color:#111;">Invoice No:</strong> ${bill.billId}</div>
+        <div style="font-size:12px;color:#555;margin-top:3px;"><strong style="color:#111;">Date:</strong> ${dateStr}</div>
+        <div style="font-size:12px;color:#555;margin-top:3px;"><strong style="color:#111;">Time:</strong> ${timeStr}</div>
+      </div>
+    </div>
+
+    <!-- Billed To -->
+    <div style="margin-bottom:14px;padding:10px 14px;background:#f7f9ff;border-radius:8px;border:1px solid #e0e8f8;">
+      <div style="font-size:11px;font-weight:700;color:#1a5aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Billed To</div>
+      <div style="font-size:14px;font-weight:700;color:#111;">${bill.customerName}</div>
+      ${bill.customerPhone ? `<div style="font-size:12px;color:#555;margin-top:2px;">📞 ${bill.customerPhone}</div>` : ""}
+    </div>
+
+    <!-- Items Table -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
+      <thead>
+        <tr style="background:#1a2a50;color:#fff;">
+          ${hsnEnabled ? `<th style="padding:8px 6px;font-size:11px;text-align:left;font-weight:700;">HSN/SAC</th>` : ""}
+          <th style="padding:8px 6px;font-size:11px;text-align:left;font-weight:700;">Description</th>
+          <th style="padding:8px 6px;font-size:11px;text-align:center;font-weight:700;">Qty</th>
+          <th style="padding:8px 6px;font-size:11px;text-align:right;font-weight:700;">Rate</th>
+          <th style="padding:8px 6px;font-size:11px;text-align:right;font-weight:700;">Taxable</th>
+          ${isIGST
+            ? `<th style="padding:8px 6px;font-size:11px;text-align:center;font-weight:700;">IGST</th>`
+            : `<th style="padding:8px 6px;font-size:11px;text-align:center;font-weight:700;">CGST</th>
+               <th style="padding:8px 6px;font-size:11px;text-align:center;font-weight:700;">SGST</th>`}
+          <th style="padding:8px 6px;font-size:11px;text-align:right;font-weight:700;">Amount</th>
+        </tr>
+      </thead>
+      <tbody style="border-bottom:1px solid #ccc;">
+        ${itemRows}
+      </tbody>
+    </table>
+
+    <!-- Totals + GST Summary side by side -->
+    <div style="display:flex;gap:20px;align-items:flex-start;margin-bottom:14px;">
+      <!-- GST Summary table -->
+      ${gstSummaryRows ? `<div style="flex:1;">
+        <div style="font-size:11px;font-weight:700;color:#1a2a50;text-transform:uppercase;margin-bottom:6px;">Tax Summary</div>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #ddd;">
+          <thead>
+            <tr style="background:#f0f4fa;">
+              <th style="padding:5px 8px;font-size:10px;text-align:left;font-weight:700;border:1px solid #ddd;">Rate</th>
+              <th style="padding:5px 8px;font-size:10px;text-align:right;font-weight:700;border:1px solid #ddd;">Taxable</th>
+              ${isIGST
+                ? `<th style="padding:5px 8px;font-size:10px;text-align:right;font-weight:700;border:1px solid #ddd;">IGST</th>`
+                : `<th style="padding:5px 8px;font-size:10px;text-align:right;font-weight:700;border:1px solid #ddd;">CGST</th>
+                   <th style="padding:5px 8px;font-size:10px;text-align:right;font-weight:700;border:1px solid #ddd;">SGST</th>`}
+              <th style="padding:5px 8px;font-size:10px;text-align:right;font-weight:700;border:1px solid #ddd;">Tax Amt</th>
+            </tr>
+          </thead>
+          <tbody>${gstSummaryRows}</tbody>
+        </table>
+      </div>` : "<div style='flex:1;'></div>"}
+
+      <!-- Grand Total box -->
+      <div style="min-width:200px;">
+        <table style="width:100%;border-collapse:collapse;">
+          ${bill.taxableTotal && bill.taxableTotal !== bill.subtotal ? `<tr><td style="padding:4px 8px;font-size:12px;color:#555;">Taxable Amount</td><td style="padding:4px 8px;font-size:12px;color:#555;text-align:right;">₹${(bill.taxableTotal||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</td></tr>` : ""}
+          ${bill.taxTotal > 0 && !isIGST ? `
+            <tr><td style="padding:4px 8px;font-size:12px;color:#555;">CGST</td><td style="padding:4px 8px;font-size:12px;color:#555;text-align:right;">₹${((bill.taxTotal||0)/2).toLocaleString("en-IN",{minimumFractionDigits:2})}</td></tr>
+            <tr><td style="padding:4px 8px;font-size:12px;color:#555;">SGST</td><td style="padding:4px 8px;font-size:12px;color:#555;text-align:right;">₹${((bill.taxTotal||0)/2).toLocaleString("en-IN",{minimumFractionDigits:2})}</td></tr>
+          ` : ""}
+          ${bill.taxTotal > 0 && isIGST ? `<tr><td style="padding:4px 8px;font-size:12px;color:#555;">IGST</td><td style="padding:4px 8px;font-size:12px;color:#555;text-align:right;">₹${(bill.taxTotal||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</td></tr>` : ""}
+          <tr style="border-top:2px solid #111;">
+            <td style="padding:8px 8px;font-size:16px;font-weight:900;color:#111;">TOTAL</td>
+            <td style="padding:8px 8px;font-size:18px;font-weight:900;color:#111;text-align:right;">₹${bill.total.toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    ${bill.notes ? `<div style="font-size:11px;color:#666;border-top:1px dashed #ccc;padding-top:8px;margin-bottom:10px;"><strong>Note:</strong> ${bill.notes}</div>` : ""}
+
+    <!-- Footer -->
+    <div style="margin-top:16px;text-align:center;border-top:1px solid #ccc;padding-top:12px;">
+      <div style="font-size:12px;color:#555;">${footer}</div>
+      <div style="font-size:10px;color:#aaa;margin-top:4px;">Powered by ShopChampion</div>
+    </div>
+  </div>`;
+  }
+
+  // ── Thermal layout ──────────────────────────────────────────
   return `
   <div id="sc-bill-print-area" style="background:#fff;color:#111;font-family:'Courier New',Courier,monospace;width:${billWidth};max-width:100%;margin:0 auto;padding:14px 12px;box-sizing:border-box;">
     <!-- Shop Header -->
     <div style="text-align:center;margin-bottom:10px;border-bottom:1px dashed #999;padding-bottom:10px;">
       ${shopIcon ? `<img src="${shopIcon}" style="width:48px;height:48px;object-fit:cover;border-radius:8px;margin-bottom:6px;" />` : ""}
       <div style="font-size:18px;font-weight:900;letter-spacing:1px;color:#111;text-transform:uppercase;">${shopName}</div>
-      ${showGST ? `<div style="font-size:10px;color:#555;margin-top:2px;">GST: ${gstNum}</div>` : ""}
+      ${showGST ? `<div style="font-size:10px;color:#555;margin-top:2px;">GSTIN: ${gstNum}</div>` : ""}
+      ${shopAddress ? `<div style="font-size:9px;color:#777;margin-top:2px;line-height:1.4;">${shopAddress.replace(/\n/g,"<br>")}</div>` : ""}
     </div>
 
     <!-- Bill Info -->
@@ -8584,9 +8935,10 @@ function renderBillHTML(bill) {
       <tbody>${itemRows}</tbody>
     </table>
 
-    <!-- Total -->
+    <!-- Totals -->
     <div style="border-top:2px solid #111;padding-top:8px;margin-top:4px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
+      ${thermalGSTBlock}
+      <div style="display:flex;justify-content:space-between;align-items:center;${bill.taxTotal>0&&hasGST?"margin-top:6px;border-top:1px dashed #ccc;padding-top:6px;":""}">
         <span style="font-size:15px;font-weight:900;color:#111;letter-spacing:1px;">TOTAL</span>
         <span style="font-size:18px;font-weight:900;color:#111;">₹${bill.total.toLocaleString("en-IN")}</span>
       </div>
@@ -8724,13 +9076,18 @@ async function showCustomerBillHistory(custId) {
 
 // ─── BILLING SETTINGS MODAL ────────────────────────────────────
 function openBillingSettingsModal() {
-  const autoWA  = getBillSetting("billAutoWhatsApp");
-  const autoPr  = getBillSetting("billAutoPrint");
-  const showGST = getBillSetting("billShowGST");
-  const gstNum  = getBillSetting("billGSTNumber") || "";
-  const footer  = getBillSetting("billFooter") || "Thank you! Visit Again 🙏";
-  const paper   = getBillSetting("billPaperSize") || "80mm";
-  const prefix  = getBillSetting("billPrefix") || "B";
+  const autoWA      = getBillSetting("billAutoWhatsApp");
+  const autoPr      = getBillSetting("billAutoPrint");
+  const showGST     = getBillSetting("billShowGST");
+  const gstNum      = getBillSetting("billGSTNumber") || "";
+  const gstType     = getBillSetting("billGSTType") || "none";
+  const gstRate     = getBillSetting("billGSTRate") || 18;
+  const shopAddress = getBillSetting("billShopAddress") || "";
+  const shopState   = getBillSetting("billShopState") || "";
+  const hsnEnabled  = getBillSetting("billHSNEnabled");
+  const footer      = getBillSetting("billFooter") || "Thank you! Visit Again 🙏";
+  const paper       = getBillSetting("billPaperSize") || "80mm";
+  const prefix      = getBillSetting("billPrefix") || "B";
 
   function toggle(key, val, label, desc) {
     return `
@@ -8745,14 +9102,24 @@ function openBillingSettingsModal() {
     </div>`;
   }
 
+  const gstTypes = [
+    { val: "none",      label: "No GST",     desc: "No tax calculation" },
+    { val: "cgst_sgst", label: "CGST + SGST", desc: "Intra-state supply" },
+    { val: "igst",      label: "IGST",        desc: "Inter-state supply" },
+  ];
+
   showWideModal(`
   ${modalHeader("🧾 Billing Settings")}
+
+  <!-- Toggles -->
   <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;overflow:hidden;margin-bottom:14px;">
-    ${toggle("billAutoWhatsApp", autoWA, "Auto Send WhatsApp", "Automatically send bill on WhatsApp after each purchase")}
-    ${toggle("billAutoPrint",    autoPr, "Auto Print Bill",    "Automatically print bill after each purchase")}
-    ${toggle("billShowGST",      showGST,"Show GST Number",    "Display GST number on the bill")}
+    ${toggle("billAutoWhatsApp", autoWA,  "Auto Send WhatsApp", "Automatically send bill on WhatsApp after each purchase")}
+    ${toggle("billAutoPrint",    autoPr,  "Auto Print Bill",    "Automatically print bill after each purchase")}
+    ${toggle("billShowGST",      showGST, "Show GSTIN on Bill", "Display your GST number on the printed bill")}
+    ${toggle("billHSNEnabled",   hsnEnabled, "Show HSN/SAC Column", "Add HSN/SAC code column on A4 invoice")}
   </div>
 
+  <!-- Paper Size -->
   <div style="margin-bottom:14px;">
     <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">📄 Paper Size</label>
     <div style="display:flex;gap:8px;">
@@ -8760,23 +9127,91 @@ function openBillingSettingsModal() {
     </div>
   </div>
 
+  <!-- Bill Prefix -->
   <div style="margin-bottom:14px;">
     <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">🔢 Bill Number Prefix</label>
     <input id="bill-prefix-input" class="input" value="${prefix}" placeholder="B" style="margin-bottom:0;" oninput="setBillSetting('billPrefix',this.value||'B')" />
   </div>
 
-  ${showGST ? `
-  <div style="margin-bottom:14px;">
-    <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">🏷 GST Number</label>
-    <input id="bill-gst-input" class="input" value="${gstNum}" placeholder="22AAAAA0000A1Z5" oninput="setBillSetting('billGSTNumber',this.value)" />
-  </div>` : ""}
+  <!-- ── GST SECTION ── -->
+  <div style="background:#0a0e1a;border:1px solid #2a3a5a;border-radius:12px;padding:16px;margin-bottom:14px;">
+    <div style="font-size:13px;font-weight:800;color:#a78bfa;margin-bottom:12px;letter-spacing:0.5px;">🏛 GST Settings</div>
 
+    <!-- GST Type -->
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:8px;">GST Type</label>
+      <div style="display:flex;gap:6px;">
+        ${gstTypes.map(t => `
+          <button onclick="setBillSetting('billGSTType','${t.val}');openBillingSettingsModal()"
+            style="cursor:pointer;flex:1;padding:10px 6px;border-radius:10px;border:2px solid ${gstType===t.val?'#a78bfa':'#1e2a45'};background:${gstType===t.val?'#1a0f2e':'#0a0e1a'};color:${gstType===t.val?'#a78bfa':'#4a5a7a'};font-size:12px;font-weight:700;text-align:center;line-height:1.3;">
+            ${t.label}<br><span style="font-size:9px;opacity:0.7;">${t.desc}</span>
+          </button>`).join("")}
+      </div>
+    </div>
+
+    ${gstType !== "none" ? `
+    <!-- Default GST Rate -->
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">Default Tax Rate (%)</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${[0,5,12,18,28].map(r => `
+          <button onclick="setBillSetting('billGSTRate',${r});openBillingSettingsModal()"
+            style="cursor:pointer;padding:8px 14px;border-radius:8px;border:2px solid ${parseFloat(gstRate)===r?'#a78bfa':'#1e2a45'};background:${parseFloat(gstRate)===r?'#1a0f2e':'#0a0e1a'};color:${parseFloat(gstRate)===r?'#a78bfa':'#4a5a7a'};font-size:13px;font-weight:700;">
+            ${r}%
+          </button>`).join("")}
+        <input type="number" class="input" value="${gstRate}" min="0" max="100" step="0.5" placeholder="18"
+          oninput="setBillSetting('billGSTRate',parseFloat(this.value)||18)"
+          style="width:70px;padding:8px;font-size:13px;text-align:center;margin-bottom:0;" />
+      </div>
+      <div style="font-size:10px;color:#4a5a7a;margin-top:5px;">Applied per-item; can be overridden item-by-item in the purchase form.</div>
+    </div>
+
+    <!-- GSTIN -->
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">GSTIN (15-digit GST Number)</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="bill-gst-input" class="input" value="${gstNum}" placeholder="22AAAAA0000A1Z5" maxlength="15"
+          style="margin-bottom:0;flex:1;transition:border-color 0.2s;"
+          oninput="
+            const v=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
+            this.value=v;
+            const valid=/^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$$/.test(v);
+            this.style.borderColor=v.length===0?'':(valid?'#22c55e':'#ef4444');
+            document.getElementById('gst-err').style.display=v.length&&!valid?'block':'none';
+            document.getElementById('gst-lookup-btn').style.display=valid?'flex':'none';
+            if(valid||v.length===0){setBillSetting('billGSTNumber',v);}
+          "
+        />
+        <button id="gst-lookup-btn" onclick="doGSTINLookup()"
+          style="display:${/^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$$/.test(gstNum)?'flex':'none'};align-items:center;gap:6px;padding:10px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+          🔍 Auto Fill
+        </button>
+      </div>
+      <div id="gst-err" style="display:none;color:#ef4444;font-size:11px;margin-top:4px;">⚠️ Invalid GSTIN — must be 15 chars like 22AAAAA0000A1Z5</div>
+      <div id="gst-lookup-status" style="display:none;font-size:11px;margin-top:4px;"></div>
+    </div>
+
+    <!-- Shop State -->
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">Shop State (for CGST/SGST vs IGST)</label>
+      <input id="bill-state-input" class="input" value="${shopState}" placeholder="e.g. Maharashtra" style="margin-bottom:0;" oninput="setBillSetting('billShopState',this.value)" />
+    </div>
+
+    <!-- Shop Address -->
+    <div style="margin-bottom:4px;">
+      <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">Shop Address (shown on A4 invoice)</label>
+      <textarea class="input" id="bill-addr-input" rows="3" placeholder="123 Main Road&#10;Mumbai, MH 400001" style="margin-bottom:0;resize:vertical;font-size:12px;line-height:1.5;" oninput="setBillSetting('billShopAddress',this.value)">${shopAddress}</textarea>
+    </div>
+    ` : `<div style="font-size:12px;color:#4a5a7a;text-align:center;padding:8px 0;">Select CGST+SGST or IGST to enable tax calculation on bills.</div>`}
+  </div>
+
+  <!-- Footer -->
   <div style="margin-bottom:16px;">
     <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">📝 Bill Footer Message</label>
     <input id="bill-footer-input" class="input" value="${footer}" placeholder="Thank you! Visit Again 🙏" oninput="setBillSetting('billFooter',this.value)" />
   </div>
 
-  <button onclick="closeModal()" style="width:100%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);border:none;border-radius:12px;color:#fff;padding:13px;font-size:15px;font-weight:800;cursor:pointer;">✅ Save Settings</button>
+  <button onclick="closeModal()" style="width:100%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);border:none;border-radius:12px;color:#fff;padding:13px;font-size:15px;font-weight:800;cursor:pointer;">✅ Done</button>
   `);
 }
 

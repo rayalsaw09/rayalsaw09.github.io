@@ -200,6 +200,32 @@
     </div>
   </div>
 
+  <!-- GSTIN Proxy Health Monitor -->
+  <div id="gstin-proxy-banner" style="display:none;background:linear-gradient(135deg,#1a0500,#2a0800);border:2px solid #f59e0b;border-radius:14px;padding:16px 20px;margin-bottom:20px;">
+    <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;">
+      <div style="font-size:28px;flex-shrink:0;">⚠️</div>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:15px;font-weight:800;color:#fbbf24;margin-bottom:4px;">GSTIN Lookup Service</div>
+        <div id="gstin-proxy-msg" style="font-size:13px;color:#d97706;line-height:1.6;margin-bottom:10px;"></div>
+        <!-- URL input — always visible so you can update it -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+          <input id="gstin-proxy-url-input" type="url" placeholder="https://gstin-proxy.yourname.workers.dev/gstin"
+            style="flex:1;min-width:200px;background:#0a0800;border:1px solid #5a3a00;border-radius:8px;color:#fbbf24;font-size:12px;padding:8px 12px;font-family:monospace;outline:none;"
+            onkeydown="if(event.key==='Enter')saveGSTINProxyURL()" />
+          <button onclick="saveGSTINProxyURL()" style="cursor:pointer;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:8px;color:#1a0a00;font-size:12px;font-weight:800;padding:8px 16px;white-space:nowrap;">💾 Save URL</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="checkGSTINProxy()" style="cursor:pointer;background:#1a1000;border:1px solid #f59e0b;border-radius:8px;color:#fbbf24;font-size:12px;font-weight:700;padding:7px 14px;">🔄 Recheck</button>
+          <button onclick="document.getElementById('gstin-proxy-banner').style.display='none'" style="cursor:pointer;background:transparent;border:1px solid #4a3000;border-radius:8px;color:#6a5000;font-size:12px;font-weight:700;padding:7px 12px;">Dismiss</button>
+        </div>
+      </div>
+      <div style="flex-shrink:0;text-align:right;">
+        <div id="gstin-proxy-status-dot" style="width:12px;height:12px;border-radius:50%;background:#f59e0b;margin-left:auto;"></div>
+        <div id="gstin-proxy-checked" style="font-size:10px;color:#6a5000;margin-top:4px;white-space:nowrap;"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Stats -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px;" id="stats-row">
     <div class="stat"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Total Users</div></div>
@@ -768,11 +794,105 @@ function resetSettings() {
   }
 }
 
+// ─── GSTIN PROXY HEALTH CHECK & URL MANAGEMENT ───────────────────────────────
+// The proxy URL is saved here in SellerPanel and pushed to Firebase so all
+// shops read it automatically — no code changes needed per shop.
+
+const SP_GSTIN_PROXY_LS_KEY = "sc_seller_gstin_proxy_url";
+
+function getSellerGSTINProxyURL() {
+  return (localStorage.getItem(SP_GSTIN_PROXY_LS_KEY) || "").trim();
+}
+
+function saveSellerGSTINProxyURL(url) {
+  const trimmed = (url || "").trim();
+  localStorage.setItem(SP_GSTIN_PROXY_LS_KEY, trimmed);
+  // Push to Firebase global settings so all shops pick it up
+  _pushGSTINProxyToFirebase(trimmed);
+}
+
+async function _pushGSTINProxyToFirebase(url) {
+  try {
+    if (!window._spDB) return;
+    await window._spDB.collection("global_settings").doc("gstin_proxy").set({
+      url: url,
+      updatedAt: Date.now()
+    });
+  } catch(e) { console.warn("Could not push proxy URL to Firebase:", e.message); }
+}
+
+async function checkGSTINProxy() {
+  const banner  = document.getElementById("gstin-proxy-banner");
+  const msgEl   = document.getElementById("gstin-proxy-msg");
+  const dotEl   = document.getElementById("gstin-proxy-status-dot");
+  const checkEl = document.getElementById("gstin-proxy-checked");
+  const inputEl = document.getElementById("gstin-proxy-url-input");
+  if (!banner || !msgEl) return;
+
+  const proxyUrl = getSellerGSTINProxyURL();
+  if (inputEl && inputEl.value !== proxyUrl) inputEl.value = proxyUrl;
+
+  if (!proxyUrl) {
+    banner.style.display = "block";
+    if (dotEl) dotEl.style.background = "#f59e0b";
+    msgEl.innerHTML = `<strong>GSTIN proxy not configured yet.</strong><br>Paste your Cloudflare Worker URL below and click Save. Shops will get it automatically via Firebase — no code changes needed.`;
+    if (checkEl) checkEl.textContent = "Not set up";
+    return;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const healthUrl = proxyUrl.replace(/\/gstin\/?$/, "/health");
+    const res = await fetch(healthUrl, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (res.ok || res.status === 400 || res.status === 422) {
+      banner.style.display = "none";
+      if (dotEl) dotEl.style.background = "#22c55e";
+    } else {
+      _gstinProxyDown(`HTTP ${res.status} — check your Worker is deployed correctly.`, proxyUrl);
+    }
+  } catch (err) {
+    _gstinProxyDown(
+      err.name === "AbortError" ? "Request timed out (8s). Worker may be down." : "Network error: " + err.message,
+      proxyUrl
+    );
+  }
+
+  if (checkEl) {
+    const now = new Date();
+    checkEl.textContent = "Checked " + now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  }
+}
+
+function _gstinProxyDown(reason, url) {
+  const banner  = document.getElementById("gstin-proxy-banner");
+  const msgEl   = document.getElementById("gstin-proxy-msg");
+  const dotEl   = document.getElementById("gstin-proxy-status-dot");
+  if (!banner) return;
+  banner.style.display = "block";
+  if (dotEl) dotEl.style.background = "#ef4444";
+  if (msgEl) msgEl.innerHTML = `<strong>GSTIN proxy is down or unreachable.</strong><br>${reason}<br><br>Shops will see an error on Auto Fill until this is fixed.<br><code style="background:#1a0a00;padding:2px 6px;border-radius:4px;color:#fbbf24;word-break:break-all;font-size:11px;">${url}</code>`;
+}
+
+function saveGSTINProxyURL() {
+  const inputEl = document.getElementById("gstin-proxy-url-input");
+  if (!inputEl) return;
+  const url = inputEl.value.trim();
+  if (!url) { spNotify("⚠️ Please paste a URL first"); return; }
+  if (!url.startsWith("https://")) { spNotify("⚠️ URL must start with https://"); return; }
+  saveSellerGSTINProxyURL(url);
+  spNotify("✅ Proxy URL saved! Checking health...");
+  setTimeout(checkGSTINProxy, 500);
+}
+
 function refreshAll() {
   loadAds();
   loadKeys();
   loadUsers();
   loadPayments();
+  checkGSTINProxy();
 }
 
 // ── Supabase helpers ──
