@@ -5172,8 +5172,10 @@ function newCreditorId(){ return "CR" + Date.now() + Math.random().toString(36).
 // ── Main Render ───────────────────────────────────────────────────────────────
 function renderCreditorsTab(){
   const creditors = getCreditors();
-  const totalOwed = creditors.reduce((s,c)=>s+Math.max(0,credBalance(c)),0);
-  const totalCount = creditors.length;
+  const totalOwed = creditors.filter(c=>c.id!=="CR_UNRECONCILED").reduce((s,c)=>s+Math.max(0,credBalance(c)),0);
+  const totalCount = creditors.filter(c=>c.id!=="CR_UNRECONCILED").length;
+  const unrecEntry = creditors.find(c=>c.id==="CR_UNRECONCILED");
+  const unrecBalance = unrecEntry ? credBalance(unrecEntry) : 0;
 
   const searchVal  = window._credSearch || "";
   const gstFilter  = window._credGstFilter || "all"; // 'all' | 'gst' | 'nogst'
@@ -5187,8 +5189,12 @@ function renderCreditorsTab(){
   if (gstFilter === 'gst')   filtered = filtered.filter(c => !!c.gstin);
   if (gstFilter === 'nogst') filtered = filtered.filter(c => !c.gstin);
 
-  // Sort: highest balance first
-  filtered.sort((a,b)=>credBalance(b)-credBalance(a));
+  // Sort: Unreconciled always first, then highest balance
+  filtered.sort((a,b)=>{
+    if(a.id==="CR_UNRECONCILED") return -1;
+    if(b.id==="CR_UNRECONCILED") return 1;
+    return credBalance(b)-credBalance(a);
+  });
 
   return `
   <div style="max-width:900px;margin:0 auto;">
@@ -5216,6 +5222,14 @@ function renderCreditorsTab(){
       ${_credSummaryCard("Paid This Month", formatINR(_credPaidThisMonth(creditors)), "#22c55e", "✅")}
       ${_credSummaryCard("Purchased This Month", formatINR(_credPurchasedThisMonth(creditors)), "#60a5fa", "📦")}
     </div>
+    ${unrecBalance>0 ? `<div onclick="openCreditorDetail('CR_UNRECONCILED')" style="cursor:pointer;background:#1a0e00;border:2px solid #d97706;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;" onmouseenter="this.style.borderColor='#fbbf24'" onmouseleave="this.style.borderColor='#d97706'">
+      <span style="font-size:24px;">⚠️</span>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:800;color:#fbbf24;">Unreconciled Purchases — ${formatINR(unrecBalance)}</div>
+        <div style="font-size:12px;color:#d97706;margin-top:2px;">${(unrecEntry.transactions||[]).length} entr${(unrecEntry.transactions||[]).length===1?'y':'ies'} without a creditor. Tap to review.</div>
+      </div>
+      <span style="color:#d97706;font-size:16px;">›</span>
+    </div>` : ""}
 
     <!-- Search -->
     <div style="margin-bottom:10px;">
@@ -5275,14 +5289,19 @@ function _renderCreditorCard(cr){
   const balColor = bal>0?"#f59e0b":bal<0?"#22c55e":"#7a8aaa";
   const balLabel = bal>0?"You owe":bal<0?"They owe you":"Settled";
   const lastTx = (cr.transactions||[]).slice(-1)[0];
-  const initials = cr.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+  const isUnrec = cr.id === "CR_UNRECONCILED";
+  const initials = isUnrec ? "⚠️" : cr.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+  const borderColor = isUnrec ? "#92400e" : "#1e2a45";
+  const cardBg = isUnrec ? "#1a0e00" : "#0d1220";
+  const hoverBorder = isUnrec ? "#d97706" : "#2a3a6a";
 
-  return `<div style="background:#0d1220;border:1px solid #1e2a45;border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
-    onmouseenter="this.style.borderColor='#2a3a6a'" onmouseleave="this.style.borderColor='#1e2a45'"
+  return `<div style="background:${cardBg};border:1px solid ${borderColor};border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
+    onmouseenter="this.style.borderColor='${hoverBorder}'" onmouseleave="this.style.borderColor='${borderColor}'"
     onclick="openCreditorDetail('${cr.id}')">
+    ${isUnrec ? `<div style="background:#92400e22;border:1px solid #92400e;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#fbbf24;font-weight:700;">⚠️ These purchases have no creditor assigned. Tap to review and link them to real suppliers.</div>` : ""}
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
       <!-- Avatar -->
-      <div style="width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;">${initials}</div>
+      <div style="width:46px;height:46px;border-radius:50%;background:${isUnrec?'linear-gradient(135deg,#92400e,#d97706)':'linear-gradient(135deg,#1e3a6e,#2a5aaa)'};display:flex;align-items:center;justify-content:center;font-size:${isUnrec?'22px':'15px'};font-weight:800;color:#fff;flex-shrink:0;">${initials}</div>
       <!-- Info -->
       <div style="flex:1;min-width:0;">
         <div style="font-weight:800;font-size:15px;color:#e8eaf0;">${escHtml(cr.name)}</div>
@@ -5421,9 +5440,15 @@ function openCreditorDetail(id){
   const balColor = bal>0?"#f59e0b":bal<0?"#22c55e":"#7a8aaa";
   const txs = (cr.transactions||[]).slice().reverse(); // newest first
 
+  const isUnrec = cr.id === "CR_UNRECONCILED";
   showWideModal(`
-    ${modalHeader("🏦 "+escHtml(cr.name))}
+    ${modalHeader((isUnrec?"⚠️ ":"🏦 ")+escHtml(cr.name))}
     <div style="display:flex;flex-direction:column;gap:16px;">
+
+      ${isUnrec ? `<div style="background:#92400e22;border:1px solid #d97706;border-radius:12px;padding:12px 16px;font-size:13px;color:#fbbf24;font-weight:700;">
+        ⚠️ These are inventory purchases with no supplier assigned.<br>
+        <span style="font-size:12px;font-weight:400;color:#f59e0b;margin-top:4px;display:block;">To reconcile: add the supplier as a creditor, then manually add those purchase entries to their account.</span>
+      </div>` : ""}
 
       <!-- Balance banner -->
       <div style="background:${bal>0?"#1a0e00":"#001a0e"};border:2px solid ${balColor};border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
@@ -5431,22 +5456,22 @@ function openCreditorDetail(id){
           <div style="font-size:12px;color:#7a8aaa;font-weight:700;">${bal>0?"AMOUNT YOU OWE":bal<0?"THEY OWE YOU":"FULLY SETTLED"}</div>
           <div style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        ${!isUnrec ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
           <button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
           <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>
-        </div>
+        </div>` : `<div style="font-size:12px;color:#d97706;font-weight:700;">Unreconciled<br>entries</div>`}
       </div>
 
       <!-- Creditor info -->
-      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+      ${!isUnrec ? `<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
         ${cr.phone?`<div><span style="color:#7a8aaa;">📞 Phone</span><br><span style="color:#e8eaf0;font-weight:700;">${cr.phone}</span></div>`:""}
         ${cr.gstin?`<div><span style="color:#7a8aaa;">🔢 GSTIN</span><br><span style="color:#e8eaf0;font-weight:700;">${cr.gstin}</span></div>`:""}
         ${cr.address?`<div style="grid-column:1/-1;"><span style="color:#7a8aaa;">📍 Address</span><br><span style="color:#e8eaf0;">${escHtml(cr.address)}</span></div>`:""}
         ${cr.bank?.acc?`<div><span style="color:#7a8aaa;">🏦 Bank</span><br><span style="color:#e8eaf0;font-weight:700;">${escHtml(cr.bank.name||"")} ${cr.bank.acc}</span></div>`:""}
         ${cr.bank?.ifsc?`<div><span style="color:#7a8aaa;">IFSC</span><br><span style="color:#e8eaf0;font-weight:700;">${cr.bank.ifsc}</span></div>`:""}
         ${cr.bank?.upi?`<div><span style="color:#7a8aaa;">UPI</span><br><span style="color:#e8eaf0;font-weight:700;">${escHtml(cr.bank.upi)}</span></div>`:""}
-      </div>
+      </div>` : ""}
 
       <!-- Transaction history -->
       <div>
@@ -5454,7 +5479,7 @@ function openCreditorDetail(id){
           <div style="font-size:13px;font-weight:800;color:#e8eaf0;">Transaction History</div>
           <div style="display:flex;gap:8px;">
             <button onclick="printCreditorStatement('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">🖨 Print</button>
-            <button onclick="openAddCreditorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>
+            ${!isUnrec ? `<button onclick="openAddCreditorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>` : ""}
           </div>
         </div>
         ${txs.length===0?`<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>`:`
@@ -8540,7 +8565,16 @@ function renderInventoryTab(){
         <input class="input" type="date" id="inv-date" value="${new Date().toISOString().slice(0,10)}" />
       </div>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Notes (optional)</label>
-      <input class="input" id="inv-notes" placeholder="Supplier, batch info..." style="margin-bottom:18px;" />
+      <input class="input" id="inv-notes" placeholder="Supplier, batch info..." style="margin-bottom:12px;" />
+      <!-- Creditor linkage -->
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:18px;">
+        <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:8px;">🏷️ Purchased From (Creditor) <span style="font-size:10px;color:#4a5a7a;font-weight:400;">— links stock to creditor account</span></div>
+        <select class="input" id="inv-creditor-id" style="margin-bottom:0;">
+          <option value="">⚠️ Skip — add to Unreconciled</option>
+          ${getCreditors().map(c=>`<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
+        </select>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">If skipped, a purchase entry will be added under <b style="color:#f59e0b;">Unreconciled Purchases</b> in the Creditors tab.</div>
+      </div>
       <button class="btn" onclick="invSubmitAdd()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">Add to Inventory →</button>
     </div>`;
   }
@@ -8667,7 +8701,16 @@ function renderInventoryTab(){
           <input class="input" type="date" id="inv-date" value="${new Date().toISOString().slice(0,10)}" />
         </div>
         <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Notes (optional)</label>
-        <input class="input" id="inv-notes" placeholder="Supplier, batch info..." style="margin-bottom:18px;" />
+        <input class="input" id="inv-notes" placeholder="Supplier, batch info..." style="margin-bottom:12px;" />
+        <!-- Creditor linkage -->
+        <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:18px;">
+          <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:8px;">🏷️ Purchased From (Creditor) <span style="font-size:10px;color:#4a5a7a;font-weight:400;">— links stock to creditor account</span></div>
+          <select class="input" id="inv-creditor-id" style="margin-bottom:0;">
+            <option value="">⚠️ Skip — add to Unreconciled</option>
+            ${getCreditors().map(c=>`<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
+          </select>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">If skipped, a purchase entry will be added under <b style="color:#f59e0b;">Unreconciled Purchases</b> in the Creditors tab.</div>
+        </div>
         <button class="btn" onclick="invSubmitRestock()" style="background:linear-gradient(135deg,#4a8aff,#2255cc);color:#fff;width:100%;padding:14px;font-size:15px;font-weight:800;">🔄 Restock Item →</button>
       </div>`;
     }
@@ -8819,7 +8862,9 @@ function invSubmitAdd(){
   const gstIncluded=document.getElementById("inv-gst-included")?.value||"exclusive";
   if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
+  const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
   invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
+  _invLogCreditorPurchase(creditorId, name, qty, cost, date, notes);
 }
 
 function invSubmitRestock(){
@@ -8835,9 +8880,76 @@ function invSubmitRestock(){
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
   const selItem = inventoryItems.find(x=>x.name===invRestockSelected);
   const category = selItem ? (selItem.category||"General") : "General";
+  const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
   invAddStock(invRestockSelected, unit||(selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
+  _invLogCreditorPurchase(creditorId, invRestockSelected, qty, cost, date, notes);
   invRestockSelected = null;
   invRestockSearch = "";
+}
+
+// ─── INV → CREDITOR PURCHASE LOGGER ──────────────────────────────────────────
+// creditorId = "" means skip → goes to "Unreconciled Purchases" auto-creditor
+function _invLogCreditorPurchase(creditorId, itemName, qty, cost, date, notes){
+  const amount = Math.round(qty * cost * 100) / 100;
+  if(!amount || amount <= 0) return; // nothing to record if no cost
+
+  const txNote = notes
+    ? `${itemName} ×${qty} — ${notes}`
+    : `${itemName} ×${qty} (inventory purchase)`;
+
+  if(creditorId){
+    // ── Known creditor: add purchase transaction directly ──
+    const creditors = getCreditors();
+    const idx = creditors.findIndex(c => c.id === creditorId);
+    if(idx < 0){ notify("⚠️ Creditor not found — entry skipped","error"); return; }
+    if(!creditors[idx].transactions) creditors[idx].transactions = [];
+    creditors[idx].transactions.push({
+      id: "TX" + Date.now() + Math.random().toString(36).slice(2,5),
+      type: "purchase",
+      amount,
+      note: txNote,
+      date,
+      invoiceNo: "",
+      createdAt: Date.now(),
+      _fromInventory: true
+    });
+    saveCreditors(creditors);
+    notify("✅ Purchase of " + formatINR(amount) + " logged to " + creditors[idx].name);
+  } else {
+    // ── No creditor selected: add to "Unreconciled Purchases" auto-creditor ──
+    const UNREC_ID = "CR_UNRECONCILED";
+    const creditors = getCreditors();
+    let unrec = creditors.find(c => c.id === UNREC_ID);
+    if(!unrec){
+      unrec = {
+        id: UNREC_ID,
+        name: "⚠️ Unreconciled Purchases",
+        phone: "",
+        gstin: "",
+        address: "",
+        notes: "Auto-created. Inventory purchases with no creditor assigned. Link these to real creditors.",
+        bank: { name:"", acc:"", ifsc:"", upi:"" },
+        createdAt: Date.now(),
+        transactions: [],
+        _autoUnreconciled: true
+      };
+      creditors.push(unrec);
+    }
+    if(!unrec.transactions) unrec.transactions = [];
+    unrec.transactions.push({
+      id: "TX" + Date.now() + Math.random().toString(36).slice(2,5),
+      type: "purchase",
+      amount,
+      note: txNote,
+      date,
+      invoiceNo: "",
+      createdAt: Date.now(),
+      _fromInventory: true,
+      _unreconciled: true
+    });
+    saveCreditors(creditors);
+    notify("⚠️ No creditor selected — added to Unreconciled Purchases (" + formatINR(amount) + ")","warn");
+  }
 }
 
 // ─── PURCHASE MODE MODAL ──────────────────────────────────────
