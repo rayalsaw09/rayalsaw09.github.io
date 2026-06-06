@@ -1218,17 +1218,22 @@ async function scHashPassword(phone, password) {
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
 const ADMIN_PASS = "1234";
-const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","inventory","creditors","settings"];
-const TABS_ICON = ["🏆","👥","💳","📊","⚖️","📦","🏦","⚙️"];
+const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","inventory","creditors","messages","settings"];
+const TABS_ICON = ["🏆","👥","💳","📊","⚖️","📦","🏦","✉️","⚙️"];
+let _shopRequestsUnread = 0; // badge count for messages tab
 function getTabs(){
   return TABS_BASE.map((k,i)=>{
     let label = TABS_ICON[i]+" "+t(k);
-    // FIX 21: Low stock badge on inventory tab (index 6)
+    // Low stock badge on inventory tab (index 5)
     if(i===5 && inventoryItems && inventoryItems.length>0){
       const oos = inventoryItems.filter(x=>invGetStock(x.name)<=0).length;
       const low = inventoryItems.filter(x=>{const s=invGetStock(x.name);return s>0&&s<=3;}).length;
       if(oos>0) label += ` <span style="background:#f66;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;">${oos}</span>`;
       else if(low>0) label += ` <span style="background:#FFD700;color:#1a0a00;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;">${low}</span>`;
+    }
+    // Unread badge on messages tab (index 7)
+    if(i===7 && _shopRequestsUnread>0){
+      label += ` <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;">${_shopRequestsUnread}</span>`;
     }
     return label;
   });
@@ -1589,6 +1594,8 @@ function startFirestoreListener() {
   if(authPhone && !invUnsubscribe){
     loadInventoryFromFirestore(null);
     loadCreditorsFromCloud();
+    // Load shop connection requests (messages inbox)
+    loadShopRequests();
   }
 }
 
@@ -2704,6 +2711,7 @@ function onLoginSuccess(phone) {
     shopId = phone;
     startFirestoreListener();
     loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
+    loadShopRequests();
     // Check Firestore — if doc doesn't exist but we have local data, push it up (first-time migration)
     loadInventoryFromFirestore((docExists)=>{
       if(!docExists && inventoryItems.length > 0){
@@ -2983,7 +2991,8 @@ function renderTab(i){
   else if(i===4)el.innerHTML=renderCompare();
   else if(i===5)el.innerHTML=renderInventoryTab();
   else if(i===6)el.innerHTML=renderCreditorsTab();
-  else if(i===7)el.innerHTML=renderSettings();
+  else if(i===7)el.innerHTML=renderMessagesTab();
+  else if(i===8)el.innerHTML=renderSettings();
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
 }
 
@@ -5019,9 +5028,25 @@ async function doShopIdSearch(mode){
           ${profile.address ?`<div style="color:#7a8aaa;">🏠 <span style="color:#e8eaf0;">${escHtml(profile.address)}</span></div>`:""}
           ${profile.gstin   ?`<div style="color:#7a8aaa;">🔢 GSTIN: <span style="color:#a78bfa;font-family:monospace;">${escHtml(profile.gstin)}</span></div>`:""}
         </div>
-        <button onclick="addFromShopProfile(${JSON.stringify(profile).replace(/"/g,'&quot;')},'${mode}')" class="btn" style="width:100%;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:13px;font-size:14px;font-weight:800;">
-          ${mode==="creditor"?"🏦 Open Creditor Account":"👤 Add as Customer"} for ${escHtml(profile.shopName||"this shop")}
-        </button>
+        <div id="sc-connect-action" style="display:flex;flex-direction:column;gap:8px;">
+          <button onclick="addFromShopProfile(${JSON.stringify(profile).replace(/"/g,'&quot;')},'${mode}')" class="btn"
+            style="width:100%;background:#0a1628;border:2px solid #2a5aaa;color:#60a5fa;padding:11px;font-size:13px;font-weight:800;">
+            ${mode==="creditor"?"🏦 Add to My Creditors (local only)":"👤 Add to My Customers (local only)"}
+          </button>
+          <button onclick="(async()=>{
+            const btn=this;btn.disabled=true;btn.textContent='⏳ Sending...';
+            const ok=await sendShopConnectRequest(${JSON.stringify(profile).replace(/"/g,'&quot;')},'${mode}');
+            if(ok){btn.style.background='linear-gradient(135deg,#16a34a,#22c55e)';btn.style.color='#fff';btn.textContent='✅ Request Sent! They will see it in their Messages tab.';}
+            else{btn.disabled=false;btn.textContent='📨 Send Connect Request (notify them)';}
+          })()" class="btn"
+            style="width:100%;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:13px;font-size:14px;font-weight:800;">
+            📨 Send Connect Request — notify ${escHtml(profile.shopName||"this shop")}
+          </button>
+        </div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:8px;text-align:center;">
+          📨 <b>Send Request</b> = they get a notification in their Messages tab and can accept/decline.<br>
+          🏦 <b>Add local only</b> = silently adds to your account without notifying them.
+        </div>
       </div>`;
   }catch(e){
     statusEl.style.color="#ef4444";
@@ -6900,6 +6925,7 @@ const TRANSLATIONS = {
     adminPanel:"Admin Panel", leaderboard:"Leaderboard", customers:"Customers",
     purchase:"Purchase", analytics:"Analytics", compare:"Compare",
     inventory:"Inventory", creditors:"Creditors",
+    messages:"Messages",
     festivals:"Festival Rewards", settings:"Settings", logout:"Logout",
     addCustomer:"+ Add Customer", exportCSV:"⬇ Export CSV", addPurchase:"Add Purchase →",
     totalSpend:"Total Spend", points:"Points", rank:"Rank", visits:"visits",
@@ -8950,6 +8976,280 @@ function _invLogCreditorPurchase(creditorId, itemName, qty, cost, date, notes){
     saveCreditors(creditors);
     notify("⚠️ No creditor selected — added to Unreconciled Purchases (" + formatINR(amount) + ")","warn");
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── SHOP CONNECT / MESSAGES SYSTEM ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Firestore collection: shop_requests/{targetPhone}/requests/{reqId}
+// Request doc: { id, fromPhone, fromShopId, fromProfile, toPhone, type, status, createdAt }
+// type: "creditor" (sender wants to be added as creditor in target)
+//       "customer" (sender wants to be added as customer in target)
+// status: "pending" | "accepted" | "declined"
+
+let _shopRequestsCache = []; // cached list of pending requests for this shop
+
+function shopRequestsCol(){
+  if(!db || !authPhone) return null;
+  return db.collection("shop_requests").doc(authPhone).collection("requests");
+}
+
+// ── Load requests from Firestore ─────────────────────────────────────────────
+async function loadShopRequests(){
+  const col = shopRequestsCol();
+  if(!col) return;
+  try {
+    const snap = await col.where("status","==","pending").orderBy("createdAt","desc").get();
+    _shopRequestsCache = snap.docs.map(d=>({id:d.id,...d.data()}));
+    _shopRequestsUnread = _shopRequestsCache.length;
+    renderTabs(); // update badge
+  } catch(e) {
+    // index might not exist yet — try without orderBy
+    try {
+      const snap2 = await col.where("status","==","pending").get();
+      _shopRequestsCache = snap2.docs.map(d=>({id:d.id,...d.data()}));
+      _shopRequestsUnread = _shopRequestsCache.length;
+      renderTabs();
+    } catch {}
+  }
+}
+
+// ── Send a connect request to another shop ───────────────────────────────────
+async function sendShopConnectRequest(targetProfile, type){
+  // type: what we want the TARGET to add US as ("creditor" or "customer")
+  if(!db || !authPhone){
+    notify("⚠️ Firebase not connected — can't send request","error");
+    return false;
+  }
+  const myProfile = {
+    phone:     authPhone,
+    shopId:    myShopId(),
+    shopName:  appSettings.shopName || "Unknown Shop",
+    shopIcon:  appSettings.appIcon  || "",
+    gstin:     appSettings.shopGstin || "",
+    city:      appSettings.shopCity  || "",
+    address:   appSettings.shopAddress || "",
+  };
+  const reqId = "REQ" + Date.now() + Math.random().toString(36).slice(2,6).toUpperCase();
+  const req = {
+    id:          reqId,
+    fromPhone:   authPhone,
+    fromShopId:  myShopId(),
+    fromProfile: myProfile,
+    toPhone:     targetProfile.phone,
+    type,         // "creditor" | "customer" — role they should add US as in their app
+    status:      "pending",
+    createdAt:   Date.now(),
+  };
+  try {
+    await db.collection("shop_requests")
+      .doc(targetProfile.phone)
+      .collection("requests")
+      .doc(reqId)
+      .set(req);
+    return true;
+  } catch(e) {
+    notify("❌ Failed to send request: " + e.message, "error");
+    return false;
+  }
+}
+
+// ── Accept a request ─────────────────────────────────────────────────────────
+async function acceptShopRequest(req){
+  if(!db || !authPhone) return;
+  // Mark accepted in Firestore
+  try {
+    await db.collection("shop_requests").doc(authPhone).collection("requests").doc(req.id)
+      .update({ status:"accepted", respondedAt: Date.now() });
+  } catch(e) { console.warn("Accept update error:", e); }
+
+  const p = req.fromProfile || {};
+
+  if(req.type === "creditor"){
+    // They want us to add them as a CREDITOR in our account
+    const creditors = getCreditors();
+    const existing = creditors.find(c=>c.phone===p.phone && c.phone);
+    if(existing){
+      notify(`ℹ️ ${p.shopName||"This shop"} is already in your creditors`);
+    } else {
+      const cr = {
+        id:       newCreditorId(),
+        name:     p.shopName || p.shopId || "Unknown Shop",
+        phone:    p.phone || "",
+        gstin:    p.gstin || "",
+        address:  [p.address, p.city].filter(Boolean).join(", "),
+        notes:    `Auto-added via Shop ID connect request (${p.shopId||""})`,
+        bank:     { name:"", acc:"", ifsc:"", upi:"" },
+        createdAt: Date.now(),
+        transactions: [],
+        _fromShopConnect: true,
+        _connectedShopId: p.shopId || "",
+      };
+      creditors.push(cr);
+      saveCreditors(creditors);
+      notify(`✅ ${p.shopName||"Shop"} added to your Creditors!`);
+    }
+  } else if(req.type === "customer"){
+    // They want us to add them as a CUSTOMER (debtor) in our account
+    const customers = getSorted(); // full customer list
+    const existing = customers.find(c=>c.phone===p.phone && p.phone);
+    if(existing){
+      notify(`ℹ️ ${p.shopName||"This shop"} is already in your customers`);
+    } else {
+      const newId = "C" + Date.now();
+      const newCust = {
+        id:         newId,
+        name:       p.shopName || p.shopId || "Unknown Shop",
+        phone:      p.phone || "",
+        gstin:      p.gstin || "",
+        gstName:    p.shopName || "",
+        gstAddress: [p.address, p.city].filter(Boolean).join(", "),
+        points:     0,
+        totalSpend: 0,
+        purchases:  [],
+        createdAt:  Date.now(),
+        notes:      `Auto-added via Shop ID connect (${p.shopId||""})`,
+        _fromShopConnect: true,
+        _connectedShopId: p.shopId || "",
+      };
+      // Add customer via the existing save mechanism
+      const allCustomers = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
+      allCustomers.push(newCust);
+      try { localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allCustomers)); } catch {}
+      if(db && authPhone) customersCol().doc(newId).set(newCust).catch(()=>{});
+      notify(`✅ ${p.shopName||"Shop"} added to your Customers!`);
+    }
+  }
+
+  // Remove from cache and refresh
+  _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==req.id);
+  _shopRequestsUnread = _shopRequestsCache.length;
+  renderTabs();
+  if(currentTab===7) renderTab(7);
+}
+
+// ── Decline a request ─────────────────────────────────────────────────────────
+async function declineShopRequest(req){
+  if(!db || !authPhone) return;
+  try {
+    await db.collection("shop_requests").doc(authPhone).collection("requests").doc(req.id)
+      .update({ status:"declined", respondedAt: Date.now() });
+  } catch(e) { console.warn("Decline update error:", e); }
+  _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==req.id);
+  _shopRequestsUnread = _shopRequestsCache.length;
+  renderTabs();
+  if(currentTab===7) renderTab(7);
+  notify("🚫 Request declined");
+}
+
+// ── Render Messages Tab ───────────────────────────────────────────────────────
+function renderMessagesTab(){
+  const reqs = _shopRequestsCache;
+  if(!db){
+    return `<div style="max-width:600px;margin:0 auto;padding:40px 20px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+      <div style="font-size:16px;font-weight:800;color:#f59e0b;margin-bottom:8px;">Firebase Not Connected</div>
+      <div style="font-size:13px;color:#7a8aaa;">Shop Connect messages require Firebase. Set it up in Settings.</div>
+    </div>`;
+  }
+  if(!authPhone){
+    return `<div style="max-width:600px;margin:0 auto;padding:40px 20px;text-align:center;">
+      <div style="font-size:13px;color:#7a8aaa;">Log in to view messages.</div>
+    </div>`;
+  }
+
+  const pendingHtml = reqs.length === 0
+    ? `<div style="text-align:center;padding:60px 20px;color:#4a5a7a;">
+        <div style="font-size:48px;margin-bottom:12px;">✉️</div>
+        <div style="font-size:15px;font-weight:700;color:#7a8aaa;margin-bottom:6px;">No pending requests</div>
+        <div style="font-size:12px;">When another shop adds you as a creditor or customer, their request will appear here.</div>
+      </div>`
+    : reqs.map(req=>{
+        const p = req.fromProfile || {};
+        const initials = (p.shopName||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+        const roleLabel = req.type === "creditor" ? "add you as a <b style='color:#f59e0b;'>Creditor</b>" : "add you as a <b style='color:#60a5fa;'>Customer/Debtor</b>";
+        const roleDesc  = req.type === "creditor"
+          ? "If you accept, they will appear in your <b>Creditors</b> tab — you owe them for purchases."
+          : "If you accept, they will appear in your <b>Customers</b> tab — they buy from you.";
+        const timeStr = new Date(req.createdAt).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+        return `
+          <div style="background:#0d1220;border:2px solid ${req.type==='creditor'?'#92400e':'#1e3a6e'};border-radius:16px;padding:18px;margin-bottom:14px;">
+            <!-- Shop info -->
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+              <div style="width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,${req.type==='creditor'?'#92400e,#d97706':'#1e3a6e,#2a5aaa'});display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">
+                ${p.shopIcon?`<img src="${p.shopIcon}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;" onerror="this.style.display='none'">`:initials}
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:16px;font-weight:800;color:#e8eaf0;">${escHtml(p.shopName||"Unknown Shop")}</div>
+                <div style="font-size:12px;color:#60a5fa;font-family:monospace;font-weight:700;">${escHtml(p.shopId||"")}</div>
+                <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">📅 ${timeStr}</div>
+              </div>
+              <div style="background:${req.type==='creditor'?'#92400e33':'#1e3a6e33'};border:1px solid ${req.type==='creditor'?'#d97706':'#3a6aee'};border-radius:8px;padding:4px 10px;font-size:11px;font-weight:800;color:${req.type==='creditor'?'#fbbf24':'#60a5fa'};white-space:nowrap;">
+                ${req.type==='creditor'?'🏦 Creditor':'👤 Customer'}
+              </div>
+            </div>
+            <!-- Message -->
+            <div style="background:#080c18;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:#a0b0d0;line-height:1.6;">
+              <b style="color:#e8eaf0;">${escHtml(p.shopName||"This shop")}</b> wants to ${roleLabel} in their account.<br>
+              <span style="font-size:12px;color:#7a8aaa;">${roleDesc}</span>
+            </div>
+            <!-- Details -->
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-size:12px;">
+              ${p.phone   ?`<span style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:6px;padding:4px 10px;color:#e8eaf0;">📞 ${escHtml(p.phone)}</span>`:""}
+              ${p.gstin   ?`<span style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:6px;padding:4px 10px;color:#a78bfa;font-family:monospace;">🔢 ${escHtml(p.gstin)}</span>`:""}
+              ${p.city    ?`<span style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:6px;padding:4px 10px;color:#e8eaf0;">📍 ${escHtml(p.city)}</span>`:""}
+              ${p.address ?`<span style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:6px;padding:4px 10px;color:#7a8aaa;">🏠 ${escHtml(p.address)}</span>`:""}
+            </div>
+            <!-- Actions -->
+            <div style="display:flex;gap:10px;">
+              <button onclick="_acceptReqById('${req.id}')" class="btn"
+                style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:12px;font-size:14px;font-weight:800;">
+                ✅ Accept — Add to ${req.type==='creditor'?'Creditors':'Customers'}
+              </button>
+              <button onclick="_declineReqById('${req.id}')" class="btn"
+                style="flex:1;background:#1a0a0a;border:1px solid #ef4444;color:#ef4444;padding:12px;font-size:13px;font-weight:700;">
+                ✕ Decline
+              </button>
+            </div>
+          </div>`;
+      }).join("");
+
+  return `<div style="max-width:680px;margin:0 auto;">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+      <div>
+        <div style="font-size:20px;font-weight:800;color:#e8eaf0;">✉️ Messages</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">Connection requests from other ShopChampion shops</div>
+      </div>
+      <button onclick="loadShopRequests().then(()=>renderTab(7))" class="btn"
+        style="background:#0a1628;border:1px solid #1e3a6e;color:#60a5fa;padding:8px 14px;font-size:12px;font-weight:800;">
+        🔄 Refresh
+      </button>
+    </div>
+    <!-- How it works info box -->
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:12px;color:#7a8aaa;line-height:1.7;">
+      <div style="font-weight:800;color:#60a5fa;margin-bottom:6px;">ℹ️ How Shop Connect works</div>
+      When another ShopChampion shop searches your <b style="color:#60a5fa;">Shop ID</b> (from Creditors or Customers tab) and sends a request, it appears here.<br>
+      <b style="color:#e8eaf0;">Accept</b> → their shop is automatically saved in your account with all details (name, phone, GSTIN, address).<br>
+      <b style="color:#e8eaf0;">Decline</b> → request is removed, nothing is saved.
+    </div>
+    <!-- Pending requests -->
+    <div>
+      ${reqs.length>0?`<div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:12px;">📬 Pending Requests (${reqs.length})</div>`:""}
+      ${pendingHtml}
+    </div>
+  </div>`;
+}
+
+// ── Helpers called from inline onclick ────────────────────────────────────────
+function _acceptReqById(id){
+  const req = _shopRequestsCache.find(r=>r.id===id);
+  if(req) acceptShopRequest(req);
+}
+function _declineReqById(id){
+  const req = _shopRequestsCache.find(r=>r.id===id);
+  if(req) declineShopRequest(req);
 }
 
 // ─── PURCHASE MODE MODAL ──────────────────────────────────────
