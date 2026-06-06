@@ -1537,16 +1537,16 @@ function loadSettingsFromCloud(cb) {
         if (d.sync_data)         { syncBinId = d.sync_data.binId || ""; syncApiKey = d.sync_data.apiKey || ""; }
         if (d.license)           { try { localStorage.setItem(storageKey("license"), JSON.stringify(d.license)); } catch {} }
         // Read GSTIN proxy URL from global settings (set by SellerPanel)
-        try {
-          const gstinDoc = await db.collection("global_settings").doc("gstin_proxy").get();
-          if (gstinDoc && gstinDoc.exists) {
-            const proxyUrl = (gstinDoc.data().url || "").trim();
-            if (proxyUrl) {
-              appSettings.gstinProxyUrl = proxyUrl;
-              localStorage.setItem("sc_gstin_proxy_url", proxyUrl);
+        db.collection("global_settings").doc("gstin_proxy").get()
+          .then(gstinDoc => {
+            if (gstinDoc && gstinDoc.exists) {
+              const proxyUrl = (gstinDoc.data().url || "").trim();
+              if (proxyUrl) {
+                appSettings.gstinProxyUrl = proxyUrl;
+                try { localStorage.setItem("sc_gstin_proxy_url", proxyUrl); } catch {}
+              }
             }
-          }
-        } catch(e) { /* silent — GSTIN proxy is optional */ }
+          }).catch(() => { /* silent — GSTIN proxy is optional */ });
       }
       if (cb) cb();
     })
