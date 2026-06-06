@@ -1218,8 +1218,8 @@ async function scHashPassword(phone, password) {
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
 const ADMIN_PASS = "1234";
-const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","inventory","settings"];
-const TABS_ICON = ["🏆","👥","💳","📊","⚖️","📦","⚙️"];
+const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","inventory","creditors","settings"];
+const TABS_ICON = ["🏆","👥","💳","📊","⚖️","📦","🏦","⚙️"];
 function getTabs(){
   return TABS_BASE.map((k,i)=>{
     let label = TABS_ICON[i]+" "+t(k);
@@ -1567,6 +1567,7 @@ function startFirestoreListener() {
   // Always start inventory listener together with customer listener
   if(authPhone && !invUnsubscribe){
     loadInventoryFromFirestore(null);
+    loadCreditorsFromCloud();
   }
 }
 
@@ -2951,19 +2952,17 @@ function renderTabs(){const TABS=getTabs();document.getElementById("tab-bar").in
 function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}if(i!==6)invPrefillName="";currentTab=i;renderTabs();renderTab(i);}
 function renderTab(i){
   const el=document.getElementById("tab-content"),s=getSorted();
-  // Reset position/overflow before rendering
   el.style.position="";el.style.overflow="";
   if(i===0)el.innerHTML=renderLeaderboard(getSortedFiltered());
   else if(i===1){const q=document.getElementById("cust-search")?.value||"";el.innerHTML=renderCustomers(s,q);}
   else if(i===2){el.innerHTML=renderPurchaseTab(s);if(getPurchaseMode()==="inventory"){const list=document.getElementById("pt-items-list");if(list&&list.children.length===0)ptAddItemRow();}
-    // ── Re-populate ad zone every time purchase tab renders ──
     setTimeout(scRenderPurchaseBanners, 0);
   }
   else if(i===3)el.innerHTML=renderAnalytics(s);
   else if(i===4)el.innerHTML=renderCompare();
   else if(i===5)el.innerHTML=renderInventoryTab();
-  else if(i===6)el.innerHTML=renderSettings();
-  // License gate — show overlay on top, don't replace content
+  else if(i===6)el.innerHTML=renderCreditorsTab();
+  else if(i===7)el.innerHTML=renderSettings();
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
 }
 
@@ -3097,11 +3096,18 @@ function renderLeaderboard(sorted){
 // ─── CUSTOMERS ────────────────────────────────────────────────
 let custDateFilter = 'all'; // 'all' | '7d' | '30d' | 'custom'
 let custCustomDate = '';
+let custGstFilter  = 'all'; // 'all' | 'gst' | 'nogst'
 // custPage and related vars declared at top level
 
 function setCustDateFilter(f, date='') {
   custDateFilter = f;
   custCustomDate = date;
+  renderTab(1);
+}
+
+function setCustGstFilter(f) {
+  custGstFilter = f;
+  custPage = 0;
   renderTab(1);
 }
 
@@ -3134,6 +3140,9 @@ function renderCustomers(sorted,q=""){
   );
   // Apply date filter
   if (custDateFilter !== 'all') f = f.filter(custMatchesDateFilter);
+  // Apply GST filter
+  if (custGstFilter === 'gst')   f = f.filter(c => !!c.gstin);
+  if (custGstFilter === 'nogst') f = f.filter(c => !c.gstin);
   custFilteredIds = f.map(c=>c.id);
   const visibleCount = Math.min(custPage > 0 ? custPage : CUST_BATCH, f.length);
   const visible = f.slice(0, visibleCount);
@@ -3167,7 +3176,7 @@ function renderCustomers(sorted,q=""){
       ${avatarEl(c,44)}
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:15px;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
-        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.phone?`📞 ${c.phone}`:"No phone"} ${showVisits?`· 🧾 ${(c.purchases||[]).length}`:""}</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.phone?`📞 ${c.phone}`:"No phone"} ${showVisits?`· 🧾 ${(c.purchases||[]).length}`:""} ${c.gstin?`· <span style="color:#a78bfa;font-size:11px;font-weight:700;">GST ✓</span>`:""}</div>
         ${showLastVisit&&lastP?`<div style="font-size:11px;margin-top:2px;color:${visitColor};">🕐 ${lastVisit}</div>`:""}
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
@@ -3176,6 +3185,17 @@ function renderCustomers(sorted,q=""){
       </div>
     </div>`;
   }
+
+  // GST filter pills
+  const gstPills = `
+    <div style="margin-bottom:10px;">
+      <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔢 GST Status:</div>
+      <div style="display:flex;gap:6px;">
+        ${[['all','👥 All'],['gst','✅ GST Registered'],['nogst','❌ Not Registered']].map(([k,l])=>`
+          <button onclick="setCustGstFilter('${k}')" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${custGstFilter===k?'#a78bfa':'#1e2a45'};background:${custGstFilter===k?'#1a0a30':'transparent'};color:${custGstFilter===k?'#a78bfa':'#4a5a7a'};font-size:12px;font-weight:${custGstFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;flex-shrink:0;">${l}</button>
+        `).join('')}
+      </div>
+    </div>`;
 
   // Date filter pills
   const dfPills = `
@@ -3219,7 +3239,7 @@ function renderCustomers(sorted,q=""){
     <div style="padding:0 14px 8px;">
       <input class="input" id="cust-search" dir="ltr" placeholder="🔍 Search name, phone, ID..." value="${q}" oninput="refreshCustSearch(this.value)" style="text-align:left;" />
     </div>
-    <div style="padding:0 14px 2px;">${dfPills}</div>
+    <div style="padding:0 14px 2px;">${gstPills}${dfPills}</div>
     <div id="cust-list" style="display:flex;flex-direction:column;gap:6px;padding:0 14px;">${list||'<div style="text-align:center;color:#4a5a7a;padding:40px;">No customers found</div>'}</div>
     ${loadMoreBtn}
   </div>`;
@@ -3578,7 +3598,15 @@ async function ptSubmit(){
   let a;
   if(isInvMode){
     if(!soldItems.length){notify("❌ Add at least one item in Inventory Mode","error");if(submitBtn)submitBtn.disabled=false;return;}
-    a = soldItems.reduce((sum,si)=>sum+(si.qty*(si.pricePerUnit||0)),0);
+    // Calculate total including GST for each item
+    a = soldItems.reduce((sum,si)=>{
+      const inv = inventoryItems.find(x=>x.name===si.name);
+      if(inv && inv.gstRate && inv.gstRate>0){
+        const g = invItemGstTotal(inv, si.qty);
+        return sum + g.total;
+      }
+      return sum+(si.qty*(si.pricePerUnit||0));
+    },0);
     if(a<=0){notify("❌ Total amount is ₹0 — set a selling price per unit for each item","error");if(submitBtn)submitBtn.disabled=false;return;}
   } else {
     a=parseFloat(document.getElementById("pt-amt").value||"0");
@@ -3841,6 +3869,57 @@ function bwItemDdKey(e, rowId){
   items[idx]?.scrollIntoView({block:"nearest"});
 }
 
+// ─── INVENTORY GST PREVIEW ────────────────────────────────────────────────────
+function invUpdateGstPreview(formType){
+  const rateEl    = document.getElementById("inv-gst-rate");
+  const inclEl    = document.getElementById("inv-gst-included");
+  const sellEl    = document.getElementById("inv-sell-price");
+  const previewEl = document.getElementById("inv-gst-preview-"+formType);
+  if(!rateEl || !previewEl) return;
+
+  const rate     = parseFloat(rateEl.value)||0;
+  const included = inclEl?.value || "exclusive";
+  const sellBase = parseFloat(sellEl?.value||"0")||0;
+
+  if(rate === 0){ previewEl.style.display="none"; return; }
+
+  previewEl.style.display = "block";
+  if(sellBase > 0){
+    if(included === "exclusive"){
+      const gstAmt     = +(sellBase * rate / 100).toFixed(2);
+      const totalPrice = +(sellBase + gstAmt).toFixed(2);
+      previewEl.innerHTML = `Base: ₹${sellBase.toFixed(2)} + GST ${rate}% (₹${gstAmt}) = <strong>Customer pays ₹${totalPrice.toFixed(2)}</strong>`;
+    } else {
+      const basePrice  = +(sellBase * 100 / (100 + rate)).toFixed(2);
+      const gstAmt     = +(sellBase - basePrice).toFixed(2);
+      previewEl.innerHTML = `Price ₹${sellBase.toFixed(2)} includes GST — Base: ₹${basePrice.toFixed(2)} + GST ${rate}% (₹${gstAmt})`;
+    }
+  } else {
+    previewEl.innerHTML = included==="exclusive"
+      ? `GST ${rate}% will be added on top of selling price`
+      : `GST ${rate}% is already inside the selling price`;
+  }
+}
+
+function invItemGstTotal(item, qty){
+  // Returns { base, gstAmt, total, rate, included }
+  const rate     = Number(item.gstRate)||0;
+  const included = item.gstIncluded || "exclusive";
+  const sellPrice = Number(item.sellingPrice)||0;
+  const basePerUnit = included === "inclusive"
+    ? +(sellPrice * 100 / (100 + rate)).toFixed(4)
+    : sellPrice;
+  const gstPerUnit = included === "inclusive"
+    ? +(sellPrice - basePerUnit).toFixed(4)
+    : +(sellPrice * rate / 100).toFixed(4);
+  return {
+    base:     +(basePerUnit * qty).toFixed(2),
+    gstAmt:   +(gstPerUnit  * qty).toFixed(2),
+    total:    +(( sellPrice + (included==="exclusive"?gstPerUnit:0) ) * qty).toFixed(2),
+    rate, included
+  };
+}
+
 function bwShowItemStock(input){
   const name = input.value.trim();
   const row = input.closest('.bw-item-row');
@@ -3849,7 +3928,10 @@ function bwShowItemStock(input){
   const item = inventoryItems.find(x=>x.name===name);
   if(item){
     const stk = invGetStock(name);
-    hint.textContent = '📦 Stock: '+stk+' '+(item.unit||'unit');
+    const gstInfo = (item.gstRate && item.gstRate > 0 && item.sellingPrice > 0)
+      ? ` · 🔢 GST ${item.gstRate}% ${item.gstIncluded==='inclusive'?'(incl.)':'(+extra)'}`
+      : "";
+    hint.textContent = '📦 Stock: '+stk+' '+(item.unit||'unit')+gstInfo;
     hint.style.color = stk<=0?'#f66':stk<=5?'#FFD700':'#4f4';
     // Auto-fill price from inventory selling price, then last sale price
     const bwPriceMode = getAutoPriceMode();
@@ -3885,22 +3967,43 @@ function bwShowItemStock(input){
 function bwUpdateTotal(){
   const rows = document.querySelectorAll('.bw-item-row');
   let grand = 0;
+  let grandBase = 0;
+  let grandGst = 0;
   rows.forEach(row=>{
-    const qty = parseFloat(row.querySelector('.bw-row-qty')?.value||'0')||0;
-    const ppu = parseFloat(row.querySelector('.bw-row-price')?.value||'0')||0;
-    const lineTotal = qty*ppu;
+    const qty  = parseFloat(row.querySelector('.bw-row-qty')?.value||'0')||0;
+    const ppu  = parseFloat(row.querySelector('.bw-row-price')?.value||'0')||0;
+    const name = row.querySelector('.bw-row-name')?.value?.trim()||'';
+    const inv  = inventoryItems.find(x=>x.name===name);
+    let lineTotal = qty*ppu;
+    let gstAmt = 0;
+    if(inv && inv.gstRate && inv.gstRate>0 && qty>0 && ppu>0){
+      const g = invItemGstTotal(inv, qty);
+      lineTotal = g.total;
+      gstAmt = g.gstAmt;
+      grandBase += g.base;
+      grandGst  += g.gstAmt;
+    } else {
+      grandBase += lineTotal;
+    }
     grand += lineTotal;
     const lt = row.querySelector('.bw-line-total');
     if(lt){
-      if(qty>0&&ppu>0){ lt.style.display='block'; lt.textContent='= ₹'+lineTotal.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-      else { lt.style.display='none'; }
+      if(qty>0&&ppu>0){
+        lt.style.display='block';
+        lt.innerHTML = gstAmt>0
+          ? `= ₹${lineTotal.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})} <span style="font-size:10px;color:#a78bfa;">(+GST ₹${gstAmt.toFixed(2)})</span>`
+          : '= ₹'+lineTotal.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+      } else { lt.style.display='none'; }
     }
   });
   const totalEl = document.getElementById('bw-inv-total');
   if(totalEl){
     if(grand>0){
       totalEl.style.display='block';
-      totalEl.innerHTML=`<span style="color:#7a8aaa;font-size:13px;">Total Amount:</span> <span style="color:#f84;font-size:20px;font-weight:800;">₹${grand.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`;
+      const gstLine = grandGst>0
+        ? `<div style="font-size:11px;color:#a78bfa;margin-top:4px;">Base: ₹${grandBase.toFixed(2)} + GST: ₹${grandGst.toFixed(2)}</div>`
+        : '';
+      totalEl.innerHTML=`<span style="color:#7a8aaa;font-size:13px;">Total Amount:</span> <span style="color:#f84;font-size:20px;font-weight:800;">₹${grand.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>${gstLine}`;
       const amtEl=document.getElementById('bw-amt');
       if(amtEl) amtEl.value=grand.toFixed(2);
     } else {
@@ -4722,6 +4825,555 @@ function showFirebaseSettings(){
 }
 
 // ─── SETTINGS ────────────────────────────────────────────────
+// ─── CUSTOMER GST AUTO-FILL (shared helper for add/edit customer modals) ─────
+async function custGSTAutoFill(gstinInputId, companyInputId, addressInputId, statusId){
+  const gstinEl   = document.getElementById(gstinInputId);
+  const companyEl = document.getElementById(companyInputId);
+  const addressEl = document.getElementById(addressInputId);
+  const statusEl  = document.getElementById(statusId);
+  const btnEl     = document.getElementById("m-gst-autofill-btn");
+  if(!gstinEl || !statusEl) return;
+
+  const gstin    = gstinEl.value.trim().toUpperCase();
+  const proxyUrl = getGSTINProxyURL();
+
+  statusEl.style.display = "block";
+  statusEl.style.color   = "#a78bfa";
+  statusEl.textContent   = "⏳ Looking up GSTIN...";
+  if(btnEl) btnEl.disabled = true;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(), 10000);
+    const res = await fetch(`${proxyUrl}?gstin=${encodeURIComponent(gstin)}`, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if(!res.ok){ statusEl.style.color="#ef4444"; statusEl.textContent=`❌ Proxy error (HTTP ${res.status})`; if(btnEl)btnEl.disabled=false; return; }
+    const data = await res.json();
+    if(!data || data.flag===false){ statusEl.style.color="#ef4444"; statusEl.textContent="❌ "+(data?.message||"GSTIN not found."); if(btnEl)btnEl.disabled=false; return; }
+
+    const info = data.data||{};
+    const a    = info.pradr?.addr||{};
+    const addr = [a.bno,a.flno,a.bnm,a.st,a.loc,a.dst,a.stcd,a.pncd].filter(Boolean).join(", ");
+    const name = info.lgnm || info.tradeNam || "";
+
+    if(companyEl && name)  companyEl.value = name;
+    if(addressEl && addr)  addressEl.value = addr;
+
+    statusEl.style.color   = "#22c55e";
+    statusEl.textContent   = "✅ Autofilled! — "+name;
+  } catch(err){
+    statusEl.style.color = "#ef4444";
+    statusEl.textContent = err.name==="AbortError"?"❌ Timed out":"❌ Network error";
+  }
+  if(btnEl) btnEl.disabled = false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── CREDITORS MODULE ───────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Storage ──────────────────────────────────────────────────────────────────
+function creditorsKey(){ return storageKey("creditors_v1"); }
+
+function loadCreditors(){
+  try { const s=localStorage.getItem(creditorsKey()); return s?JSON.parse(s):[]; }
+  catch { return []; }
+}
+
+function saveCreditors(list){
+  try { localStorage.setItem(creditorsKey(), JSON.stringify(list)); } catch {}
+  // Push to Firebase if connected
+  if(db && authPhone){
+    db.collection("users").doc(authPhone).collection("app_data").doc("creditors")
+      .set({ list, updatedAt: Date.now() }).catch(()=>{});
+  }
+}
+
+function getCreditors(){ return loadCreditors(); }
+
+// Load from Firebase on init
+function loadCreditorsFromCloud(){
+  if(!db || !authPhone) return;
+  db.collection("users").doc(authPhone).collection("app_data").doc("creditors")
+    .get().then(doc=>{
+      if(doc && doc.exists){
+        const data = doc.data();
+        if(data.list) try { localStorage.setItem(creditorsKey(), JSON.stringify(data.list)); } catch {}
+      }
+    }).catch(()=>{});
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function credBalance(cr){
+  const purchased = (cr.transactions||[]).filter(t=>t.type==="purchase").reduce((s,t)=>s+t.amount,0);
+  const paid      = (cr.transactions||[]).filter(t=>t.type==="payment").reduce((s,t)=>s+t.amount,0);
+  const returned  = (cr.transactions||[]).filter(t=>t.type==="return").reduce((s,t)=>s+t.amount,0);
+  return purchased - paid - returned; // positive = you owe them
+}
+
+function credTxIcon(type){
+  if(type==="purchase") return "📦";
+  if(type==="payment")  return "💰";
+  if(type==="return")   return "↩️";
+  return "•";
+}
+
+function credTxColor(type){
+  if(type==="purchase") return "#f59e0b";
+  if(type==="payment")  return "#22c55e";
+  if(type==="return")   return "#a78bfa";
+  return "#7a8aaa";
+}
+
+function newCreditorId(){ return "CR" + Date.now() + Math.random().toString(36).slice(2,6).toUpperCase(); }
+
+// ── Main Render ───────────────────────────────────────────────────────────────
+function renderCreditorsTab(){
+  const creditors = getCreditors();
+  const totalOwed = creditors.reduce((s,c)=>s+Math.max(0,credBalance(c)),0);
+  const totalCount = creditors.length;
+
+  const searchVal  = window._credSearch || "";
+  const gstFilter  = window._credGstFilter || "all"; // 'all' | 'gst' | 'nogst'
+
+  let filtered = creditors.filter(c=>
+    !searchVal ||
+    c.name.toLowerCase().includes(searchVal.toLowerCase()) ||
+    (c.phone||"").includes(searchVal)
+  );
+  // Apply GST filter
+  if (gstFilter === 'gst')   filtered = filtered.filter(c => !!c.gstin);
+  if (gstFilter === 'nogst') filtered = filtered.filter(c => !c.gstin);
+
+  // Sort: highest balance first
+  filtered.sort((a,b)=>credBalance(b)-credBalance(a));
+
+  return `
+  <div style="max-width:900px;margin:0 auto;">
+
+    <!-- Header row -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+      <div>
+        <div style="font-size:20px;font-weight:800;color:#e8eaf0;">🏦 Creditors</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${totalCount} supplier${totalCount!==1?"s":""} · Total payable: <span style="color:#f59e0b;font-weight:800;">${formatINR(totalOwed)}</span></div>
+      </div>
+      <button onclick="openAddCreditorModal()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:10px 20px;font-size:13px;font-weight:800;">
+        + Add Creditor
+      </button>
+    </div>
+
+    <!-- Summary cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+      ${_credSummaryCard("Total Suppliers", totalCount, "#a78bfa", "🏢")}
+      ${_credSummaryCard("Total Payable", formatINR(totalOwed), "#f59e0b", "💸")}
+      ${_credSummaryCard("Paid This Month", formatINR(_credPaidThisMonth(creditors)), "#22c55e", "✅")}
+      ${_credSummaryCard("Purchased This Month", formatINR(_credPurchasedThisMonth(creditors)), "#60a5fa", "📦")}
+    </div>
+
+    <!-- Search -->
+    <div style="margin-bottom:10px;">
+      <input class="input" placeholder="🔍 Search creditor by name or phone..." value="${escHtml(searchVal)}"
+        oninput="window._credSearch=this.value;renderTab(6)" style="font-size:13px;" />
+    </div>
+
+    <!-- GST filter pills -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔢 GST Status:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${[['all','🏢 All'],['gst','✅ GST Registered'],['nogst','❌ Not Registered']].map(([k,l])=>`
+          <button onclick="window._credGstFilter='${k}';renderTab(6)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${gstFilter===k?'#a78bfa':'#1e2a45'};background:${gstFilter===k?'#1a0a30':'transparent'};color:${gstFilter===k?'#a78bfa':'#4a5a7a'};font-size:12px;font-weight:${gstFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Creditor list -->
+    ${filtered.length===0 ? `
+      <div style="text-align:center;padding:60px 20px;color:#4a5a7a;">
+        <div style="font-size:48px;margin-bottom:12px;">🏦</div>
+        <div style="font-size:16px;font-weight:700;color:#7a8aaa;">${searchVal?"No creditors found":"No creditors yet"}</div>
+        <div style="font-size:13px;margin-top:6px;">${searchVal?"Try a different search":"Click '+ Add Creditor' to add your first supplier"}</div>
+      </div>
+    ` : `
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        ${filtered.map(cr=>_renderCreditorCard(cr)).join("")}
+      </div>
+    `}
+  </div>`;
+}
+
+function _credSummaryCard(label, value, color, icon){
+  return `<div style="background:#0d1220;border:1px solid #1e2a45;border-radius:14px;padding:14px 16px;">
+    <div style="font-size:20px;margin-bottom:6px;">${icon}</div>
+    <div style="font-size:18px;font-weight:800;color:${color};">${value}</div>
+    <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${label}</div>
+  </div>`;
+}
+
+function _credPaidThisMonth(creditors){
+  const now=new Date(); const y=now.getFullYear(),m=now.getMonth();
+  return creditors.reduce((s,c)=>s+(c.transactions||[]).filter(t=>{
+    const d=new Date(t.date); return t.type==="payment"&&d.getFullYear()===y&&d.getMonth()===m;
+  }).reduce((ss,t)=>ss+t.amount,0),0);
+}
+
+function _credPurchasedThisMonth(creditors){
+  const now=new Date(); const y=now.getFullYear(),m=now.getMonth();
+  return creditors.reduce((s,c)=>s+(c.transactions||[]).filter(t=>{
+    const d=new Date(t.date); return t.type==="purchase"&&d.getFullYear()===y&&d.getMonth()===m;
+  }).reduce((ss,t)=>ss+t.amount,0),0);
+}
+
+function _renderCreditorCard(cr){
+  const bal = credBalance(cr);
+  const balColor = bal>0?"#f59e0b":bal<0?"#22c55e":"#7a8aaa";
+  const balLabel = bal>0?"You owe":bal<0?"They owe you":"Settled";
+  const lastTx = (cr.transactions||[]).slice(-1)[0];
+  const initials = cr.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+
+  return `<div style="background:#0d1220;border:1px solid #1e2a45;border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
+    onmouseenter="this.style.borderColor='#2a3a6a'" onmouseleave="this.style.borderColor='#1e2a45'"
+    onclick="openCreditorDetail('${cr.id}')">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <!-- Avatar -->
+      <div style="width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;">${initials}</div>
+      <!-- Info -->
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:800;font-size:15px;color:#e8eaf0;">${escHtml(cr.name)}</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">
+          ${cr.phone?`📞 ${cr.phone}`:""}
+          ${cr.gstin?` · 🔢 ${cr.gstin}`:""}
+        </div>
+        ${lastTx?`<div style="font-size:11px;color:#4a5a7a;margin-top:3px;">Last: ${credTxIcon(lastTx.type)} ${escHtml(lastTx.note||lastTx.type)} · ${new Date(lastTx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>`:""}
+      </div>
+      <!-- Balance -->
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:18px;font-weight:800;color:${balColor};">${formatINR(Math.abs(bal))}</div>
+        <div style="font-size:11px;color:${balColor};margin-top:2px;">${balLabel}</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${(cr.transactions||[]).length} transactions</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Add/Edit Creditor Modal ────────────────────────────────────────────────────
+function openAddCreditorModal(editId){
+  const creditors = getCreditors();
+  const cr = editId ? creditors.find(c=>c.id===editId) : null;
+  const isEdit = !!cr;
+
+  showWideModal(`
+    ${modalHeader(isEdit?"✏️ Edit Creditor":"🏦 Add New Creditor")}
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">CREDITOR NAME *</label>
+        <input class="input" id="cr-name" placeholder="e.g. Sharma Traders" value="${escHtml(cr?.name||"")}" style="margin-bottom:0;" />
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">PHONE</label>
+          <input class="input" id="cr-phone" type="tel" placeholder="9876543210" value="${escHtml(cr?.phone||"")}" style="margin-bottom:0;" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GSTIN</label>
+          <input class="input" id="cr-gstin" placeholder="27XXXXX0000X1ZX" value="${escHtml(cr?.gstin||"")}" style="margin-bottom:0;" />
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">ADDRESS</label>
+        <textarea class="input" id="cr-address" placeholder="Shop address..." rows="2" style="margin-bottom:0;resize:vertical;">${escHtml(cr?.address||"")}</textarea>
+      </div>
+
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;">
+        <div style="font-size:12px;color:#a78bfa;font-weight:800;margin-bottom:10px;">🏦 Bank Details</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <input class="input" id="cr-bank-name" placeholder="Bank name (e.g. SBI)" value="${escHtml(cr?.bank?.name||"")}" style="margin-bottom:0;font-size:12px;" />
+          <input class="input" id="cr-bank-acc" placeholder="Account number" value="${escHtml(cr?.bank?.acc||"")}" style="margin-bottom:0;font-size:12px;" />
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <input class="input" id="cr-bank-ifsc" placeholder="IFSC code" value="${escHtml(cr?.bank?.ifsc||"")}" style="margin-bottom:0;font-size:12px;" />
+            <input class="input" id="cr-bank-upi" placeholder="UPI ID" value="${escHtml(cr?.bank?.upi||"")}" style="margin-bottom:0;font-size:12px;" />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">NOTES</label>
+        <input class="input" id="cr-notes" placeholder="Any notes about this supplier..." value="${escHtml(cr?.notes||"")}" style="margin-bottom:0;" />
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        ${isEdit?`<button onclick="deleteCreditor('${cr.id}')" class="btn" style="background:#1a0000;border:1px solid #5a1a1a;color:#f66;flex:0.4;">🗑 Delete</button>`:""}
+        <button onclick="saveCreditorModal('${editId||""}')" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;flex:1;font-weight:800;">
+          ${isEdit?"✅ Save Changes":"✅ Add Creditor"}
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+function saveCreditorModal(editId){
+  const name = document.getElementById("cr-name")?.value.trim();
+  if(!name){ notify("⚠️ Name is required"); return; }
+
+  const creditors = getCreditors();
+  const cr = {
+    id:       editId || newCreditorId(),
+    name,
+    phone:    document.getElementById("cr-phone")?.value.trim()||"",
+    gstin:    document.getElementById("cr-gstin")?.value.trim().toUpperCase()||"",
+    address:  document.getElementById("cr-address")?.value.trim()||"",
+    notes:    document.getElementById("cr-notes")?.value.trim()||"",
+    bank: {
+      name: document.getElementById("cr-bank-name")?.value.trim()||"",
+      acc:  document.getElementById("cr-bank-acc")?.value.trim()||"",
+      ifsc: document.getElementById("cr-bank-ifsc")?.value.trim().toUpperCase()||"",
+      upi:  document.getElementById("cr-bank-upi")?.value.trim()||"",
+    },
+    createdAt: editId ? (creditors.find(c=>c.id===editId)?.createdAt || Date.now()) : Date.now(),
+    transactions: editId ? (creditors.find(c=>c.id===editId)?.transactions||[]) : [],
+  };
+
+  const idx = creditors.findIndex(c=>c.id===editId);
+  if(idx>=0) creditors[idx]=cr; else creditors.push(cr);
+  saveCreditors(creditors);
+  closeModal();
+  notify(editId?"✅ Creditor updated":"✅ Creditor added");
+  renderTab(6);
+}
+
+function deleteCreditor(id){
+  if(!confirm("Delete this creditor and all their transactions?")) return;
+  const creditors = getCreditors().filter(c=>c.id!==id);
+  saveCreditors(creditors);
+  closeModal();
+  notify("🗑 Creditor deleted");
+  renderTab(6);
+}
+
+// ── Creditor Detail Modal ─────────────────────────────────────────────────────
+function openCreditorDetail(id){
+  const creditors = getCreditors();
+  const cr = creditors.find(c=>c.id===id);
+  if(!cr) return;
+
+  const bal = credBalance(cr);
+  const balColor = bal>0?"#f59e0b":bal<0?"#22c55e":"#7a8aaa";
+  const txs = (cr.transactions||[]).slice().reverse(); // newest first
+
+  showWideModal(`
+    ${modalHeader("🏦 "+escHtml(cr.name))}
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Balance banner -->
+      <div style="background:${bal>0?"#1a0e00":"#001a0e"};border:2px solid ${balColor};border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:12px;color:#7a8aaa;font-weight:700;">${bal>0?"AMOUNT YOU OWE":bal<0?"THEY OWE YOU":"FULLY SETTLED"}</div>
+          <div style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
+          <button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
+          <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>
+        </div>
+      </div>
+
+      <!-- Creditor info -->
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+        ${cr.phone?`<div><span style="color:#7a8aaa;">📞 Phone</span><br><span style="color:#e8eaf0;font-weight:700;">${cr.phone}</span></div>`:""}
+        ${cr.gstin?`<div><span style="color:#7a8aaa;">🔢 GSTIN</span><br><span style="color:#e8eaf0;font-weight:700;">${cr.gstin}</span></div>`:""}
+        ${cr.address?`<div style="grid-column:1/-1;"><span style="color:#7a8aaa;">📍 Address</span><br><span style="color:#e8eaf0;">${escHtml(cr.address)}</span></div>`:""}
+        ${cr.bank?.acc?`<div><span style="color:#7a8aaa;">🏦 Bank</span><br><span style="color:#e8eaf0;font-weight:700;">${escHtml(cr.bank.name||"")} ${cr.bank.acc}</span></div>`:""}
+        ${cr.bank?.ifsc?`<div><span style="color:#7a8aaa;">IFSC</span><br><span style="color:#e8eaf0;font-weight:700;">${cr.bank.ifsc}</span></div>`:""}
+        ${cr.bank?.upi?`<div><span style="color:#7a8aaa;">UPI</span><br><span style="color:#e8eaf0;font-weight:700;">${escHtml(cr.bank.upi)}</span></div>`:""}
+      </div>
+
+      <!-- Transaction history -->
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:800;color:#e8eaf0;">Transaction History</div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="printCreditorStatement('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">🖨 Print</button>
+            <button onclick="openAddCreditorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>
+          </div>
+        </div>
+        ${txs.length===0?`<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>`:`
+        <div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;">
+          ${txs.map((tx,i)=>`
+            <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+              <div style="font-size:20px;flex-shrink:0;">${credTxIcon(tx.type)}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:700;color:#e8eaf0;">${escHtml(tx.note||tx.type)}</div>
+                <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${new Date(tx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${tx.invoiceNo?` · Invoice: ${escHtml(tx.invoiceNo)}`:""}</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;">
+                <div style="font-size:14px;font-weight:800;color:${credTxColor(tx.type)};">${tx.type==="payment"||tx.type==="return"?"-":"+"}${formatINR(tx.amount)}</div>
+              </div>
+              <button onclick="deleteCrTx('${id}',${txs.length-1-i})" style="cursor:pointer;background:none;border:none;color:#4a5a7a;font-size:14px;padding:2px 6px;">✕</button>
+            </div>
+          `).join("")}
+        </div>`}
+      </div>
+    </div>
+  `);
+}
+
+// ── Add Transaction Modal ─────────────────────────────────────────────────────
+function openAddTxModal(creditorId, defaultType){
+  const today = new Date().toISOString().slice(0,10);
+  showWideModal(`
+    ${modalHeader(defaultType==="purchase"?"📦 Record Purchase":defaultType==="payment"?"💰 Record Payment":"↩️ Record Return/Debit Note")}
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <input type="hidden" id="tx-creditor-id" value="${creditorId}" />
+
+      <div style="display:flex;gap:8px;">
+        ${["purchase","payment","return"].map(t=>`
+          <button onclick="document.querySelectorAll('.tx-type-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('tx-type').value='${t}'"
+            class="btn tx-type-btn${t===defaultType?" active":""}"
+            style="flex:1;font-size:12px;padding:8px;background:${t===defaultType?"linear-gradient(135deg,#1e3a6e,#2a5aaa)":"#0a0e1a"};border:1px solid ${t===defaultType?"#2a5aaa":"#1e2a45"};">
+            ${credTxIcon(t)} ${t.charAt(0).toUpperCase()+t.slice(1)}
+          </button>
+        `).join("")}
+      </div>
+      <input type="hidden" id="tx-type" value="${defaultType}" />
+
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">AMOUNT (₹) *</label>
+        <input class="input" id="tx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:18px;font-weight:800;" />
+      </div>
+
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">NOTE / DESCRIPTION</label>
+        <input class="input" id="tx-note" placeholder="e.g. Rice 50kg, Wheat 100kg..." style="margin-bottom:0;" />
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">DATE</label>
+          <input class="input" id="tx-date" type="date" value="${today}" style="margin-bottom:0;" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">INVOICE / REF NO.</label>
+          <input class="input" id="tx-invoice" placeholder="INV-001" style="margin-bottom:0;" />
+        </div>
+      </div>
+
+      <button onclick="saveCrTransaction()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;margin-top:4px;">
+        ✅ Save Transaction
+      </button>
+    </div>
+  `);
+  // Focus amount
+  setTimeout(()=>document.getElementById("tx-amount")?.focus(),100);
+}
+
+function saveCrTransaction(){
+  const creditorId = document.getElementById("tx-creditor-id")?.value;
+  const type    = document.getElementById("tx-type")?.value;
+  const amount  = parseFloat(document.getElementById("tx-amount")?.value)||0;
+  const note    = document.getElementById("tx-note")?.value.trim();
+  const date    = document.getElementById("tx-date")?.value || new Date().toISOString().slice(0,10);
+  const invoiceNo = document.getElementById("tx-invoice")?.value.trim();
+
+  if(!amount || amount<=0){ notify("⚠️ Enter a valid amount"); return; }
+
+  const creditors = getCreditors();
+  const idx = creditors.findIndex(c=>c.id===creditorId);
+  if(idx<0){ notify("❌ Creditor not found"); return; }
+
+  if(!creditors[idx].transactions) creditors[idx].transactions=[];
+  creditors[idx].transactions.push({ id:"TX"+Date.now(), type, amount, note, date, invoiceNo, createdAt:Date.now() });
+  saveCreditors(creditors);
+  closeModal();
+  notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return"} of ${formatINR(amount)} recorded`);
+  // Re-open detail
+  setTimeout(()=>openCreditorDetail(creditorId),200);
+}
+
+function deleteCrTx(creditorId, txIndex){
+  if(!confirm("Delete this transaction?")) return;
+  const creditors = getCreditors();
+  const cr = creditors.find(c=>c.id===creditorId);
+  if(!cr) return;
+  cr.transactions.splice(txIndex,1);
+  saveCreditors(creditors);
+  notify("🗑 Transaction deleted");
+  closeModal();
+  setTimeout(()=>openCreditorDetail(creditorId),200);
+}
+
+// ── Print Statement ───────────────────────────────────────────────────────────
+function printCreditorStatement(id){
+  const cr = getCreditors().find(c=>c.id===id);
+  if(!cr) return;
+  const bal = credBalance(cr);
+  const balColor = bal>0?"#d97706":bal<0?"#16a34a":"#6b7280";
+  const shopName = appSettings?.shopName || "Shop Champion";
+  const txs = (cr.transactions||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+  let running = 0;
+  const rows = txs.map(tx=>{
+    if(tx.type==="purchase") running+=tx.amount;
+    else running-=tx.amount;
+    return `<tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${new Date(tx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${tx.invoiceNo||"-"}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${tx.note||tx.type}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#d97706;">${tx.type==="purchase"?("₹"+tx.amount.toLocaleString("en-IN")):"-"}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#16a34a;">${tx.type!=="purchase"?("₹"+tx.amount.toLocaleString("en-IN")):"-"}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;color:${running>=0?"#d97706":"#16a34a"};">₹${Math.abs(running).toLocaleString("en-IN")}</td>
+    </tr>`;
+  }).join("");
+
+  const html = `<!DOCTYPE html><html><head><title>Statement — ${cr.name}</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:30px;color:#111;max-width:800px;margin:0 auto;}
+    h1{margin:0;font-size:22px;}h2{margin:0;font-size:16px;color:#555;}
+    table{width:100%;border-collapse:collapse;margin-top:20px;}
+    th{background:#f3f4f6;padding:9px 10px;text-align:left;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;}
+    @media print{button{display:none}}
+  </style></head><body>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+    <div><h1>${shopName}</h1><div style="font-size:12px;color:#6b7280;margin-top:4px;">Creditor Statement</div></div>
+    <div style="text-align:right;font-size:12px;color:#6b7280;">Printed: ${new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"})}</div>
+  </div>
+  <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:20px;">
+    <div style="font-size:18px;font-weight:700;margin-bottom:8px;">${cr.name}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">
+      ${cr.phone?`<div>📞 ${cr.phone}</div>`:""}
+      ${cr.gstin?`<div>🔢 ${cr.gstin}</div>`:""}
+      ${cr.address?`<div style="grid-column:1/-1">📍 ${cr.address}</div>`:""}
+      ${cr.bank?.acc?`<div>🏦 ${cr.bank.name} — ${cr.bank.acc}</div>`:""}
+      ${cr.bank?.ifsc?`<div>IFSC: ${cr.bank.ifsc}</div>`:""}
+      ${cr.bank?.upi?`<div>UPI: ${cr.bank.upi}</div>`:""}
+    </div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Date</th><th>Invoice</th><th>Description</th>
+      <th style="text-align:right">Purchase (Dr)</th>
+      <th style="text-align:right">Payment (Cr)</th>
+      <th style="text-align:right">Balance</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr style="background:#f9fafb;">
+      <td colspan="5" style="padding:10px;font-weight:800;text-align:right;">Closing Balance:</td>
+      <td style="padding:10px;font-weight:800;text-align:right;color:${balColor};">₹${Math.abs(bal).toLocaleString("en-IN")} ${bal>0?"(Payable)":bal<0?"(Receivable)":"(Settled)"}</td>
+    </tr></tfoot>
+  </table>
+  <div style="margin-top:30px;text-align:center;font-size:11px;color:#9ca3af;">Generated by ShopChampion</div>
+  <div style="margin-top:16px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:#1e40af;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🖨 Print / Save PDF</button></div>
+  </body></html>`;
+
+  const w = window.open("","_blank","width=860,height=700");
+  w.document.write(html);
+  w.document.close();
+}
+
+// ─── END CREDITORS MODULE ────────────────────────────────────────────────────
+
 function renderSettings(){
   const savedPhone = localStorage.getItem("sc_auth_phone") || "";
   const userNumRaw = savedPhone ? localStorage.getItem("sc_usernum_" + savedPhone) || "" : "";
@@ -5199,7 +5851,36 @@ function openAddModal(){
       <input class="input" id="m-id" placeholder="Custom ID, or leave blank for auto" style="font-family:monospace;" />
       <button class="btn" onclick="document.getElementById('m-id').value=autoId()" style="background:#1a2540;color:#7ab3ff;border:1px solid #2a3560;padding:10px 14px;font-size:12px;white-space:nowrap;">🎲 Auto</button>
     </div>
-    <div style="font-size:11px;color:#4a5a7a;margin-bottom:20px;">Leave blank to auto-generate, or type your own (e.g. SC001, CUST-42).</div>
+    <div style="font-size:11px;color:#4a5a7a;margin-bottom:16px;">Leave blank to auto-generate, or type your own (e.g. SC001, CUST-42).</div>
+
+    <!-- Optional GST Section -->
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="const s=document.getElementById('add-gst-section');const a=document.getElementById('add-gst-arrow');s.style.display=s.style.display==='none'?'block':'none';a.textContent=s.style.display==='none'?'▶':'▼';">
+        <div style="font-size:12px;font-weight:800;color:#a78bfa;">🔢 GST Details <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional)</span></div>
+        <span id="add-gst-arrow" style="color:#4a5a7a;font-size:12px;">▶</span>
+      </div>
+      <div id="add-gst-section" style="display:none;margin-top:12px;">
+        <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;">
+          <div style="flex:1;">
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GSTIN (15-digit)</label>
+            <input class="input" id="m-gstin" placeholder="27XXXXX0000X1ZX" maxlength="15" style="margin-bottom:0;text-transform:uppercase;font-family:monospace;"
+              oninput="this.value=this.value.toUpperCase();const v=/^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(this.value.trim());document.getElementById('m-gst-autofill-btn').style.display=v?'flex':'none';" />
+          </div>
+          <button id="m-gst-autofill-btn" onclick="custGSTAutoFill('m-gstin','m-gst-company','m-gst-address','m-gst-status')" style="display:none;align-items:center;gap:6px;padding:10px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+            🔍 Auto Fill
+          </button>
+        </div>
+        <div id="m-gst-status" style="font-size:11px;margin-bottom:8px;display:none;"></div>
+        <div style="margin-bottom:8px;">
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">COMPANY / LEGAL NAME</label>
+          <input class="input" id="m-gst-company" placeholder="Auto-filled or enter manually" style="margin-bottom:0;" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST ADDRESS</label>
+          <textarea class="input" id="m-gst-address" placeholder="Auto-filled or enter manually" rows="2" style="margin-bottom:0;resize:vertical;"></textarea>
+        </div>
+      </div>
+    </div>
 
     <button class="btn" onclick="saveNewCustomer()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-weight:800;">Add Customer →</button>`);
 }
@@ -5235,7 +5916,12 @@ async function saveNewCustomer(){
   if(phone && customers.some(c=>c.phone && c.phone===phone)){
     if(!confirm(`⚠️ A customer with phone ${phone} already exists (${customers.find(c=>c.phone===phone).name}). Add anyway?`)) return;
   }
-  const newC={id,name,phone,photo:tempPhoto||"",totalSpend:0,purchases:[]};
+  const gstin   = (document.getElementById("m-gstin")?.value.trim()||"").toUpperCase();
+  const gstName = document.getElementById("m-gst-company")?.value.trim()||"";
+  const gstAddr = document.getElementById("m-gst-address")?.value.trim()||"";
+  const newC={id,name,phone,photo:tempPhoto||"",totalSpend:0,purchases:[],
+    ...(gstin?{gstin, gstName, gstAddress:gstAddr}:{})
+  };
   customers.push(newC);
   closeModal();tempPhoto="";
   notify(`✅ ${name} added! ID: ${id}`);
@@ -5454,6 +6140,7 @@ async function bulkSaveAll() {
 function openEditModal(id){
   const c=customers.find(x=>x.id===id);if(!c)return;
   tempPhoto=c.photo||"";
+  const hasGst = !!(c.gstin);
   showWideModal(`${modalHeader("Edit Customer")}
     <div style="display:flex;justify-content:center;margin-bottom:20px;">
       <div>
@@ -5470,7 +6157,37 @@ function openEditModal(id){
     <input class="input" id="m-phone" value="${c.phone||""}" placeholder="Leave blank if none" style="margin-bottom:14px;" />
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Customer ID</label>
     <input class="input" id="m-id" value="${c.id}" style="margin-bottom:4px;font-family:monospace;" />
-    <div style="font-size:11px;color:#4a5a7a;margin-bottom:20px;">Only change the ID if needed — it must be unique.</div>
+    <div style="font-size:11px;color:#4a5a7a;margin-bottom:16px;">Only change the ID if needed — it must be unique.</div>
+
+    <!-- Optional GST Section -->
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;" onclick="const s=document.getElementById('edit-gst-section');const a=document.getElementById('edit-gst-arrow');s.style.display=s.style.display==='none'?'block':'none';a.textContent=s.style.display==='none'?'▶':'▼';">
+        <div style="font-size:12px;font-weight:800;color:#a78bfa;">🔢 GST Details <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional)</span></div>
+        <span id="edit-gst-arrow" style="color:#4a5a7a;font-size:12px;">${hasGst?"▼":"▶"}</span>
+      </div>
+      <div id="edit-gst-section" style="display:${hasGst?"block":"none"};margin-top:12px;">
+        <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;">
+          <div style="flex:1;">
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GSTIN (15-digit)</label>
+            <input class="input" id="m-gstin" placeholder="27XXXXX0000X1ZX" maxlength="15" value="${escHtml(c.gstin||"")}" style="margin-bottom:0;text-transform:uppercase;font-family:monospace;"
+              oninput="this.value=this.value.toUpperCase();const v=/^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(this.value.trim());document.getElementById('m-gst-autofill-btn').style.display=v?'flex':'none';" />
+          </div>
+          <button id="m-gst-autofill-btn" onclick="custGSTAutoFill('m-gstin','m-gst-company','m-gst-address','m-gst-status')" style="display:${/^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(c.gstin||"")?"flex":"none"};align-items:center;gap:6px;padding:10px 14px;border-radius:10px;border:none;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+            🔍 Auto Fill
+          </button>
+        </div>
+        <div id="m-gst-status" style="font-size:11px;margin-bottom:8px;display:none;"></div>
+        <div style="margin-bottom:8px;">
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">COMPANY / LEGAL NAME</label>
+          <input class="input" id="m-gst-company" placeholder="Auto-filled or enter manually" value="${escHtml(c.gstName||"")}" style="margin-bottom:0;" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST ADDRESS</label>
+          <textarea class="input" id="m-gst-address" placeholder="Auto-filled or enter manually" rows="2" style="margin-bottom:0;resize:vertical;">${escHtml(c.gstAddress||"")}</textarea>
+        </div>
+      </div>
+    </div>
+
     <button class="btn" onclick="saveEditCustomer('${id}')" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-weight:800;">Save Changes</button>`);
 }
 function handleEditPhoto(inp){
@@ -5498,6 +6215,9 @@ async function saveEditCustomer(oldId){
   const newId=(document.getElementById("m-id")?.value.trim()||oldId).toUpperCase();
   if(newId!==oldId&&idExists(newId,oldId)){notify("❌ ID already exists");return;}
   const phone=document.getElementById("m-phone")?.value.trim()||"";
+  const gstin   = (document.getElementById("m-gstin")?.value.trim()||"").toUpperCase();
+  const gstName = document.getElementById("m-gst-company")?.value.trim()||"";
+  const gstAddr = document.getElementById("m-gst-address")?.value.trim()||"";
   const c=customers.find(x=>x.id===oldId);if(!c)return;
   // If ID changed: delete old doc, create new one
   const idChanged = newId !== oldId;
@@ -5505,6 +6225,8 @@ async function saveEditCustomer(oldId){
     try { await userCol().doc(oldId).delete(); } catch{}
   }
   c.id=newId;c.name=name;c.phone=phone;c.photo=tempPhoto||"";
+  if(gstin){ c.gstin=gstin; c.gstName=gstName; c.gstAddress=gstAddr; }
+  else { delete c.gstin; delete c.gstName; delete c.gstAddress; }
   closeModal();tempPhoto="";notify("✅ Customer updated!");
   try { await saveOneCustomer(c); } catch(e){notify("⚠️ Saved locally, Firebase error: "+e.message);}
   if(useLocalOnly) safeRenderTab(currentTab);
@@ -5873,6 +6595,7 @@ const TRANSLATIONS = {
   en: {
     adminPanel:"Admin Panel", leaderboard:"Leaderboard", customers:"Customers",
     purchase:"Purchase", analytics:"Analytics", compare:"Compare",
+    inventory:"Inventory", creditors:"Creditors",
     festivals:"Festival Rewards", settings:"Settings", logout:"Logout",
     addCustomer:"+ Add Customer", exportCSV:"⬇ Export CSV", addPurchase:"Add Purchase →",
     totalSpend:"Total Spend", points:"Points", rank:"Rank", visits:"visits",
@@ -7058,17 +7781,18 @@ function invDeductSold(soldItems, custId){
 }
 
 // Add stock entry
-function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice){
+function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice, gstRate, gstIncluded){
   let item = inventoryItems.find(x=>x.name===name);
   if(!item){
     item = {id:autoId(), name, unit:unit||"unit", category:category||"General", stock:[], salesLog:[]};
     inventoryItems.push(item);
   }
   item.unit = unit||item.unit;
-  // Always update category when explicitly provided
   if(category && category.trim()) item.category = category.trim();
-  // Save/update selling price if provided
   if(sellingPrice && Number(sellingPrice)>0) item.sellingPrice = Number(sellingPrice);
+  // Save GST settings on item
+  if(gstRate !== undefined && gstRate !== null) item.gstRate = Number(gstRate)||0;
+  if(gstIncluded) item.gstIncluded = gstIncluded;
   if(!item.stock) item.stock=[];
   item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes});
   saveInventory();
@@ -7507,6 +8231,31 @@ function renderInventoryTab(){
           <input class="input" type="number" id="inv-sell-price" min="0" step="0.01" placeholder="0.00" value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex&&ex.sellingPrice>0?Number(ex.sellingPrice).toFixed(2):'';})()}" style="color:#FFD700;" />
         </div>
       </div>
+      <!-- GST Section -->
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:10px;">🔢 GST on this item <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional)</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
+          <div>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST RATE (%)</label>
+            <select class="input" id="inv-gst-rate" style="margin-bottom:0;" onchange="invUpdateGstPreview('add')">
+              <option value="0">0% — No GST</option>
+              <option value="5">5%</option>
+              <option value="12">12%</option>
+              <option value="18" selected>18%</option>
+              <option value="28">28%</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">PRICE IS</label>
+            <select class="input" id="inv-gst-included" style="margin-bottom:0;" onchange="invUpdateGstPreview('add')">
+              <option value="exclusive">Exclusive (+ GST on sale)</option>
+              <option value="inclusive">Inclusive (GST inside price)</option>
+            </select>
+          </div>
+        </div>
+        <div id="inv-gst-preview-add" style="font-size:12px;color:#a78bfa;background:#0d0820;border-radius:8px;padding:8px 10px;display:none;"></div>
+      </div>
+
       <div style="margin-bottom:12px;">
         <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Date</label>
         <input class="input" type="date" id="inv-date" value="${new Date().toISOString().slice(0,10)}" />
@@ -7609,6 +8358,31 @@ function renderInventoryTab(){
             <input class="input" type="number" id="inv-sell-price" min="0" step="0.01" placeholder="0.00" value="${lastSell}" style="color:#FFD700;" />
           </div>
         </div>
+        <!-- GST Section -->
+        <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;">
+          <div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:10px;">🔢 GST on this item <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — updates existing setting)</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
+            <div>
+              <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST RATE (%)</label>
+              <select class="input" id="inv-gst-rate" style="margin-bottom:0;" onchange="invUpdateGstPreview('restock')">
+                <option value="0" ${selItem&&selItem.gstRate===0?'selected':''}>0% — No GST</option>
+                <option value="5" ${selItem&&selItem.gstRate===5?'selected':''}>5%</option>
+                <option value="12" ${selItem&&selItem.gstRate===12?'selected':''}>12%</option>
+                <option value="18" ${!selItem||selItem.gstRate===18||selItem.gstRate===undefined?'selected':''}>18%</option>
+                <option value="28" ${selItem&&selItem.gstRate===28?'selected':''}>28%</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">PRICE IS</label>
+              <select class="input" id="inv-gst-included" style="margin-bottom:0;" onchange="invUpdateGstPreview('restock')">
+                <option value="exclusive" ${!selItem||selItem.gstIncluded!=='inclusive'?'selected':''}>Exclusive (+ GST on sale)</option>
+                <option value="inclusive" ${selItem&&selItem.gstIncluded==='inclusive'?'selected':''}>Inclusive (GST inside price)</option>
+              </select>
+            </div>
+          </div>
+          <div id="inv-gst-preview-restock" style="font-size:12px;color:#a78bfa;background:#0d0820;border-radius:8px;padding:8px 10px;display:none;"></div>
+        </div>
+
         <div style="margin-bottom:12px;">
           <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Date</label>
           <input class="input" type="date" id="inv-date" value="${new Date().toISOString().slice(0,10)}" />
@@ -7762,9 +8536,11 @@ function invSubmitAdd(){
   const sellPrice=parseFloat(document.getElementById("inv-sell-price").value||"0");
   const date=document.getElementById("inv-date").value||new Date().toISOString().slice(0,10);
   const notes=(document.getElementById("inv-notes").value||"").trim();
+  const gstRate=parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
+  const gstIncluded=document.getElementById("inv-gst-included")?.value||"exclusive";
   if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
-  invAddStock(name, unit, qty, cost, date, notes, category, sellPrice);
+  invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
 }
 
 function invSubmitRestock(){
@@ -7775,12 +8551,12 @@ function invSubmitRestock(){
   const sellPrice=parseFloat(document.getElementById("inv-sell-price").value||"0");
   const date=document.getElementById("inv-date").value||new Date().toISOString().slice(0,10);
   const notes=(document.getElementById("inv-notes").value||"").trim();
+  const gstRate=parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
+  const gstIncluded=document.getElementById("inv-gst-included")?.value||"exclusive";
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
-  // Get existing item's category
   const selItem = inventoryItems.find(x=>x.name===invRestockSelected);
   const category = selItem ? (selItem.category||"General") : "General";
-  invAddStock(invRestockSelected, unit||( selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice);
-  // After restock, reset selection so user can pick another item
+  invAddStock(invRestockSelected, unit||(selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
   invRestockSelected = null;
   invRestockSearch = "";
 }
