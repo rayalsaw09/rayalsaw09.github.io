@@ -799,9 +799,10 @@ function resetSettings() {
 // shops read it automatically — no code changes needed per shop.
 
 const SP_GSTIN_PROXY_LS_KEY = "sc_seller_gstin_proxy_url";
+const SP_GSTIN_PROXY_DEFAULT = "https://rapid-sun-4fd4.rayalsaw.workers.dev/gstin";
 
 function getSellerGSTINProxyURL() {
-  return (localStorage.getItem(SP_GSTIN_PROXY_LS_KEY) || "").trim();
+  return (localStorage.getItem(SP_GSTIN_PROXY_LS_KEY) || SP_GSTIN_PROXY_DEFAULT).trim();
 }
 
 function saveSellerGSTINProxyURL(url) {

@@ -8315,12 +8315,13 @@ function getGSTINProxyURL() {
   // Primary: read from app settings saved by SellerPanel via Firebase
   const fromSettings = appSettings && appSettings.gstinProxyUrl;
   if (fromSettings && fromSettings.trim()) return fromSettings.trim();
-  // Fallback: localStorage (cached from last cloud load)
+  // Secondary: localStorage cache
   try {
     const cached = localStorage.getItem("sc_gstin_proxy_url");
     if (cached && cached.trim()) return cached.trim();
   } catch {}
-  return "";
+  // Fallback: hardcoded default
+  return "https://rapid-sun-4fd4.rayalsaw.workers.dev/gstin";
 }
 
 async function doGSTINLookup() {
