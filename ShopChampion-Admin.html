@@ -1447,7 +1447,7 @@ function ptRestoreState() {
       const _showVisits1 = !_isPro1||isSubFeatureAllowed(8);
       const _showLastVisit1 = !_isPro1||isSubFeatureAllowed(10);
       const _showRank1 = !_isPro1||isSubFeatureAllowed(0);
-      pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank1?` &middot; Rank #${c.rank||"?"}`:""} ${_showVisits1?`&middot; 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit1?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc1};font-weight:700;">${_lv1}</span></div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
+      pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank1?` &middot; Rank #${c.rank||"?"}`:""} ${_showVisits1?`&middot; 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit1?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc1};font-weight:700;">${_lv1}</span></div>`:""} ${c.gstin?`<div style="font-size:11px;color:#a78bfa;font-weight:700;margin-top:3px;">🔢 GST: ${c.gstin}${c.gstName?` · ${c.gstName}`:""}${c.gstAddress?`<br><span style="color:#7a8aaa;font-weight:400;">${c.gstAddress}</span>`:""}</div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
     }
   }
   // Restore date mode - only restore manual picker if it was open
@@ -1519,6 +1519,27 @@ function saveSettingsToCloud(extraFields) {
   };
   userSettingsDoc().set(data, { merge: true })
     .catch(e => console.warn("Settings cloud save error:", e));
+
+  // ── Also update public shop profile so other shops can find this shop ──
+  _savePublicShopProfile();
+}
+
+// Writes a minimal public-readable profile to shop_profiles/{phone}
+function _savePublicShopProfile(){
+  if(!db || !authPhone) return;
+  const shopId = "SC-" + String(authPhone).slice(-6);
+  const profile = {
+    shopId,
+    phone: authPhone,
+    shopName: appSettings.shopName || "ShopChampion Shop",
+    shopIcon: appSettings.appIcon  || "",
+    gstin:    appSettings.shopGstin || "",
+    city:     appSettings.shopCity  || "",
+    address:  appSettings.shopAddress || "",
+    updatedAt: Date.now()
+  };
+  db.collection("shop_profiles").doc(authPhone).set(profile, {merge:true})
+    .catch(e=>console.warn("Public profile save error:",e));
 }
 
 // ── Cloud settings: load all user prefs from Firestore ──
@@ -3226,6 +3247,7 @@ function renderCustomers(sorted,q=""){
     </div>` : `
     <div style="display:flex;gap:8px;align-items:center;padding:0 14px 12px;flex-wrap:wrap;">
       <button class="btn" onclick="openAddModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:9px 20px;font-size:13px;font-weight:800;flex:1;">+ Add Customer</button>
+      <button class="btn" onclick="openShopIdSearchModal('customer')" style="background:#0a1628;border:2px solid #1e3a6e;color:#60a5fa;padding:9px 14px;font-size:12px;font-weight:800;">🔗 Shop ID</button>
       <button class="btn" onclick="openBulkAddModal()" style="background:#1a3a5c;color:#7ab3ff;border:1px solid #2a5080;padding:9px 14px;font-size:13px;">👥 Bulk</button>
       <button class="btn" onclick="exportCSV()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:9px 12px;font-size:13px;">⬇</button>
       <button class="btn" onclick="custToggleSelectMode()" style="background:#1a2540;color:#f88;border:1px solid #3a2020;padding:9px 12px;font-size:13px;">☑</button>
@@ -3542,7 +3564,7 @@ function ptSelectCustomer(id){
   const _showVisits2 = !_isPro2||isSubFeatureAllowed(8);
   const _showLastVisit2 = !_isPro2||isSubFeatureAllowed(10);
   const _showRank2 = !_isPro2||isSubFeatureAllowed(0);
-  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank2?` · Rank #${c.rank}`:""}${_showVisits2?` · 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit2?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:20px;padding:4px 8px;">✕</button>`;
+  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank2?` · Rank #${c.rank}`:""}${_showVisits2?` · 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit2?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div>`:""} ${c.gstin?`<div style="font-size:11px;color:#a78bfa;font-weight:700;margin-top:3px;">🔢 GST: ${c.gstin}${c.gstName?` · ${c.gstName}`:""}${c.gstAddress?`<br><span style="color:#7a8aaa;font-weight:400;">${c.gstAddress}</span>`:""}</div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:20px;padding:4px 8px;">✕</button>`;
   ptPts();
 }
 
@@ -4825,6 +4847,9 @@ function showFirebaseSettings(){
 }
 
 // ─── SETTINGS ────────────────────────────────────────────────
+// ─── GSTIN VALIDATION HELPER ─────────────────────────────────────────────────
+function isValidGSTIN(g){ return /^[0-3][0-9][A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test((g||"").trim().toUpperCase()); }
+
 // ─── CUSTOMER GST AUTO-FILL (shared helper for add/edit customer modals) ─────
 async function custGSTAutoFill(gstinInputId, companyInputId, addressInputId, statusId){
   const gstinEl   = document.getElementById(gstinInputId);
@@ -4870,6 +4895,222 @@ async function custGSTAutoFill(gstinInputId, companyInputId, addressInputId, sta
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ─── SHOP ID LOOKUP ──────────────────────────────────────────────────────────
+// Returns this shop's ShopChampion ID (SC-XXXXXX)
+function myShopId(){ return authPhone ? "SC-" + String(authPhone).slice(-6) : "SC-??????"; }
+
+// Search shop_profiles by SC-XXXXXX id or phone number
+async function lookupShopById(query){
+  if(!db) return null;
+  query = (query||"").trim();
+  // Accept SC-XXXXXX format or raw 6-digit suffix
+  let phone = null;
+  if(/^SC-\d{6}$/i.test(query)){
+    // We can't reverse SC-XXXXXX → full phone without scanning, so query by shopId field
+    const snap = await db.collection("shop_profiles").where("shopId","==",query.toUpperCase()).limit(1).get();
+    if(!snap.empty) return snap.docs[0].data();
+    return null;
+  }
+  // Raw phone number
+  if(/^\d{10}$/.test(query)) phone = query;
+  if(!phone) return null;
+  const doc = await db.collection("shop_profiles").doc(phone).get();
+  if(doc.exists) return doc.data();
+  return null;
+}
+
+// Open the shop profile setup modal (for this shop's own public profile)
+function openShopProfileModal(){
+  showWideModal(`
+    ${modalHeader("🏪 My Shop Profile")}
+    <div style="font-size:12px;color:#7a8aaa;margin-bottom:16px;">This info is visible to other ShopChampion shops when they search your Shop ID. It helps them add you as a creditor/debtor easily.</div>
+
+    <div style="background:#0a1628;border:1px solid #1e3a6e;border-radius:12px;padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:14px;">
+      <div style="font-size:28px;">🪪</div>
+      <div>
+        <div style="font-size:11px;color:#7a8aaa;font-weight:700;">YOUR SHOP ID (share this)</div>
+        <div style="font-size:22px;font-weight:900;color:#60a5fa;font-family:monospace;letter-spacing:2px;">${myShopId()}</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Other shops use this to find & connect with you</div>
+      </div>
+      <button onclick="navigator.clipboard.writeText('${myShopId()}').then(()=>notify('✅ Shop ID copied!'))" style="margin-left:auto;background:#1e3a6e;border:none;color:#60a5fa;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;">📋 Copy</button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">SHOP GSTIN (for others to verify)</label>
+        <input class="input" id="sp-gstin" placeholder="27XXXXX0000X1ZX" maxlength="15" value="${escHtml(appSettings.shopGstin||"")}" style="text-transform:uppercase;font-family:monospace;margin-bottom:0;"
+          oninput="this.value=this.value.toUpperCase();" />
+      </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">CITY / AREA</label>
+        <input class="input" id="sp-city" placeholder="e.g. Mumbai, Andheri West" value="${escHtml(appSettings.shopCity||"")}" style="margin-bottom:0;" />
+      </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">FULL ADDRESS</label>
+        <textarea class="input" id="sp-address" placeholder="Shop address..." rows="2" style="margin-bottom:0;resize:vertical;">${escHtml(appSettings.shopAddress||"")}</textarea>
+      </div>
+    </div>
+
+    <button onclick="saveShopProfile()" class="btn" style="width:100%;margin-top:16px;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);padding:13px;font-size:15px;font-weight:800;">💾 Save Profile</button>
+  `);
+}
+
+function saveShopProfile(){
+  const gstin = (document.getElementById("sp-gstin")?.value.trim()||"").toUpperCase();
+  if(gstin && !isValidGSTIN(gstin)){ notify("⚠️ Invalid GSTIN format"); return; }
+  appSettings.shopGstin   = gstin;
+  appSettings.shopCity    = document.getElementById("sp-city")?.value.trim()||"";
+  appSettings.shopAddress = document.getElementById("sp-address")?.value.trim()||"";
+  try{ localStorage.setItem("sc_app_settings", JSON.stringify(appSettings)); }catch{}
+  saveSettingsToCloud();
+  closeModal();
+  notify("✅ Shop profile saved & published!");
+}
+
+// Open Search-by-Shop-ID modal for adding creditor/debtor
+async function openShopIdSearchModal(mode){ // mode = 'creditor' | 'debtor'
+  showWideModal(`
+    ${modalHeader(mode==="creditor"?"🔍 Find Creditor by Shop ID":"🔍 Find Debtor by Shop ID")}
+    <div style="font-size:12px;color:#7a8aaa;margin-bottom:14px;">Enter the other shop's <strong style="color:#60a5fa;">SC-XXXXXX</strong> ID or their 10-digit phone number.</div>
+
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <input class="input" id="sc-search-input" placeholder="SC-123456 or 9876543210" style="flex:1;margin-bottom:0;font-family:monospace;font-size:15px;letter-spacing:1px;"
+        oninput="this.value=this.value.toUpperCase();"
+        onkeydown="if(event.key==='Enter')doShopIdSearch('${mode}')" />
+      <button onclick="doShopIdSearch('${mode}')" class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);padding:10px 18px;font-size:13px;font-weight:800;white-space:nowrap;">🔍 Search</button>
+    </div>
+    <div id="sc-search-status" style="font-size:12px;color:#7a8aaa;min-height:18px;margin-bottom:10px;"></div>
+    <div id="sc-search-result"></div>
+  `);
+  setTimeout(()=>document.getElementById("sc-search-input")?.focus(),100);
+}
+
+async function doShopIdSearch(mode){
+  const q = document.getElementById("sc-search-input")?.value.trim()||"";
+  const statusEl = document.getElementById("sc-search-status");
+  const resultEl = document.getElementById("sc-search-result");
+  if(!q){ if(statusEl) statusEl.textContent="⚠️ Enter a Shop ID or phone number."; return; }
+  if(!db){ if(statusEl){ statusEl.style.color="#f59e0b"; statusEl.textContent="⚠️ Firebase not connected. You can still add manually."; } return; }
+
+  statusEl.style.color="#a78bfa"; statusEl.textContent="⏳ Searching...";
+  resultEl.innerHTML="";
+
+  try{
+    const profile = await lookupShopById(q);
+    if(!profile){ statusEl.style.color="#ef4444"; statusEl.textContent="❌ No ShopChampion shop found with that ID. Ask them to share their Shop ID from Settings."; return; }
+
+    statusEl.style.color="#22c55e"; statusEl.textContent="✅ Shop found!";
+
+    const initials = (profile.shopName||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+    resultEl.innerHTML=`
+      <div style="background:#0a1628;border:2px solid #2a5aaa;border-radius:14px;padding:16px;margin-top:6px;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
+          <div style="width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">
+            ${profile.shopIcon?`<img src="${profile.shopIcon}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`:initials}
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:18px;font-weight:800;color:#e8eaf0;">${escHtml(profile.shopName||"Unknown Shop")}</div>
+            <div style="font-size:12px;color:#60a5fa;font-family:monospace;font-weight:700;">${escHtml(profile.shopId||"")}</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:16px;">
+          ${profile.phone   ?`<div style="color:#7a8aaa;">📞 <span style="color:#e8eaf0;">${profile.phone}</span></div>`:""}
+          ${profile.city    ?`<div style="color:#7a8aaa;">📍 <span style="color:#e8eaf0;">${escHtml(profile.city)}</span></div>`:""}
+          ${profile.address ?`<div style="color:#7a8aaa;">🏠 <span style="color:#e8eaf0;">${escHtml(profile.address)}</span></div>`:""}
+          ${profile.gstin   ?`<div style="color:#7a8aaa;">🔢 GSTIN: <span style="color:#a78bfa;font-family:monospace;">${escHtml(profile.gstin)}</span></div>`:""}
+        </div>
+        <button onclick="addFromShopProfile(${JSON.stringify(profile).replace(/"/g,'&quot;')},'${mode}')" class="btn" style="width:100%;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:13px;font-size:14px;font-weight:800;">
+          ${mode==="creditor"?"🏦 Open Creditor Account":"👤 Add as Customer"} for ${escHtml(profile.shopName||"this shop")}
+        </button>
+      </div>`;
+  }catch(e){
+    statusEl.style.color="#ef4444";
+    statusEl.textContent="❌ Search failed: "+(e.message||"Network error");
+  }
+}
+
+function addFromShopProfile(profile, mode){
+  closeModal();
+  if(mode==="creditor"){
+    openAddCreditorModal();
+    setTimeout(()=>{
+      const setVal = (id,v)=>{ const el=document.getElementById(id); if(el&&v) el.value=v; };
+      setVal("cr-name",    profile.shopName||"");
+      setVal("cr-phone",   profile.phone||"");
+      setVal("cr-gstin",   profile.gstin||"");
+      setVal("cr-address", [profile.address,profile.city].filter(Boolean).join(", ")||"");
+      const gstinEl = document.getElementById("cr-gstin");
+      if(gstinEl) gstinEl.dispatchEvent(new Event("input"));
+      notify("✅ Profile loaded — review and save");
+    }, 120);
+  } else if(mode==="customer"){
+    openAddModal();
+    setTimeout(()=>{
+      const setVal = (id,v)=>{ const el=document.getElementById(id); if(el&&v) el.value=v; };
+      setVal("m-name",  profile.shopName||"");
+      setVal("m-phone", profile.phone||"");
+      // Pre-fill GST section if available
+      if(profile.gstin){
+        // Expand the GST section
+        const gstSection = document.getElementById("add-gst-section");
+        const gstArrow   = document.getElementById("add-gst-arrow");
+        if(gstSection){ gstSection.style.display="block"; }
+        if(gstArrow)  { gstArrow.textContent="▼"; }
+        setVal("m-gstin",       profile.gstin||"");
+        setVal("m-gst-company", profile.shopName||"");
+        setVal("m-gst-address", [profile.address,profile.city].filter(Boolean).join(", ")||"");
+        const gstinEl = document.getElementById("m-gstin");
+        if(gstinEl) gstinEl.dispatchEvent(new Event("input"));
+      }
+      notify("✅ Profile loaded — review and save");
+    }, 120);
+  }
+}
+
+// ─── CREDITOR GST AUTO-FILL ──────────────────────────────────────────────────
+async function credGSTAutoFill(){
+  const gstinEl   = document.getElementById("cr-gstin");
+  const nameEl    = document.getElementById("cr-name");
+  const addressEl = document.getElementById("cr-address");
+  const statusEl  = document.getElementById("cr-gst-status");
+  const btnEl     = document.getElementById("cr-gst-autofill-btn");
+  if(!gstinEl || !statusEl) return;
+
+  const gstin    = gstinEl.value.trim().toUpperCase();
+  const proxyUrl = getGSTINProxyURL();
+
+  statusEl.style.display = "block";
+  statusEl.style.color   = "#a78bfa";
+  statusEl.textContent   = "⏳ Looking up GSTIN...";
+  if(btnEl) btnEl.disabled = true;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(), 10000);
+    const res = await fetch(`${proxyUrl}?gstin=${encodeURIComponent(gstin)}`, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if(!res.ok){ statusEl.style.color="#ef4444"; statusEl.textContent=`❌ Proxy error (HTTP ${res.status})`; if(btnEl)btnEl.disabled=false; return; }
+    const data = await res.json();
+    if(!data || data.flag===false){ statusEl.style.color="#ef4444"; statusEl.textContent="❌ "+(data?.message||"GSTIN not found."); if(btnEl)btnEl.disabled=false; return; }
+
+    const info = data.data||{};
+    const a    = info.pradr?.addr||{};
+    const addr = [a.bno,a.flno,a.bnm,a.st,a.loc,a.dst,a.stcd,a.pncd].filter(Boolean).join(", ");
+    const name = info.lgnm || info.tradeNam || "";
+
+    if(nameEl && name && !nameEl.value.trim())  nameEl.value = name;
+    if(addressEl && addr) addressEl.value = addr;
+
+    statusEl.style.color   = "#22c55e";
+    statusEl.textContent   = "✅ Autofilled! — "+name;
+  } catch(err){
+    statusEl.style.color = "#ef4444";
+    statusEl.textContent = err.name==="AbortError"?"❌ Timed out":"❌ Network error";
+  }
+  if(btnEl) btnEl.disabled = false;
+}
+
 // ─── CREDITORS MODULE ───────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -4958,9 +5199,14 @@ function renderCreditorsTab(){
         <div style="font-size:20px;font-weight:800;color:#e8eaf0;">🏦 Creditors</div>
         <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${totalCount} supplier${totalCount!==1?"s":""} · Total payable: <span style="color:#f59e0b;font-weight:800;">${formatINR(totalOwed)}</span></div>
       </div>
-      <button onclick="openAddCreditorModal()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:10px 20px;font-size:13px;font-weight:800;">
-        + Add Creditor
-      </button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="openShopIdSearchModal('creditor')" class="btn" style="background:#0a1628;border:2px solid #1e3a6e;color:#60a5fa;padding:10px 16px;font-size:12px;font-weight:800;">
+          🔗 Find by Shop ID
+        </button>
+        <button onclick="openAddCreditorModal()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:10px 20px;font-size:13px;font-weight:800;">
+          + Add Manually
+        </button>
+      </div>
     </div>
 
     <!-- Summary cards -->
@@ -5078,7 +5324,12 @@ function openAddCreditorModal(editId){
         </div>
         <div>
           <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GSTIN</label>
-          <input class="input" id="cr-gstin" placeholder="27XXXXX0000X1ZX" value="${escHtml(cr?.gstin||"")}" style="margin-bottom:0;" />
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input class="input" id="cr-gstin" placeholder="27XXXXX0000X1ZX" maxlength="15" value="${escHtml(cr?.gstin||"")}" style="margin-bottom:0;text-transform:uppercase;font-family:monospace;flex:1;"
+              oninput="this.value=this.value.toUpperCase();const v=isValidGSTIN(this.value);document.getElementById('cr-gst-autofill-btn').style.display=v?'inline-flex':'none';document.getElementById('cr-gst-status').style.display='none';" />
+            <button id="cr-gst-autofill-btn" onclick="credGSTAutoFill()" style="display:${isValidGSTIN(cr?.gstin||"")?'inline-flex':'none'};align-items:center;gap:4px;padding:9px 11px;border-radius:9px;border:none;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;">🔍 Fill</button>
+          </div>
+          <div id="cr-gst-status" style="font-size:10px;margin-top:4px;display:none;"></div>
         </div>
       </div>
 
@@ -5118,12 +5369,19 @@ function saveCreditorModal(editId){
   const name = document.getElementById("cr-name")?.value.trim();
   if(!name){ notify("⚠️ Name is required"); return; }
 
+  const gstinRaw = document.getElementById("cr-gstin")?.value.trim().toUpperCase()||"";
+  if(gstinRaw && !isValidGSTIN(gstinRaw)){
+    notify("⚠️ Invalid GSTIN — must be 15 characters like 27AAAAA0000A1Z5");
+    document.getElementById("cr-gstin")?.focus();
+    return;
+  }
+
   const creditors = getCreditors();
   const cr = {
     id:       editId || newCreditorId(),
     name,
     phone:    document.getElementById("cr-phone")?.value.trim()||"",
-    gstin:    document.getElementById("cr-gstin")?.value.trim().toUpperCase()||"",
+    gstin:    gstinRaw,
     address:  document.getElementById("cr-address")?.value.trim()||"",
     notes:    document.getElementById("cr-notes")?.value.trim()||"",
     bank: {
@@ -5407,8 +5665,19 @@ function renderSettings(){
   return `<div style="max-width:560px;padding:16px 14px 80px;">
     <h2 style="margin:0 0 20px;font-size:22px;font-weight:800;color:#e8eaf0;font-family:'Rajdhani',sans-serif;">⚙️ Settings</h2>
 
+    <!-- My Shop ID card -->
+    <div style="background:linear-gradient(135deg,#0a1628,#0f2040);border:2px solid #1e3a6e;border-radius:16px;padding:16px 18px;margin-bottom:16px;display:flex;align-items:center;gap:14px;">
+      <div style="font-size:32px;">🪪</div>
+      <div style="flex:1;">
+        <div style="font-size:10px;color:#7a8aaa;font-weight:800;text-transform:uppercase;letter-spacing:1px;">My ShopChampion ID</div>
+        <div style="font-size:24px;font-weight:900;color:#60a5fa;font-family:monospace;letter-spacing:3px;">${myShopId()}</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Share this ID with suppliers & buyers so they can connect with you</div>
+      </div>
+      <button onclick="navigator.clipboard.writeText('${myShopId()}').then(()=>notify('✅ Shop ID copied!'))" style="background:#1e3a6e;border:none;color:#60a5fa;border-radius:10px;padding:10px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0;">📋 Copy</button>
+    </div>
+
     ${section("Account",
-      row("🪪","Support ID",`Your ID: <strong style="color:#7ab3ff;font-family:monospace;">${displayUID}</strong> · +91 ${savedPhone}`,"","") +
+      row("🏪","My Public Profile","Shop name, city, GSTIN visible to other shops","openShopProfileModal()") +
       row("🚪","Logout","Sign out of your account","doLogout()","›",true)
     )}
 
@@ -5917,6 +6186,11 @@ async function saveNewCustomer(){
     if(!confirm(`⚠️ A customer with phone ${phone} already exists (${customers.find(c=>c.phone===phone).name}). Add anyway?`)) return;
   }
   const gstin   = (document.getElementById("m-gstin")?.value.trim()||"").toUpperCase();
+  if(gstin && !isValidGSTIN(gstin)){
+    notify("⚠️ Invalid GSTIN — must be 15 characters like 27AAAAA0000A1Z5","error");
+    document.getElementById("m-gstin")?.focus();
+    return;
+  }
   const gstName = document.getElementById("m-gst-company")?.value.trim()||"";
   const gstAddr = document.getElementById("m-gst-address")?.value.trim()||"";
   const newC={id,name,phone,photo:tempPhoto||"",totalSpend:0,purchases:[],
@@ -6216,6 +6490,11 @@ async function saveEditCustomer(oldId){
   if(newId!==oldId&&idExists(newId,oldId)){notify("❌ ID already exists");return;}
   const phone=document.getElementById("m-phone")?.value.trim()||"";
   const gstin   = (document.getElementById("m-gstin")?.value.trim()||"").toUpperCase();
+  if(gstin && !isValidGSTIN(gstin)){
+    notify("⚠️ Invalid GSTIN — must be 15 characters like 27AAAAA0000A1Z5");
+    document.getElementById("m-gstin")?.focus();
+    return;
+  }
   const gstName = document.getElementById("m-gst-company")?.value.trim()||"";
   const gstAddr = document.getElementById("m-gst-address")?.value.trim()||"";
   const c=customers.find(x=>x.id===oldId);if(!c)return;
