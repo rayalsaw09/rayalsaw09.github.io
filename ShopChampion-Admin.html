@@ -2715,6 +2715,7 @@ function onLoginSuccess(phone) {
     loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
     loadShopRequests();
     setTimeout(startPaymentRequestListener, 2000); // Start payment sync listener
+    setTimeout(sweepAcceptedPaymentSyncRequests, 3000); // Catch any accepted requests missed while offline
     // Check Firestore — if doc doesn't exist but we have local data, push it up (first-time migration)
     loadInventoryFromFirestore((docExists)=>{
       if(!docExists && inventoryItems.length > 0){
@@ -6081,7 +6082,13 @@ async function sendPaymentSyncRequest(creditorId, txId, amount, note, date, invo
     closeModal();
     setTimeout(()=>openCreditorDetail(creditorId),200);
     listenPaymentSyncResponse(reqId, creditorId, txId);
-  } catch(e){ notify("❌ Failed: "+e.message,"error"); }
+  } catch(e){
+    notify("❌ Failed: "+e.message,"error");
+    // Auto-show rules fix modal for permission errors
+    if(e.message && (e.message.toLowerCase().includes("permission") || e.message.toLowerCase().includes("insufficient"))){
+      setTimeout(()=>_showFirestoreRulesError(e.message), 400);
+    }
+  }
 }
 
 function listenPaymentSyncResponse(reqId, creditorId, txId){
@@ -6090,7 +6097,7 @@ function listenPaymentSyncResponse(reqId, creditorId, txId){
     if(!snap.exists) return;
     const d = snap.data();
     if(d.status==="accepted"){
-      notify("✅ Payment synced! Both ledgers now match. 🔗","success");
+      // ── Update creditor transaction syncStatus ──
       const credList = getCreditors();
       const cIdx = credList.findIndex(c=>c.id===creditorId);
       if(cIdx>=0){
@@ -6098,6 +6105,41 @@ function listenPaymentSyncResponse(reqId, creditorId, txId){
         if(tIdx>=0) credList[cIdx].transactions[tIdx].syncStatus="accepted";
         saveCreditors(credList);
       }
+
+      // ── Auto-add Shop B (the accepting shop) to MY customers tab ──
+      // d.acceptedByProfile is written by acceptPaymentSyncRequest on Shop B's side
+      const p = d.acceptedByProfile || {};
+      const acceptorPhone = d.toPhone || p.phone;
+      if(acceptorPhone){
+        const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
+        if(!allCust.find(c=>c.phone===acceptorPhone)){
+          const nc = {
+            id: "C"+Date.now(),
+            name: p.shopName || p.shopId || d.toShopName || acceptorPhone,
+            phone: acceptorPhone,
+            gstin: p.gstin || "",
+            gstName: p.shopName || "",
+            gstAddress: [p.address, p.city].filter(Boolean).join(", "),
+            points: 0,
+            totalSpend: 0,
+            purchases: [],
+            createdAt: Date.now(),
+            notes: "Auto-added via payment sync accept",
+            _fromShopConnect: true,
+            _connectedShopId: p.shopId || "",
+          };
+          allCust.push(nc);
+          try{ localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allCust)); }catch(e){}
+          if(db && authPhone) customersCol().doc(nc.id).set(nc).catch(()=>{});
+          notify("✅ Payment synced & " + (nc.name) + " added to your Customers! 🔗","success");
+          if(currentTab===1) renderTab(1);
+        } else {
+          notify("✅ Payment synced! Both ledgers now match. 🔗","success");
+        }
+      } else {
+        notify("✅ Payment synced! Both ledgers now match. 🔗","success");
+      }
+
       if(currentTab===6) renderTab(6);
       unsub();
     } else if(d.status==="declined"){
@@ -6113,6 +6155,46 @@ function listenPaymentSyncResponse(reqId, creditorId, txId){
       unsub();
     }
   });
+}
+
+// ─── On-load sweep: catch any payment sync requests accepted while we were offline ─────────────
+async function sweepAcceptedPaymentSyncRequests(){
+  if(!db || !authPhone) return;
+  try {
+    // Find all accepted PSRs that I SENT (fromPhone == me) in the last 30 days
+    const cutoff = Date.now() - 30*24*60*60*1000;
+    const snap = await db.collection("payment_sync_requests")
+      .where("fromPhone","==",authPhone)
+      .where("status","==","accepted")
+      .get();
+    for(const doc of snap.docs){
+      const d = doc.data();
+      const p = d.acceptedByProfile || {};
+      const acceptorPhone = d.toPhone || p.phone;
+      if(!acceptorPhone) continue;
+      const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
+      if(!allCust.find(c=>c.phone===acceptorPhone)){
+        const nc = {
+          id: "C"+Date.now(),
+          name: p.shopName || p.shopId || acceptorPhone,
+          phone: acceptorPhone,
+          gstin: p.gstin || "",
+          gstName: p.shopName || "",
+          gstAddress: [p.address, p.city].filter(Boolean).join(", "),
+          points: 0, totalSpend: 0, purchases: [],
+          createdAt: Date.now(),
+          notes: "Auto-added via payment sync accept",
+          _fromShopConnect: true,
+          _connectedShopId: p.shopId || "",
+        };
+        allCust.push(nc);
+        try{ localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allCust)); }catch(e){}
+        if(db && authPhone) customersCol().doc(nc.id).set(nc).catch(()=>{});
+        if(currentTab===1) renderTab(1);
+        if(currentTab===6) renderTab(6);
+      }
+    }
+  } catch(e){ console.warn("sweepAcceptedPaymentSyncRequests:", e); }
 }
 
 // ─── INCOMING REQUESTS LISTENER (Customers tab badge) ────────────────────────
@@ -6166,7 +6248,21 @@ async function acceptPaymentSyncRequest(reqId){
   if(db && authPhone){
     await db.collection("users").doc(authPhone).collection("customers").doc(cust.id).set(cust,{merge:true}).catch(()=>{});
   }
-  await db.collection("payment_sync_requests").doc(reqId).update({status:"accepted", resolvedAt:Date.now()});
+  // Write back Shop B's profile so Shop A can auto-add them to their customers tab
+  const myProfile = {
+    phone:    authPhone,
+    shopId:   (typeof myShopId === "function") ? myShopId() : "",
+    shopName: (window.appSettings && window.appSettings.shopName) || authPhone,
+    shopIcon: (window.appSettings && window.appSettings.appIcon) || "",
+    gstin:    (window.appSettings && window.appSettings.shopGstin) || "",
+    city:     (window.appSettings && window.appSettings.shopCity)  || "",
+    address:  (window.appSettings && window.appSettings.shopAddress) || "",
+  };
+  await db.collection("payment_sync_requests").doc(reqId).update({
+    status: "accepted",
+    resolvedAt: Date.now(),
+    acceptedByProfile: myProfile
+  });
   notify("✅ Accepted! Purchase entry added to customer history.","success");
   closeModal();
   if(currentTab===1) renderTab(1);
