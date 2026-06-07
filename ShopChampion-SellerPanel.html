@@ -2643,12 +2643,16 @@ function saSetLast7() {
   document.getElementById("sa-date-to").value = to.toISOString().slice(0,10);
   renderShopList();
 }
-function saSetThisMonth() {
+function saSetThisMonth(autoLoad) {
   const now = new Date();
   const from = new Date(now.getFullYear(), now.getMonth(), 1);
   document.getElementById("sa-date-from").value = from.toISOString().slice(0,10);
   document.getElementById("sa-date-to").value = now.toISOString().slice(0,10);
-  renderShopList();
+  if (autoLoad || saAllShops.length === 0) {
+    loadShopActivity();
+  } else {
+    renderShopList();
+  }
 }
 
 async function loadShopActivity() {
@@ -2660,7 +2664,7 @@ async function loadShopActivity() {
   // Set default date range to today if empty
   const fromEl = document.getElementById("sa-date-from");
   const toEl = document.getElementById("sa-date-to");
-  if (!fromEl.value) { saSetThisMonth(); return; } // saSetThisMonth calls renderShopList
+  if (!fromEl.value) { saSetThisMonth(true); return; } // saSetThisMonth(true) calls loadShopActivity
 
   document.getElementById("sa-shop-list").innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:40px;font-size:14px;">⏳ Loading shop data from Firebase...</div>`;
 

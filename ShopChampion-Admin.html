@@ -4486,214 +4486,177 @@ function renderAnalytics(sorted){
   }).join("");
 
   return `
-  <div style="font-family:'Nunito',sans-serif;max-width:600px;margin:0 auto;padding:0 0 80px 0;">
+  <div style="font-family:'Nunito',sans-serif;padding:0 0 80px 0;">
 
     <!-- Year Picker + Export -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
       <div style="display:flex;gap:6px;flex-wrap:wrap;">${yearBtns}</div>
       <button onclick="exportYearCSV(${analyticsYear})" style="cursor:pointer;border-radius:20px;padding:6px 14px;border:1px solid #1e2a45;background:#0a0e1a;color:#4a5a7a;font-size:12px;font-weight:700;">⬇ Export</button>
     </div>
 
-    <!-- SECTION 1: BUSINESS STATUS HERO CARD -->
-    <div style="background:${statusBg};border:2px solid ${statusBorder};border-radius:20px;padding:24px 20px;margin-bottom:14px;position:relative;overflow:hidden;">
-      <div style="position:absolute;right:-20px;top:-20px;font-size:100px;opacity:0.06;pointer-events:none;">💰</div>
-      <div style="display:flex;align-items:flex-start;gap:14px;">
-        <div style="font-size:42px;line-height:1;">${statusEmoji}</div>
+    <!-- SECTION 1: BUSINESS STATUS HERO CARD (full width) -->
+    <div style="background:${statusBg};border:2px solid ${statusBorder};border-radius:20px;padding:18px 16px;margin-bottom:12px;position:relative;overflow:hidden;">
+      <div style="position:absolute;right:-20px;top:-20px;font-size:80px;opacity:0.06;pointer-events:none;">💰</div>
+      <div style="display:flex;align-items:flex-start;gap:12px;">
+        <div style="font-size:36px;line-height:1;">${statusEmoji}</div>
         <div style="flex:1;">
-          <div style="font-size:20px;font-weight:900;color:#f0f4ff;line-height:1.2;margin-bottom:6px;">${statusMsg}</div>
-          <div style="font-size:14px;color:${statusColor};font-weight:700;">${statusSub}</div>
-          ${salesGrowth!==null ? `<div style="margin-top:8px;display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.07);border-radius:20px;padding:4px 10px;">
-            <span style="font-size:16px;">${salesGrowth>=0?'⬆️':'⬇️'}</span>
-            <span style="font-size:13px;color:${salesGrowth>=0?'#22c55e':'#ef4444'};font-weight:800;">Sales ${salesGrowth>=0?'+':''}${salesGrowth}% vs last month</span>
+          <div style="font-size:17px;font-weight:900;color:#f0f4ff;line-height:1.2;margin-bottom:4px;">${statusMsg}</div>
+          <div style="font-size:13px;color:${statusColor};font-weight:700;">${statusSub}</div>
+          ${salesGrowth!==null ? `<div style="margin-top:6px;display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.07);border-radius:20px;padding:3px 10px;">
+            <span style="font-size:14px;">${salesGrowth>=0?'⬆️':'⬇️'}</span>
+            <span style="font-size:12px;color:${salesGrowth>=0?'#22c55e':'#ef4444'};font-weight:800;">Sales ${salesGrowth>=0?'+':''}${salesGrowth}% vs last month</span>
           </div>` : ''}
         </div>
       </div>
     </div>
 
-    <!-- SECTION 2: FOUR MAIN NUMBERS -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-      <div style="background:#0a0e1a;border:1px solid #1a3a1a;border-radius:16px;padding:18px 14px;">
-        <div style="font-size:22px;margin-bottom:4px;">💰</div>
-        <div style="font-size:22px;font-weight:900;color:#22c55e;line-height:1;">${formatINR(yearProfit)}</div>
-        <div style="font-size:12px;color:#4a5a7a;margin-top:4px;font-weight:600;">Total Profit (${yr})</div>
-        <div style="font-size:11px;color:#2d4a2d;margin-top:2px;">Money earned after expenses</div>
-      </div>
-      <div style="background:#0a0e1a;border:1px solid #1a2a4a;border-radius:16px;padding:18px 14px;">
-        <div style="font-size:22px;margin-bottom:4px;">🛒</div>
-        <div style="font-size:22px;font-weight:900;color:#4a8aff;line-height:1;">${formatINR(totalYearSales)}</div>
-        <div style="font-size:12px;color:#4a5a7a;margin-top:4px;font-weight:600;">Total Sales (${yr})</div>
-        <div style="font-size:11px;color:#1e2d4a;margin-top:2px;">Total money collected</div>
-      </div>
-      <div style="background:#0a0e1a;border:1px solid #3a1a1a;border-radius:16px;padding:18px 14px;">
-        <div style="font-size:22px;margin-bottom:4px;">📦</div>
-        <div style="font-size:22px;font-weight:900;color:#f87171;line-height:1;">${formatINR(totalYearCost)}</div>
-        <div style="font-size:12px;color:#4a5a7a;margin-top:4px;font-weight:600;">Total Purchases (${yr})</div>
-        <div style="font-size:11px;color:#3a1a1a;margin-top:2px;">Stock bought this year</div>
-      </div>
-      <div style="background:#0a0e1a;border:1px solid #2a2a0a;border-radius:16px;padding:18px 14px;">
-        <div style="font-size:22px;margin-bottom:4px;">🏪</div>
-        <div style="font-size:22px;font-weight:900;color:#fbbf24;line-height:1;">${formatINR(inventoryValue)}</div>
-        <div style="font-size:12px;color:#4a5a7a;margin-top:4px;font-weight:600;">Current Stock Value</div>
-        <div style="font-size:11px;color:#2a2a0a;margin-top:2px;">Value of unsold items</div>
-      </div>
-    </div>
+    <!-- 2-COLUMN GRID: Year stats + This Month side by side -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
 
-    <!-- SECTION 3: THIS MONTH SUMMARY -->
-    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:16px;padding:18px;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-        <span style="font-size:18px;">📅</span>
-        <span style="font-size:15px;font-weight:800;color:#e8eaf0;">This Month — ${MONTHS[thisMonth]} ${thisYear}</span>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-        <div style="background:#0d1525;border-radius:12px;padding:12px 8px;text-align:center;">
-          <div style="font-size:16px;font-weight:900;color:#4a8aff;">${formatINR(totalMonthSales)}</div>
-          <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">💸 Sales</div>
-        </div>
-        <div style="background:#0d1525;border-radius:12px;padding:12px 8px;text-align:center;">
-          <div style="font-size:16px;font-weight:900;color:#f87171;">${formatINR(totalMonthCost)}</div>
-          <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">🛍 Expenses</div>
-        </div>
-        <div style="background:#0d1525;border-radius:12px;padding:12px 8px;text-align:center;border:1px solid ${monthProfit>=0?'#1a3a1a':'#3a1a1a'};">
-          <div style="font-size:16px;font-weight:900;color:${monthProfit>=0?'#22c55e':'#ef4444'};">${monthProfit>=0?'+':''}${formatINR(monthProfit)}</div>
-          <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">✨ Profit</div>
-        </div>
-      </div>
-      ${salesGrowth!==null ? `<div style="margin-top:10px;display:flex;align-items:center;gap:6px;font-size:12px;color:#4a5a7a;border-top:1px solid #1e2a45;padding-top:10px;">
-        <span style="font-size:16px;">${salesGrowth>=0?'⬆️':'⬇️'}</span>
-        <span>Sales are <strong style="color:${salesGrowth>=0?'#22c55e':'#ef4444'};">${salesGrowth>=0?'+':''}${salesGrowth}%</strong> compared to ${MONTHS[prevMonth]}</span>
-      </div>` : ''}
-    </div>
-
-    <!-- SECTION 4: TOP SELLING ITEMS -->
-    ${topItems.length>0 ? `<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:16px;padding:18px;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-        <span style="font-size:18px;">🏆</span>
-        <span style="font-size:15px;font-weight:800;color:#e8eaf0;">Best Selling Items</span>
-        <span style="font-size:11px;color:#4a5a7a;margin-left:auto;">${yr}</span>
-      </div>
+      <!-- LEFT COL: 4 main year numbers -->
       <div style="display:flex;flex-direction:column;gap:8px;">
-        ${topItems.map((x,i)=>{
-          const medals=['🥇','🥈','🥉','4️⃣','5️⃣'];
-          const bgColors=['#1a1200','#0d1525','#0d1525','#0d1525','#0d1525'];
-          const borderColors=['#b45309','#1e2a45','#1e2a45','#1e2a45','#1e2a45'];
-          return `<div style="background:${bgColors[i]};border:1px solid ${borderColors[i]};border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;">
-            <span style="font-size:22px;flex-shrink:0;">${medals[i]}</span>
+        <div style="background:#0a0e1a;border:1px solid #1a3a1a;border-radius:14px;padding:14px 12px;flex:1;">
+          <div style="font-size:18px;margin-bottom:2px;">💰</div>
+          <div style="font-size:20px;font-weight:900;color:#22c55e;line-height:1;">${formatINR(yearProfit)}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">Total Profit (${yr})</div>
+        </div>
+        <div style="background:#0a0e1a;border:1px solid #1a2a4a;border-radius:14px;padding:14px 12px;flex:1;">
+          <div style="font-size:18px;margin-bottom:2px;">🛒</div>
+          <div style="font-size:20px;font-weight:900;color:#4a8aff;line-height:1;">${formatINR(totalYearSales)}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">Total Sales (${yr})</div>
+        </div>
+        <div style="background:#0a0e1a;border:1px solid #3a1a1a;border-radius:14px;padding:14px 12px;flex:1;">
+          <div style="font-size:18px;margin-bottom:2px;">📦</div>
+          <div style="font-size:20px;font-weight:900;color:#f87171;line-height:1;">${formatINR(totalYearCost)}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">Total Purchases (${yr})</div>
+        </div>
+        <div style="background:#0a0e1a;border:1px solid #2a2a0a;border-radius:14px;padding:14px 12px;flex:1;">
+          <div style="font-size:18px;margin-bottom:2px;">🏪</div>
+          <div style="font-size:20px;font-weight:900;color:#fbbf24;line-height:1;">${formatINR(inventoryValue)}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">Stock Value Now</div>
+        </div>
+      </div>
+
+      <!-- RIGHT COL: This Month + Customers stacked -->
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:14px;padding:14px 12px;">
+          <div style="font-size:12px;font-weight:800;color:#e8eaf0;margin-bottom:10px;">📅 ${MONTHS[thisMonth]} ${thisYear}</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="background:#0d1525;border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:#4a5a7a;font-weight:600;">💸 Sales</span>
+              <span style="font-size:14px;font-weight:900;color:#4a8aff;">${formatINR(totalMonthSales)}</span>
+            </div>
+            <div style="background:#0d1525;border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:#4a5a7a;font-weight:600;">🛍 Expenses</span>
+              <span style="font-size:14px;font-weight:900;color:#f87171;">${formatINR(totalMonthCost)}</span>
+            </div>
+            <div style="background:#0d1525;border:1px solid ${monthProfit>=0?'#1a3a1a':'#3a1a1a'};border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:#4a5a7a;font-weight:600;">✨ Profit</span>
+              <span style="font-size:14px;font-weight:900;color:${monthProfit>=0?'#22c55e':'#ef4444'};">${monthProfit>=0?'+':''}${formatINR(monthProfit)}</span>
+            </div>
+          </div>
+          ${salesGrowth!==null ? `<div style="margin-top:8px;font-size:11px;color:#4a5a7a;display:flex;align-items:center;gap:4px;border-top:1px solid #1e2a45;padding-top:8px;">
+            ${salesGrowth>=0?'⬆️':'⬇️'} <strong style="color:${salesGrowth>=0?'#22c55e':'#ef4444'};">${salesGrowth>=0?'+':''}${salesGrowth}%</strong> vs ${MONTHS[prevMonth]}
+          </div>` : ''}
+        </div>
+        <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:14px;padding:14px 12px;flex:1;">
+          <div style="font-size:12px;font-weight:800;color:#e8eaf0;margin-bottom:10px;">👥 Customers</div>
+          <div style="display:flex;gap:6px;margin-bottom:${bestCust?'8px':'0'};">
+            <div style="background:#0d1525;border-radius:10px;padding:10px;flex:1;text-align:center;">
+              <div style="font-size:22px;font-weight:900;color:#4a8aff;">${sorted.length}</div>
+              <div style="font-size:10px;color:#4a5a7a;margin-top:2px;">Total</div>
+            </div>
+            <div style="background:#0d1525;border-radius:10px;padding:10px;flex:1;text-align:center;">
+              <div style="font-size:22px;font-weight:900;color:#a78bfa;">${activeThisMonth.length}</div>
+              <div style="font-size:10px;color:#4a5a7a;margin-top:2px;">This Mo.</div>
+            </div>
+          </div>
+          ${bestCust ? `<div style="background:linear-gradient(135deg,#1a1200,#0d1525);border:1px solid #b45309;border-radius:10px;padding:10px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:20px;">👑</span>
             <div style="flex:1;min-width:0;">
-              <div style="font-size:14px;font-weight:800;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.name}</div>
-              <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Sold: ${x.unitsSold} ${x.unit}</div>
+              <div style="font-size:9px;color:#b45309;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Top Customer</div>
+              <div style="font-size:12px;font-weight:900;color:#fde68a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${bestCust.name}</div>
             </div>
-            <div style="text-align:right;flex-shrink:0;">
-              <div style="font-size:15px;font-weight:900;color:#22c55e;">+${formatINR(x.profit)}</div>
-              <div style="font-size:10px;color:#4a5a7a;">profit</div>
-            </div>
-          </div>`;
-        }).join("")}
-      </div>
-    </div>` : ''}
-
-    <!-- SECTION 5: ITEMS NEEDING ATTENTION -->
-    ${lossItems.length>0 ? `<div style="background:#120508;border:2px solid #7f1d1d;border-radius:16px;padding:18px;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-        <span style="font-size:18px;">⚠️</span>
-        <span style="font-size:15px;font-weight:800;color:#fca5a5;">Attention Needed</span>
-      </div>
-      <div style="font-size:12px;color:#7f1d1d;margin-bottom:12px;background:#1a0508;border-radius:8px;padding:8px 12px;">These items are costing you money. You are selling them for less than what you paid.</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        ${lossItems.map(x=>`<div style="background:#0a0205;border:1px solid #7f1d1d;border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;">
-          <span style="font-size:22px;flex-shrink:0;">🔴</span>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:14px;font-weight:800;color:#fca5a5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.name}</div>
-            <div style="font-size:11px;color:#7f1d1d;margin-top:2px;">Selling price is lower than purchase cost</div>
-          </div>
-          <div style="text-align:right;flex-shrink:0;">
-            <div style="font-size:15px;font-weight:900;color:#ef4444;">${formatINR(x.profit)}</div>
-            <div style="font-size:10px;color:#7f1d1d;">loss</div>
-          </div>
-        </div>`).join("")}
-      </div>
-    </div>` : ''}
-
-    <!-- SECTION 6: LOW STOCK ALERTS -->
-    ${(lowStockItems.length>0||outOfStock.length>0) ? `<div style="background:#0a0a00;border:2px solid #854d0e;border-radius:16px;padding:18px;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-        <span style="font-size:18px;">📦</span>
-        <span style="font-size:15px;font-weight:800;color:#fde68a;">Low Stock Alerts</span>
-        <span style="font-size:12px;color:#854d0e;margin-left:auto;background:#1a0e00;border-radius:20px;padding:3px 10px;font-weight:700;">${lowStockItems.length+outOfStock.length} items</span>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        ${outOfStock.slice(0,3).map(x=>`<div style="background:#0a0000;border:1px solid #991b1b;border-radius:12px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:16px;">🚫</span>
-            <span style="font-size:13px;font-weight:700;color:#fca5a5;">${x.name}</span>
-          </div>
-          <span style="font-size:12px;font-weight:800;color:#ef4444;background:#1a0000;border-radius:8px;padding:3px 8px;">OUT OF STOCK</span>
-        </div>`).join("")}
-        ${lowStockItems.slice(0,5).map(x=>`<div style="background:#0a0800;border:1px solid #854d0e;border-radius:12px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:16px;">⚠️</span>
-            <span style="font-size:13px;font-weight:700;color:#fde68a;">${x.name}</span>
-          </div>
-          <span style="font-size:12px;font-weight:800;color:#f59e0b;background:#1a1000;border-radius:8px;padding:3px 8px;">${invGetStock(x.name)} ${x.unit||'units'} left</span>
-        </div>`).join("")}
-      </div>
-    </div>` : ''}
-
-    <!-- SECTION 7: CUSTOMER SUMMARY -->
-    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:16px;padding:18px;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-        <span style="font-size:18px;">👥</span>
-        <span style="font-size:15px;font-weight:800;color:#e8eaf0;">Customers</span>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:${bestCust?'12px':'0'};">
-        <div style="background:#0d1525;border-radius:12px;padding:14px;text-align:center;">
-          <div style="font-size:28px;font-weight:900;color:#4a8aff;">${sorted.length}</div>
-          <div style="font-size:12px;color:#4a5a7a;margin-top:4px;font-weight:600;">Total Customers</div>
-        </div>
-        <div style="background:#0d1525;border-radius:12px;padding:14px;text-align:center;">
-          <div style="font-size:28px;font-weight:900;color:#a78bfa;">${activeThisMonth.length}</div>
-          <div style="font-size:12px;color:#4a5a7a;margin-top:4px;font-weight:600;">Visited This Month</div>
+            <div style="font-size:13px;font-weight:900;color:#fbbf24;flex-shrink:0;">${formatINR(bestCust._ms)}</div>
+          </div>` : ''}
         </div>
       </div>
-      ${bestCust ? `<div style="background:linear-gradient(135deg,#1a1200,#0d1525);border:1px solid #b45309;border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;">
-        <span style="font-size:28px;">👑</span>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:11px;color:#b45309;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Best Customer This Month</div>
-          <div style="font-size:15px;font-weight:900;color:#fde68a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${bestCust.name}</div>
+    </div>
+
+    <!-- SECTION: MONTHLY TREND (full width, compact) -->
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:16px;padding:14px 16px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="font-size:16px;">📈</span>
+        <span style="font-size:14px;font-weight:800;color:#e8eaf0;">Monthly Trend — ${yr}</span>
+      </div>
+      <div style="display:flex;gap:2px;align-items:flex-end;padding:0 2px;margin-bottom:6px;">${monthBars}</div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#3a4a6a;padding:0 2px;margin-bottom:${totalTxns>0?'10px':'0'};">
+        <span>🟢 profit month</span><span>🔴 loss month</span>
+      </div>
+      ${totalTxns>0 ? `<div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <div style="background:#0d1525;border-radius:10px;padding:8px 12px;flex:1;min-width:80px;text-align:center;">
+          <div style="font-size:16px;font-weight:900;color:#e8eaf0;">${totalTxns}</div>
+          <div style="font-size:10px;color:#4a5a7a;margin-top:2px;">Bills (${yr})</div>
         </div>
-        <div style="text-align:right;flex-shrink:0;">
-          <div style="font-size:16px;font-weight:900;color:#fbbf24;">${formatINR(bestCust._ms)}</div>
-          <div style="font-size:10px;color:#b45309;">purchased</div>
+        <div style="background:#0d1525;border-radius:10px;padding:8px 12px;flex:1;min-width:80px;text-align:center;">
+          <div style="font-size:16px;font-weight:900;color:#a78bfa;">${activeYearCustomers.length}</div>
+          <div style="font-size:10px;color:#4a5a7a;margin-top:2px;">Active Custs</div>
+        </div>
+        <div style="background:#0d1525;border-radius:10px;padding:8px 12px;flex:1;min-width:80px;text-align:center;">
+          <div style="font-size:16px;font-weight:900;color:#fbbf24;">${activeYearCustomers.length>0?formatINR(Math.round(totalYearSales/activeYearCustomers.length)):'₹0'}</div>
+          <div style="font-size:10px;color:#4a5a7a;margin-top:2px;">Avg/Customer</div>
         </div>
       </div>` : ''}
     </div>
 
-    <!-- SECTION 8: SIMPLE MONTHLY TREND -->
-    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:16px;padding:18px;margin-bottom:14px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-        <span style="font-size:18px;">📈</span>
-        <span style="font-size:15px;font-weight:800;color:#e8eaf0;">Monthly Sales Trend — ${yr}</span>
-      </div>
-      <div style="display:flex;gap:2px;align-items:flex-end;padding:0 2px;margin-bottom:8px;">${monthBars}</div>
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:#3a4a6a;padding:0 2px;">
-        <span>Green = profitable month</span>
-        <span>Red = loss month</span>
-      </div>
-      ${totalTxns>0 ? `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-        <div style="background:#0d1525;border-radius:10px;padding:10px 14px;flex:1;min-width:100px;text-align:center;">
-          <div style="font-size:18px;font-weight:900;color:#e8eaf0;">${totalTxns}</div>
-          <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Total Bills (${yr})</div>
+    <!-- ITEMS GRID: Top Items + Loss Items side by side -->
+    ${(topItems.length>0||lossItems.length>0) ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      ${topItems.length>0 ? `<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:16px;padding:14px;">
+        <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:10px;">🏆 Best Items <span style="font-size:10px;color:#4a5a7a;">${yr}</span></div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          ${topItems.map((x,i)=>{
+            const medals=['🥇','🥈','🥉','4️⃣','5️⃣'];
+            return `<div style="background:${i===0?'#1a1200':'#0d1525'};border:1px solid ${i===0?'#b45309':'#1e2a45'};border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:6px;">
+              <span style="font-size:16px;flex-shrink:0;">${medals[i]}</span>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:11px;font-weight:800;color:#e8eaf0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.name}</div>
+                <div style="font-size:10px;color:#4a5a7a;">${x.unitsSold} ${x.unit}</div>
+              </div>
+              <div style="font-size:12px;font-weight:900;color:#22c55e;flex-shrink:0;">+${formatINR(x.profit)}</div>
+            </div>`;
+          }).join("")}
         </div>
-        <div style="background:#0d1525;border-radius:10px;padding:10px 14px;flex:1;min-width:100px;text-align:center;">
-          <div style="font-size:18px;font-weight:900;color:#a78bfa;">${activeYearCustomers.length}</div>
-          <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Active Customers</div>
+      </div>` : '<div></div>'}
+      ${lossItems.length>0 ? `<div style="background:#120508;border:2px solid #7f1d1d;border-radius:16px;padding:14px;">
+        <div style="font-size:13px;font-weight:800;color:#fca5a5;margin-bottom:10px;">⚠️ Loss Items</div>
+        <div style="font-size:11px;color:#7f1d1d;margin-bottom:8px;background:#1a0508;border-radius:6px;padding:6px 8px;">Selling below cost price</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          ${lossItems.map(x=>`<div style="background:#0a0205;border:1px solid #7f1d1d;border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:6px;">
+            <span style="font-size:16px;flex-shrink:0;">🔴</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:11px;font-weight:800;color:#fca5a5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.name}</div>
+            </div>
+            <div style="font-size:12px;font-weight:900;color:#ef4444;flex-shrink:0;">${formatINR(x.profit)}</div>
+          </div>`).join("")}
         </div>
-        <div style="background:#0d1525;border-radius:10px;padding:10px 14px;flex:1;min-width:100px;text-align:center;">
-          <div style="font-size:18px;font-weight:900;color:#fbbf24;">${activeYearCustomers.length>0?formatINR(Math.round(totalYearSales/activeYearCustomers.length)):'₹0'}</div>
-          <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Avg per Customer</div>
-        </div>
-      </div>` : ''}
-    </div>
+      </div>` : '<div></div>'}
+    </div>` : ''}
 
+    <!-- LOW STOCK (full width, compact) -->
+    ${(lowStockItems.length>0||outOfStock.length>0) ? `<div style="background:#0a0a00;border:2px solid #854d0e;border-radius:16px;padding:14px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="font-size:16px;">📦</span>
+        <span style="font-size:14px;font-weight:800;color:#fde68a;">Low Stock</span>
+        <span style="font-size:11px;color:#854d0e;margin-left:auto;background:#1a0e00;border-radius:20px;padding:2px 8px;font-weight:700;">${lowStockItems.length+outOfStock.length} items</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        ${outOfStock.slice(0,4).map(x=>`<div style="background:#0a0000;border:1px solid #991b1b;border-radius:10px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:6px;">
+          <span style="font-size:13px;font-weight:700;color:#fca5a5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🚫 ${x.name}</span>
+          <span style="font-size:10px;font-weight:800;color:#ef4444;background:#1a0000;border-radius:6px;padding:2px 6px;flex-shrink:0;">OUT</span>
+        </div>`).join("")}
+        ${lowStockItems.slice(0,6).map(x=>`<div style="background:#0a0800;border:1px solid #854d0e;border-radius:10px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:6px;">
+          <span style="font-size:13px;font-weight:700;color:#fde68a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">⚠️ ${x.name}</span>
+          <span style="font-size:10px;font-weight:800;color:#f59e0b;background:#1a1000;border-radius:6px;padding:2px 6px;flex-shrink:0;">${invGetStock(x.name)}</span>
   </div>`;
 }
 
