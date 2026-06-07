@@ -5621,6 +5621,69 @@ function deleteCreditor(id){
   renderTab(6);
 }
 
+// ── Transaction filter/search helpers ─────────────────────────────────────────
+let _crTxCurrentFilter = "all";
+
+// ── Month navigator helpers ───────────────────────────────────────────────────
+const _MONTH_NAMES=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const _MONTH_NAMES_FULL=["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+function _crTxApplyMonthNav(creditorId){
+  const yr=window._crTxNavYear||new Date().getFullYear();
+  const mo=window._crTxNavMonth!=null?window._crTxNavMonth:new Date().getMonth();
+  const now=new Date();
+  const isCurrent=(yr===now.getFullYear()&&mo===now.getMonth());
+  const label=document.getElementById("cr-tx-month-label");
+  if(label) label.textContent=_MONTH_NAMES_FULL[mo]+" "+yr+(isCurrent?" (Current)":"");
+  // Set hidden date inputs
+  const fromEl=document.getElementById("cr-tx-from");
+  const toEl=document.getElementById("cr-tx-to");
+  const firstDay=new Date(yr,mo,1);
+  const lastDay=new Date(yr,mo+1,0);
+  const fmt=d=>d.toISOString().slice(0,10);
+  if(fromEl) fromEl.value=fmt(firstDay);
+  if(toEl) toEl.value=fmt(lastDay);
+  _crTxRender(creditorId);
+}
+
+function _crTxShiftMonth(creditorId, dir){
+  if(window._crTxIsCustom){
+    window._crTxIsCustom=false;
+    const customBtn=document.getElementById("cr-tx-custom-btn");
+    const customRange=document.getElementById("cr-tx-custom-range");
+    if(customBtn){customBtn.style.color="#7a8aaa";customBtn.style.border="1px solid #1e2a45";}
+    if(customRange) customRange.style.display="none";
+  }
+  let mo=(window._crTxNavMonth!=null?window._crTxNavMonth:new Date().getMonth())+dir;
+  let yr=window._crTxNavYear||new Date().getFullYear();
+  if(mo>11){mo=0;yr++;}
+  if(mo<0){mo=11;yr--;}
+  // Don't go into the future
+  const now=new Date();
+  if(yr>now.getFullYear()||(yr===now.getFullYear()&&mo>now.getMonth())){return;}
+  window._crTxNavMonth=mo;
+  window._crTxNavYear=yr;
+  _crTxApplyMonthNav(creditorId);
+}
+
+function _crTxToggleCustomRange(creditorId){
+  window._crTxIsCustom=!window._crTxIsCustom;
+  const customBtn=document.getElementById("cr-tx-custom-btn");
+  const customRange=document.getElementById("cr-tx-custom-range");
+  if(customBtn){
+    customBtn.style.color=window._crTxIsCustom?"#FFD700":"#7a8aaa";
+    customBtn.style.border=window._crTxIsCustom?"1px solid #FFD700":"1px solid #1e2a45";
+  }
+  if(customRange) customRange.style.display=window._crTxIsCustom?"grid":"none";
+  if(!window._crTxIsCustom) _crTxApplyMonthNav(creditorId);
+}
+
+function _crTxOnCustomDate(creditorId){
+  _crTxRender(creditorId);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+
 // ── Creditor Detail Modal ─────────────────────────────────────────────────────
 function openCreditorDetail(id){
   const creditors = getCreditors();
@@ -5731,76 +5794,16 @@ function openCreditorDetail(id){
     </div>
   `);
   _crTxCurrentFilter="all";
-  // Default to current month
-  (function(){
-    const now=new Date();
-    window._crTxNavYear=now.getFullYear();
-    window._crTxNavMonth=now.getMonth(); // 0-indexed
-    window._crTxIsCustom=false;
-    _crTxApplyMonthNav('${id}');
-  })();
-
-// ── Transaction filter/search helpers ─────────────────────────────────────────
-let _crTxCurrentFilter = "all";
-
-// ── Month navigator helpers ───────────────────────────────────────────────────
-const _MONTH_NAMES=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const _MONTH_NAMES_FULL=["January","February","March","April","May","June","July","August","September","October","November","December"];
-
-function _crTxApplyMonthNav(creditorId){
-  const yr=window._crTxNavYear||new Date().getFullYear();
-  const mo=window._crTxNavMonth!=null?window._crTxNavMonth:new Date().getMonth();
-  const now=new Date();
-  const isCurrent=(yr===now.getFullYear()&&mo===now.getMonth());
-  const label=document.getElementById("cr-tx-month-label");
-  if(label) label.textContent=_MONTH_NAMES_FULL[mo]+" "+yr+(isCurrent?" (Current)":"");
-  // Set hidden date inputs
-  const fromEl=document.getElementById("cr-tx-from");
-  const toEl=document.getElementById("cr-tx-to");
-  const firstDay=new Date(yr,mo,1);
-  const lastDay=new Date(yr,mo+1,0);
-  const fmt=d=>d.toISOString().slice(0,10);
-  if(fromEl) fromEl.value=fmt(firstDay);
-  if(toEl) toEl.value=fmt(lastDay);
-  _crTxRender(creditorId);
-}
-
-function _crTxShiftMonth(creditorId, dir){
-  if(window._crTxIsCustom){
-    window._crTxIsCustom=false;
-    const customBtn=document.getElementById("cr-tx-custom-btn");
-    const customRange=document.getElementById("cr-tx-custom-range");
-    if(customBtn){customBtn.style.color="#7a8aaa";customBtn.style.border="1px solid #1e2a45";}
-    if(customRange) customRange.style.display="none";
-  }
-  let mo=(window._crTxNavMonth!=null?window._crTxNavMonth:new Date().getMonth())+dir;
-  let yr=window._crTxNavYear||new Date().getFullYear();
-  if(mo>11){mo=0;yr++;}
-  if(mo<0){mo=11;yr--;}
-  // Don't go into the future
-  const now=new Date();
-  if(yr>now.getFullYear()||(yr===now.getFullYear()&&mo>now.getMonth())){return;}
-  window._crTxNavMonth=mo;
-  window._crTxNavYear=yr;
-  _crTxApplyMonthNav(creditorId);
-}
-
-function _crTxToggleCustomRange(creditorId){
-  window._crTxIsCustom=!window._crTxIsCustom;
-  const customBtn=document.getElementById("cr-tx-custom-btn");
-  const customRange=document.getElementById("cr-tx-custom-range");
-  if(customBtn){
-    customBtn.style.color=window._crTxIsCustom?"#FFD700":"#7a8aaa";
-    customBtn.style.border=window._crTxIsCustom?"1px solid #FFD700":"1px solid #1e2a45";
-  }
-  if(customRange) customRange.style.display=window._crTxIsCustom?"grid":"none";
-  if(!window._crTxIsCustom) _crTxApplyMonthNav(creditorId);
-}
-
-function _crTxOnCustomDate(creditorId){
-  _crTxRender(creditorId);
-}
-// ─────────────────────────────────────────────────────────────────────────────
+  // Default to current month - use setTimeout so DOM+functions are ready, pass real id variable
+  (function(creditorId){
+    setTimeout(function(){
+      var now=new Date();
+      window._crTxNavYear=now.getFullYear();
+      window._crTxNavMonth=now.getMonth();
+      window._crTxIsCustom=false;
+      if(typeof _crTxApplyMonthNav==='function') _crTxApplyMonthNav(creditorId);
+    }, 50);
+  })(id);
 
 function _crTxSetFilter(creditorId, filter){
   _crTxCurrentFilter = filter;
@@ -7688,11 +7691,11 @@ function openCustomerPage(id){
             </div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="btn" onclick="cpSetDatePreset('today')" style="font-size:11px;padding:4px 10px;background:#1a1500;color:#FFD700;border:1px solid #3a3a00;">Today</button>
-            <button class="btn" onclick="cpSetDatePreset('yesterday')" style="font-size:11px;padding:4px 10px;background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;">Yesterday</button>
-            <button class="btn" onclick="cpSetDatePreset('week')" style="font-size:11px;padding:4px 10px;background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;">This Week</button>
-            <button class="btn" onclick="cpSetDatePreset('month')" style="font-size:11px;padding:4px 10px;background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;">This Month</button>
-            <button class="btn" onclick="cpSetDatePreset('clear')" style="font-size:11px;padding:4px 10px;background:none;color:#f66;border:1px solid #3a1515;">✕ Clear</button>
+            <button id="cp-preset-today" class="btn" onclick="cpSetDatePreset('today')" style="font-size:11px;padding:4px 10px;background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;">Today</button>
+            <button id="cp-preset-yesterday" class="btn" onclick="cpSetDatePreset('yesterday')" style="font-size:11px;padding:4px 10px;background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;">Yesterday</button>
+            <button id="cp-preset-week" class="btn" onclick="cpSetDatePreset('week')" style="font-size:11px;padding:4px 10px;background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;">This Week</button>
+            <button id="cp-preset-month" class="btn" onclick="cpSetDatePreset('month')" style="font-size:11px;padding:4px 10px;background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;">This Month</button>
+            <button id="cp-preset-clear" class="btn" onclick="cpSetDatePreset('clear')" style="font-size:11px;padding:4px 10px;background:none;color:#f66;border:1px solid #3a1515;">✕ Clear</button>
           </div>
         </div>
         <div id="cp-filter-amount" style="display:none;">
@@ -7860,7 +7863,23 @@ function cpSetDatePreset(preset){
   const fromEl = document.getElementById("cp-date-from");
   const toEl   = document.getElementById("cp-date-to");
   if(!fromEl||!toEl) return;
-  if(preset==="clear"){ fromEl.value=""; toEl.value=""; cpApply(); return; }
+  // Highlight active preset button
+  ["today","yesterday","week","month"].forEach(p=>{
+    const btn=document.getElementById("cp-preset-"+p);
+    if(!btn) return;
+    const active=(p===preset);
+    btn.style.background=active?"#1a1500":"#0a0e1a";
+    btn.style.color=active?"#FFD700":"#7a8aaa";
+    btn.style.border=active?"1px solid #3a3a00":"1px solid #1e2a45";
+  });
+  if(preset==="clear"){
+    fromEl.value=""; toEl.value="";
+    ["today","yesterday","week","month"].forEach(p=>{
+      const btn=document.getElementById("cp-preset-"+p);
+      if(btn){btn.style.background="#0a0e1a";btn.style.color="#7a8aaa";btn.style.border="1px solid #1e2a45";}
+    });
+    cpApply(); return;
+  }
   const todayStart = new Date(now.getFullYear(),now.getMonth(),now.getDate(),0,0);
   const todayEnd   = new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59);
   if(preset==="today"){ fromEl.value=fmt(todayStart); toEl.value=fmt(todayEnd); }
@@ -7872,8 +7891,10 @@ function cpSetDatePreset(preset){
     const w = new Date(todayStart); w.setDate(w.getDate()-w.getDay());
     fromEl.value=fmt(w); toEl.value=fmt(todayEnd);
   } else if(preset==="month"){
-    const m = new Date(now.getFullYear(),now.getMonth(),1,0,0);
-    fromEl.value=fmt(m); toEl.value=fmt(todayEnd);
+    // Full month: 1st to last day of current month
+    const monthStart = new Date(now.getFullYear(),now.getMonth(),1,0,0);
+    const monthEnd   = new Date(now.getFullYear(),now.getMonth()+1,0,23,59);
+    fromEl.value=fmt(monthStart); toEl.value=fmt(monthEnd);
   }
   _cpUpdateMonthLabel();
   cpApply();
