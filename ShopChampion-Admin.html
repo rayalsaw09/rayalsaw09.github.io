@@ -4657,6 +4657,10 @@ function renderAnalytics(sorted){
         ${lowStockItems.slice(0,6).map(x=>`<div style="background:#0a0800;border:1px solid #854d0e;border-radius:10px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:6px;">
           <span style="font-size:13px;font-weight:700;color:#fde68a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">⚠️ ${x.name}</span>
           <span style="font-size:10px;font-weight:800;color:#f59e0b;background:#1a1000;border-radius:6px;padding:2px 6px;flex-shrink:0;">${invGetStock(x.name)}</span>
+        </div>`).join("")}
+      </div>
+    </div>` : ''}
+
   </div>`;
 }
 
