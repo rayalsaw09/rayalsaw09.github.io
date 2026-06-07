@@ -5036,9 +5036,9 @@ async function doShopIdSearch(mode){
           </button>
           <button onclick="(async()=>{
             const btn=this;btn.disabled=true;btn.textContent='⏳ Sending...';
-            // Flip: if I'm adding them as creditor → they should add me as customer, and vice versa
-            const requestType = '${mode}' === 'creditor' ? 'customer' : 'creditor';
-            const ok=await sendShopConnectRequest(${JSON.stringify(profile).replace(/"/g,'&quot;')},'${mode}',requestType);
+            const myMode='${mode}';
+            const theirRole = myMode==='creditor' ? 'customer' : 'creditor';
+            const ok=await sendShopConnectRequest(${JSON.stringify(profile).replace(/"/g,'&quot;')},myMode,theirRole);
             if(ok){btn.style.background='linear-gradient(135deg,#16a34a,#22c55e)';btn.style.color='#fff';btn.textContent='✅ Request Sent! They will see it in their Messages tab.';}
             else{btn.disabled=false;btn.textContent='📨 Send Connect Request (notify them)';}
           })()" class="btn"
@@ -9082,6 +9082,10 @@ async function sendShopConnectRequest(targetProfile, myRoleForThem, theirRoleFor
     notify("⚠️ Firebase not connected — can't send request","error");
     return false;
   }
+  if(!targetProfile || !targetProfile.phone){
+    notify("❌ Target shop has no phone number in their profile — can't send request","error");
+    return false;
+  }
   const myProfile = {
     phone:     authPhone,
     shopId:    myShopId(),
@@ -9131,6 +9135,10 @@ async function sendShopConnectRequest(targetProfile, myRoleForThem, theirRoleFor
     }
   }
 
+  if(success){
+    const targetName = targetProfile.shopName || targetProfile.shopId || "the shop";
+    notify(`✅ Request sent to ${targetName}! They will see it in their Messages tab.`);
+  }
   return success;
 }
 
