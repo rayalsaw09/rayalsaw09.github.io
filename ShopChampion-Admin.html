@@ -1481,7 +1481,7 @@ function ptRestoreState() {
     const pr = document.getElementById("bw-prev");
     const c  = window._ptState.bwSelData;
     if (pr && c) {
-      const pending=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial");
+      const pending=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial"||b.status==="pending_payment");
       const owed=pending.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);
       pr.style.cssText="display:flex;align-items:center;gap:12px;";
       pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)} spend &middot; ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':"No pending borrows"}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:20px;padding:4px 8px;">&times;</button>`;
@@ -3317,9 +3317,9 @@ function refreshCustSearch(q){
 let ptView = "purchase"; // "purchase" | "borrow"
 function renderPurchaseTab(sorted){
   // Borrow summary: all customers with pending or partial borrows
-  const pendingBorrows = customers.filter(c=>(c.borrows||[]).some(b=>b.status==="pending"||b.status==="partial"));
+  const pendingBorrows = customers.filter(c=>(c.borrows||[]).some(b=>b.status==="pending"||b.status==="partial"||b.status==="pending_payment"));
   const totalOwed = pendingBorrows.reduce((s,c)=>(c.borrows||[])
-    .filter(b=>b.status==="pending"||b.status==="partial")
+    .filter(b=>b.status==="pending"||b.status==="partial"||b.status==="pending_payment")
     .reduce((ss,b)=>ss+Math.max(0,Number(b.amount)-(b.amountPaid||0)),s),0);
 
   const tabBtn = (v,label,color)=>{
@@ -3411,7 +3411,7 @@ function renderPurchaseTab(sorted){
         <span style="font-size:12px;font-weight:800;color:#f84;">Total owed: ${formatINR(totalOwed)}</span>
       </div>
       ${pendingBorrows.map(c=>{
-        const pending=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial");
+        const pending=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial"||b.status==="pending_payment");
         const owed=pending.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);
         return `<div style="padding:12px 16px;border-bottom:1px solid #0d1220;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
@@ -3801,7 +3801,7 @@ function bwSelectCustomer(id){
   const srchRow=document.getElementById("bw-search-row");
   if(srchRow) srchRow.style.display="none";
   const pr=document.getElementById("bw-prev");
-  const pending=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial");
+  const pending=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial"||b.status==="pending_payment");
   const owed=pending.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);
   pr.style.display="flex";
   pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)} spend · ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':'No pending borrows'}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:20px;padding:4px 8px;">✕</button>`;
@@ -4113,13 +4113,33 @@ async function bwSubmit(){
 
 async function bwMarkReturned(custId,borrowId){
   const c=customers.find(x=>x.id===custId);if(!c)return;
-  // Update borrows list
   const b=(c.borrows||[]).find(x=>x.id===borrowId);
-  if(b){b.status="returned";b.returnedAt=new Date().toISOString();}
-  // Sync status on the matching purchase entry
-  const p=(c.purchases||[]).find(x=>x.bill===borrowId);
-  if(p){p.borrowStatus="returned";}
-  notify(`✅ Marked as returned for ${c.name}`);
+  if(b){
+    if(b._syncType==="purchase" && b.status==="pending_payment"){
+      // This was a synced purchase borrow — payment received, move to purchase history
+      b.status="returned"; b.returnedAt=new Date().toISOString();
+      b.amountPaid=Number(b.amount); // fully paid
+      if(!c.purchases) c.purchases=[];
+      c.purchases.push({
+        id:       "PAY"+Date.now(),
+        amount:   Number(b.amount),
+        bill:     b.bill,
+        notes:    b.notes+" [Payment received]",
+        date:     new Date().toISOString().slice(0,10),
+        createdAt:Date.now(),
+        _fromBorrowId: borrowId,
+        _syncSource:   b._syncSource,
+      });
+      c.totalSpend=(c.purchases||[]).reduce((s,p)=>s+(p.amount||0),0);
+      notify(`✅ Payment received — moved to purchase history for ${c.name}`);
+    } else {
+      b.status="returned"; b.returnedAt=new Date().toISOString();
+      // Sync status on the matching purchase entry (legacy)
+      const p=(c.purchases||[]).find(x=>x.bill===borrowId);
+      if(p){p.borrowStatus="returned";}
+      notify(`✅ Marked as returned for ${c.name}`);
+    }
+  }
   try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
   safeRenderTab(currentTab);
 }
@@ -4127,22 +4147,23 @@ async function bwMarkReturned(custId,borrowId){
 function showBorrowDetails(custId){
   const c=customers.find(x=>x.id===custId);if(!c)return;
   const borrows=[...(c.borrows||[])].sort((a,b)=>new Date(b.recordedAt||b.date)-new Date(a.recordedAt||a.date));
-  const active=borrows.filter(b=>b.status==="pending"||b.status==="partial");
+  const active=borrows.filter(b=>b.status==="pending"||b.status==="partial"||b.status==="pending_payment");
   const returned=borrows.filter(b=>b.status==="returned");
   const totalOwed=active.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);
   const totalOriginal=active.reduce((s,b)=>s+Number(b.amount),0);
   const totalReturned=returned.reduce((s,b)=>s+Number(b.amount),0);
 
   const borrowRow=(b)=>{
-    const isPending = b.status==="pending"||b.status==="partial";
+    const isPending = b.status==="pending"||b.status==="partial"||b.status==="pending_payment";
     const isPartial = b.status==="partial";
-    const isOverdue = isPending && b.due && new Date(b.due)<new Date();
+    const isSyncedUnpaid = b.status==="pending_payment";
+    const isOverdue = isPending && !isSyncedUnpaid && b.due && new Date(b.due)<new Date();
     const paid      = b.amountPaid || 0;
     const total     = Number(b.amount);
     const remaining = Math.round((total - paid)*100)/100;
     const paidPct   = Math.min(100, Math.round((paid/total)*100));
-    const statusColor = isPending ? (isOverdue?'#f44': isPartial?'#f59e0b':'#f84') : '#4f4';
-    const statusLabel = isPending ? (isPartial?'💛 Partial':'🔴 Pending') : '✅ Returned';
+    const statusColor = isPending ? (isSyncedUnpaid?'#a78bfa':isOverdue?'#f44': isPartial?'#f59e0b':'#f84') : '#4f4';
+    const statusLabel = isPending ? (isSyncedUnpaid?'🟣 Awaiting Payment':isPartial?'💛 Partial':'🔴 Pending') : '✅ Returned';
 
     return `<div style="padding:12px 14px;border-bottom:1px solid #0d1220;background:${isPending?(isPartial?'#120e00':'#0f0a00'):'#0a0f0a'};">
       <!-- Top row: amount + status badge -->
@@ -4175,6 +4196,12 @@ function showBorrowDetails(custId){
       <!-- Action buttons -->
       ${isPending?`
       <div style="display:flex;gap:8px;margin-top:6px;">
+        ${isSyncedUnpaid ? `
+        <button onclick="bwMarkReturned('${c.id}','${b.id}');closeModal();showBorrowDetails('${c.id}')"
+          style="flex:1;cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid #4c1d95;background:#1a0a3a;color:#a78bfa;font-size:11px;font-weight:700;">
+          💜 Mark as Paid — Move to Purchases
+        </button>
+        ` : `
         <button onclick="openPartialPaymentModal('${c.id}','${b.id}')"
           style="flex:1;cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid #92400e;background:#1a0e00;color:#f59e0b;font-size:11px;font-weight:700;">
           💰 Pay ${isPartial?'More':'Partial'}
@@ -4183,6 +4210,7 @@ function showBorrowDetails(custId){
           style="flex:1;cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:11px;font-weight:700;">
           ✓ Mark Fully Cleared
         </button>
+        `}
       </div>`:''}
     </div>`;
   };
@@ -6250,20 +6278,37 @@ async function acceptPaymentSyncRequest(reqId){
   try { allData = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]"); } catch{}
   let cust = allData.find(c=>c.phone===req.fromPhone);
   if(!cust){
-    cust = { id:"C"+Date.now(), name:req.fromShopName||req.fromPhone, phone:req.fromPhone, purchases:[], totalSpend:0, createdAt:Date.now(), _fromShopConnect:true };
+    cust = { id:"C"+Date.now(), name:req.fromShopName||req.fromPhone, phone:req.fromPhone,
+             purchases:[], borrows:[], totalSpend:0, createdAt:Date.now(), _fromShopConnect:true };
     allData.push(cust);
   }
+  if(!cust.borrows) cust.borrows=[];
   if(!cust.purchases) cust.purchases=[];
-  cust.purchases.push({
-    id:"SYN"+Date.now(), amount:req.amount,
-    bill:req.invoiceNo||"Synced Payment",
-    notes:(req.note||"Payment")+" [Synced from "+(req.fromShopName||req.fromPhone)+"]",
-    date:req.date, createdAt:Date.now(),
-    _syncedReqId:reqId, _syncSource:req.fromPhone
+
+  // A purchase sync from Shop A means Shop A owes money to me (Shop B).
+  // So this appears in MY Borrows tab (they owe me) with status "pending_payment".
+  // It only moves to purchase history once Shop A sends a payment sync.
+  const borrowId = "SYN"+Date.now();
+  cust.borrows.push({
+    id:         borrowId,
+    amount:     req.amount,
+    amountPaid: 0,
+    bill:       req.invoiceNo || "Synced Invoice",
+    notes:      (req.note||"Purchase") + " [Synced from " + (req.fromShopName||req.fromPhone) + "]",
+    date:       req.date,
+    recordedAt: Date.now(),
+    status:     "pending_payment",   // waiting for Shop A to pay
+    _syncedReqId: reqId,
+    _syncSource:  req.fromPhone,
+    _syncType:    "purchase",        // source was a purchase sync
   });
-  cust.totalSpend = cust.purchases.reduce((s,p)=>s+(p.amount||0),0);
+  // Do NOT touch totalSpend or purchases — payment is not done yet
 
   try { localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allData)); } catch{}
+  // Sync in-memory array too
+  const memIdx = customers.findIndex(c=>c.id===cust.id);
+  if(memIdx>=0) customers[memIdx]=cust; else customers.push(cust);
+
   // Cloud save
   if(db && authPhone){
     await db.collection("users").doc(authPhone).collection("customers").doc(cust.id).set(cust,{merge:true}).catch(()=>{});
@@ -6283,7 +6328,7 @@ async function acceptPaymentSyncRequest(reqId){
     resolvedAt: Date.now(),
     acceptedByProfile: myProfile
   });
-  notify("✅ Accepted! Purchase entry added to customer history.","success");
+  notify("✅ Accepted! Added to Borrows — will move to purchases once they pay.","success");
   closeModal();
   if(currentTab===1) renderTab(1);
 }
@@ -6312,7 +6357,7 @@ function openPendingPaymentRequests(){
         <div style="font-size:20px;font-weight:800;color:#22c55e;white-space:nowrap;">${formatINR(r.amount)}</div>
       </div>
       <div style="display:flex;gap:8px;margin-top:12px;">
-        <button onclick="acceptPaymentSyncRequest('${r.id}')" class="btn" style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-size:13px;font-weight:800;padding:10px;">✅ Accept — Add to My Purchases</button>
+        <button onclick="acceptPaymentSyncRequest('${r.id}')" class="btn" style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-size:13px;font-weight:800;padding:10px;">✅ Accept — Add to Borrows (Unpaid)</button>
         <button onclick="declinePaymentSyncRequest('${r.id}')" class="btn" style="background:#1a0808;border:1px solid #ef444460;color:#f87171;font-size:13px;font-weight:700;padding:10px 14px;">❌ Decline</button>
       </div>
     </div>
@@ -7589,7 +7634,7 @@ function showProfile(id){
     <div style="display:flex;gap:8px;margin-top:16px;">
       <button class="btn" onclick="closeModal();openPurchaseModal('${c.id}')" style="background:#1a3a60;color:#5af;border:1px solid #1a4a80;flex:1;padding:12px;font-weight:800;">+ Add Purchase</button>
       <button class="btn" onclick="closeModal();showCustomerBillHistory('${c.id}')" style="background:#1a2a20;color:#4f4;border:1px solid #1a4a2a;flex:1;padding:12px;font-weight:800;">🧾 Bills</button>
-      ${(()=>{const pb=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial");const owed=pb.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);return pb.length?`<button class="btn" onclick="closeModal();showBorrowDetails('${c.id}')" style="background:#2a1500;color:#f84;border:1px solid #5a2a00;flex:1;padding:12px;font-weight:800;">📦 Owes ${formatINR(owed)}</button>`:''})()}
+      ${(()=>{const pb=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial"||b.status==="pending_payment");const owed=pb.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);return pb.length?`<button class="btn" onclick="closeModal();showBorrowDetails('${c.id}')" style="background:#2a1500;color:#f84;border:1px solid #5a2a00;flex:1;padding:12px;font-weight:800;">📦 Owes ${formatINR(owed)}</button>`:''})()}
       <button class="btn" onclick="closeModal();openEditModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #1a4a1a;flex:1;padding:12px;font-weight:800;">✏️ Edit</button>
     </div>`);
   if(visits>0) setTimeout(phInit,0);
@@ -7960,7 +8005,7 @@ function openCustomerPage(id){
   }
 
   // Borrow summary
-  const pendingBorrows=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial");
+  const pendingBorrows=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial"||b.status==="pending_payment");
   const totalOwed=pendingBorrows.reduce((s,b)=>s+Number(b.amount),0);
 
   inner.innerHTML=`
@@ -10218,6 +10263,7 @@ async function acceptShopRequest(req){
       points:     0,
       totalSpend: 0,
       purchases:  [],
+      borrows:    [],
       createdAt:  Date.now(),
       notes:      `Auto-added via Shop Connect (${profile.shopId||""})`,
       _fromShopConnect: true,
@@ -10225,7 +10271,9 @@ async function acceptShopRequest(req){
     };
     allCustomers.push(newCust);
     try { localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allCustomers)); } catch {}
-    if(db && authPhone) customersCol().doc(newCust.id).set(newCust).catch(()=>{});
+    // NOTE: Do NOT write to Firestore here — the onSnapshot listener on
+    // startFirestoreListener() will auto-sync it once it lands in Firestore
+    // via Step 2 below.  A double-write causes a duplicate customer entry.
     notify(`✅ ${profile.shopName||"Shop"} added to your Customers!`);
   }
 
