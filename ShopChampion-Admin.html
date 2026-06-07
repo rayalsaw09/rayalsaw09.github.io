@@ -1596,6 +1596,8 @@ function startFirestoreListener() {
     loadCreditorsFromCloud();
     // Load shop connection requests (messages inbox)
     loadShopRequests();
+    // Live listener: get notified when other shops accept our connect requests
+    startAutoAcceptedListener();
   }
 }
 
@@ -2801,6 +2803,10 @@ function doLogout() {
   authPhone = ""; // clear in-memory phone so storageKey() resets
   // Unsubscribe inventory real-time listener
   if(invUnsubscribe){ try{ invUnsubscribe(); } catch(e){} invUnsubscribe=null; }
+  // Unsubscribe shop-connect listeners
+  if(_payReqListener){ try{ _payReqListener(); } catch(e){} _payReqListener=null; }
+  if(_autoAcceptedListener){ try{ _autoAcceptedListener(); } catch(e){} _autoAcceptedListener=null; }
+  _shopRequestsCache = []; _shopRequestsUnread = 0;
   // Reset in-memory state so next account starts clean
   customers = [];
   inventoryItems = [];
@@ -5181,8 +5187,9 @@ async function doShopIdSearch(mode){
           <button onclick="(async()=>{
             const btn=this;btn.disabled=true;btn.textContent='⏳ Sending...';
             const myMode='${mode}';
-            const theirRole = myMode==='creditor' ? 'customer' : 'creditor';
-            const ok=await sendShopConnectRequest(${JSON.stringify(profile).replace(/"/g,'&quot;')},myMode,theirRole);
+            // If I add them as my CREDITOR → I am their CUSTOMER; if I add them as my CUSTOMER → I am their CREDITOR
+            const roleIAmToThem = myMode==='creditor' ? 'customer' : 'creditor';
+            const ok=await sendShopConnectRequest(${JSON.stringify(profile).replace(/"/g,'&quot;')},roleIAmToThem,myMode);
             if(ok){btn.style.background='linear-gradient(135deg,#16a34a,#22c55e)';btn.style.color='#fff';btn.textContent='✅ Request Sent! They will see it in their Messages tab.';}
             else{btn.disabled=false;btn.textContent='📨 Send Connect Request (notify them)';}
           })()" class="btn"
@@ -9762,6 +9769,7 @@ function _invLogCreditorPurchase(creditorId, itemName, qty, cost, date, notes){
 // status: "pending" | "accepted" | "declined"
 
 let _shopRequestsCache = []; // cached list of pending requests for this shop
+let _autoAcceptedListener = null; // live listener for auto_accepted docs
 
 function shopRequestsCol(){
   if(!db || !authPhone) return null;
@@ -9790,48 +9798,21 @@ async function loadShopRequests(){
   } catch(e2) { /* rules may not allow yet */ }
 
   // ── Path 3: auto_accepted requests written for me by shops that accepted my request ─
+  // (Live listener handles these in real-time; this is the on-load sweep for any missed ones)
   try {
     const snap3 = await db.collection("shop_connect_requests")
       .where("toPhone","==",authPhone)
       .where("status","==","auto_accepted")
       .get();
-    for(const doc of snap3.docs){
-      const req = {id:doc.id,...doc.data(),_path:"flat"};
-      // Apply to my account silently
-      const p = req.fromProfile || {};
-      if(req.type === "creditor"){
-        const creditors = getCreditors();
-        if(!creditors.find(c=>c.phone===p.phone && p.phone)){
-          creditors.push({
-            id: newCreditorId(), name: p.shopName||p.shopId||"Shop",
-            phone: p.phone||"", gstin: p.gstin||"",
-            address: [p.address,p.city].filter(Boolean).join(", "),
-            notes: `Auto-added — they accepted your connect request (${p.shopId||""})`,
-            bank:{name:"",acc:"",ifsc:"",upi:""}, createdAt:Date.now(), transactions:[],
-            _fromShopConnect:true, _connectedShopId:p.shopId||"",
-          });
-          saveCreditors(creditors);
-        }
-      } else if(req.type === "customer"){
-        const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
-        if(!allCust.find(c=>c.phone===p.phone && p.phone)){
-          const nc = {
-            id:"C"+Date.now(), name:p.shopName||p.shopId||"Shop",
-            phone:p.phone||"", gstin:p.gstin||"", gstName:p.shopName||"",
-            gstAddress:[p.address,p.city].filter(Boolean).join(", "),
-            points:0, totalSpend:0, purchases:[], createdAt:Date.now(),
-            notes:`Auto-added — they accepted your connect request (${p.shopId||""})`,
-            _fromShopConnect:true, _connectedShopId:p.shopId||"",
-          };
-          allCust.push(nc);
-          try{ localStorage.setItem(storageKey("customers_v2"),JSON.stringify(allCust)); }catch{}
-          if(db && authPhone) customersCol().doc(nc.id).set(nc).catch(()=>{});
-        }
-      }
-      // Mark consumed so we don't re-apply
-      doc.ref.update({status:"consumed"}).catch(()=>{});
-    }
+    for(const doc of snap3.docs) await _applyAutoAcceptedReq(doc);
   } catch(e3){ /* rules or index issue */ }
+  // Also sweep subcollection path
+  try {
+    const snap3b = await db.collection("shop_requests").doc(authPhone).collection("requests")
+      .where("status","==","auto_accepted")
+      .get();
+    for(const doc of snap3b.docs) await _applyAutoAcceptedReq(doc);
+  } catch(e4){ /* rules or index issue */ }
 
   // Deduplicate by id and sort newest first
   const seen = new Set();
@@ -9839,6 +9820,76 @@ async function loadShopRequests(){
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   _shopRequestsUnread = _shopRequestsCache.length;
   renderTabs();
+}
+
+// ── Live listener for auto_accepted docs (Shop A gets notified when Shop B accepts) ─────────────
+// Helper: apply a single auto_accepted request to local data
+async function _applyAutoAcceptedReq(doc){
+  const req = {id:doc.id,...doc.data()};
+  const p = req.fromProfile || {};
+  let applied = false;
+  if(req.type === "creditor"){
+    const creditors = getCreditors();
+    if(!creditors.find(c=>c.phone===p.phone && p.phone)){
+      creditors.push({
+        id: newCreditorId(), name: p.shopName||p.shopId||"Shop",
+        phone: p.phone||"", gstin: p.gstin||"",
+        address: [p.address,p.city].filter(Boolean).join(", "),
+        notes: "Auto-added — they accepted your connect request (" + (p.shopId||"") + ")",
+        bank:{name:"",acc:"",ifsc:"",upi:""}, createdAt:Date.now(), transactions:[],
+        _fromShopConnect:true, _connectedShopId:p.shopId||"",
+      });
+      saveCreditors(creditors);
+      applied = true;
+      notify("✅ " + (p.shopName||"A shop") + " accepted — added to your Creditors!", "success");
+    }
+  } else if(req.type === "customer"){
+    const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
+    if(!allCust.find(c=>c.phone===p.phone && p.phone)){
+      const nc = {
+        id:"C"+Date.now(), name:p.shopName||p.shopId||"Shop",
+        phone:p.phone||"", gstin:p.gstin||"", gstName:p.shopName||"",
+        gstAddress:[p.address,p.city].filter(Boolean).join(", "),
+        points:0, totalSpend:0, purchases:[], createdAt:Date.now(),
+        notes:"Auto-added — they accepted your connect request (" + (p.shopId||"") + ")",
+        _fromShopConnect:true, _connectedShopId:p.shopId||"",
+      };
+      allCust.push(nc);
+      try{ localStorage.setItem(storageKey("customers_v2"),JSON.stringify(allCust)); }catch(e){}
+      if(db && authPhone) customersCol().doc(nc.id).set(nc).catch(()=>{});
+      applied = true;
+      notify("✅ " + (p.shopName||"A shop") + " accepted — added to your Customers!", "success");
+    }
+  }
+  if(applied){
+    doc.ref.update({status:"consumed"}).catch(()=>{});
+    if(currentTab===1) renderTab(1);
+    if(currentTab===6) renderTab(6);
+  }
+}
+
+function startAutoAcceptedListener(){
+  if(!db || !authPhone || _autoAcceptedListener) return;
+  // Listen on flat collection (shop_connect_requests) for auto_accepted docs sent to me
+  const unsubFlat = db.collection("shop_connect_requests")
+    .where("toPhone","==",authPhone)
+    .where("status","==","auto_accepted")
+    .onSnapshot(async snap=>{
+      for(const doc of snap.docs) await _applyAutoAcceptedReq(doc);
+    }, err=>{ console.warn("auto_accepted (flat) listener error:", err); });
+
+  // Also listen on subcollection path (shop_requests/{myPhone}/requests)
+  let unsubSub = ()=>{};
+  try {
+    unsubSub = db.collection("shop_requests").doc(authPhone).collection("requests")
+      .where("status","==","auto_accepted")
+      .onSnapshot(async snap=>{
+        for(const doc of snap.docs) await _applyAutoAcceptedReq(doc);
+      }, err=>{ console.warn("auto_accepted (sub) listener error:", err); });
+  } catch(e){ console.warn("sub listener setup error:", e); }
+
+  // Store combined unsubscribe
+  _autoAcceptedListener = ()=>{ try{ unsubFlat(); unsubSub(); } catch(e){} };
 }
 
 // ── Send a connect request to another shop ───────────────────────────────────
@@ -10056,18 +10107,22 @@ async function acceptShopRequest(req){
       id:           autoReqId,
       fromPhone:    authPhone,
       fromShopId:   myShopId(),
-      fromProfile:  myProfile,
+      fromProfile:  myProfile,   // Shop B's profile — Shop A will add this as creditor/customer
       toPhone:      req.fromPhone,
-      type:         req.theirRoleForMe,  // what Shop A should add ME as
+      type:         req.theirRoleForMe,  // what Shop A should add ME (Shop B) as
       status:       "auto_accepted",
       createdAt:    Date.now(),
       _autoAccepted: true,
     };
-    // Write to Shop A's flat collection so they see it applied immediately
+    // Write to BOTH paths so Shop A's live listener picks it up regardless of rules
     try {
+      // Primary: flat collection (live listener watches this)
       await db.collection("shop_connect_requests").doc(autoReqId).set(autoReq);
-      // Also process it locally if it's for me (rare edge case)
-    } catch(e){ console.warn("Auto-notify sender:", e); }
+    } catch(e1){ console.warn("Auto-notify sender (flat):", e1); }
+    try {
+      // Secondary: subcollection under Shop A's phone
+      await db.collection("shop_requests").doc(req.fromPhone).collection("requests").doc(autoReqId).set(autoReq);
+    } catch(e2){ console.warn("Auto-notify sender (sub):", e2); }
   }
 
   // Remove from cache and refresh
