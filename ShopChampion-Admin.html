@@ -1481,8 +1481,8 @@ function ptRestoreState() {
     const pr = document.getElementById("bw-prev");
     const c  = window._ptState.bwSelData;
     if (pr && c) {
-      const pending=(c.borrows||[]).filter(b=>b.status==="pending");
-      const owed=pending.reduce((s,b)=>s+Number(b.amount),0);
+      const pending=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial");
+      const owed=pending.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);
       pr.style.cssText="display:flex;align-items:center;gap:12px;";
       pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)} spend &middot; ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':"No pending borrows"}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:20px;padding:4px 8px;">&times;</button>`;
     }
@@ -3294,9 +3294,11 @@ function refreshCustSearch(q){
 // ─── PURCHASE TAB ─────────────────────────────────────────────
 let ptView = "purchase"; // "purchase" | "borrow"
 function renderPurchaseTab(sorted){
-  // Borrow summary: all customers with pending borrows
-  const pendingBorrows = customers.filter(c=>(c.borrows||[]).some(b=>b.status==="pending"));
-  const totalOwed = pendingBorrows.reduce((s,c)=>(c.borrows||[]).filter(b=>b.status==="pending").reduce((ss,b)=>ss+Number(b.amount),s),0);
+  // Borrow summary: all customers with pending or partial borrows
+  const pendingBorrows = customers.filter(c=>(c.borrows||[]).some(b=>b.status==="pending"||b.status==="partial"));
+  const totalOwed = pendingBorrows.reduce((s,c)=>(c.borrows||[])
+    .filter(b=>b.status==="pending"||b.status==="partial")
+    .reduce((ss,b)=>ss+Math.max(0,Number(b.amount)-(b.amountPaid||0)),s),0);
 
   const tabBtn = (v,label,color)=>{
     const a=ptView===v;
@@ -3387,8 +3389,8 @@ function renderPurchaseTab(sorted){
         <span style="font-size:12px;font-weight:800;color:#f84;">Total owed: ${formatINR(totalOwed)}</span>
       </div>
       ${pendingBorrows.map(c=>{
-        const pending=(c.borrows||[]).filter(b=>b.status==="pending");
-        const owed=pending.reduce((s,b)=>s+Number(b.amount),0);
+        const pending=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial");
+        const owed=pending.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);
         return `<div style="padding:12px 16px;border-bottom:1px solid #0d1220;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
             ${avatarEl(c,36)}
@@ -3402,7 +3404,11 @@ function renderPurchaseTab(sorted){
             <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#0a0e1a;border-radius:8px;margin-bottom:4px;">
               <div style="flex:1;">
                 <div style="font-size:12px;font-weight:700;color:#f84;">${formatINR(b.amount)} <span style="color:#7a8aaa;font-weight:400;">— ${b.item||"No description"}</span></div>
-                <div style="font-size:10px;color:#556;">Borrowed: ${new Date(b.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${b.due?" · Due: "+new Date(b.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short"})+(new Date(b.due)<new Date()?' <span style="color:#f44;">⚠️ Overdue</span>':""):""}</div>
+                <div style="font-size:10px;color:#556;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span>Borrowed: ${new Date(b.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span>
+            ${b.due?" · Due: "+new Date(b.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short"})+(new Date(b.due)<new Date()?' <span style="color:#f44;">⚠️ Overdue</span>':""):""}
+            ${b.status==="partial"?`<span style="background:#92400e33;color:#f59e0b;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;">💛 Partial · ${formatINR(Math.max(0,b.amount-(b.amountPaid||0)))} left</span>`:""}
+          </div>
               </div>
               <button onclick="bwMarkReturned('${c.id}','${b.id}')" style="cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:11px;font-weight:700;white-space:nowrap;">✓ Returned</button>
             </div>`).join("")}
@@ -3773,8 +3779,8 @@ function bwSelectCustomer(id){
   const srchRow=document.getElementById("bw-search-row");
   if(srchRow) srchRow.style.display="none";
   const pr=document.getElementById("bw-prev");
-  const pending=(c.borrows||[]).filter(b=>b.status==="pending");
-  const owed=pending.reduce((s,b)=>s+Number(b.amount),0);
+  const pending=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial");
+  const owed=pending.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);
   pr.style.display="flex";
   pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)} spend · ${pending.length>0?'<span style="color:#f84;">Owes '+formatINR(owed)+'</span>':'No pending borrows'}</div></div><button onclick="bwClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:20px;padding:4px 8px;">✕</button>`;
 }
@@ -4099,34 +4105,191 @@ async function bwMarkReturned(custId,borrowId){
 function showBorrowDetails(custId){
   const c=customers.find(x=>x.id===custId);if(!c)return;
   const borrows=[...(c.borrows||[])].sort((a,b)=>new Date(b.recordedAt||b.date)-new Date(a.recordedAt||a.date));
-  const pending=borrows.filter(b=>b.status==="pending");
+  const active=borrows.filter(b=>b.status==="pending"||b.status==="partial");
   const returned=borrows.filter(b=>b.status==="returned");
-  const totalOwed=pending.reduce((s,b)=>s+Number(b.amount),0);
+  const totalOwed=active.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);
+  const totalOriginal=active.reduce((s,b)=>s+Number(b.amount),0);
   const totalReturned=returned.reduce((s,b)=>s+Number(b.amount),0);
 
   const borrowRow=(b)=>{
-    const isPending=b.status==="pending";
-    const isOverdue=isPending&&b.due&&new Date(b.due)<new Date();
-    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid #0d1220;background:${isPending?'#0f0a00':'#0a0f0a'};">
-      <div style="flex:1;">
-        <div style="font-size:13px;font-weight:700;color:${isPending?(isOverdue?'#f44':'#f84'):'#4f4'};">${formatINR(b.amount)} — <span style="font-weight:400;color:#e8eaf0;">${b.item||"No description"}</span></div>
-        <div style="font-size:10px;color:#556;margin-top:2px;">Borrowed: ${new Date(b.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}
-          ${b.due?" · Due: "+new Date(b.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})+(isOverdue?' <span style="color:#f44;">⚠️ Overdue</span>':""):""}
-          ${b.returnedAt?" · Returned: "+new Date(b.returnedAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}):""}
+    const isPending = b.status==="pending"||b.status==="partial";
+    const isPartial = b.status==="partial";
+    const isOverdue = isPending && b.due && new Date(b.due)<new Date();
+    const paid      = b.amountPaid || 0;
+    const total     = Number(b.amount);
+    const remaining = Math.round((total - paid)*100)/100;
+    const paidPct   = Math.min(100, Math.round((paid/total)*100));
+    const statusColor = isPending ? (isOverdue?'#f44': isPartial?'#f59e0b':'#f84') : '#4f4';
+    const statusLabel = isPending ? (isPartial?'💛 Partial':'🔴 Pending') : '✅ Returned';
+
+    return `<div style="padding:12px 14px;border-bottom:1px solid #0d1220;background:${isPending?(isPartial?'#120e00':'#0f0a00'):'#0a0f0a'};">
+      <!-- Top row: amount + status badge -->
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;color:${statusColor};">
+            ${formatINR(total)}
+            ${isPartial?`<span style="font-size:11px;font-weight:400;color:#e8eaf0;"> — <span style="color:#f59e0b;">${formatINR(remaining)} remaining</span> / <span style="color:#4f4;">${formatINR(paid)} paid</span></span>`:""}
+            <span style="font-size:11px;font-weight:400;color:#e8eaf0;"> — ${b.item||"No description"}</span>
+          </div>
+          <div style="font-size:10px;color:#556;margin-top:2px;">
+            Borrowed: ${new Date(b.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}
+            ${b.due?" · Due: "+new Date(b.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})+(isOverdue?' <span style="color:#f44;">⚠️ Overdue</span>':""):""}
+            ${b.returnedAt?" · Cleared: "+new Date(b.returnedAt).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}):""}
+          </div>
         </div>
+        <span style="font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;background:${isPending?(isPartial?'#92400e33':'#3a1a0033'):'#0a2a0a33'};color:${statusColor};white-space:nowrap;">${statusLabel}</span>
       </div>
-      ${isPending?`<button onclick="bwMarkReturned('${c.id}','${b.id}');closeModal();showBorrowDetails('${c.id}')" style="cursor:pointer;padding:5px 10px;border-radius:8px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:11px;font-weight:700;white-space:nowrap;">✓ Returned</button>`:'<span style="font-size:11px;color:#4f4;font-weight:700;">✓ Returned</span>'}
+      <!-- Progress bar (only for partial/pending) -->
+      ${isPending?`
+      <div style="margin-bottom:8px;">
+        <div style="background:#1e2a45;border-radius:99px;height:7px;overflow:hidden;">
+          <div style="height:100%;width:${paidPct}%;background:linear-gradient(90deg,#22c55e,#4ade80);border-radius:99px;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-top:3px;color:#4a5a7a;">
+          <span>${paidPct}% paid</span>
+          <span>${formatINR(remaining)} left</span>
+        </div>
+      </div>`:""}
+      <!-- Action buttons -->
+      ${isPending?`
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <button onclick="openPartialPaymentModal('${c.id}','${b.id}')"
+          style="flex:1;cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid #92400e;background:#1a0e00;color:#f59e0b;font-size:11px;font-weight:700;">
+          💰 Pay ${isPartial?'More':'Partial'}
+        </button>
+        <button onclick="bwMarkReturned('${c.id}','${b.id}');closeModal();showBorrowDetails('${c.id}')"
+          style="flex:1;cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:11px;font-weight:700;">
+          ✓ Mark Fully Cleared
+        </button>
+      </div>`:''}
     </div>`;
   };
 
-  showWideModal(`${modalHeader("📦 Borrow Details — "+c.name)}
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
-      ${[{l:"Outstanding",v:formatINR(totalOwed),col:"#f84"},{l:"Pending Items",v:pending.length,col:"#e8eaf0"},{l:"Total Returned",v:formatINR(totalReturned),col:"#4f4"}].map(m=>`<div style="background:#0a0e1a;border-radius:10px;padding:12px;text-align:center;"><div style="font-weight:800;font-size:15px;color:${m.col};">${m.v}</div><div style="font-size:11px;color:#556;margin-top:2px;">${m.l}</div></div>`).join("")}
+  // Summary stats row
+  const partialCount = active.filter(b=>b.status==="partial").length;
+  const summaryCards = [
+    {l:"Still Owed",    v:formatINR(Math.round(totalOwed*100)/100), col:"#f84"},
+    {l:"Active Borrows",v:active.length,                             col:"#e8eaf0"},
+    {l:"Part Paid",     v:partialCount,                              col:"#f59e0b"},
+    {l:"Cleared",       v:formatINR(totalReturned),                  col:"#4f4"},
+  ];
+
+  showWideModal(`${modalHeader("📦 Borrow Details — "+escHtml(c.name))}
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
+      ${summaryCards.map(m=>`<div style="background:#0a0e1a;border-radius:10px;padding:10px;text-align:center;">
+        <div style="font-weight:800;font-size:14px;color:${m.col};">${m.v}</div>
+        <div style="font-size:10px;color:#556;margin-top:2px;">${m.l}</div>
+      </div>`).join("")}
     </div>
-    ${pending.length?`<div style="font-size:12px;font-weight:700;color:#f84;text-transform:uppercase;letter-spacing:1px;padding:8px 14px;border-bottom:1px solid #1e2a45;">Pending</div>${pending.map(borrowRow).join("")}`:""}
-    ${returned.length?`<div style="font-size:12px;font-weight:700;color:#4f4;text-transform:uppercase;letter-spacing:1px;padding:8px 14px;border-bottom:1px solid #1e2a45;margin-top:8px;">Returned</div>${returned.map(borrowRow).join("")}`:""}
+    ${active.length?`
+      <div style="font-size:12px;font-weight:700;color:#f84;text-transform:uppercase;letter-spacing:1px;padding:8px 14px;border-bottom:1px solid #1e2a45;">
+        Active / Unpaid (${active.length})
+      </div>
+      ${active.map(borrowRow).join("")}`:""}
+    ${returned.length?`
+      <div style="font-size:12px;font-weight:700;color:#4f4;text-transform:uppercase;letter-spacing:1px;padding:8px 14px;border-bottom:1px solid #1e2a45;margin-top:8px;">
+        Cleared (${returned.length})
+      </div>
+      ${returned.map(borrowRow).join("")}`:""}
     ${!borrows.length?`<div style="text-align:center;color:#4a5a7a;padding:24px;">No borrow records yet</div>`:""}
-    <div style="padding:14px;"><button class="btn" onclick="closeModal()" style="width:100%;padding:11px;background:#1a2a45;color:#5af;border:1px solid #1a3a60;">Close</button></div>
+    <div style="padding:14px;">
+      <button class="btn" onclick="closeModal()" style="width:100%;padding:11px;background:#1a2a45;color:#5af;border:1px solid #1a3a60;">Close</button>
+    </div>
+  `);
+}
+
+
+// ─── PARTIAL BORROW PAYMENT ───────────────────────────────────────────────────
+async function bwRecordPartialPayment(custId, borrowId, payAmount){
+  const c = customers.find(x=>x.id===custId); if(!c) return;
+  const b = (c.borrows||[]).find(x=>x.id===borrowId); if(!b) return;
+
+  if(!b.amountPaid) b.amountPaid = 0;
+  if(!b.payments)   b.payments   = [];
+
+  b.amountPaid = Math.round((b.amountPaid + payAmount) * 100) / 100;
+  b.payments.push({ amount: payAmount, date: new Date().toISOString().slice(0,10), paidAt: new Date().toISOString() });
+
+  const remaining = Math.round((Number(b.amount) - b.amountPaid) * 100) / 100;
+
+  if(remaining <= 0){
+    b.status = "returned";
+    b.returnedAt = new Date().toISOString();
+    b.amountPaid = Number(b.amount); // cap at original
+    const p = (c.purchases||[]).find(x=>x.bill===borrowId);
+    if(p){ p.borrowStatus="returned"; p.amountPaid=b.amountPaid; }
+    notify(`✅ Fully paid! ${c.name}'s borrow of ${formatINR(b.amount)} is cleared.`);
+  } else {
+    b.status = "partial";
+    const p = (c.purchases||[]).find(x=>x.bill===borrowId);
+    if(p){ p.borrowStatus="partial"; p.amountPaid=b.amountPaid; }
+    notify(`💰 Payment of ${formatINR(payAmount)} recorded. ${formatINR(remaining)} still remaining for ${c.name}.`);
+  }
+
+  try{ await saveOneCustomer(c); } catch(e){ notify("⚠️ Save error: "+e.message); }
+  safeRenderTab(currentTab);
+  // Re-open details
+  setTimeout(()=>showBorrowDetails(custId), 300);
+}
+
+function openPartialPaymentModal(custId, borrowId){
+  const c = customers.find(x=>x.id===custId); if(!c) return;
+  const b = (c.borrows||[]).find(x=>x.id===borrowId); if(!b) return;
+  const paid    = b.amountPaid || 0;
+  const total   = Number(b.amount);
+  const remaining = Math.round((total - paid) * 100) / 100;
+  const paidPct = Math.min(100, Math.round((paid/total)*100));
+
+  showWideModal(`${modalHeader("💰 Record Payment — "+escHtml(c.name))}
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;color:#e8eaf0;margin-bottom:10px;">📦 ${escHtml(b.item||"Borrow")} · ${new Date(b.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div>
+      <!-- Progress bar -->
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;">
+        <span style="color:#4f4;">Paid: ${formatINR(paid)}</span>
+        <span style="color:#f84;">Remaining: ${formatINR(remaining)}</span>
+      </div>
+      <div style="background:#1e2a45;border-radius:99px;height:10px;overflow:hidden;margin-bottom:4px;">
+        <div style="height:100%;width:${paidPct}%;background:linear-gradient(90deg,#22c55e,#4ade80);border-radius:99px;transition:width 0.3s;"></div>
+      </div>
+      <div style="font-size:11px;color:#4a5a7a;text-align:right;">${paidPct}% paid of ${formatINR(total)}</div>
+      ${(b.payments||[]).length>0?`
+      <div style="margin-top:10px;font-size:11px;color:#7a8aaa;">
+        <div style="font-weight:700;margin-bottom:4px;">Previous payments:</div>
+        ${(b.payments||[]).map(pm=>`<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #0d1220;">
+          <span style="color:#4f4;">+${formatINR(pm.amount)}</span>
+          <span style="color:#4a5a7a;">${pm.date}</span>
+        </div>`).join("")}
+      </div>`:""}
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:6px;">Payment Amount (₹)</label>
+      <input type="number" id="partial-pay-amt" class="input" placeholder="Enter amount paid"
+        min="1" max="${remaining}" value="${remaining}"
+        style="font-size:18px;font-weight:800;text-align:center;" />
+      <!-- Quick amount buttons -->
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        ${[25,50,75,100].map(pct=>{
+          const amt = Math.round(remaining * pct / 100);
+          return amt>0?`<button onclick="document.getElementById('partial-pay-amt').value='${amt}'" 
+            style="flex:1;min-width:60px;background:#0a1628;border:1px solid #1e3a6e;color:#60a5fa;border-radius:8px;padding:7px;font-size:12px;font-weight:700;cursor:pointer;">
+            ${pct}%<br><span style="font-size:10px;color:#7a8aaa;">${formatINR(amt)}</span>
+          </button>`:"";
+        }).join("")}
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="
+        const amt=parseFloat(document.getElementById('partial-pay-amt').value||'0');
+        if(!amt||amt<=0){notify('❌ Enter a valid amount','error');return;}
+        if(amt>${remaining}+0.01){notify('❌ Cannot pay more than remaining ${formatINR(remaining)}','error');return;}
+        closeModal();
+        bwRecordPartialPayment('${custId}','${borrowId}',amt);
+      " class="btn" style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:13px;font-size:14px;font-weight:800;">
+        💰 Record Payment
+      </button>
+      <button onclick="closeModal();showBorrowDetails('${custId}')" class="btn"
+        style="background:#1a2540;color:#7a8aaa;padding:13px;font-size:13px;">Cancel</button>
+    </div>
   `);
 }
 
@@ -5503,6 +5666,7 @@ function openCreditorDetail(id){
 
       <!-- Transaction history -->
       <div>
+        <!-- Header row -->
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
           <div style="font-size:13px;font-weight:800;color:#e8eaf0;">Transaction History</div>
           <div style="display:flex;gap:8px;">
@@ -5510,25 +5674,234 @@ function openCreditorDetail(id){
             ${!isUnrec ? `<button onclick="openAddCreditorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>` : ""}
           </div>
         </div>
-        ${txs.length===0?`<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>`:`
-        <div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;">
-          ${txs.map((tx,i)=>`
-            <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
-              <div style="font-size:20px;flex-shrink:0;">${credTxIcon(tx.type)}</div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:13px;font-weight:700;color:#e8eaf0;">${escHtml(tx.note||tx.type)}</div>
-                <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${new Date(tx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${tx.invoiceNo?` · Invoice: ${escHtml(tx.invoiceNo)}`:""}</div>
-              </div>
-              <div style="text-align:right;flex-shrink:0;">
-                <div style="font-size:14px;font-weight:800;color:${credTxColor(tx.type)};">${tx.type==="payment"||tx.type==="return"?"-":"+"}${formatINR(tx.amount)}</div>
-              </div>
-              <button onclick="deleteCrTx('${id}',${txs.length-1-i})" style="cursor:pointer;background:none;border:none;color:#4a5a7a;font-size:14px;padding:2px 6px;">✕</button>
+
+        <!-- Search bar -->
+        <div style="position:relative;margin-bottom:10px;">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#4a5a7a;font-size:14px;">🔍</span>
+          <input id="cr-tx-search" type="text" placeholder="Search by note, invoice, amount or date..."
+            oninput="_crTxRender('${id}')"
+            style="width:100%;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:9px 12px 9px 34px;color:#e8eaf0;font-size:12px;box-sizing:border-box;outline:none;" />
+        </div>
+
+        <!-- Month Navigator -->
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <button onclick="_crTxShiftMonth('${id}',-1)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;color:#a0b0d0;font-size:16px;font-weight:800;padding:5px 12px;">&#8249;</button>
+            <div id="cr-tx-month-label" style="flex:1;text-align:center;font-size:13px;font-weight:800;color:#e8eaf0;"></div>
+            <button onclick="_crTxShiftMonth('${id}',1)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;color:#a0b0d0;font-size:16px;font-weight:800;padding:5px 12px;">&#8250;</button>
+            <button onclick="_crTxToggleCustomRange('${id}')" id="cr-tx-custom-btn" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;color:#7a8aaa;font-size:11px;font-weight:700;padding:5px 10px;white-space:nowrap;">&#128197; Custom</button>
+          </div>
+          <div id="cr-tx-custom-range" style="display:none;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <label style="font-size:10px;color:#4a5a7a;font-weight:700;display:block;margin-bottom:3px;">FROM DATE</label>
+              <input id="cr-tx-from" type="date" oninput="_crTxOnCustomDate('${id}')"
+                style="width:100%;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:7px 10px;color:#e8eaf0;font-size:12px;box-sizing:border-box;outline:none;" />
             </div>
-          `).join("")}
-        </div>`}
+            <div>
+              <label style="font-size:10px;color:#4a5a7a;font-weight:700;display:block;margin-bottom:3px;">TO DATE</label>
+              <input id="cr-tx-to" type="date" oninput="_crTxOnCustomDate('${id}')"
+                style="width:100%;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:7px 10px;color:#e8eaf0;font-size:12px;box-sizing:border-box;outline:none;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter type tabs -->
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
+          ${["all","purchase","payment","return"].map(f=>{
+            const labels={all:"📋 All",purchase:"📦 Purchase",payment:"💰 Payment",return:"↩️ Return"};
+            const cnt={all:txs.length,purchase:txs.filter(t=>t.type==="purchase").length,payment:txs.filter(t=>t.type==="payment").length,return:txs.filter(t=>t.type==="return").length};
+            return `<button id="cr-tf-${f}" onclick="_crTxSetFilter('${id}','${f}')"
+              style="flex:1;cursor:pointer;border-radius:8px;padding:7px 6px;font-size:11px;font-weight:800;
+                     background:${f==="all"?"linear-gradient(135deg,#1e3a6e,#2a5aaa)":"#0a0e1a"};
+                     border:1px solid ${f==="all"?"#2a5aaa":"#1e2a45"};
+                     color:${f==="all"?"#60a5fa":"#4a5a7a"};">
+              ${labels[f]}<br><span style="font-size:10px;opacity:0.7;">(${cnt[f]})</span>
+            </button>`;
+          }).join("")}
+        </div>
+
+        <!-- Summary line -->
+        <div id="cr-tx-summary" style="font-size:11px;color:#4a5a7a;margin-bottom:8px;min-height:16px;"></div>
+
+        <!-- Transaction list (rendered by JS) -->
+        <div id="cr-tx-list" style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;">
+          ${txs.length===0?`<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>`:"⏳"}
+        </div>
       </div>
     </div>
   `);
+  _crTxCurrentFilter="all";
+  // Default to current month
+  (function(){
+    const now=new Date();
+    window._crTxNavYear=now.getFullYear();
+    window._crTxNavMonth=now.getMonth(); // 0-indexed
+    window._crTxIsCustom=false;
+    _crTxApplyMonthNav('${id}');
+  })();
+
+// ── Transaction filter/search helpers ─────────────────────────────────────────
+let _crTxCurrentFilter = "all";
+
+// ── Month navigator helpers ───────────────────────────────────────────────────
+const _MONTH_NAMES=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const _MONTH_NAMES_FULL=["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+function _crTxApplyMonthNav(creditorId){
+  const yr=window._crTxNavYear||new Date().getFullYear();
+  const mo=window._crTxNavMonth!=null?window._crTxNavMonth:new Date().getMonth();
+  const now=new Date();
+  const isCurrent=(yr===now.getFullYear()&&mo===now.getMonth());
+  const label=document.getElementById("cr-tx-month-label");
+  if(label) label.textContent=_MONTH_NAMES_FULL[mo]+" "+yr+(isCurrent?" (Current)":"");
+  // Set hidden date inputs
+  const fromEl=document.getElementById("cr-tx-from");
+  const toEl=document.getElementById("cr-tx-to");
+  const firstDay=new Date(yr,mo,1);
+  const lastDay=new Date(yr,mo+1,0);
+  const fmt=d=>d.toISOString().slice(0,10);
+  if(fromEl) fromEl.value=fmt(firstDay);
+  if(toEl) toEl.value=fmt(lastDay);
+  _crTxRender(creditorId);
+}
+
+function _crTxShiftMonth(creditorId, dir){
+  if(window._crTxIsCustom){
+    window._crTxIsCustom=false;
+    const customBtn=document.getElementById("cr-tx-custom-btn");
+    const customRange=document.getElementById("cr-tx-custom-range");
+    if(customBtn){customBtn.style.color="#7a8aaa";customBtn.style.border="1px solid #1e2a45";}
+    if(customRange) customRange.style.display="none";
+  }
+  let mo=(window._crTxNavMonth!=null?window._crTxNavMonth:new Date().getMonth())+dir;
+  let yr=window._crTxNavYear||new Date().getFullYear();
+  if(mo>11){mo=0;yr++;}
+  if(mo<0){mo=11;yr--;}
+  // Don't go into the future
+  const now=new Date();
+  if(yr>now.getFullYear()||(yr===now.getFullYear()&&mo>now.getMonth())){return;}
+  window._crTxNavMonth=mo;
+  window._crTxNavYear=yr;
+  _crTxApplyMonthNav(creditorId);
+}
+
+function _crTxToggleCustomRange(creditorId){
+  window._crTxIsCustom=!window._crTxIsCustom;
+  const customBtn=document.getElementById("cr-tx-custom-btn");
+  const customRange=document.getElementById("cr-tx-custom-range");
+  if(customBtn){
+    customBtn.style.color=window._crTxIsCustom?"#FFD700":"#7a8aaa";
+    customBtn.style.border=window._crTxIsCustom?"1px solid #FFD700":"1px solid #1e2a45";
+  }
+  if(customRange) customRange.style.display=window._crTxIsCustom?"grid":"none";
+  if(!window._crTxIsCustom) _crTxApplyMonthNav(creditorId);
+}
+
+function _crTxOnCustomDate(creditorId){
+  _crTxRender(creditorId);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+function _crTxSetFilter(creditorId, filter){
+  _crTxCurrentFilter = filter;
+  const colors={all:"#60a5fa",purchase:"#f59e0b",payment:"#22c55e",return:"#a78bfa"};
+  ["all","purchase","payment","return"].forEach(f=>{
+    const btn=document.getElementById("cr-tf-"+f); if(!btn) return;
+    const active=f===filter;
+    btn.style.background=active?"linear-gradient(135deg,#1e3a6e,#2a5aaa)":"#0a0e1a";
+    btn.style.border="1px solid "+(active?"#2a5aaa":"#1e2a45");
+    btn.style.color=active?colors[f]:"#4a5a7a";
+  });
+  _crTxRender(creditorId);
+}
+
+function _crTxRender(creditorId){
+  const listEl=document.getElementById("cr-tx-list");
+  const summaryEl=document.getElementById("cr-tx-summary");
+  if(!listEl) return;
+  const cr=getCreditors().find(c=>c.id===creditorId);
+  if(!cr){listEl.innerHTML='<div style="text-align:center;padding:30px;color:#4a5a7a;">Not found</div>';return;}
+
+  const allTxs=(cr.transactions||[]).slice().reverse();
+  const search=(document.getElementById("cr-tx-search")?.value||"").trim().toLowerCase();
+  const fromStr=document.getElementById("cr-tx-from")?.value||"";
+  const toStr=document.getElementById("cr-tx-to")?.value||"";
+  const fromDate=fromStr?new Date(fromStr):null;
+  const toDate=toStr?new Date(toStr+"T23:59:59"):null;
+
+  let filtered=allTxs;
+  if(_crTxCurrentFilter!=="all") filtered=filtered.filter(tx=>tx.type===_crTxCurrentFilter);
+  if(fromDate) filtered=filtered.filter(tx=>new Date(tx.date)>=fromDate);
+  if(toDate)   filtered=filtered.filter(tx=>new Date(tx.date)<=toDate);
+  if(search)   filtered=filtered.filter(tx=>
+    (tx.note||"").toLowerCase().includes(search)||
+    (tx.invoiceNo||"").toLowerCase().includes(search)||
+    String(tx.amount).includes(search)||
+    (tx.date||"").includes(search)||
+    (tx.type||"").toLowerCase().includes(search)
+  );
+
+  // Summary
+  const totalPurchase=filtered.filter(t=>t.type==="purchase").reduce((s,t)=>s+t.amount,0);
+  const totalOut=filtered.filter(t=>t.type==="payment"||t.type==="return").reduce((s,t)=>s+t.amount,0);
+  if(summaryEl) summaryEl.innerHTML=filtered.length===0?"":
+    `<span style="color:#e8eaf0;font-weight:700;">${filtered.length} result${filtered.length>1?"s":""}</span>`+
+    (totalPurchase?` &nbsp;·&nbsp; <span style="color:#f59e0b;">📦 ${formatINR(totalPurchase)}</span>`:"")+
+    (totalOut?` &nbsp;·&nbsp; <span style="color:#22c55e;">💰 ${formatINR(totalOut)}</span>`:"");
+
+  if(filtered.length===0){
+    listEl.innerHTML=`<div style="text-align:center;padding:30px;color:#4a5a7a;">
+      <div style="font-size:28px;margin-bottom:8px;">🔍</div>
+      No transactions match your search/filter.
+      <br><button onclick="_crTxSetFilter('`+creditorId+`','all');var _s=document.getElementById('cr-tx-search');if(_s)_s.value='';window._crTxIsCustom=false;var _cb=document.getElementById('cr-tx-custom-btn');var _cr=document.getElementById('cr-tx-custom-range');if(_cb){_cb.style.color='#7a8aaa';_cb.style.border='1px solid #1e2a45';}if(_cr)_cr.style.display='none';var _now=new Date();window._crTxNavYear=_now.getFullYear();window._crTxNavMonth=_now.getMonth();_crTxApplyMonthNav('`+creditorId+`');"
+        style="margin-top:10px;cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#60a5fa;font-size:12px;font-weight:700;padding:7px 14px;">
+        Clear Filters
+      </button>
+    </div>`;
+    return;
+  }
+
+  function hl(str){
+    if(!search||!str) return escHtml(str||"");
+    const lo=str.toLowerCase(); const idx=lo.indexOf(search);
+    if(idx<0) return escHtml(str);
+    return escHtml(str.slice(0,idx))+
+      `<mark style="background:#2a4a1e;color:#4ade80;border-radius:3px;">${escHtml(str.slice(idx,idx+search.length))}</mark>`+
+      escHtml(str.slice(idx+search.length));
+  }
+
+  const origTxs=(cr.transactions||[]);
+  const typeBadge={
+    purchase:{bg:"#92400e33",col:"#fbbf24"},
+    payment: {bg:"#14532d33",col:"#4ade80"},
+    return:  {bg:"#2e106544",col:"#c4b5fd"},
+  };
+
+  listEl.innerHTML=filtered.map(tx=>{
+    const origIdx=origTxs.findIndex(t=>t.id===tx.id);
+    const isCredit=tx.type==="payment"||tx.type==="return";
+    const amtColor=credTxColor(tx.type);
+    const dateStr=new Date(tx.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
+    const tb=typeBadge[tx.type]||{bg:"#1e2a45",col:"#7a8aaa"};
+    return `<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:20px;flex-shrink:0;">${credTxIcon(tx.type)}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
+          <span style="font-size:13px;font-weight:700;color:#e8eaf0;">${hl(tx.note||tx.type)}</span>
+          <span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:${tb.bg};color:${tb.col};">${tx.type}</span>
+        </div>
+        <div style="font-size:11px;color:#7a8aaa;">📅 ${dateStr}${tx.invoiceNo?` &nbsp;·&nbsp; 🧾 ${hl(tx.invoiceNo)}`:""}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:14px;font-weight:800;color:${amtColor};">${isCredit?"-":"+"}${formatINR(tx.amount)}</div>
+      </div>
+      <button onclick="deleteCrTx('${creditorId}',${origIdx});setTimeout(()=>_crTxRender('${creditorId}'),300);"
+        style="cursor:pointer;background:none;border:none;color:#4a5a7a;font-size:14px;padding:2px 6px;" title="Delete">✕</button>
+    </div>`;
+  }).join("");
+}
+
+
 }
 
 // ── Add Transaction Modal ─────────────────────────────────────────────────────
@@ -6872,7 +7245,7 @@ function showProfile(id){
     <div style="display:flex;gap:8px;margin-top:16px;">
       <button class="btn" onclick="closeModal();openPurchaseModal('${c.id}')" style="background:#1a3a60;color:#5af;border:1px solid #1a4a80;flex:1;padding:12px;font-weight:800;">+ Add Purchase</button>
       <button class="btn" onclick="closeModal();showCustomerBillHistory('${c.id}')" style="background:#1a2a20;color:#4f4;border:1px solid #1a4a2a;flex:1;padding:12px;font-weight:800;">🧾 Bills</button>
-      ${(()=>{const pb=(c.borrows||[]).filter(b=>b.status==="pending");const owed=pb.reduce((s,b)=>s+Number(b.amount),0);return pb.length?`<button class="btn" onclick="closeModal();showBorrowDetails('${c.id}')" style="background:#2a1500;color:#f84;border:1px solid #5a2a00;flex:1;padding:12px;font-weight:800;">📦 Owes ${formatINR(owed)}</button>`:''})()}
+      ${(()=>{const pb=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial");const owed=pb.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);return pb.length?`<button class="btn" onclick="closeModal();showBorrowDetails('${c.id}')" style="background:#2a1500;color:#f84;border:1px solid #5a2a00;flex:1;padding:12px;font-weight:800;">📦 Owes ${formatINR(owed)}</button>`:''})()}
       <button class="btn" onclick="closeModal();openEditModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #1a4a1a;flex:1;padding:12px;font-weight:800;">✏️ Edit</button>
     </div>`);
   if(visits>0) setTimeout(phInit,0);
@@ -7243,7 +7616,7 @@ function openCustomerPage(id){
   }
 
   // Borrow summary
-  const pendingBorrows=(c.borrows||[]).filter(b=>b.status==="pending");
+  const pendingBorrows=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial");
   const totalOwed=pendingBorrows.reduce((s,b)=>s+Number(b.amount),0);
 
   inner.innerHTML=`
@@ -7342,17 +7715,65 @@ function openCustomerPage(id){
 
   // Store data for filter functions
   window._cpData={custId:c.id,purchases:reversedPurchases,totalVisits:visits};
-  window._cpMode="all";
+  window._cpMode="date";
 
   pg.style.display="block";
   pg.style.animation="cpSlideIn 0.25s ease";
   pg.scrollTop=0;
 
   if(visits>0){
-    setTimeout(()=>{cpSetMode("all"); cpApply();},100);
+    setTimeout(()=>{
+      cpSetMode("date");
+      cpSetDatePreset("month"); // Default: current month
+      _cpAddMonthNav();
+    },100);
     setTimeout(()=>{ if(document.getElementById("cp-purchase-list")&&document.getElementById("cp-purchase-list").innerHTML==="") cpApply(); },500);
     setTimeout(()=>{ if(document.getElementById("cp-purchase-list")&&document.getElementById("cp-purchase-list").innerHTML==="") cpApply(); },1000);
   }
+}
+
+function _cpAddMonthNav(){
+  const box=document.getElementById("cp-filter-date");
+  if(!box||document.getElementById("cp-month-nav")) return;
+  const nav=document.createElement("div");
+  nav.id="cp-month-nav";
+  nav.style.cssText="display:flex;align-items:center;gap:6px;margin-bottom:8px;";
+  nav.innerHTML=`<button onclick="_cpShiftMonth(-1)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;color:#a0b0d0;font-size:16px;font-weight:800;padding:4px 11px;">&#8249;</button><div id="cp-month-label" style="flex:1;text-align:center;font-size:12px;font-weight:800;color:#e8eaf0;"></div><button onclick="_cpShiftMonth(1)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;color:#a0b0d0;font-size:16px;font-weight:800;padding:4px 11px;">&#8250;</button>`;
+  box.insertBefore(nav,box.firstChild);
+  _cpUpdateMonthLabel();
+}
+
+function _cpUpdateMonthLabel(){
+  const fromEl=document.getElementById("cp-date-from");
+  const lbl=document.getElementById("cp-month-label");
+  if(!fromEl||!lbl) return;
+  const v=fromEl.value?fromEl.value.slice(0,10):"";
+  if(!v) return;
+  const d=new Date(v+"T00:00:00");
+  if(isNaN(d)) return;
+  const now=new Date();
+  const isCurr=(d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth());
+  lbl.textContent=_MONTH_NAMES_FULL[d.getMonth()]+" "+d.getFullYear()+(isCurr?" (Current)":"");
+}
+
+function _cpShiftMonth(dir){
+  const fromEl=document.getElementById("cp-date-from");
+  if(!fromEl) return;
+  const v=fromEl.value?fromEl.value.slice(0,10):"";
+  const d=v?new Date(v+"T00:00:00"):new Date();
+  let mo=d.getMonth()+dir, yr=d.getFullYear();
+  if(mo>11){mo=0;yr++;} if(mo<0){mo=11;yr--;}
+  const now=new Date();
+  if(yr>now.getFullYear()||(yr===now.getFullYear()&&mo>now.getMonth())) return;
+  const lastDay=new Date(yr,mo+1,0).getDate();
+  const pad=n=>String(n).padStart(2,'0');
+  const fromVal=`${yr}-${pad(mo+1)}-01T00:00`;
+  const toVal=`${yr}-${pad(mo+1)}-${pad(lastDay)}T23:59`;
+  if(fromEl) fromEl.value=fromVal;
+  const toEl=document.getElementById("cp-date-to");
+  if(toEl) toEl.value=toVal;
+  _cpUpdateMonthLabel();
+  cpApply();
 }
 
 function cpSetMode(mode){
@@ -7454,27 +7875,42 @@ function cpSetDatePreset(preset){
     const m = new Date(now.getFullYear(),now.getMonth(),1,0,0);
     fromEl.value=fmt(m); toEl.value=fmt(todayEnd);
   }
+  _cpUpdateMonthLabel();
   cpApply();
 }
 
 function cpClearFilters(){
-  ["cp-search","cp-date-from","cp-date-to","cp-amt-exact","cp-amt-min","cp-amt-max"].forEach(id=>{
-    const el=document.getElementById(id);if(el)el.value="";
-  });
-  cpSetMode("all");
+  // Reset to current month, clear text/amount filters
+  const _now=new Date();
+  const _pad=n=>String(n).padStart(2,"0");
+  const _fmt=d=>`${d.getFullYear()}-${_pad(d.getMonth()+1)}-${_pad(d.getDate())}T${_pad(d.getHours())}:${_pad(d.getMinutes())}`;
+  const _from=new Date(_now.getFullYear(),_now.getMonth(),1,0,0);
+  const _to=new Date(_now.getFullYear(),_now.getMonth(),_now.getDate(),23,59);
+  const _fe=document.getElementById("cp-date-from");
+  const _te=document.getElementById("cp-date-to");
+  if(_fe) _fe.value=_fmt(_from);
+  if(_te) _te.value=_fmt(_to);
+  ["cp-search","cp-amt-exact","cp-amt-min","cp-amt-max"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+  _cpUpdateMonthLabel();
+  cpSetMode("date");
 }
 
 function cpPurchaseCard(p,custId){
   const isBorrow=p.type==="borrow";
-  const isPending=isBorrow&&p.borrowStatus==="pending";
+  const isPartialB=isBorrow&&(p.borrowStatus==="partial");
+  const isPending=isBorrow&&(p.borrowStatus==="pending"||p.borrowStatus==="partial");
   const isOverdue=isPending&&p.due&&new Date(p.due)<new Date();
+  const amtPaid=p.amountPaid||0;
+  const remaining=Math.max(0,Math.round((p.amount-amtPaid)*100)/100);
   const statusBadge=isBorrow
     ?(isPending
-        ?`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${isOverdue?'#3a0a00':'#2a1500'};color:${isOverdue?'#f44':'#f84'};border:1px solid ${isOverdue?'#6a1a00':'#5a3000'};">📦 ${isOverdue?'OVERDUE':'PENDING'}</span>`
+        ?(isPartialB
+            ?`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#1a0e0033;color:#f59e0b;border:1px solid #92400e;">💛 PARTIAL · ${formatINR(remaining)} left</span>`
+            :`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${isOverdue?'#3a0a00':'#2a1500'};color:${isOverdue?'#f44':'#f84'};border:1px solid ${isOverdue?'#6a1a00':'#5a3000'};">📦 ${isOverdue?'OVERDUE':'PENDING'}</span>`)
         :`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#0a1a0a;color:#4f4;border:1px solid #1a4a1a;">✅ RETURNED</span>`)
     :"";
-  const amtColor=isBorrow?(isPending?(isOverdue?'#f44':'#f84'):'#4f4'):'#e8eaf0';
-  const borderStyle=isBorrow?`border-left:3px solid ${isPending?(isOverdue?'#f44':'#f84'):'#4f4'};`:'';
+  const amtColor=isBorrow?(isPending?(isOverdue?'#f44':isPartialB?'#f59e0b':'#f84'):'#4f4'):'#e8eaf0';
+  const borderStyle=isBorrow?`border-left:3px solid ${isPending?(isOverdue?'#f44':isPartialB?'#f59e0b':'#f84'):'#4f4'};`:'';
   const clickHandler = !isBorrow ? `onclick="reprintBill('${p.bill}')" style="${borderStyle}padding:12px 16px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"` : `style="${borderStyle}padding:12px 16px;"`;
   return `<div class="purchase-card" ${clickHandler}>
     <div style="flex:1;">
@@ -7492,7 +7928,7 @@ function cpPurchaseCard(p,custId){
     </div>
     <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:12px;" onclick="event.stopPropagation()">
       ${isBorrow
-        ?(isPending?`<button onclick="bwMarkReturned('${custId}','${p.bill}');openCustomerPage('${custId}');" style="cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:11px;font-weight:700;">✓ Returned</button>`:'')
+        ?(isPending?`<div style="display:flex;flex-direction:column;gap:5px;"><button onclick="openPartialPaymentModal('${custId}','${p.bill}');event.stopPropagation();" style="cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid #92400e;background:#1a0e00;color:#f59e0b;font-size:10px;font-weight:700;white-space:nowrap;">💰 Pay</button><button onclick="bwMarkReturned('${custId}','${p.bill}');openCustomerPage('${custId}');event.stopPropagation();" style="cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:10px;font-weight:700;white-space:nowrap;">✓ Clear</button></div>`:'')
         :`<div style="color:#5af;font-size:13px;font-weight:700;">+${getPoints(p.amount)} pts</div>`}
       <button onclick="event.stopPropagation();deletePurchase('${custId}','${p.bill}','${encodeURIComponent(p.date)}');openCustomerPage('${custId}');" style="background:none;border:none;color:#f66;cursor:pointer;font-size:11px;">🗑 delete</button>
     </div>
@@ -7502,15 +7938,20 @@ function cpPurchaseCard(p,custId){
 // ─── PURCHASE HISTORY FILTER (profile modal) ─────────────────────────────
 function phPurchaseCardHTML(p,custId){
   const isBorrow=p.type==="borrow";
-  const isPending=isBorrow&&p.borrowStatus==="pending";
+  const isPartialB=isBorrow&&(p.borrowStatus==="partial");
+  const isPending=isBorrow&&(p.borrowStatus==="pending"||p.borrowStatus==="partial");
   const isOverdue=isPending&&p.due&&new Date(p.due)<new Date();
+  const amtPaid=p.amountPaid||0;
+  const remaining=Math.max(0,Math.round((p.amount-amtPaid)*100)/100);
   const statusBadge=isBorrow
     ?(isPending
-        ?`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${isOverdue?'#3a0a00':'#2a1500'};color:${isOverdue?'#f44':'#f84'};border:1px solid ${isOverdue?'#6a1a00':'#5a3000'};">📦 ${isOverdue?'OVERDUE':'PENDING'}</span>`
+        ?(isPartialB
+            ?`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#1a0e0033;color:#f59e0b;border:1px solid #92400e;">💛 PARTIAL · ${formatINR(remaining)} left</span>`
+            :`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${isOverdue?'#3a0a00':'#2a1500'};color:${isOverdue?'#f44':'#f84'};border:1px solid ${isOverdue?'#6a1a00':'#5a3000'};">📦 ${isOverdue?'OVERDUE':'PENDING'}</span>`)
         :`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#0a1a0a;color:#4f4;border:1px solid #1a4a1a;">✅ RETURNED</span>`)
     :"";
-  const amtColor=isBorrow?(isPending?(isOverdue?'#f44':'#f84'):'#4f4'):'#e8eaf0';
-  const borderStyle=isBorrow?`border-left:3px solid ${isPending?(isOverdue?'#f44':'#f84'):'#4f4'};`:'';
+  const amtColor=isBorrow?(isPending?(isOverdue?'#f44':isPartialB?'#f59e0b':'#f84'):'#4f4'):'#e8eaf0';
+  const borderStyle=isBorrow?`border-left:3px solid ${isPending?(isOverdue?'#f44':isPartialB?'#f59e0b':'#f84'):'#4f4'};`:'';
   const phClickHandler = !isBorrow ? `onclick="reprintBill('${p.bill}')" style="${borderStyle}cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"` : `style="${borderStyle}"`;
   return `<div class="purchase-card" ${phClickHandler}>
     <div>
@@ -7528,7 +7969,7 @@ function phPurchaseCardHTML(p,custId){
     </div>
     <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;" onclick="event.stopPropagation()">
       ${isBorrow
-        ?(isPending?`<button onclick="bwMarkReturned('${custId}','${p.bill}');closeModal();" style="cursor:pointer;padding:4px 9px;border-radius:7px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:11px;font-weight:700;">✓ Returned</button>`:'')
+        ?(isPending?`<div style="display:flex;flex-direction:column;gap:5px;"><button onclick="openPartialPaymentModal('${custId}','${p.bill}');event.stopPropagation();" style="cursor:pointer;padding:4px 9px;border-radius:7px;border:1px solid #92400e;background:#1a0e00;color:#f59e0b;font-size:10px;font-weight:700;white-space:nowrap;">💰 Pay</button><button onclick="bwMarkReturned('${custId}','${p.bill}');closeModal();event.stopPropagation();" style="cursor:pointer;padding:4px 9px;border-radius:7px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:10px;font-weight:700;white-space:nowrap;">✓ Clear</button></div>`:'')
         :`<div style="color:#5af;font-size:13px;font-weight:700;">+${getPoints(p.amount)} pts</div>`}
       <button onclick="event.stopPropagation();deletePurchase('${custId}','${p.bill}','${encodeURIComponent(p.date)}');closeModal();" style="background:none;border:none;color:#f66;cursor:pointer;font-size:11px;">🗑 delete</button>
     </div>
@@ -7594,13 +8035,71 @@ function phApplyFilter(){
 }
 
 function phClearFilter(){
-  const inputs=["ph-date-from","ph-date-to","ph-amt-exact","ph-amt-min","ph-amt-max"];
-  inputs.forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
-  phApplyFilter();
+  // Reset date to current month; clear amount filters
+  const _now=new Date();
+  const _y=_now.getFullYear();
+  const _m=String(_now.getMonth()+1).padStart(2,'0');
+  const _last=new Date(_y,_now.getMonth()+1,0).getDate();
+  const fromEl=document.getElementById("ph-date-from");
+  const toEl=document.getElementById("ph-date-to");
+  if(fromEl) fromEl.value=`${_y}-${_m}-01`;
+  if(toEl) toEl.value=`${_y}-${_m}-${String(_last).padStart(2,'0')}`;
+  ["ph-amt-exact","ph-amt-min","ph-amt-max"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
+  _phUpdateMonthLabel();
+  phSetMode("date");
 }
 
 function phInit(){
-  phSetMode(window._phMode||"date");
+  // Default: show current month in date filter
+  const _now=new Date();
+  const _y=_now.getFullYear();
+  const _m=String(_now.getMonth()+1).padStart(2,'0');
+  const _lastDay=new Date(_y,_now.getMonth()+1,0).getDate();
+  const fromEl=document.getElementById("ph-date-from");
+  const toEl=document.getElementById("ph-date-to");
+  if(fromEl&&!fromEl.value) fromEl.value=`${_y}-${_m}-01`;
+  if(toEl&&!toEl.value) toEl.value=`${_y}-${_m}-${String(_lastDay).padStart(2,'0')}`;
+  phSetMode("date");
+  _phAddMonthNav();
+}
+
+function _phAddMonthNav(){
+  const box=document.getElementById("ph-filter-date");
+  if(!box||document.getElementById("ph-month-nav")) return;
+  const nav=document.createElement("div");
+  nav.id="ph-month-nav";
+  nav.style.cssText="display:flex;align-items:center;gap:6px;margin-bottom:8px;";
+  nav.innerHTML=`<button onclick="_phShiftMonth(-1)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;color:#a0b0d0;font-size:16px;font-weight:800;padding:4px 11px;">&#8249;</button><div id="ph-month-label" style="flex:1;text-align:center;font-size:12px;font-weight:800;color:#e8eaf0;"></div><button onclick="_phShiftMonth(1)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;color:#a0b0d0;font-size:16px;font-weight:800;padding:4px 11px;">&#8250;</button>`;
+  box.insertBefore(nav,box.firstChild);
+  _phUpdateMonthLabel();
+}
+
+function _phUpdateMonthLabel(){
+  const fromEl=document.getElementById("ph-date-from");
+  const lbl=document.getElementById("ph-month-label");
+  if(!fromEl||!lbl) return;
+  const d=new Date(fromEl.value+"T00:00:00");
+  if(isNaN(d)) return;
+  const now=new Date();
+  const isCurr=(d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth());
+  lbl.textContent=_MONTH_NAMES_FULL[d.getMonth()]+" "+d.getFullYear()+(isCurr?" (Current)":"");
+}
+
+function _phShiftMonth(dir){
+  const fromEl=document.getElementById("ph-date-from");
+  if(!fromEl) return;
+  const d=new Date(fromEl.value+"T00:00:00");
+  if(isNaN(d)) return;
+  let mo=d.getMonth()+dir, yr=d.getFullYear();
+  if(mo>11){mo=0;yr++;} if(mo<0){mo=11;yr--;}
+  const now=new Date();
+  if(yr>now.getFullYear()||(yr===now.getFullYear()&&mo>now.getMonth())) return;
+  const lastDay=new Date(yr,mo+1,0).getDate();
+  const pad=n=>String(n).padStart(2,'0');
+  document.getElementById("ph-date-from").value=`${yr}-${pad(mo+1)}-01`;
+  document.getElementById("ph-date-to").value=`${yr}-${pad(mo+1)}-${pad(lastDay)}`;
+  _phUpdateMonthLabel();
+  phApplyFilter();
 }
 
 // ═══════════════════════════════════════════════════════════════
