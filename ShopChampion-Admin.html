@@ -2716,6 +2716,7 @@ function onLoginSuccess(phone) {
     loadShopRequests();
     setTimeout(startPaymentRequestListener, 2000); // Start payment sync listener
     setTimeout(sweepAcceptedPaymentSyncRequests, 3000); // Catch any accepted requests missed while offline
+    setTimeout(cleanupStaleSentRequests, 5000);         // Remove stale pending requests sent before role fix
     // Check Firestore — if doc doesn't exist but we have local data, push it up (first-time migration)
     loadInventoryFromFirestore((docExists)=>{
       if(!docExists && inventoryItems.length > 0){
@@ -5001,7 +5002,7 @@ function showFirebaseSettings(){
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;">
       <button class="btn" onclick="closeModal();document.getElementById('fb-setup-screen').style.display='flex';" style="background:#1a1a0a;color:#FFD700;border:1px solid #3a3a1a;padding:10px;font-size:13px;">🔧 Change Firebase Config</button>
-      <button class="btn" onclick="_showFirestoreRulesError('')" style="background:#0a1628;color:#60a5fa;border:1px solid #1e3a6e;padding:10px;font-size:13px;">📋 View / Copy Firestore Security Rules</button>
+      <button class="btn" onclick="_showFirestoreRulesError('')" style="background:linear-gradient(135deg,#92400e,#d97706);color:#fff;border:none;padding:12px;font-size:13px;font-weight:800;">🔒 View &amp; Copy Firestore Security Rules — REQUIRED for Shop Connect &amp; Payment Sync</button>
       ${connected?`<button class="btn" onclick="if(confirm('Disconnect Firebase? You will switch to local demo mode.')){useLocalOnly=true;localStorage.removeItem(storageKey('fb_config'));if(fbUnsubscribe)fbUnsubscribe();loadLocalCustomers();closeModal();safeRenderTab(currentTab);updateDbStatus('📦 Local storage (demo mode)','#f84');}" style="background:#3a1a1a;color:#f66;border:1px solid #4a1515;padding:10px;font-size:13px;">Disconnect Firebase</button>`:''}
       <button class="btn" onclick="closeModal()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:10px;font-size:13px;">Close</button>
     </div>`);
@@ -6155,6 +6156,25 @@ function listenPaymentSyncResponse(reqId, creditorId, txId){
       unsub();
     }
   });
+}
+
+// ─── Cleanup: delete stale pending requests this shop sent with old wrong roles ─────────────────
+// Stale = sent by ME, still "pending", older than 10 minutes (i.e. from before current session)
+async function cleanupStaleSentRequests(){
+  if(!db || !authPhone) return;
+  try {
+    // Delete from flat collection
+    const snap = await db.collection("shop_connect_requests")
+      .where("fromPhone","==",authPhone)
+      .where("status","==","pending")
+      .get();
+    const batch = db.batch();
+    snap.docs.forEach(doc=>{
+      const age = Date.now() - (doc.data().createdAt||0);
+      if(age > 10*60*1000) batch.delete(doc.ref); // older than 10 min
+    });
+    await batch.commit().catch(()=>{});
+  } catch(e){ /* ignore */ }
 }
 
 // ─── On-load sweep: catch any payment sync requests accepted while we were offline ─────────────
@@ -9961,6 +9981,29 @@ async function _applyAutoAcceptedReq(doc){
     doc.ref.update({status:"consumed"}).catch(()=>{});
     if(currentTab===1) renderTab(1);
     if(currentTab===6) renderTab(6);
+  } else {
+    // Even if already in local list, mark consumed and refresh UI
+    // because the direct Firestore write (Step 2 in acceptShopRequest) may have
+    // already added the entry — reload from cloud to get it into local state
+    doc.ref.update({status:"consumed"}).catch(()=>{});
+    loadCreditorsFromCloud();
+    if(db && authPhone){
+      // Re-sync customers from Firestore
+      db.collection("users").doc(authPhone).collection("customers").get()
+        .then(snap=>{
+          if(snap.empty) return;
+          const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
+          let changed = false;
+          snap.docs.forEach(d=>{
+            const c = d.data();
+            if(!allCust.find(x=>x.id===c.id)){ allCust.push(c); changed=true; }
+          });
+          if(changed){
+            try{ localStorage.setItem(storageKey("customers_v2"),JSON.stringify(allCust)); }catch(e){}
+            if(currentTab===1) renderTab(1);
+          }
+        }).catch(()=>{});
+    }
   }
 }
 
@@ -10060,24 +10103,35 @@ async function sendShopConnectRequest(targetProfile, myRoleForThem, theirRoleFor
 }
 
 function _showFirestoreRulesError(errMsg){
-  const rules = `rules_version = '2';
+  const rules = `// ShopChampion — Firestore Security Rules v5
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── ShopChampion required rules ──────────────────
+    // User shop data — customers, purchases, leaderboard
     match /users/{userId}/{document=**} {
       allow read, write: if true;
     }
-    match /shop_profiles/{shopId} {
+
+    // Leaderboard display screen data
+    match /sc_shops/{shopId}/{document=**} {
       allow read, write: if true;
     }
-    // Shop Connect messages (cross-shop requests)
+
+    // Public shop profiles — for Shop ID search feature
+    match /shop_profiles/{phone} {
+      allow read, write: if true;
+    }
+
+    // Shop Connect — cross-shop connection requests
     match /shop_requests/{phone}/requests/{reqId} {
       allow read, write: if true;
     }
     match /shop_connect_requests/{reqId} {
       allow read, write: if true;
     }
+
+    // Payment sync requests — cross-shop payment sync
     match /payment_sync_requests/{reqId} {
       allow read, write: if true;
     }
@@ -10175,51 +10229,92 @@ async function acceptShopRequest(req){
     notify(`✅ ${profile.shopName||"Shop"} added to your Customers!`);
   }
 
-  // Add Shop A (sender) into MY account with the role they requested
+  // ── STEP 1: Add Shop A (sender) into MY (Shop B) account ──────────────────
+  // req.type = what Shop A wants ME to add THEM as
   if(req.type === "creditor"){
-    // Shop A wants me to add them as my CREDITOR → they supply to me
-    _autoAddAsCreditor(p);
+    _autoAddAsCreditor(p);   // Shop A wants me to record them as my creditor
   } else if(req.type === "customer"){
-    // Shop A wants me to add them as my CUSTOMER → they buy from me
-    _autoAddAsCustomer(p);
+    _autoAddAsCustomer(p);   // Shop A wants me to record them as my customer
   }
 
-  // Also save Shop B (me) into Shop A's account with the opposite role,
-  // using req.theirRoleForMe (what Shop A originally was adding me as)
-  // We do this by writing a pre-accepted request back to Shop A's collection
-  if(req.theirRoleForMe && req.toProfile){
-    const myProfile = {
-      phone:    authPhone,
-      shopId:   myShopId(),
-      shopName: appSettings.shopName || "Unknown Shop",
-      shopIcon: appSettings.appIcon  || "",
-      gstin:    appSettings.shopGstin || "",
-      city:     appSettings.shopCity  || "",
-      address:  appSettings.shopAddress || "",
+  // ── STEP 2: Add ME (Shop B) directly into Shop A's Firestore account ───────
+  // This is the KEY fix: write directly into Shop A's users/{phone}/customers
+  // or users/{phone}/creditors collection so Shop A sees us immediately,
+  // regardless of whether their listener is alive.
+  const myProfile = {
+    phone:    authPhone,
+    shopId:   (typeof myShopId === "function") ? myShopId() : "",
+    shopName: (appSettings && appSettings.shopName) || authPhone,
+    shopIcon: (appSettings && appSettings.appIcon)  || "",
+    gstin:    (appSettings && appSettings.shopGstin) || "",
+    city:     (appSettings && appSettings.shopCity)  || "",
+    address:  (appSettings && appSettings.shopAddress) || "",
+  };
+
+  // theirRoleForMe = what Shop A added ME as (e.g. "creditor" = they added me as their creditor)
+  // So I (Shop B) should appear in Shop A's creditors list
+  const roleInShopA = req.theirRoleForMe; // "creditor" or "customer"
+
+  if(roleInShopA === "creditor"){
+    // Shop B should appear in Shop A's CREDITORS — write directly to Shop A's creditors cloud doc
+    const shopAPhone = req.fromPhone;
+    const newCredId = "CR" + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase();
+    const newCred = {
+      id: newCredId,
+      name: myProfile.shopName,
+      phone: myProfile.phone,
+      gstin: myProfile.gstin || "",
+      address: [myProfile.address, myProfile.city].filter(Boolean).join(", "),
+      notes: "Auto-added — they accepted your connect request (" + (myProfile.shopId||"") + ")",
+      bank: {name:"", acc:"", ifsc:"", upi:""},
+      createdAt: Date.now(),
+      transactions: [],
+      _fromShopConnect: true,
+      _connectedShopId: myProfile.shopId || "",
     };
-    // Directly save into Shop A's account on their behalf (auto-accept)
-    const autoReqId = "AUTOREQ" + Date.now();
-    const autoReq = {
-      id:           autoReqId,
-      fromPhone:    authPhone,
-      fromShopId:   myShopId(),
-      fromProfile:  myProfile,   // Shop B's profile — Shop A will add this as creditor/customer
-      toPhone:      req.fromPhone,
-      type:         req.theirRoleForMe,  // what Shop A should add ME (Shop B) as
-      status:       "auto_accepted",
-      createdAt:    Date.now(),
-      _autoAccepted: true,
+    // Write to Shop A's app_data/creditors doc (merge into list)
+    try {
+      const shopACredRef = db.collection("users").doc(shopAPhone).collection("app_data").doc("creditors");
+      const existing = await shopACredRef.get().catch(()=>null);
+      let list = (existing && existing.exists && existing.data().list) ? existing.data().list : [];
+      if(!list.find(c=>c.phone===myProfile.phone)){
+        list.push(newCred);
+        await shopACredRef.set({list}, {merge:true});
+      }
+    } catch(e){ console.warn("Direct creditor write to Shop A failed:", e); }
+
+  } else if(roleInShopA === "customer"){
+    // Shop B should appear in Shop A's CUSTOMERS — write directly to Shop A's customers collection
+    const shopAPhone = req.fromPhone;
+    const newCustId = "C" + Date.now();
+    const newCust = {
+      id: newCustId,
+      name: myProfile.shopName,
+      phone: myProfile.phone,
+      gstin: myProfile.gstin || "",
+      gstName: myProfile.shopName || "",
+      gstAddress: [myProfile.address, myProfile.city].filter(Boolean).join(", "),
+      points: 0, totalSpend: 0, purchases: [],
+      createdAt: Date.now(),
+      notes: "Auto-added — they accepted your connect request (" + (myProfile.shopId||"") + ")",
+      _fromShopConnect: true,
+      _connectedShopId: myProfile.shopId || "",
     };
-    // Write to BOTH paths so Shop A's live listener picks it up regardless of rules
     try {
-      // Primary: flat collection (live listener watches this)
-      await db.collection("shop_connect_requests").doc(autoReqId).set(autoReq);
-    } catch(e1){ console.warn("Auto-notify sender (flat):", e1); }
-    try {
-      // Secondary: subcollection under Shop A's phone
-      await db.collection("shop_requests").doc(req.fromPhone).collection("requests").doc(autoReqId).set(autoReq);
-    } catch(e2){ console.warn("Auto-notify sender (sub):", e2); }
+      await db.collection("users").doc(shopAPhone).collection("customers").doc(newCustId).set(newCust);
+    } catch(e){ console.warn("Direct customer write to Shop A failed:", e); }
   }
+
+  // ── STEP 3: Also write autoReq for Shop A's listener (belt-and-suspenders) ─
+  const autoReqId = "AUTOREQ" + Date.now();
+  const autoReq = {
+    id: autoReqId, fromPhone: authPhone, fromShopId: myProfile.shopId,
+    fromProfile: myProfile, toPhone: req.fromPhone,
+    type: roleInShopA, status: "auto_accepted",
+    createdAt: Date.now(), _autoAccepted: true,
+  };
+  try { await db.collection("shop_connect_requests").doc(autoReqId).set(autoReq); } catch(e){}
+  try { await db.collection("shop_requests").doc(req.fromPhone).collection("requests").doc(autoReqId).set(autoReq); } catch(e){}
 
   // Remove from cache and refresh
   _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==req.id);
