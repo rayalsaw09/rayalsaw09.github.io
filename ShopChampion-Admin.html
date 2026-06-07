@@ -5036,7 +5036,9 @@ async function doShopIdSearch(mode){
           </button>
           <button onclick="(async()=>{
             const btn=this;btn.disabled=true;btn.textContent='⏳ Sending...';
-            const ok=await sendShopConnectRequest(${JSON.stringify(profile).replace(/"/g,'&quot;')},'${mode}');
+            // Flip: if I'm adding them as creditor → they should add me as customer, and vice versa
+            const requestType = '${mode}' === 'creditor' ? 'customer' : 'creditor';
+            const ok=await sendShopConnectRequest(${JSON.stringify(profile).replace(/"/g,'&quot;')},'${mode}',requestType);
             if(ok){btn.style.background='linear-gradient(135deg,#16a34a,#22c55e)';btn.style.color='#fff';btn.textContent='✅ Request Sent! They will see it in their Messages tab.';}
             else{btn.disabled=false;btn.textContent='📨 Send Connect Request (notify them)';}
           })()" class="btn"
@@ -9017,6 +9019,50 @@ async function loadShopRequests(){
     combined.push(...snap2.docs.map(d=>({id:d.id,...d.data(),_path:"flat"})));
   } catch(e2) { /* rules may not allow yet */ }
 
+  // ── Path 3: auto_accepted requests written for me by shops that accepted my request ─
+  try {
+    const snap3 = await db.collection("shop_connect_requests")
+      .where("toPhone","==",authPhone)
+      .where("status","==","auto_accepted")
+      .get();
+    for(const doc of snap3.docs){
+      const req = {id:doc.id,...doc.data(),_path:"flat"};
+      // Apply to my account silently
+      const p = req.fromProfile || {};
+      if(req.type === "creditor"){
+        const creditors = getCreditors();
+        if(!creditors.find(c=>c.phone===p.phone && p.phone)){
+          creditors.push({
+            id: newCreditorId(), name: p.shopName||p.shopId||"Shop",
+            phone: p.phone||"", gstin: p.gstin||"",
+            address: [p.address,p.city].filter(Boolean).join(", "),
+            notes: `Auto-added — they accepted your connect request (${p.shopId||""})`,
+            bank:{name:"",acc:"",ifsc:"",upi:""}, createdAt:Date.now(), transactions:[],
+            _fromShopConnect:true, _connectedShopId:p.shopId||"",
+          });
+          saveCreditors(creditors);
+        }
+      } else if(req.type === "customer"){
+        const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
+        if(!allCust.find(c=>c.phone===p.phone && p.phone)){
+          const nc = {
+            id:"C"+Date.now(), name:p.shopName||p.shopId||"Shop",
+            phone:p.phone||"", gstin:p.gstin||"", gstName:p.shopName||"",
+            gstAddress:[p.address,p.city].filter(Boolean).join(", "),
+            points:0, totalSpend:0, purchases:[], createdAt:Date.now(),
+            notes:`Auto-added — they accepted your connect request (${p.shopId||""})`,
+            _fromShopConnect:true, _connectedShopId:p.shopId||"",
+          };
+          allCust.push(nc);
+          try{ localStorage.setItem(storageKey("customers_v2"),JSON.stringify(allCust)); }catch{}
+          if(db && authPhone) customersCol().doc(nc.id).set(nc).catch(()=>{});
+        }
+      }
+      // Mark consumed so we don't re-apply
+      doc.ref.update({status:"consumed"}).catch(()=>{});
+    }
+  } catch(e3){ /* rules or index issue */ }
+
   // Deduplicate by id and sort newest first
   const seen = new Set();
   _shopRequestsCache = combined.filter(r=>{ if(seen.has(r.id)) return false; seen.add(r.id); return true; })
@@ -9026,8 +9072,12 @@ async function loadShopRequests(){
 }
 
 // ── Send a connect request to another shop ───────────────────────────────────
-async function sendShopConnectRequest(targetProfile, type){
-  // type: what we want the TARGET to add US as ("creditor" or "customer")
+async function sendShopConnectRequest(targetProfile, myRoleForThem, theirRoleForMe){
+  // myRoleForThem:   what Shop A (me) is to Shop B (them) — what they add ME as
+  // theirRoleForMe:  what Shop B is to Shop A — what I already added THEM as (or will add)
+  // Example: I add them from Creditors tab →
+  //   theirRoleForMe = "creditor" (they are my creditor)
+  //   myRoleForThem  = "customer" (I am their customer/debtor)
   if(!db || !authPhone){
     notify("⚠️ Firebase not connected — can't send request","error");
     return false;
@@ -9043,14 +9093,17 @@ async function sendShopConnectRequest(targetProfile, type){
   };
   const reqId = "REQ" + Date.now() + Math.random().toString(36).slice(2,6).toUpperCase();
   const req = {
-    id:          reqId,
-    fromPhone:   authPhone,
-    fromShopId:  myShopId(),
-    fromProfile: myProfile,
-    toPhone:     targetProfile.phone,
-    type,
-    status:      "pending",
-    createdAt:   Date.now(),
+    id:           reqId,
+    fromPhone:    authPhone,
+    fromShopId:   myShopId(),
+    fromProfile:  myProfile,
+    toPhone:      targetProfile.phone,
+    toProfile:    targetProfile,
+    type:         myRoleForThem,   // what THEY should add ME as (shown in their Messages tab)
+    myRoleForThem,                 // same — what they add me as
+    theirRoleForMe,                // what I added them as (so on accept we can auto-save them too)
+    status:       "pending",
+    createdAt:    Date.now(),
   };
 
   let success = false;
@@ -9143,62 +9196,97 @@ async function acceptShopRequest(req){
     }
   } catch(e) { console.warn("Accept update error:", e); }
 
+  // req.type = what they want ME (Shop B) to add THEM (Shop A) as
+  // "creditor" → add Shop A as my creditor
+  // "customer" → add Shop A as my customer
   const p = req.fromProfile || {};
 
-  if(req.type === "creditor"){
-    // They want us to add them as a CREDITOR in our account
+  function _autoAddAsCreditor(profile, label){
     const creditors = getCreditors();
-    const existing = creditors.find(c=>c.phone===p.phone && c.phone);
-    if(existing){
-      notify(`ℹ️ ${p.shopName||"This shop"} is already in your creditors`);
-    } else {
-      const cr = {
-        id:       newCreditorId(),
-        name:     p.shopName || p.shopId || "Unknown Shop",
-        phone:    p.phone || "",
-        gstin:    p.gstin || "",
-        address:  [p.address, p.city].filter(Boolean).join(", "),
-        notes:    `Auto-added via Shop ID connect request (${p.shopId||""})`,
-        bank:     { name:"", acc:"", ifsc:"", upi:"" },
-        createdAt: Date.now(),
-        transactions: [],
-        _fromShopConnect: true,
-        _connectedShopId: p.shopId || "",
-      };
-      creditors.push(cr);
-      saveCreditors(creditors);
-      notify(`✅ ${p.shopName||"Shop"} added to your Creditors!`);
-    }
+    const existing = creditors.find(c=>c.phone===profile.phone && profile.phone);
+    if(existing){ notify(`ℹ️ ${profile.shopName||"This shop"} is already in your Creditors`); return; }
+    creditors.push({
+      id:           newCreditorId(),
+      name:         profile.shopName || profile.shopId || "Unknown Shop",
+      phone:        profile.phone || "",
+      gstin:        profile.gstin || "",
+      address:      [profile.address, profile.city].filter(Boolean).join(", "),
+      notes:        `Auto-added via Shop Connect (${profile.shopId||""})`,
+      bank:         { name:"", acc:"", ifsc:"", upi:"" },
+      createdAt:    Date.now(),
+      transactions: [],
+      _fromShopConnect: true,
+      _connectedShopId: profile.shopId || "",
+    });
+    saveCreditors(creditors);
+    notify(`✅ ${profile.shopName||"Shop"} added to your Creditors!`);
+  }
+
+  function _autoAddAsCustomer(profile){
+    const allCustomers = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
+    const existing = allCustomers.find(c=>c.phone===profile.phone && profile.phone);
+    if(existing){ notify(`ℹ️ ${profile.shopName||"This shop"} is already in your Customers`); return; }
+    const newCust = {
+      id:         "C" + Date.now(),
+      name:       profile.shopName || profile.shopId || "Unknown Shop",
+      phone:      profile.phone || "",
+      gstin:      profile.gstin || "",
+      gstName:    profile.shopName || "",
+      gstAddress: [profile.address, profile.city].filter(Boolean).join(", "),
+      points:     0,
+      totalSpend: 0,
+      purchases:  [],
+      createdAt:  Date.now(),
+      notes:      `Auto-added via Shop Connect (${profile.shopId||""})`,
+      _fromShopConnect: true,
+      _connectedShopId: profile.shopId || "",
+    };
+    allCustomers.push(newCust);
+    try { localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allCustomers)); } catch {}
+    if(db && authPhone) customersCol().doc(newCust.id).set(newCust).catch(()=>{});
+    notify(`✅ ${profile.shopName||"Shop"} added to your Customers!`);
+  }
+
+  // Add Shop A (sender) into MY account with the role they requested
+  if(req.type === "creditor"){
+    // Shop A wants me to add them as my CREDITOR → they supply to me
+    _autoAddAsCreditor(p);
   } else if(req.type === "customer"){
-    // They want us to add them as a CUSTOMER (debtor) in our account
-    const customers = getSorted(); // full customer list
-    const existing = customers.find(c=>c.phone===p.phone && p.phone);
-    if(existing){
-      notify(`ℹ️ ${p.shopName||"This shop"} is already in your customers`);
-    } else {
-      const newId = "C" + Date.now();
-      const newCust = {
-        id:         newId,
-        name:       p.shopName || p.shopId || "Unknown Shop",
-        phone:      p.phone || "",
-        gstin:      p.gstin || "",
-        gstName:    p.shopName || "",
-        gstAddress: [p.address, p.city].filter(Boolean).join(", "),
-        points:     0,
-        totalSpend: 0,
-        purchases:  [],
-        createdAt:  Date.now(),
-        notes:      `Auto-added via Shop ID connect (${p.shopId||""})`,
-        _fromShopConnect: true,
-        _connectedShopId: p.shopId || "",
-      };
-      // Add customer via the existing save mechanism
-      const allCustomers = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
-      allCustomers.push(newCust);
-      try { localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allCustomers)); } catch {}
-      if(db && authPhone) customersCol().doc(newId).set(newCust).catch(()=>{});
-      notify(`✅ ${p.shopName||"Shop"} added to your Customers!`);
-    }
+    // Shop A wants me to add them as my CUSTOMER → they buy from me
+    _autoAddAsCustomer(p);
+  }
+
+  // Also save Shop B (me) into Shop A's account with the opposite role,
+  // using req.theirRoleForMe (what Shop A originally was adding me as)
+  // We do this by writing a pre-accepted request back to Shop A's collection
+  if(req.theirRoleForMe && req.toProfile){
+    const myProfile = {
+      phone:    authPhone,
+      shopId:   myShopId(),
+      shopName: appSettings.shopName || "Unknown Shop",
+      shopIcon: appSettings.appIcon  || "",
+      gstin:    appSettings.shopGstin || "",
+      city:     appSettings.shopCity  || "",
+      address:  appSettings.shopAddress || "",
+    };
+    // Directly save into Shop A's account on their behalf (auto-accept)
+    const autoReqId = "AUTOREQ" + Date.now();
+    const autoReq = {
+      id:           autoReqId,
+      fromPhone:    authPhone,
+      fromShopId:   myShopId(),
+      fromProfile:  myProfile,
+      toPhone:      req.fromPhone,
+      type:         req.theirRoleForMe,  // what Shop A should add ME as
+      status:       "auto_accepted",
+      createdAt:    Date.now(),
+      _autoAccepted: true,
+    };
+    // Write to Shop A's flat collection so they see it applied immediately
+    try {
+      await db.collection("shop_connect_requests").doc(autoReqId).set(autoReq);
+      // Also process it locally if it's for me (rare edge case)
+    } catch(e){ console.warn("Auto-notify sender:", e); }
   }
 
   // Remove from cache and refresh
@@ -9252,10 +9340,15 @@ function renderMessagesTab(){
     : reqs.map(req=>{
         const p = req.fromProfile || {};
         const initials = (p.shopName||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-        const roleLabel = req.type === "creditor" ? "add you as a <b style='color:#f59e0b;'>Creditor</b>" : "add you as a <b style='color:#60a5fa;'>Customer/Debtor</b>";
-        const roleDesc  = req.type === "creditor"
-          ? "If you accept, they will appear in your <b>Creditors</b> tab — you owe them for purchases."
-          : "If you accept, they will appear in your <b>Customers</b> tab — they buy from you.";
+        // req.type = what they want ME to add THEM as
+        // "creditor" → they want me to record them as my creditor (they supply to me)
+        // "customer" → they want me to record them as my customer (they buy from me)
+        const roleLabel = req.type === "creditor"
+          ? "add you as their <b style='color:#60a5fa;'>Customer/Debtor</b> — and wants you to add them as your <b style='color:#f59e0b;'>Creditor</b>"
+          : "add you as their <b style='color:#f59e0b;'>Creditor</b> — and wants you to add them as your <b style='color:#60a5fa;'>Customer/Debtor</b>";
+        const roleDesc = req.type === "creditor"
+          ? "✅ Accept → <b style='color:#f59e0b;'>They appear in your Creditors</b> (they supply to you) · You appear in their Customers."
+          : "✅ Accept → <b style='color:#60a5fa;'>They appear in your Customers</b> (they buy from you) · You appear in their Creditors.";
         const timeStr = new Date(req.createdAt).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
         return `
           <div style="background:#0d1220;border:2px solid ${req.type==='creditor'?'#92400e':'#1e3a6e'};border-radius:16px;padding:18px;margin-bottom:14px;">
@@ -9289,7 +9382,7 @@ function renderMessagesTab(){
             <div style="display:flex;gap:10px;">
               <button onclick="_acceptReqById('${req.id}')" class="btn"
                 style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:12px;font-size:14px;font-weight:800;">
-                ✅ Accept — Add to ${req.type==='creditor'?'Creditors':'Customers'}
+                ✅ Accept — Add to ${req.type==='creditor'?'My Creditors':'My Customers'}
               </button>
               <button onclick="_declineReqById('${req.id}')" class="btn"
                 style="flex:1;background:#1a0a0a;border:1px solid #ef4444;color:#ef4444;padding:12px;font-size:13px;font-weight:700;">
