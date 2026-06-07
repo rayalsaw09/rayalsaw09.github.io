@@ -2712,6 +2712,7 @@ function onLoginSuccess(phone) {
     startFirestoreListener();
     loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
     loadShopRequests();
+    setTimeout(startPaymentRequestListener, 2000); // Start payment sync listener
     // Check Firestore — if doc doesn't exist but we have local data, push it up (first-time migration)
     loadInventoryFromFirestore((docExists)=>{
       if(!docExists && inventoryItems.length > 0){
@@ -2725,6 +2726,7 @@ function onLoginSuccess(phone) {
     const retrySync = (attempts) => {
       if(db && authPhone){
         startFirestoreListener();
+        setTimeout(startPaymentRequestListener, 2000);
         loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
         loadInventoryFromFirestore((docExists)=>{
           if(!docExists && inventoryItems.length > 0){
@@ -3262,10 +3264,22 @@ function renderCustomers(sorted,q=""){
       <button class="btn" onclick="custToggleSelectMode()" style="background:#1a2540;color:#f88;border:1px solid #3a2020;padding:9px 12px;font-size:13px;">☑</button>
     </div>`;
 
+  const pendingReqs = window._pendingPayReqs || [];
+  const pendingBanner = pendingReqs.length > 0 ? `
+    <div onclick="openPendingPaymentRequests()" style="cursor:pointer;background:linear-gradient(135deg,#14532d,#166534);border:2px solid #22c55e;border-radius:12px;padding:13px 16px;margin:0 14px 10px;display:flex;align-items:center;gap:12px;" onmouseenter="this.style.borderColor='#4ade80'" onmouseleave="this.style.borderColor='#22c55e'">
+      <div style="font-size:24px;">📨</div>
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:800;color:#4ade80;">${pendingReqs.length} Payment Request${pendingReqs.length>1?'s':''} Waiting</div>
+        <div style="font-size:12px;color:#86efac;margin-top:2px;">Linked shops sent you payment entries to confirm</div>
+      </div>
+      <div style="font-size:20px;font-weight:800;color:#4ade80;background:#14532d;border-radius:8px;padding:4px 10px;">${pendingReqs.length}</div>
+    </div>` : "";
+
   return `<div>
     <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 14px 8px;">
       <h2 style="margin:0;font-size:19px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Customers <span style="font-size:14px;color:#4a5a7a;font-weight:600;">(${f.length}${custDateFilter!=='all'?' filtered':''})</span></h2>
     </div>
+    ${pendingBanner}
     ${headerBtns}
     <div style="padding:0 14px 8px;">
       <input class="input" id="cust-search" dir="ltr" placeholder="🔍 Search name, phone, ID..." value="${q}" oninput="refreshCustSearch(this.value)" style="text-align:left;" />
@@ -5468,6 +5482,8 @@ function _renderCreditorCard(cr){
           ${cr.gstin?` · 🔢 ${cr.gstin}`:""}
         </div>
         ${lastTx?`<div style="font-size:11px;color:#4a5a7a;margin-top:3px;">Last: ${credTxIcon(lastTx.type)} ${escHtml(lastTx.note||lastTx.type)} · ${new Date(lastTx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>`:""}
+        ${cr._fromShopConnect?`<div style="margin-top:4px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#1e3a6e44;color:#60a5fa;border:1px solid #2a5aaa44;">🔗 Linked Shop</span></div>`:""
+        }
       </div>
       <!-- Balance -->
       <div style="text-align:right;flex-shrink:0;">
@@ -5860,8 +5876,13 @@ function _crTxRender(creditorId){
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
           <span style="font-size:13px;font-weight:700;color:#e8eaf0;">${hl(tx.note||tx.type)}</span>
           <span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:${tb.bg};color:${tb.col};">${tx.type}</span>
+          ${tx.syncStatus==="pending"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#92400e44;color:#fbbf24;">🟡 Sync Pending</span>`:""}
+          ${tx.syncStatus==="accepted"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#14532d44;color:#4ade80;">🔗 Synced</span>`:""}
+          ${tx.syncStatus==="declined"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#7f1d1d44;color:#f87171;">❌ Declined</span>`:""}
         </div>
         <div style="font-size:11px;color:#7a8aaa;">📅 ${dateStr}${tx.invoiceNo?` &nbsp;·&nbsp; 🧾 ${hl(tx.invoiceNo)}`:""}</div>
+        ${tx.syncStatus==="declined" && tx.syncReqId ? `<div style="margin-top:4px;"><button onclick="openRequestAgainModal('${creditorId}','${tx.id||""}',${tx.amount},'${(tx.note||"").replace(/'/g,"\'")}','${tx.date||""}','${(tx.invoiceNo||"").replace(/'/g,"\'")}','${tx.syncReqId}')" style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:6px;color:#f87171;font-size:10px;font-weight:700;padding:3px 8px;">🔄 Request Again</button></div>`:""
+        }
       </div>
       <div style="text-align:right;flex-shrink:0;">
         <div style="font-size:14px;font-weight:800;color:${amtColor};">${isCredit?"-":"+"}${formatINR(tx.amount)}</div>
@@ -5872,6 +5893,32 @@ function _crTxRender(creditorId){
   }).join("");
 }
 
+
+function openRequestAgainModal(creditorId, txId, amount, note, date, invoiceNo, reqId){
+  const creditors = getCreditors();
+  const cr = creditors.find(c=>c.id===creditorId);
+  if(!cr){ notify("❌ Creditor not found","error"); return; }
+  showWideModal(`
+    ${modalHeader("🔄 Request Again — " + escHtml(cr.name))}
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="background:#0a1220;border:1px solid #1e3a6e;border-radius:12px;padding:14px;">
+        <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:4px;">PAYMENT</div>
+        <div style="font-size:22px;font-weight:800;color:#22c55e;">${formatINR(amount)}</div>
+        ${note?`<div style="font-size:12px;color:#a0b0d0;margin-top:4px;">${escHtml(note)}</div>`:""}
+        <div style="font-size:11px;color:#4a5a7a;">${date}</div>
+      </div>
+      <div style="background:#1a0808;border:1px solid #ef444440;border-radius:12px;padding:12px;font-size:13px;color:#fca5a5;">
+        ❌ Previous sync request was declined. You can send up to 3 requests total.
+      </div>
+      <button onclick="sendPaymentSyncRequest('${creditorId}','${txId}',${amount},'${(note||'').replace(/'/g,"\'")}','${date}','${(invoiceNo||'').replace(/'/g,"\'")}','${cr.phone||''}','${reqId}')" class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-size:13px;font-weight:800;padding:12px;">
+        📤 Send Request Again
+      </button>
+      <button onclick="closeModal();setTimeout(()=>openCreditorDetail('${creditorId}'),200)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;color:#7a8aaa;font-size:13px;font-weight:700;padding:10px;">
+        Cancel
+      </button>
+    </div>
+  `);
+}
 
 // ── Add Transaction Modal ─────────────────────────────────────────────────────
 function openAddTxModal(creditorId, defaultType){
@@ -5936,13 +5983,218 @@ function saveCrTransaction(){
   const idx = creditors.findIndex(c=>c.id===creditorId);
   if(idx<0){ notify("❌ Creditor not found"); return; }
 
+  const txId = "TX"+Date.now();
   if(!creditors[idx].transactions) creditors[idx].transactions=[];
-  creditors[idx].transactions.push({ id:"TX"+Date.now(), type, amount, note, date, invoiceNo, createdAt:Date.now() });
+  creditors[idx].transactions.push({ id:txId, type, amount, note, date, invoiceNo, createdAt:Date.now(), syncStatus:"local" });
   saveCreditors(creditors);
   closeModal();
   notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return"} of ${formatINR(amount)} recorded`);
-  // Re-open detail
-  setTimeout(()=>openCreditorDetail(creditorId),200);
+
+  // If linked shop AND payment — offer sync request
+  const cr = creditors[idx];
+  if(type === "payment" && cr._fromShopConnect && cr.phone && db && authPhone){
+    setTimeout(()=>openPaymentSyncModal(creditorId, txId, amount, note, date, invoiceNo), 300);
+  } else {
+    setTimeout(()=>openCreditorDetail(creditorId),200);
+  }
+}
+
+// ─── PAYMENT SYNC REQUEST SYSTEM ────────────────────────────────────────────
+// Firebase: payment_sync_requests/{reqId}
+// Fields: fromPhone, toPhone, creditorId, amount, note, date, invoiceNo, txId, type, status, attempts, createdAt
+
+function openPaymentSyncModal(creditorId, txId, amount, note, date, invoiceNo){
+  const creditors = getCreditors();
+  const cr = creditors.find(c=>c.id===creditorId);
+  if(!cr) return;
+  showWideModal(`
+    ${modalHeader("🔗 Sync with " + escHtml(cr.name))}
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="background:#0a1220;border:1px solid #1e3a6e;border-radius:12px;padding:14px;">
+        <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:4px;">PAYMENT RECORDED</div>
+        <div style="font-size:22px;font-weight:800;color:#22c55e;">${formatINR(amount)}</div>
+        ${note?`<div style="font-size:12px;color:#a0b0d0;margin-top:4px;">${escHtml(note)}</div>`:""}
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${date}${invoiceNo?" · "+invoiceNo:""}</div>
+      </div>
+      <div style="background:#001a0a;border:1px solid #16a34a33;border-radius:12px;padding:14px;font-size:13px;color:#a7f3d0;">
+        <div style="font-size:12px;font-weight:800;color:#22c55e;margin-bottom:6px;">🔗 ${escHtml(cr.name)} is a connected shop</div>
+        Send a sync request — if they accept, this payment will appear in their Customer tab and both ledgers will match instantly.
+      </div>
+      <button onclick="sendPaymentSyncRequest('${creditorId}','${txId}',${amount},'${(note||'').replace(/'/g,"\'")}','${date}','${(invoiceNo||'').replace(/'/g,"\'")}','${cr.phone}')" class="btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-size:14px;font-weight:800;padding:13px;">
+        📤 Send Sync Request to ${escHtml(cr.name)}
+      </button>
+      <button onclick="closeModal();setTimeout(()=>openCreditorDetail('${creditorId}'),200)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;color:#7a8aaa;font-size:13px;font-weight:700;padding:11px;">
+        Skip — Save for myself only
+      </button>
+    </div>
+  `);
+}
+
+async function sendPaymentSyncRequest(creditorId, txId, amount, note, date, invoiceNo, toPhone, retryReqId){
+  if(!db || !authPhone){ notify("❌ Not connected to Firebase","error"); return; }
+  const creditors = getCreditors();
+  const cr = creditors.find(c=>c.id===creditorId);
+  const resolvedToPhone = toPhone || cr?.phone;
+  if(!resolvedToPhone){ notify("❌ Creditor phone not found","error"); return; }
+
+  // Check existing attempt count
+  let existingAttempts = 0;
+  if(retryReqId){
+    const existSnap = await db.collection("payment_sync_requests").doc(retryReqId).get().catch(()=>null);
+    if(existSnap?.exists) existingAttempts = existSnap.data().attempts||0;
+  }
+  if(existingAttempts >= 3){ notify("⚠️ Max 3 sync requests allowed per transaction","error"); return; }
+
+  const reqId = retryReqId || ("PSR"+Date.now()+Math.random().toString(36).slice(2,6).toUpperCase());
+  const req = {
+    fromPhone: authPhone,
+    toPhone: resolvedToPhone,
+    creditorId, txId, amount,
+    note: note||"Payment",
+    date, invoiceNo: invoiceNo||"",
+    type: "payment",
+    status: "pending",
+    attempts: existingAttempts+1,
+    fromShopName: (window.appSettings?.shopName)||authPhone,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+
+  try {
+    await db.collection("payment_sync_requests").doc(reqId).set(req, {merge:true});
+    // Mark local tx
+    const credList = getCreditors();
+    const cIdx = credList.findIndex(c=>c.id===creditorId);
+    if(cIdx>=0){
+      const tIdx = (credList[cIdx].transactions||[]).findIndex(t=>t.id===txId);
+      if(tIdx>=0){ credList[cIdx].transactions[tIdx].syncStatus="pending"; credList[cIdx].transactions[tIdx].syncReqId=reqId; }
+      saveCreditors(credList);
+    }
+    notify(`📤 Sync request sent! (Attempt ${existingAttempts+1}/3)`,"success");
+    closeModal();
+    setTimeout(()=>openCreditorDetail(creditorId),200);
+    listenPaymentSyncResponse(reqId, creditorId, txId);
+  } catch(e){ notify("❌ Failed: "+e.message,"error"); }
+}
+
+function listenPaymentSyncResponse(reqId, creditorId, txId){
+  if(!db) return;
+  const unsub = db.collection("payment_sync_requests").doc(reqId).onSnapshot(snap=>{
+    if(!snap.exists) return;
+    const d = snap.data();
+    if(d.status==="accepted"){
+      notify("✅ Payment synced! Both ledgers now match. 🔗","success");
+      const credList = getCreditors();
+      const cIdx = credList.findIndex(c=>c.id===creditorId);
+      if(cIdx>=0){
+        const tIdx = (credList[cIdx].transactions||[]).findIndex(t=>t.syncReqId===reqId);
+        if(tIdx>=0) credList[cIdx].transactions[tIdx].syncStatus="accepted";
+        saveCreditors(credList);
+      }
+      if(currentTab===6) renderTab(6);
+      unsub();
+    } else if(d.status==="declined"){
+      notify("❌ Sync request declined by the other shop.","error");
+      const credList = getCreditors();
+      const cIdx = credList.findIndex(c=>c.id===creditorId);
+      if(cIdx>=0){
+        const tIdx = (credList[cIdx].transactions||[]).findIndex(t=>t.syncReqId===reqId);
+        if(tIdx>=0) credList[cIdx].transactions[tIdx].syncStatus="declined";
+        saveCreditors(credList);
+      }
+      if(currentTab===6) renderTab(6);
+      unsub();
+    }
+  });
+}
+
+// ─── INCOMING REQUESTS LISTENER (Customers tab badge) ────────────────────────
+let _payReqListener = null;
+function startPaymentRequestListener(){
+  if(!db || !authPhone || _payReqListener) return;
+  _payReqListener = db.collection("payment_sync_requests")
+    .where("toPhone","==",authPhone)
+    .where("status","==","pending")
+    .onSnapshot(snap=>{
+      const count = snap.size;
+      window._pendingPayReqs = snap.docs.map(d=>({id:d.id,...d.data()}));
+      // Badge on Customers tab button
+      const TABS = getTabs();
+      const tabBtns = document.querySelectorAll(".tab-btn");
+      TABS.forEach((t,i)=>{
+        if(t.toLowerCase().includes("customer") && tabBtns[i]){
+          tabBtns[i].innerHTML = t + (count>0?`<span style="display:inline-block;background:#ef4444;color:#fff;border-radius:8px;font-size:9px;font-weight:800;padding:1px 5px;margin-left:4px;vertical-align:middle;">${count}</span>`:"");
+        }
+      });
+      if(currentTab===1) renderTab(1);
+    });
+}
+
+async function acceptPaymentSyncRequest(reqId){
+  if(!db || !authPhone){ notify("❌ Not logged in","error"); return; }
+  const snap = await db.collection("payment_sync_requests").doc(reqId).get().catch(()=>null);
+  if(!snap?.exists){ notify("❌ Request not found","error"); return; }
+  const req = snap.data();
+
+  // Find or create customer
+  let allData = [];
+  try { allData = JSON.parse(localStorage.getItem(storageKey("customers"))||"[]"); } catch{}
+  let cust = allData.find(c=>c.phone===req.fromPhone);
+  if(!cust){
+    cust = { id:"C"+Date.now(), name:req.fromShopName||req.fromPhone, phone:req.fromPhone, purchases:[], createdAt:Date.now() };
+    allData.push(cust);
+  }
+  if(!cust.purchases) cust.purchases=[];
+  cust.purchases.push({
+    id:"SYN"+Date.now(), amount:req.amount,
+    bill:req.invoiceNo||"Synced Payment",
+    notes:(req.note||"Payment")+" [Synced from "+escHtml(req.fromShopName||req.fromPhone)+"]",
+    date:req.date, createdAt:Date.now(),
+    _syncedReqId:reqId, _syncSource:req.fromPhone
+  });
+  cust.totalSpend = cust.purchases.reduce((s,p)=>s+(p.amount||0),0);
+
+  try { localStorage.setItem(storageKey("customers"), JSON.stringify(allData)); } catch{}
+  // Cloud save
+  if(db && authPhone){
+    await db.collection("users").doc(authPhone).collection("customers").doc(cust.id).set(cust,{merge:true}).catch(()=>{});
+  }
+  await db.collection("payment_sync_requests").doc(reqId).update({status:"accepted", resolvedAt:Date.now()});
+  notify("✅ Accepted! Purchase entry added to customer history.","success");
+  closeModal();
+  if(currentTab===1) renderTab(1);
+}
+
+async function declinePaymentSyncRequest(reqId){
+  if(!db) return;
+  await db.collection("payment_sync_requests").doc(reqId).update({status:"declined", resolvedAt:Date.now()}).catch(()=>{});
+  notify("❌ Payment request declined.");
+  closeModal();
+  if(currentTab===1) renderTab(1);
+}
+
+function openPendingPaymentRequests(){
+  const reqs = window._pendingPayReqs||[];
+  if(reqs.length===0){ notify("✅ No pending payment requests."); return; }
+  const html = reqs.map(r=>`
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div>
+          <div style="font-size:14px;font-weight:800;color:#e8eaf0;">${escHtml(r.fromShopName||r.fromPhone)}</div>
+          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">📞 ${r.fromPhone} · ${r.date}</div>
+          ${r.note?`<div style="font-size:12px;color:#a0b0d0;margin-top:3px;">${escHtml(r.note)}</div>`:""}
+          ${r.invoiceNo?`<div style="font-size:11px;color:#4a5a7a;">Ref: ${escHtml(r.invoiceNo)}</div>`:""}
+          <div style="font-size:11px;color:#f59e0b;margin-top:3px;">Attempt ${r.attempts||1}/3</div>
+        </div>
+        <div style="font-size:20px;font-weight:800;color:#22c55e;white-space:nowrap;">${formatINR(r.amount)}</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button onclick="acceptPaymentSyncRequest('${r.id}')" class="btn" style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-size:13px;font-weight:800;padding:10px;">✅ Accept — Add to My Purchases</button>
+        <button onclick="declinePaymentSyncRequest('${r.id}')" class="btn" style="background:#1a0808;border:1px solid #ef444460;color:#f87171;font-size:13px;font-weight:700;padding:10px 14px;">❌ Decline</button>
+      </div>
+    </div>
+  `).join("");
+  showWideModal(`${modalHeader("📨 Payment Requests from Linked Shops")}<div>${html}</div>`);
 }
 
 function deleteCrTx(creditorId, txIndex){
@@ -6487,7 +6739,7 @@ function removeAppIcon(){
 // ─── MODALS ──────────────────────────────────────────────────
 function closeModal(){document.getElementById("modal-container").innerHTML="";}
 function showModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:440px;">${html}</div></div>`;}
-function showWideModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:min(900px,92vw);">${html}</div></div>`;}
+function showWideModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:min(960px,95vw);max-height:95vh;">${html}</div></div>`;}
 function modalHeader(t){return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><div class="modal-title">${t}</div><button onclick="closeModal()" style="background:none;border:none;color:#7a8aaa;cursor:pointer;font-size:20px;">✕</button></div>`;}
 
 // ─── ADD / EDIT CUSTOMER ──────────────────────────────────────
@@ -9645,6 +9897,9 @@ service cloud.firestore {
       allow read, write: if true;
     }
     match /shop_connect_requests/{reqId} {
+      allow read, write: if true;
+    }
+    match /payment_sync_requests/{reqId} {
       allow read, write: if true;
     }
   }
