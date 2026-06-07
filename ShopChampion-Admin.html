@@ -1201,7 +1201,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 
 <!-- Customer Detail Full Page -->
 <div id="customer-page" style="display:none;position:fixed;inset:0;background:#0a0e1a;z-index:500;overflow-y:auto;">
-  <div id="customer-page-inner" style="max-width:700px;margin:0 auto;padding:20px;"></div>
+  <div id="customer-page-inner" style="width:100%;padding:20px;box-sizing:border-box;"></div>
 </div>
 
 <script>
@@ -5355,7 +5355,7 @@ function renderCreditorsTab(){
   });
 
   return `
-  <div style="max-width:900px;margin:0 auto;">
+  <div style="width:100%;">
 
     <!-- Header row -->
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
@@ -5754,7 +5754,7 @@ function openCreditorDetail(id){
         <div id="cr-tx-summary" style="font-size:11px;color:#4a5a7a;margin-bottom:8px;min-height:16px;"></div>
 
         <!-- Transaction list (rendered by JS) -->
-        <div id="cr-tx-list" style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;">
+        <div id="cr-tx-list" style="display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;">
           ${txs.length===0?`<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>`:"⏳"}
         </div>
       </div>
@@ -5771,6 +5771,7 @@ function openCreditorDetail(id){
       if(typeof _crTxApplyMonthNav==='function') _crTxApplyMonthNav(creditorId);
     }, 50);
   })(id);
+} // end openCreditorDetail
 
 function _crTxSetFilter(creditorId, filter){
   _crTxCurrentFilter = filter;
@@ -6488,7 +6489,7 @@ function removeAppIcon(){
 // ─── MODALS ──────────────────────────────────────────────────
 function closeModal(){document.getElementById("modal-container").innerHTML="";}
 function showModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:440px;">${html}</div></div>`;}
-function showWideModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:540px;">${html}</div></div>`;}
+function showWideModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:min(900px,92vw);">${html}</div></div>`;}
 function modalHeader(t){return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><div class="modal-title">${t}</div><button onclick="closeModal()" style="background:none;border:none;color:#7a8aaa;cursor:pointer;font-size:20px;">✕</button></div>`;}
 
 // ─── ADD / EDIT CUSTOMER ──────────────────────────────────────
@@ -9351,7 +9352,7 @@ function renderInventoryTab(){
     }
   }
 
-  return `<div style="padding:16px 14px;max-width:600px;margin:0 auto;">
+  return `<div style="padding:16px 14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
       <div style="font-size:18px;font-weight:800;color:#FFD700;">📦 Inventory</div>
       <div style="display:flex;gap:8px;align-items:center;">
@@ -9814,14 +9815,14 @@ async function declineShopRequest(req){
 function renderMessagesTab(){
   const reqs = _shopRequestsCache;
   if(!db){
-    return `<div style="max-width:600px;margin:0 auto;padding:40px 20px;text-align:center;">
+    return `<div style="padding:40px 20px;text-align:center;">
       <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
       <div style="font-size:16px;font-weight:800;color:#f59e0b;margin-bottom:8px;">Firebase Not Connected</div>
       <div style="font-size:13px;color:#7a8aaa;">Shop Connect messages require Firebase. Set it up in Settings.</div>
     </div>`;
   }
   if(!authPhone){
-    return `<div style="max-width:600px;margin:0 auto;padding:40px 20px;text-align:center;">
+    return `<div style="padding:40px 20px;text-align:center;">
       <div style="font-size:13px;color:#7a8aaa;">Log in to view messages.</div>
     </div>`;
   }
@@ -9887,7 +9888,7 @@ function renderMessagesTab(){
           </div>`;
       }).join("");
 
-  return `<div style="max-width:680px;margin:0 auto;">
+  return `<div style="width:100%;">
     <!-- Header -->
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
       <div>
@@ -10060,7 +10061,7 @@ function renderInventoryCategoryPage(catName){
         </div>`;
       }).join("");
 
-  return `<div style="padding:16px 14px;max-width:600px;margin:0 auto;">
+  return `<div style="padding:16px 14px;">
     <!-- Header -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
       <button onclick="invView='stock';invCatPageName='';invCatPageSearch='';safeRenderTab(currentTab)"
@@ -10198,7 +10199,7 @@ function renderInventoryItemDetail(itemName){
     </div>
     <div id="inv-cust-list" style="display:flex;flex-direction:column;gap:8px;"></div>`;
 
-  return `<div style="padding:16px 14px;max-width:600px;margin:0 auto;">
+  return `<div style="padding:16px 14px;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
       <button onclick="invView='stock';invDetailItem=null;window._invDetailTab='history';window._invHistMode='all';window._invCustMode='all';safeRenderTab(currentTab)" style="background:#1a2540;border:none;border-radius:9px;color:#7ab3ff;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;">← Back</button>
       <div style="font-size:17px;font-weight:800;color:#FFD700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${itemName}</div>
