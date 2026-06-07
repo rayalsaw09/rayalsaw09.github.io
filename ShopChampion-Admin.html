@@ -4850,6 +4850,7 @@ function showFirebaseSettings(){
     </div>
     <div style="display:flex;flex-direction:column;gap:8px;">
       <button class="btn" onclick="closeModal();document.getElementById('fb-setup-screen').style.display='flex';" style="background:#1a1a0a;color:#FFD700;border:1px solid #3a3a1a;padding:10px;font-size:13px;">🔧 Change Firebase Config</button>
+      <button class="btn" onclick="_showFirestoreRulesError('')" style="background:#0a1628;color:#60a5fa;border:1px solid #1e3a6e;padding:10px;font-size:13px;">📋 View / Copy Firestore Security Rules</button>
       ${connected?`<button class="btn" onclick="if(confirm('Disconnect Firebase? You will switch to local demo mode.')){useLocalOnly=true;localStorage.removeItem(storageKey('fb_config'));if(fbUnsubscribe)fbUnsubscribe();loadLocalCustomers();closeModal();safeRenderTab(currentTab);updateDbStatus('📦 Local storage (demo mode)','#f84');}" style="background:#3a1a1a;color:#f66;border:1px solid #4a1515;padding:10px;font-size:13px;">Disconnect Firebase</button>`:''}
       <button class="btn" onclick="closeModal()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:10px;font-size:13px;">Close</button>
     </div>`);
@@ -8997,22 +8998,31 @@ function shopRequestsCol(){
 
 // ── Load requests from Firestore ─────────────────────────────────────────────
 async function loadShopRequests(){
-  const col = shopRequestsCol();
-  if(!col) return;
+  if(!db || !authPhone) return;
+  let combined = [];
+
+  // ── Path 1: subcollection shop_requests/{myPhone}/requests ──────────────
   try {
-    const snap = await col.where("status","==","pending").orderBy("createdAt","desc").get();
-    _shopRequestsCache = snap.docs.map(d=>({id:d.id,...d.data()}));
-    _shopRequestsUnread = _shopRequestsCache.length;
-    renderTabs(); // update badge
-  } catch(e) {
-    // index might not exist yet — try without orderBy
-    try {
-      const snap2 = await col.where("status","==","pending").get();
-      _shopRequestsCache = snap2.docs.map(d=>({id:d.id,...d.data()}));
-      _shopRequestsUnread = _shopRequestsCache.length;
-      renderTabs();
-    } catch {}
-  }
+    const col = db.collection("shop_requests").doc(authPhone).collection("requests");
+    const snap = await col.where("status","==","pending").get();
+    combined.push(...snap.docs.map(d=>({id:d.id,...d.data(),_path:"sub"})));
+  } catch(e1) { /* rules may not allow yet */ }
+
+  // ── Path 2: flat shop_connect_requests where toPhone == me ──────────────
+  try {
+    const snap2 = await db.collection("shop_connect_requests")
+      .where("toPhone","==",authPhone)
+      .where("status","==","pending")
+      .get();
+    combined.push(...snap2.docs.map(d=>({id:d.id,...d.data(),_path:"flat"})));
+  } catch(e2) { /* rules may not allow yet */ }
+
+  // Deduplicate by id and sort newest first
+  const seen = new Set();
+  _shopRequestsCache = combined.filter(r=>{ if(seen.has(r.id)) return false; seen.add(r.id); return true; })
+    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  _shopRequestsUnread = _shopRequestsCache.length;
+  renderTabs();
 }
 
 // ── Send a connect request to another shop ───────────────────────────────────
@@ -9038,30 +9048,99 @@ async function sendShopConnectRequest(targetProfile, type){
     fromShopId:  myShopId(),
     fromProfile: myProfile,
     toPhone:     targetProfile.phone,
-    type,         // "creditor" | "customer" — role they should add US as in their app
+    type,
     status:      "pending",
     createdAt:   Date.now(),
   };
+
+  let success = false;
+
+  // ── Primary path: subcollection ─────────────────────────────────────────────
   try {
     await db.collection("shop_requests")
       .doc(targetProfile.phone)
       .collection("requests")
       .doc(reqId)
       .set(req);
-    return true;
-  } catch(e) {
-    notify("❌ Failed to send request: " + e.message, "error");
-    return false;
+    success = true;
+  } catch(e1) {
+    // ── Fallback path: flat collection (simpler Firestore rules) ────────────
+    try {
+      await db.collection("shop_connect_requests")
+        .doc(reqId)
+        .set(req);
+      success = true;
+    } catch(e2) {
+      // Both failed — show rules fix instructions
+      notify("❌ Permission denied — see Firestore rules fix below", "error");
+      _showFirestoreRulesError(e2.message);
+      return false;
+    }
   }
+
+  return success;
+}
+
+function _showFirestoreRulesError(errMsg){
+  const rules = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── ShopChampion required rules ──────────────────
+    match /users/{userId}/{document=**} {
+      allow read, write: if true;
+    }
+    match /shop_profiles/{shopId} {
+      allow read, write: if true;
+    }
+    // Shop Connect messages (cross-shop requests)
+    match /shop_requests/{phone}/requests/{reqId} {
+      allow read, write: if true;
+    }
+    match /shop_connect_requests/{reqId} {
+      allow read, write: if true;
+    }
+  }
+}`;
+
+  showWideModal(`
+    ${modalHeader("🔒 Firestore Rules — Fix Required")}
+    <div style="font-size:13px;color:#fbbf24;background:#1a0e00;border:1px solid #d97706;border-radius:10px;padding:12px 14px;margin-bottom:14px;line-height:1.6;">
+      <b>Error:</b> ${escHtml(errMsg||"Missing or insufficient permissions")}<br>
+      <span style="font-size:12px;color:#7a8aaa;">The <b>shop_requests</b> collection needs read/write rules in your Firebase console.</span>
+    </div>
+    <div style="font-size:12px;color:#7a8aaa;margin-bottom:10px;line-height:1.7;">
+      <b style="color:#e8eaf0;">How to fix (takes 1 minute):</b><br>
+      1. Open <a href="https://console.firebase.google.com" target="_blank" style="color:#60a5fa;">console.firebase.google.com</a><br>
+      2. Go to <b style="color:#e8eaf0;">Firestore Database → Rules</b><br>
+      3. Replace the rules with the text below and click <b style="color:#4f4;">Publish</b>
+    </div>
+    <div style="position:relative;">
+      <pre id="frules-box" style="background:#050810;border:1px solid #1e2a45;border-radius:10px;padding:14px;font-size:12px;color:#a0ffa0;font-family:monospace;overflow-x:auto;white-space:pre;margin:0 0 10px;">${escHtml(rules)}</pre>
+      <button onclick="navigator.clipboard.writeText(document.getElementById('frules-box').innerText).then(()=>notify('✅ Rules copied! Paste in Firebase console.'))" 
+        style="position:absolute;top:8px;right:8px;background:#1e3a6e;border:none;color:#60a5fa;border-radius:6px;padding:6px 12px;font-size:11px;font-weight:800;cursor:pointer;">
+        📋 Copy
+      </button>
+    </div>
+    <div style="font-size:11px;color:#4a5a7a;line-height:1.6;margin-bottom:14px;">
+      These rules allow ShopChampion shops to read/write their own data and send connect requests to other shops. No personal data is exposed beyond what shops choose to share in their public profile.
+    </div>
+    <button onclick="closeModal()" class="btn" style="width:100%;background:#1a2540;color:#7a8aaa;padding:10px;font-size:13px;">Close</button>
+  `);
 }
 
 // ── Accept a request ─────────────────────────────────────────────────────────
 async function acceptShopRequest(req){
   if(!db || !authPhone) return;
-  // Mark accepted in Firestore
+  // Mark accepted in Firestore (try both paths)
   try {
-    await db.collection("shop_requests").doc(authPhone).collection("requests").doc(req.id)
-      .update({ status:"accepted", respondedAt: Date.now() });
+    if(req._path==="flat"){
+      await db.collection("shop_connect_requests").doc(req.id)
+        .update({ status:"accepted", respondedAt: Date.now() });
+    } else {
+      await db.collection("shop_requests").doc(authPhone).collection("requests").doc(req.id)
+        .update({ status:"accepted", respondedAt: Date.now() });
+    }
   } catch(e) { console.warn("Accept update error:", e); }
 
   const p = req.fromProfile || {};
@@ -9133,8 +9212,13 @@ async function acceptShopRequest(req){
 async function declineShopRequest(req){
   if(!db || !authPhone) return;
   try {
-    await db.collection("shop_requests").doc(authPhone).collection("requests").doc(req.id)
-      .update({ status:"declined", respondedAt: Date.now() });
+    if(req._path==="flat"){
+      await db.collection("shop_connect_requests").doc(req.id)
+        .update({ status:"declined", respondedAt: Date.now() });
+    } else {
+      await db.collection("shop_requests").doc(authPhone).collection("requests").doc(req.id)
+        .update({ status:"declined", respondedAt: Date.now() });
+    }
   } catch(e) { console.warn("Decline update error:", e); }
   _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==req.id);
   _shopRequestsUnread = _shopRequestsCache.length;
