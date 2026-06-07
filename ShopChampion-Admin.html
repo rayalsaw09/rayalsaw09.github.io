@@ -5959,33 +5959,29 @@ function openRequestAgainModal(creditorId, txId, amount, note, date, invoiceNo, 
 
 // ── Add Transaction Modal ─────────────────────────────────────────────────────
 function openAddTxModal(creditorId, defaultType){
+  if(defaultType === "payment") { openSmartPaymentModal(creditorId); return; }
+  if(defaultType === "return")  { openReturnModal(creditorId); return; }
+  // Purchase flow
   const today = new Date().toISOString().slice(0,10);
+  const cr = getCreditors().find(c=>c.id===creditorId);
   showWideModal(`
-    ${modalHeader(defaultType==="purchase"?"📦 Record Purchase":defaultType==="payment"?"💰 Record Payment":"↩️ Record Return/Debit Note")}
+    ${modalHeader("📦 Record Purchase from " + escHtml(cr?.name||"Creditor"))}
     <div style="display:flex;flex-direction:column;gap:12px;">
       <input type="hidden" id="tx-creditor-id" value="${creditorId}" />
+      <input type="hidden" id="tx-type" value="purchase" />
 
-      <div style="display:flex;gap:8px;">
-        ${["purchase","payment","return"].map(t=>`
-          <button onclick="document.querySelectorAll('.tx-type-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');document.getElementById('tx-type').value='${t}'"
-            class="btn tx-type-btn${t===defaultType?" active":""}"
-            style="flex:1;font-size:12px;padding:8px;background:${t===defaultType?"linear-gradient(135deg,#1e3a6e,#2a5aaa)":"#0a0e1a"};border:1px solid ${t===defaultType?"#2a5aaa":"#1e2a45"};">
-            ${credTxIcon(t)} ${t.charAt(0).toUpperCase()+t.slice(1)}
-          </button>
-        `).join("")}
+      <div style="background:#0a0e1a;border:1px solid #92400e33;border-radius:10px;padding:12px;font-size:12px;color:#f59e0b;">
+        📦 Recording a purchase adds to the amount you owe this creditor.
       </div>
-      <input type="hidden" id="tx-type" value="${defaultType}" />
 
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">AMOUNT (₹) *</label>
-        <input class="input" id="tx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:18px;font-weight:800;" />
+        <input class="input" id="tx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
       </div>
-
       <div>
-        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">NOTE / DESCRIPTION</label>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">ITEM / DESCRIPTION</label>
         <input class="input" id="tx-note" placeholder="e.g. Rice 50kg, Wheat 100kg..." style="margin-bottom:0;" />
       </div>
-
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div>
           <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">DATE</label>
@@ -5996,13 +5992,231 @@ function openAddTxModal(creditorId, defaultType){
           <input class="input" id="tx-invoice" placeholder="INV-001" style="margin-bottom:0;" />
         </div>
       </div>
-
-      <button onclick="saveCrTransaction()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;margin-top:4px;">
-        ✅ Save Transaction
+      <button onclick="saveCrTransaction()" class="btn" style="background:linear-gradient(135deg,#d97706,#f59e0b);color:#1a0a00;font-weight:800;margin-top:4px;">
+        📦 Save Purchase
       </button>
     </div>
   `);
-  // Focus amount
+  setTimeout(()=>document.getElementById("tx-amount")?.focus(),100);
+}
+
+// ── Smart Payment Modal: shows pending purchase bills, lets user pick & pay ──
+function openSmartPaymentModal(creditorId){
+  const creditors = getCreditors();
+  const cr = creditors.find(c=>c.id===creditorId);
+  if(!cr){ notify("❌ Creditor not found"); return; }
+  const today = new Date().toISOString().slice(0,10);
+  const bal = credBalance(cr);
+
+  // Collect all unpaid / partially-paid purchase transactions
+  const purchases = (cr.transactions||[]).filter(t=>t.type==="purchase");
+  const payments  = (cr.transactions||[]).filter(t=>t.type==="payment"||t.type==="return");
+
+  // Build a per-bill outstanding map
+  // Each purchase tx gets credited with payments that reference it (_paysBill) first,
+  // then we spread any remaining payments proportionally
+  const billMap = {}; // txId -> { tx, paid }
+  purchases.forEach(t=>{ billMap[t.id]={ tx:t, paid: t._paidAmount||0 }; });
+  // Any payment with _paysBill targets a specific bill
+  payments.forEach(t=>{ if(t._paysBill && billMap[t._paysBill]) billMap[t._paysBill].paid += t.amount; });
+
+  const pendingBills = Object.values(billMap).filter(b=> b.paid < b.tx.amount )
+    .sort((a,b)=>new Date(a.tx.date)-new Date(b.tx.date));
+
+  const billsHtml = pendingBills.length===0
+    ? `<div style="text-align:center;padding:16px;color:#4a5a7a;font-size:13px;">✅ No outstanding bills — fully settled!</div>`
+    : pendingBills.map(b=>{
+        const remaining = Math.max(0, b.tx.amount - b.paid);
+        const pct = Math.min(100, Math.round((b.paid/b.tx.amount)*100));
+        return `<div class="cr-bill-row" data-bill-id="${b.tx.id}" data-remaining="${remaining}"
+          onclick="crSelectBill('${b.tx.id}', ${remaining})"
+          style="cursor:pointer;padding:12px;border-radius:10px;border:2px solid #1e2a45;background:#0a0e1a;margin-bottom:8px;transition:border-color 0.15s;"
+          onmouseenter="this.style.borderColor='#2a5aaa'" onmouseleave="if(!this.classList.contains('selected'))this.style.borderColor='#1e2a45'">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:700;color:#e8eaf0;">${escHtml(b.tx.note||b.tx.invoiceNo||"Purchase")}</div>
+              <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">
+                ${b.tx.date} ${b.tx.invoiceNo?`· <span style="color:#60a5fa;">${escHtml(b.tx.invoiceNo)}</span>`:""}
+              </div>
+              <div style="margin-top:6px;background:#1e2a45;border-radius:99px;height:5px;overflow:hidden;">
+                <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#22c55e,#4ade80);border-radius:99px;"></div>
+              </div>
+              <div style="font-size:10px;color:#4a5a7a;margin-top:2px;">${pct}% paid · ₹${remaining.toLocaleString("en-IN")} remaining</div>
+            </div>
+            <div style="text-align:right;white-space:nowrap;">
+              <div style="font-size:16px;font-weight:800;color:#f84;">₹${remaining.toLocaleString("en-IN")}</div>
+              <div style="font-size:10px;color:#4a5a7a;">of ₹${b.tx.amount.toLocaleString("en-IN")}</div>
+            </div>
+          </div>
+          <div id="cr-bill-selected-${b.tx.id}" style="display:none;margin-top:8px;">
+            <div style="font-size:10px;color:#22c55e;font-weight:700;margin-bottom:4px;">✅ Selected — enter payment amount below</div>
+          </div>
+        </div>`;
+      }).join("");
+
+  showWideModal(`
+    ${modalHeader("💰 Make Payment to " + escHtml(cr.name))}
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <input type="hidden" id="spm-creditor-id" value="${creditorId}" />
+      <input type="hidden" id="spm-selected-bill" value="" />
+
+      <!-- Balance summary -->
+      <div style="background:#1a0e00;border:1px solid #d97706;border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:11px;color:#7a8aaa;font-weight:700;">TOTAL YOU OWE</div>
+          <div style="font-size:22px;font-weight:800;color:#f59e0b;">${formatINR(Math.max(0,bal))}</div>
+        </div>
+        <div style="font-size:11px;color:#4a5a7a;text-align:right;">${pendingBills.length} unpaid bill${pendingBills.length!==1?"s":""}</div>
+      </div>
+
+      <!-- Bill selection -->
+      <div>
+        <div style="font-size:12px;font-weight:800;color:#e8eaf0;margin-bottom:8px;">📋 Select Bill to Pay (optional)</div>
+        <div style="max-height:220px;overflow-y:auto;">${billsHtml}</div>
+      </div>
+
+      <!-- Payment details -->
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">PAYMENT AMOUNT (₹) *</label>
+          <input class="input" id="spm-amount" type="number" placeholder="0" min="0"
+            style="margin-bottom:0;font-size:20px;font-weight:800;border-color:#22c55e33;" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">PAYMENT MODE</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${["Cash","UPI","NEFT","Cheque","Other"].map((m,i)=>`
+              <button onclick="document.querySelectorAll('.spm-mode-btn').forEach(b=>b.style.background='#0a0e1a');document.querySelectorAll('.spm-mode-btn').forEach(b=>b.style.borderColor='#1e2a45');document.querySelectorAll('.spm-mode-btn').forEach(b=>b.style.color='#4a5a7a');this.style.background='#001a0e';this.style.borderColor='#22c55e';this.style.color='#22c55e';document.getElementById('spm-mode').value='${m}'"
+                class="spm-mode-btn" style="cursor:pointer;padding:6px 12px;border-radius:8px;border:1px solid ${i===0?'#22c55e':'#1e2a45'};background:${i===0?'#001a0e':'#0a0e1a'};color:${i===0?'#22c55e':'#4a5a7a'};font-size:12px;font-weight:700;">${m}</button>
+            `).join("")}
+          </div>
+          <input type="hidden" id="spm-mode" value="Cash" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">DATE</label>
+            <input class="input" id="spm-date" type="date" value="${today}" style="margin-bottom:0;" />
+          </div>
+          <div>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">REF / UTR NO.</label>
+            <input class="input" id="spm-ref" placeholder="UTR or cheque no." style="margin-bottom:0;" />
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">NOTE (optional)</label>
+          <input class="input" id="spm-note" placeholder="Payment note..." style="margin-bottom:0;" />
+        </div>
+      </div>
+
+      <button onclick="saveSmartPayment()" class="btn"
+        style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-size:14px;font-weight:800;padding:14px;">
+        💰 Record Payment & Notify Creditor
+      </button>
+    </div>
+  `);
+  setTimeout(()=>document.getElementById("spm-amount")?.focus(),100);
+}
+
+function crSelectBill(billId, remaining){
+  // Deselect all
+  document.querySelectorAll(".cr-bill-row").forEach(r=>{
+    r.style.borderColor="#1e2a45"; r.style.background="#0a0e1a";
+    r.classList.remove("selected");
+    const si = r.querySelector("[id^='cr-bill-selected-']"); if(si) si.style.display="none";
+  });
+  const selectedId = document.getElementById("spm-selected-bill").value;
+  if(selectedId === billId){
+    // Toggle off
+    document.getElementById("spm-selected-bill").value="";
+    return;
+  }
+  // Select this row
+  const row = document.querySelector(`[data-bill-id="${billId}"]`);
+  if(row){
+    row.style.borderColor="#22c55e"; row.style.background="#001a0e"; row.classList.add("selected");
+    const si = document.getElementById("cr-bill-selected-"+billId); if(si) si.style.display="block";
+  }
+  document.getElementById("spm-selected-bill").value = billId;
+  // Pre-fill amount with remaining
+  const amtEl = document.getElementById("spm-amount");
+  if(amtEl && (!amtEl.value || parseFloat(amtEl.value)===0)) amtEl.value = remaining;
+}
+
+async function saveSmartPayment(){
+  const creditorId  = document.getElementById("spm-creditor-id")?.value;
+  const selectedBill= document.getElementById("spm-selected-bill")?.value;
+  const amount      = parseFloat(document.getElementById("spm-amount")?.value)||0;
+  const mode        = document.getElementById("spm-mode")?.value||"Cash";
+  const date        = document.getElementById("spm-date")?.value||new Date().toISOString().slice(0,10);
+  const ref         = document.getElementById("spm-ref")?.value.trim()||"";
+  const note        = document.getElementById("spm-note")?.value.trim()||"";
+
+  if(!amount||amount<=0){ notify("⚠️ Enter a valid payment amount"); return; }
+
+  const creditors = getCreditors();
+  const idx = creditors.findIndex(c=>c.id===creditorId);
+  if(idx<0){ notify("❌ Creditor not found"); return; }
+
+  const cr = creditors[idx];
+  const txId = "TX"+Date.now();
+  const tx = {
+    id: txId, type:"payment", amount, date,
+    note: [note, mode, ref].filter(Boolean).join(" · ")||"Payment",
+    invoiceNo: ref||"",
+    mode, ref,
+    _paysBill: selectedBill||"",   // which purchase bill this pays (if selected)
+    createdAt: Date.now(),
+    syncStatus: "local",
+  };
+  if(!cr.transactions) cr.transactions=[];
+  cr.transactions.push(tx);
+  saveCreditors(creditors);
+  closeModal();
+  notify(`✅ Payment of ${formatINR(amount)} recorded`,"success");
+
+  // If linked shop — send sync request to creditor (they see it in their Borrows tab)
+  if(cr._fromShopConnect && cr.phone && db && authPhone){
+    setTimeout(()=>openPaymentSyncModal(creditorId, txId, amount, tx.note, date, ref||"", selectedBill), 300);
+  } else {
+    setTimeout(()=>openCreditorDetail(creditorId),200);
+  }
+}
+
+// ── Return / Debit Note modal ──
+function openReturnModal(creditorId){
+  const cr = getCreditors().find(c=>c.id===creditorId);
+  const today = new Date().toISOString().slice(0,10);
+  showWideModal(`
+    ${modalHeader("↩️ Record Return / Debit Note")}
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <input type="hidden" id="tx-creditor-id" value="${creditorId}" />
+      <input type="hidden" id="tx-type" value="return" />
+      <div style="background:#0d0020;border:1px solid #a78bfa33;border-radius:10px;padding:12px;font-size:12px;color:#a78bfa;">
+        ↩️ A return reduces the amount you owe (goods sent back / debit note issued).
+      </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">RETURN AMOUNT (₹) *</label>
+        <input class="input" id="tx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
+      </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">ITEM / REASON</label>
+        <input class="input" id="tx-note" placeholder="e.g. Damaged goods returned" style="margin-bottom:0;" />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">DATE</label>
+          <input class="input" id="tx-date" type="date" value="${today}" style="margin-bottom:0;" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">DEBIT NOTE / REF</label>
+          <input class="input" id="tx-invoice" placeholder="DN-001" style="margin-bottom:0;" />
+        </div>
+      </div>
+      <button onclick="saveCrTransaction()" class="btn" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;font-weight:800;margin-top:4px;">
+        ↩️ Save Return
+      </button>
+    </div>
+  `);
   setTimeout(()=>document.getElementById("tx-amount")?.focus(),100);
 }
 
@@ -6026,39 +6240,34 @@ function saveCrTransaction(){
   saveCreditors(creditors);
   closeModal();
   notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return"} of ${formatINR(amount)} recorded`);
-
-  // If linked shop AND payment — offer sync request
-  const cr = creditors[idx];
-  if(type === "payment" && cr._fromShopConnect && cr.phone && db && authPhone){
-    setTimeout(()=>openPaymentSyncModal(creditorId, txId, amount, note, date, invoiceNo), 300);
-  } else {
-    setTimeout(()=>openCreditorDetail(creditorId),200);
-  }
+  setTimeout(()=>openCreditorDetail(creditorId),200);
 }
 
 // ─── PAYMENT SYNC REQUEST SYSTEM ────────────────────────────────────────────
 // Firebase: payment_sync_requests/{reqId}
 // Fields: fromPhone, toPhone, creditorId, amount, note, date, invoiceNo, txId, type, status, attempts, createdAt
 
-function openPaymentSyncModal(creditorId, txId, amount, note, date, invoiceNo){
+function openPaymentSyncModal(creditorId, txId, amount, note, date, invoiceNo, selectedBill){
   const creditors = getCreditors();
   const cr = creditors.find(c=>c.id===creditorId);
   if(!cr) return;
+  const safeBill = selectedBill||"";
   showWideModal(`
-    ${modalHeader("🔗 Sync with " + escHtml(cr.name))}
+    ${modalHeader("🔗 Sync Payment with " + escHtml(cr.name))}
     <div style="display:flex;flex-direction:column;gap:14px;">
       <div style="background:#0a1220;border:1px solid #1e3a6e;border-radius:12px;padding:14px;">
         <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:4px;">PAYMENT RECORDED</div>
         <div style="font-size:22px;font-weight:800;color:#22c55e;">${formatINR(amount)}</div>
         ${note?`<div style="font-size:12px;color:#a0b0d0;margin-top:4px;">${escHtml(note)}</div>`:""}
         <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${date}${invoiceNo?" · "+invoiceNo:""}</div>
+        ${safeBill?`<div style="font-size:11px;color:#22c55e;margin-top:4px;">📌 Against bill: ${escHtml(safeBill)}</div>`:""}
       </div>
       <div style="background:#001a0a;border:1px solid #16a34a33;border-radius:12px;padding:14px;font-size:13px;color:#a7f3d0;">
         <div style="font-size:12px;font-weight:800;color:#22c55e;margin-bottom:6px;">🔗 ${escHtml(cr.name)} is a connected shop</div>
-        Send a sync request — if they accept, this payment will appear in their Customer tab and both ledgers will match instantly.
+        Sending this request will notify <strong>${escHtml(cr.name)}</strong>. When they accept, the payment will be reflected in their Borrows tab and the pending amount will decrease automatically.
       </div>
-      <button onclick="sendPaymentSyncRequest('${creditorId}','${txId}',${amount},'${(note||'').replace(/'/g,"\'")}','${date}','${(invoiceNo||'').replace(/'/g,"\'")}','${cr.phone}')" class="btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-size:14px;font-weight:800;padding:13px;">
-        📤 Send Sync Request to ${escHtml(cr.name)}
+      <button onclick="sendPaymentSyncRequest('${creditorId}','${txId}',${amount},'${(note||'').replace(/'/g,"\'")  }','${date}','${(invoiceNo||'').replace(/'/g,"\'")}','${cr.phone}',undefined,'${safeBill}')" class="btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-size:14px;font-weight:800;padding:13px;">
+        📤 Send Payment Notification to ${escHtml(cr.name)}
       </button>
       <button onclick="closeModal();setTimeout(()=>openCreditorDetail('${creditorId}'),200)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;color:#7a8aaa;font-size:13px;font-weight:700;padding:11px;">
         Skip — Save for myself only
@@ -6067,7 +6276,7 @@ function openPaymentSyncModal(creditorId, txId, amount, note, date, invoiceNo){
   `);
 }
 
-async function sendPaymentSyncRequest(creditorId, txId, amount, note, date, invoiceNo, toPhone, retryReqId){
+async function sendPaymentSyncRequest(creditorId, txId, amount, note, date, invoiceNo, toPhone, retryReqId, selectedBill){
   if(!db || !authPhone){ notify("❌ Not connected to Firebase","error"); return; }
   const creditors = getCreditors();
   const cr = creditors.find(c=>c.id===creditorId);
@@ -6090,6 +6299,7 @@ async function sendPaymentSyncRequest(creditorId, txId, amount, note, date, invo
     note: note||"Payment",
     date, invoiceNo: invoiceNo||"",
     type: "payment",
+    selectedBill: selectedBill||"",
     status: "pending",
     attempts: existingAttempts+1,
     fromShopName: (window.appSettings?.shopName)||authPhone,
@@ -6273,7 +6483,7 @@ async function acceptPaymentSyncRequest(reqId){
   if(!snap?.exists){ notify("❌ Request not found","error"); return; }
   const req = snap.data();
 
-  // Find or create customer (use correct customers_v2 key)
+  // Find or create the customer record for the sender (Shop A)
   let allData = [];
   try { allData = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]"); } catch{}
   let cust = allData.find(c=>c.phone===req.fromPhone);
@@ -6282,38 +6492,87 @@ async function acceptPaymentSyncRequest(reqId){
              purchases:[], borrows:[], totalSpend:0, createdAt:Date.now(), _fromShopConnect:true };
     allData.push(cust);
   }
-  if(!cust.borrows) cust.borrows=[];
+  if(!cust.borrows)   cust.borrows=[];
   if(!cust.purchases) cust.purchases=[];
 
-  // A purchase sync from Shop A means Shop A owes money to me (Shop B).
-  // So this appears in MY Borrows tab (they owe me) with status "pending_payment".
-  // It only moves to purchase history once Shop A sends a payment sync.
-  const borrowId = "SYN"+Date.now();
-  cust.borrows.push({
-    id:         borrowId,
-    amount:     req.amount,
-    amountPaid: 0,
-    bill:       req.invoiceNo || "Synced Invoice",
-    notes:      (req.note||"Purchase") + " [Synced from " + (req.fromShopName||req.fromPhone) + "]",
-    date:       req.date,
-    recordedAt: Date.now(),
-    status:     "pending_payment",   // waiting for Shop A to pay
-    _syncedReqId: reqId,
-    _syncSource:  req.fromPhone,
-    _syncType:    "purchase",        // source was a purchase sync
-  });
-  // Do NOT touch totalSpend or purchases — payment is not done yet
+  const reqType = req.type || "purchase"; // "purchase" or "payment"
+  let notifyMsg = "";
 
+  if(reqType === "payment"){
+    // ── Shop A sent a payment — reduce pending borrow amount ──
+    const payAmt = Number(req.amount)||0;
+    const targetBillId = req.selectedBill||""; // which specific borrow they're paying
+    let remaining = payAmt;
+
+    // Try to apply to the targeted borrow first
+    const applyToBorrow = (b) => {
+      if(remaining<=0) return;
+      const owed = Math.max(0, Number(b.amount) - (b.amountPaid||0));
+      const apply = Math.min(owed, remaining);
+      b.amountPaid = (b.amountPaid||0) + apply;
+      remaining -= apply;
+      if(b.amountPaid >= b.amount - 0.01){
+        // Fully paid — convert to purchase
+        b.status = "returned"; b.returnedAt = new Date().toISOString();
+        if(!cust.purchases) cust.purchases=[];
+        cust.purchases.push({
+          id: "PAY"+Date.now()+Math.random().toString(36).slice(2,4),
+          amount: Number(b.amount),
+          bill: b.bill,
+          notes: (b.notes||"") + " [Payment received]",
+          date: req.date || new Date().toISOString().slice(0,10),
+          createdAt: Date.now(),
+          _fromBorrowId: b.id,
+          _syncSource: req.fromPhone,
+          _syncReqId: reqId,
+        });
+        cust.totalSpend = (cust.purchases||[]).reduce((s,p)=>s+(p.amount||0),0);
+      } else {
+        b.status = "partial";
+      }
+    };
+
+    // Apply to targeted borrow (if specified)
+    const pending = cust.borrows.filter(b=>b.status==="pending_payment"||b.status==="pending"||b.status==="partial");
+    if(targetBillId){
+      const target = pending.find(b=>b.id===targetBillId||b.bill===targetBillId);
+      if(target) applyToBorrow(target);
+    }
+    // If still remaining, apply to oldest pending borrows
+    if(remaining>0){
+      pending.sort((a,b)=>new Date(a.date)-new Date(b.date));
+      for(const b of pending){ applyToBorrow(b); if(remaining<=0) break; }
+    }
+    notifyMsg = `✅ Payment of ${formatINR(payAmt)} from ${req.fromShopName||req.fromPhone} applied. Borrow updated.`;
+
+  } else {
+    // ── Shop A recorded a purchase — add to MY Borrows (they owe me) ──
+    const borrowId = "SYN"+Date.now();
+    cust.borrows.push({
+      id:         borrowId,
+      amount:     req.amount,
+      amountPaid: 0,
+      bill:       req.invoiceNo || "Synced Invoice",
+      notes:      (req.note||"Purchase") + " [Synced from " + (req.fromShopName||req.fromPhone) + "]",
+      date:       req.date,
+      recordedAt: Date.now(),
+      status:     "pending_payment",
+      _syncedReqId: reqId,
+      _syncSource:  req.fromPhone,
+      _syncType:    "purchase",
+    });
+    notifyMsg = "✅ Accepted! Added to Borrows — will move to purchases once they pay.";
+  }
+
+  // Persist
   try { localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allData)); } catch{}
-  // Sync in-memory array too
   const memIdx = customers.findIndex(c=>c.id===cust.id);
   if(memIdx>=0) customers[memIdx]=cust; else customers.push(cust);
-
-  // Cloud save
   if(db && authPhone){
     await db.collection("users").doc(authPhone).collection("customers").doc(cust.id).set(cust,{merge:true}).catch(()=>{});
   }
-  // Write back Shop B's profile so Shop A can auto-add them to their customers tab
+
+  // Write back profile so Shop A can auto-add me to their customers
   const myProfile = {
     phone:    authPhone,
     shopId:   (typeof myShopId === "function") ? myShopId() : "",
@@ -6328,7 +6587,7 @@ async function acceptPaymentSyncRequest(reqId){
     resolvedAt: Date.now(),
     acceptedByProfile: myProfile
   });
-  notify("✅ Accepted! Added to Borrows — will move to purchases once they pay.","success");
+  notify(notifyMsg,"success");
   closeModal();
   if(currentTab===1) renderTab(1);
 }
@@ -6344,25 +6603,38 @@ async function declinePaymentSyncRequest(reqId){
 function openPendingPaymentRequests(){
   const reqs = window._pendingPayReqs||[];
   if(reqs.length===0){ notify("✅ No pending payment requests."); return; }
-  const html = reqs.map(r=>`
+  const html = reqs.map(r=>{
+    const isPurchase = (r.type||"purchase")==="purchase";
+    const typeColor  = isPurchase?"#f59e0b":"#22c55e";
+    const typeLabel  = isPurchase?"📦 Purchase Sync":"💰 Payment Received";
+    const typeDesc   = isPurchase
+      ? "They recorded a purchase from you. Accept to add to Borrows."
+      : "They sent a payment. Accept to reduce their borrow balance.";
+    const acceptLabel = isPurchase?"✅ Accept — Add to Borrows":"✅ Accept — Apply Payment";
+    return `
     <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px;margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-        <div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:8px;background:${typeColor}22;color:${typeColor};border:1px solid ${typeColor}44;">${typeLabel}</span>
+          </div>
           <div style="font-size:14px;font-weight:800;color:#e8eaf0;">${escHtml(r.fromShopName||r.fromPhone)}</div>
           <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">📞 ${r.fromPhone} · ${r.date}</div>
           ${r.note?`<div style="font-size:12px;color:#a0b0d0;margin-top:3px;">${escHtml(r.note)}</div>`:""}
-          ${r.invoiceNo?`<div style="font-size:11px;color:#4a5a7a;">Ref: ${escHtml(r.invoiceNo)}</div>`:""}
-          <div style="font-size:11px;color:#f59e0b;margin-top:3px;">Attempt ${r.attempts||1}/3</div>
+          ${r.invoiceNo?`<div style="font-size:11px;color:#60a5fa;">Ref: ${escHtml(r.invoiceNo)}</div>`:""}
+          ${r.selectedBill?`<div style="font-size:11px;color:#22c55e;margin-top:2px;">📌 Against bill: ${escHtml(r.selectedBill)}</div>`:""}
+          <div style="font-size:11px;color:#4a5a7a;margin-top:4px;">${typeDesc}</div>
+          <div style="font-size:10px;color:#f59e0b;margin-top:3px;">Attempt ${r.attempts||1}/3</div>
         </div>
-        <div style="font-size:20px;font-weight:800;color:#22c55e;white-space:nowrap;">${formatINR(r.amount)}</div>
+        <div style="font-size:22px;font-weight:800;color:${typeColor};white-space:nowrap;">${formatINR(r.amount)}</div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:12px;">
-        <button onclick="acceptPaymentSyncRequest('${r.id}')" class="btn" style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-size:13px;font-weight:800;padding:10px;">✅ Accept — Add to Borrows (Unpaid)</button>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button onclick="acceptPaymentSyncRequest('${r.id}')" class="btn" style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-size:13px;font-weight:800;padding:10px;">${acceptLabel}</button>
         <button onclick="declinePaymentSyncRequest('${r.id}')" class="btn" style="background:#1a0808;border:1px solid #ef444460;color:#f87171;font-size:13px;font-weight:700;padding:10px 14px;">❌ Decline</button>
       </div>
-    </div>
-  `).join("");
-  showWideModal(`${modalHeader("📨 Payment Requests from Linked Shops")}<div>${html}</div>`);
+    </div>`;
+  }).join("");
+  showWideModal(`${modalHeader("📨 Incoming Requests from Linked Shops")}<div>${html}</div>`);
 }
 
 function deleteCrTx(creditorId, txIndex){
