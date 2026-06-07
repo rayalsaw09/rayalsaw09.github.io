@@ -5122,9 +5122,9 @@ function saveShopProfile(){
 }
 
 // Open Search-by-Shop-ID modal for adding creditor/debtor
-async function openShopIdSearchModal(mode){ // mode = 'creditor' | 'debtor'
+async function openShopIdSearchModal(mode){ // mode = 'creditor' | 'customer'
   showWideModal(`
-    ${modalHeader(mode==="creditor"?"🔍 Find Creditor by Shop ID":"🔍 Find Debtor by Shop ID")}
+    ${modalHeader(mode==="creditor"?"🔍 Find Creditor by Shop ID":"🔍 Find Customer by Shop ID")}
     <div style="font-size:12px;color:#7a8aaa;margin-bottom:14px;">Enter the other shop's <strong style="color:#60a5fa;">SC-XXXXXX</strong> ID or their 10-digit phone number.</div>
 
     <div style="display:flex;gap:8px;margin-bottom:8px;">
@@ -6136,25 +6136,25 @@ async function acceptPaymentSyncRequest(reqId){
   if(!snap?.exists){ notify("❌ Request not found","error"); return; }
   const req = snap.data();
 
-  // Find or create customer
+  // Find or create customer (use correct customers_v2 key)
   let allData = [];
-  try { allData = JSON.parse(localStorage.getItem(storageKey("customers"))||"[]"); } catch{}
+  try { allData = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]"); } catch{}
   let cust = allData.find(c=>c.phone===req.fromPhone);
   if(!cust){
-    cust = { id:"C"+Date.now(), name:req.fromShopName||req.fromPhone, phone:req.fromPhone, purchases:[], createdAt:Date.now() };
+    cust = { id:"C"+Date.now(), name:req.fromShopName||req.fromPhone, phone:req.fromPhone, purchases:[], totalSpend:0, createdAt:Date.now(), _fromShopConnect:true };
     allData.push(cust);
   }
   if(!cust.purchases) cust.purchases=[];
   cust.purchases.push({
     id:"SYN"+Date.now(), amount:req.amount,
     bill:req.invoiceNo||"Synced Payment",
-    notes:(req.note||"Payment")+" [Synced from "+escHtml(req.fromShopName||req.fromPhone)+"]",
+    notes:(req.note||"Payment")+" [Synced from "+(req.fromShopName||req.fromPhone)+"]",
     date:req.date, createdAt:Date.now(),
     _syncedReqId:reqId, _syncSource:req.fromPhone
   });
   cust.totalSpend = cust.purchases.reduce((s,p)=>s+(p.amount||0),0);
 
-  try { localStorage.setItem(storageKey("customers"), JSON.stringify(allData)); } catch{}
+  try { localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allData)); } catch{}
   // Cloud save
   if(db && authPhone){
     await db.collection("users").doc(authPhone).collection("customers").doc(cust.id).set(cust,{merge:true}).catch(()=>{});
@@ -9338,7 +9338,7 @@ function renderInventoryTab(){
         <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:8px;">🏷️ Purchased From (Creditor) <span style="font-size:10px;color:#4a5a7a;font-weight:400;">— links stock to creditor account</span></div>
         <select class="input" id="inv-creditor-id" style="margin-bottom:0;">
           <option value="">⚠️ Skip — add to Unreconciled</option>
-          ${getCreditors().map(c=>`<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
+          ${getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").map(c=>`<option value="${c.id}">${c._fromShopConnect?'🔗 ':' '}${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
         </select>
         <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">If skipped, a purchase entry will be added under <b style="color:#f59e0b;">Unreconciled Purchases</b> in the Creditors tab.</div>
       </div>
@@ -9474,7 +9474,7 @@ function renderInventoryTab(){
           <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:8px;">🏷️ Purchased From (Creditor) <span style="font-size:10px;color:#4a5a7a;font-weight:400;">— links stock to creditor account</span></div>
           <select class="input" id="inv-creditor-id" style="margin-bottom:0;">
             <option value="">⚠️ Skip — add to Unreconciled</option>
-            ${getCreditors().map(c=>`<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
+            ${getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").map(c=>`<option value="${c.id}">${c._fromShopConnect?'🔗 ':' '}${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
           </select>
           <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">If skipped, a purchase entry will be added under <b style="color:#f59e0b;">Unreconciled Purchases</b> in the Creditors tab.</div>
         </div>
@@ -9632,6 +9632,20 @@ function invSubmitAdd(){
   const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
   invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
   _invLogCreditorPurchase(creditorId, name, qty, cost, date, notes);
+
+  // If linked shop creditor, offer sync
+  if(creditorId && cost > 0){
+    const creditors = getCreditors();
+    const cr = creditors.find(c=>c.id===creditorId);
+    if(cr && cr._fromShopConnect && cr.phone && db && authPhone){
+      const totalAmt = Math.round(qty * cost * 100) / 100;
+      const txNote = notes ? `${name} ×${qty} — ${notes}` : `${name} ×${qty} (new inventory)`;
+      const latestTx = (cr.transactions||[]).slice(-1)[0];
+      const txId = latestTx?.id || ("TX"+Date.now());
+      setTimeout(()=>openPaymentSyncModal(creditorId, txId, totalAmt, txNote, date, ""), 400);
+      return;
+    }
+  }
 }
 
 function invSubmitRestock(){
@@ -9650,6 +9664,24 @@ function invSubmitRestock(){
   const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
   invAddStock(invRestockSelected, unit||(selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
   _invLogCreditorPurchase(creditorId, invRestockSelected, qty, cost, date, notes);
+
+  // If creditor is a linked shop, offer payment sync request
+  if(creditorId && cost > 0){
+    const creditors = getCreditors();
+    const cr = creditors.find(c=>c.id===creditorId);
+    if(cr && cr._fromShopConnect && cr.phone && db && authPhone){
+      const totalAmt = Math.round(qty * cost * 100) / 100;
+      const txNote = notes ? `${invRestockSelected} ×${qty} — ${notes}` : `${invRestockSelected} ×${qty} (inventory purchase)`;
+      // Find the tx we just added to get its id
+      const latestTx = (cr.transactions||[]).slice(-1)[0];
+      const txId = latestTx?.id || ("TX"+Date.now());
+      setTimeout(()=>openPaymentSyncModal(creditorId, txId, totalAmt, txNote, date, ""), 400);
+      invRestockSelected = null;
+      invRestockSearch = "";
+      return;
+    }
+  }
+
   invRestockSelected = null;
   invRestockSearch = "";
 }
