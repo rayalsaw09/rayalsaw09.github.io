@@ -3295,7 +3295,7 @@ function renderCustomers(sorted,q=""){
     ${pendingBanner}
     ${headerBtns}
     <div style="padding:0 14px 8px;">
-      <input class="input" id="cust-search" dir="ltr" placeholder="🔍 Search name, phone, ID..." value="${q}" oninput="refreshCustSearch(this.value)" style="text-align:left;" />
+      <input class="input" id="cust-search" dir="ltr" placeholder="🔍 Search name or phone..." value="${q}" oninput="refreshCustSearch(this.value)" style="text-align:left;" />
     </div>
     <div style="padding:0 14px 2px;">${gstPills}${dfPills}</div>
     <div id="cust-list" style="display:flex;flex-direction:column;gap:6px;padding:0 14px;">${list||'<div style="text-align:center;color:#4a5a7a;padding:40px;">No customers found</div>'}</div>
@@ -5794,10 +5794,8 @@ function openCreditorDetail(id){
         </div>
         ${!isUnrec ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${cr._fromShopConnect
-            ? `<div style="font-size:11px;color:#4ade80;font-weight:700;background:#16653422;border:1px solid #22c55e44;border-radius:10px;padding:8px 12px;text-align:center;line-height:1.5;">
-                🔗 Linked Shop<br><span style="color:#7a8aaa;font-weight:400;">Entries auto-sync from their side</span>
-               </div>
-               <button onclick="openAddTxModal('${id}','return')" class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>`
+            ? `<button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
+               <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>`
             : `<button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
                <button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
                <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>`
@@ -6028,8 +6026,20 @@ function openRequestAgainModal(creditorId, txId, amount, note, date, invoiceNo, 
 // ── Add Transaction Modal ─────────────────────────────────────────────────────
 function openAddTxModal(creditorId, defaultType){
   if(defaultType === "payment") { openSmartPaymentModal(creditorId); return; }
-  if(defaultType === "return")  { openReturnModal(creditorId); return; }
-  // Purchase flow
+  if(defaultType === "return")  {
+    const cr = getCreditors().find(c=>c.id===creditorId);
+    if(cr && cr._fromShopConnect){
+      notify("❌ Return entries are automated for linked shops", "error");
+      return;
+    }
+    openReturnModal(creditorId); return;
+  }
+  // Purchase flow — block for linked shops (automated from their Sale entry)
+  const crCheck = getCreditors().find(c=>c.id===creditorId);
+  if(crCheck && crCheck._fromShopConnect){
+    notify("❌ Purchase entries are automated for linked shops", "error");
+    return;
+  }
   const today = new Date().toISOString().slice(0,10);
   const cr = getCreditors().find(c=>c.id===creditorId);
   showWideModal(`
@@ -7166,10 +7176,7 @@ function openDebtorDetail(id){
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           ${dr._fromShopConnect
-            ? `<div style="font-size:11px;color:#4ade80;font-weight:700;background:#16653422;border:1px solid #22c55e44;border-radius:10px;padding:8px 12px;text-align:center;line-height:1.5;">
-                🔗 Linked Shop<br><span style="color:#7a8aaa;font-weight:400;">Entries auto-sync from their side</span>
-               </div>
-               <button onclick="openAddDebtTxModal('${id}','return')" class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>`
+            ? `<button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sale</button>`
             : `<button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sale</button>
                <button onclick="openAddDebtTxModal('${id}','payment')" class="btn" style="background:#0a1628;border:1px solid #60a5fa;color:#60a5fa;font-size:12px;padding:8px 12px;">💰 Payment</button>
                <button onclick="openAddDebtTxModal('${id}','return')"  class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>`
@@ -7499,6 +7506,13 @@ function saveDebtTransaction(){
 
   if(!debtorId||!type){ notify("⚠️ Error: missing debtor info","error"); return; }
   if(isNaN(amtRaw)||amtRaw<=0){ notify("⚠️ Enter a valid amount"); return; }
+
+  // Block disallowed types for linked shops
+  const isLinkedCheck = document.getElementById("drtx-is-linked")?.value === "1";
+  if(isLinkedCheck && type !== "sale"){
+    notify("❌ Linked shops can only have Sale entries in Debtors tab", "error");
+    return;
+  }
 
   // Collect item rows if this is a sale
   const soldItems = [];
