@@ -6316,6 +6316,25 @@ function saveCrTransaction(){
   if(!creditors[idx].transactions) creditors[idx].transactions=[];
   creditors[idx].transactions.push({ id:txId, type, amount, note, date, invoiceNo, createdAt:Date.now(), syncStatus:"local" });
   saveCreditors(creditors);
+
+  // ── Cross-write to linked creditor's shop for purchase/payment/return ──
+  const cr = creditors[idx];
+  if(cr._fromShopConnect && cr.phone){
+    // purchase and payment already handled by openPurchaseSyncModal/openPaymentSyncModal
+    // Return must be cross-written here since there's no separate sync modal for it
+    if(type === "return"){
+      const crossTx = { id:txId, type:"return", amount, note, date, invoiceNo, createdAt:Date.now() };
+      crossWriteTransaction(cr.phone, crossTx).then(ok => {
+        if(ok) notify("🔗 Return synced to " + (cr.name||cr.phone) + " live!", "success");
+        else   notify("⚠️ Live sync failed — return saved locally", "error");
+      });
+    } else if(type === "purchase"){
+      crossWriteCreditorTx(creditorId, { id:txId, type:"purchase", amount, note, date, invoiceNo, createdAt:Date.now() });
+    } else if(type === "payment"){
+      crossWriteCreditorTx(creditorId, { id:txId, type:"payment", amount, note, date, invoiceNo, createdAt:Date.now() });
+    }
+  }
+
   closeModal();
   notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return"} of ${formatINR(amount)} recorded`);
   setTimeout(()=>openCreditorDetail(creditorId),200);
@@ -6637,7 +6656,7 @@ function _onLinkedDebtorTx(theirPhone, txs) {
 
   if (changed) {
     saveDebtors(debtors);
-    if (currentTab === 3) renderTab(3); // refresh Debtors tab if open
+    if (currentTab === 7) renderTab(7); // refresh Debtors tab if open
   }
 }
 
@@ -7551,9 +7570,10 @@ function saveDebtTransaction(){
   const idx = debtors.findIndex(d=>d.id===debtorId);
   if(idx<0){ notify("❌ Debtor not found","error"); return; }
 
+  const txId = "DT"+Date.now()+Math.random().toString(36).slice(2,5);
   if(!debtors[idx].transactions) debtors[idx].transactions=[];
   debtors[idx].transactions.push({
-    id:        "DT"+Date.now()+Math.random().toString(36).slice(2,5),
+    id:        txId,
     type,
     amount:    amtRaw,
     note,
@@ -7567,6 +7587,24 @@ function saveDebtTransaction(){
   if(soldItems.length){
     const dr = debtors[idx];
     invDeductSold(soldItems, dr.id);
+  }
+
+  // ── Cross-write to linked debtor's shop so THEY see this as a purchase ──
+  const isLinkedDebt = document.getElementById("drtx-is-linked")?.value === "1";
+  if(isLinkedDebt && debtors[idx].phone && type === "sale"){
+    const crossTx = {
+      id:        txId,
+      type:      "purchase",   // on their side this is a purchase (they bought from us)
+      amount:    amtRaw,
+      note,
+      date,
+      invoiceNo: "",
+      createdAt: Date.now(),
+    };
+    crossWriteTransaction(debtors[idx].phone, crossTx).then(ok => {
+      if(ok) notify("🔗 Synced to " + (debtors[idx].name||debtors[idx].phone) + " live!", "success");
+      else   notify("⚠️ Live sync failed — transaction saved locally", "error");
+    });
   }
 
   closeModal();
