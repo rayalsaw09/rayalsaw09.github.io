@@ -3512,7 +3512,6 @@ function renderCustomers(sorted,q=""){
     </div>` : `
     <div style="display:flex;gap:8px;align-items:center;padding:0 14px 12px;flex-wrap:wrap;">
       <button class="btn" onclick="openAddModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:9px 20px;font-size:13px;font-weight:800;flex:1;">+ Add Customer</button>
-      <button class="btn" onclick="openShopIdSearchModal('customer')" style="background:#0a1628;border:2px solid #1e3a6e;color:#60a5fa;padding:9px 14px;font-size:12px;font-weight:800;">🔗 Shop ID</button>
       <button class="btn" onclick="openBulkAddModal()" style="background:#1a3a5c;color:#7ab3ff;border:1px solid #2a5080;padding:9px 14px;font-size:13px;">👥 Bulk</button>
       <button class="btn" onclick="exportCSV()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:9px 12px;font-size:13px;">⬇</button>
       <button class="btn" onclick="custToggleSelectMode()" style="background:#1a2540;color:#f88;border:1px solid #3a2020;padding:9px 12px;font-size:13px;">☑</button>
@@ -3522,16 +3521,7 @@ function renderCustomers(sorted,q=""){
   // Count linked customers for live sync badge
   let allCustData = [];
   try { allCustData = JSON.parse(localStorage.getItem(storageKey("customers_v2")) || "[]"); } catch {}
-  const linkedCustCount = allCustData.filter(c => c._fromShopConnect && c.phone).length;
-  const pendingBanner = linkedCustCount > 0 ? `
-    <div style="background:linear-gradient(135deg,#0a1628,#0d1e38);border:2px solid #1e3a6e;border-radius:12px;padding:13px 16px;margin:0 14px 10px;display:flex;align-items:center;gap:12px;">
-      <div style="font-size:22px;">🔗</div>
-      <div style="flex:1;">
-        <div style="font-size:13px;font-weight:800;color:#60a5fa;">Live Ledger Active — ${linkedCustCount} Linked Shop${linkedCustCount>1?'s':''}</div>
-        <div style="font-size:11px;color:#4a7aaa;margin-top:2px;">Transactions sync automatically — no accept needed</div>
-      </div>
-      <div style="font-size:10px;font-weight:800;color:#22c55e;background:#14532d44;border:1px solid #22c55e44;border-radius:6px;padding:3px 8px;">🟢 LIVE</div>
-    </div>` : "";
+  const pendingBanner = "";
 
   return `<div>
     <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 14px 8px;">
@@ -4666,9 +4656,13 @@ function renderAnalytics(sorted){
   }
   function yearSpend(c,y){ return (c.purchases||[]).filter(p=>(p.date||"").slice(0,4)===y).reduce((a,p)=>a+Number(p.amount),0); }
 
-  const totalMonthSales = sorted.reduce((a,c)=>a+monthSpend(c,thisMonth,thisYear),0);
-  const totalPrevMonthSales = sorted.reduce((a,c)=>a+monthSpend(c,prevMonth,prevMonthYear),0);
-  const totalYearSales = sorted.reduce((a,c)=>a+yearSpend(c,yr),0);
+  const custMonthSales = sorted.reduce((a,c)=>a+monthSpend(c,thisMonth,thisYear),0);
+  const custPrevMonthSales = sorted.reduce((a,c)=>a+monthSpend(c,prevMonth,prevMonthYear),0);
+  const custYearSales = sorted.reduce((a,c)=>a+yearSpend(c,yr),0);
+  // Combined sales = customer purchases + debtor sales
+  const totalMonthSales = custMonthSales; // will add debtor below after calc
+  const totalPrevMonthSales = custPrevMonthSales;
+  const totalYearSales = custYearSales;
   const activeThisMonth = sorted.filter(c=>monthSpend(c,thisMonth,thisYear)>0);
   const activeYearCustomers = sorted.filter(c=>yearSpend(c,yr)>0);
 
@@ -4677,7 +4671,7 @@ function renderAnalytics(sorted){
     if((p.date||"").slice(0,4)===yr) totalTxns++;
   }));
 
-  // ── Purchase cost from inventory restocks ──
+  // ── Purchase cost: inventory restocks + creditor purchases ──
   let totalMonthCost=0, totalPrevMonthCost=0, totalYearCost=0;
   inventoryItems.forEach(item=>{
     (item.stock||[]).forEach(e=>{
@@ -4687,6 +4681,37 @@ function renderAnalytics(sorted){
       if(d.getMonth()===prevMonth && d.getFullYear()===prevMonthYear) totalPrevMonthCost+=cost;
       if((e.date||"").slice(0,4)===yr) totalYearCost+=cost;
     });
+  });
+  // Creditor purchase transactions (avoid double-count if linked to inventory)
+  getCreditors().forEach(cr=>(cr.transactions||[]).filter(t=>t.type==="purchase"&&!t._invItem).forEach(t=>{
+    const d = new Date(t.date||"");
+    if(d.getMonth()===thisMonth && d.getFullYear()===thisYear) totalMonthCost+=Number(t.amount)||0;
+    if(d.getMonth()===prevMonth && d.getFullYear()===prevMonthYear) totalPrevMonthCost+=Number(t.amount)||0;
+    if((t.date||"").slice(0,4)===yr) totalYearCost+=Number(t.amount)||0;
+  }));
+
+  // ── Revenue: customer purchases + debtor sales ──
+  let totalMonthDebtorSales=0, totalPrevMonthDebtorSales=0, totalYearDebtorSales=0;
+  getDebtors().forEach(dr=>(dr.transactions||[]).filter(t=>t.type==="sale").forEach(t=>{
+    const d = new Date(t.date||"");
+    if(d.getMonth()===thisMonth && d.getFullYear()===thisYear) totalMonthDebtorSales+=Number(t.amount)||0;
+    if(d.getMonth()===prevMonth && d.getFullYear()===prevMonthYear) totalPrevMonthDebtorSales+=Number(t.amount)||0;
+    if((t.date||"").slice(0,4)===yr) totalYearDebtorSales+=Number(t.amount)||0;
+  }));
+
+  // ── Creditor/Debtor balance summary ──
+  let totalCreditorOwed=0, totalDebtorOwed=0;
+  getCreditors().forEach(cr=>{
+    const txs=cr.transactions||[];
+    const purchases=txs.filter(t=>t.type==="purchase").reduce((s,t)=>s+Number(t.amount),0);
+    const payments=txs.filter(t=>t.type==="payment"||t.type==="return").reduce((s,t)=>s+Number(t.amount),0);
+    totalCreditorOwed+=Math.max(0,purchases-payments);
+  });
+  getDebtors().forEach(dr=>{
+    const txs=dr.transactions||[];
+    const sales=txs.filter(t=>t.type==="sale").reduce((s,t)=>s+Number(t.amount),0);
+    const received=txs.filter(t=>t.type==="payment"||t.type==="return").reduce((s,t)=>s+Number(t.amount),0);
+    totalDebtorOwed+=Math.max(0,sales-received);
   });
 
   // ── Current stock value ──
@@ -4698,11 +4723,16 @@ function renderAnalytics(sorted){
     inventoryValue += stk*cpu;
   });
 
+  // ── Combined totals (customer + debtor) ──
+  const allMonthSales     = custMonthSales + totalMonthDebtorSales;
+  const allPrevMonthSales = custPrevMonthSales + totalPrevMonthDebtorSales;
+  const allYearSales      = custYearSales + totalYearDebtorSales;
+
   // ── Profit calculations ──
-  const monthProfit = totalMonthSales - totalMonthCost;
-  const prevMonthProfit = totalPrevMonthSales - totalPrevMonthCost;
-  const yearProfit  = totalYearSales - totalYearCost;
-  const salesGrowth = totalPrevMonthSales > 0 ? Math.round((totalMonthSales - totalPrevMonthSales)/totalPrevMonthSales*100) : null;
+  const monthProfit = allMonthSales - totalMonthCost;
+  const prevMonthProfit = allPrevMonthSales - totalPrevMonthCost;
+  const yearProfit  = allYearSales - totalYearCost;
+  const salesGrowth = allPrevMonthSales > 0 ? Math.round((allMonthSales - allPrevMonthSales)/allPrevMonthSales*100) : null;
 
   // ── Business status ──
   let statusEmoji, statusColor, statusBg, statusBorder, statusMsg, statusSub;
@@ -4757,16 +4787,32 @@ function renderAnalytics(sorted){
   // ── Monthly mini bars for trend ──
   const monthlySales = Array(12).fill(0);
   const monthlyCost  = Array(12).fill(0);
+  // Customer purchases
   sorted.forEach(c=>(c.purchases||[]).forEach(p=>{
     if((p.date||"").slice(0,4)===yr){
       const m=parseInt((p.date||"").slice(5,7))-1;
       if(m>=0&&m<12) monthlySales[m]+=Number(p.amount);
     }
   }));
+  // Debtor sales
+  getDebtors().forEach(dr=>(dr.transactions||[]).filter(t=>t.type==="sale").forEach(t=>{
+    if((t.date||"").slice(0,4)===yr){
+      const m=parseInt((t.date||"").slice(5,7))-1;
+      if(m>=0&&m<12) monthlySales[m]+=Number(t.amount)||0;
+    }
+  }));
+  // Inventory restocks
   inventoryItems.forEach(item=>(item.stock||[]).forEach(e=>{
     if((e.date||"").slice(0,4)===yr){
       const m=parseInt((e.date||"").slice(5,7))-1;
       if(m>=0&&m<12) monthlyCost[m]+=(Number(e.qty)||0)*(Number(e.costPerUnit)||0);
+    }
+  }));
+  // Creditor purchases (non-inventory-linked)
+  getCreditors().forEach(cr=>(cr.transactions||[]).filter(t=>t.type==="purchase"&&!t._invItem).forEach(t=>{
+    if((t.date||"").slice(0,4)===yr){
+      const m=parseInt((t.date||"").slice(5,7))-1;
+      if(m>=0&&m<12) monthlyCost[m]+=Number(t.amount)||0;
     }
   }));
   const maxBarVal = Math.max(...monthlySales,...monthlyCost,1);
@@ -4822,7 +4868,7 @@ function renderAnalytics(sorted){
         </div>
         <div style="background:#0a0e1a;border:1px solid #1a2a4a;border-radius:14px;padding:14px 12px;flex:1;">
           <div style="font-size:18px;margin-bottom:2px;">🛒</div>
-          <div style="font-size:20px;font-weight:900;color:#4a8aff;line-height:1;">${formatINR(totalYearSales)}</div>
+          <div style="font-size:20px;font-weight:900;color:#4a8aff;line-height:1;">${formatINR(allYearSales)}</div>
           <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">Total Sales (${yr})</div>
         </div>
         <div style="background:#0a0e1a;border:1px solid #3a1a1a;border-radius:14px;padding:14px 12px;flex:1;">
@@ -4844,7 +4890,7 @@ function renderAnalytics(sorted){
           <div style="display:flex;flex-direction:column;gap:6px;">
             <div style="background:#0d1525;border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center;">
               <span style="font-size:11px;color:#4a5a7a;font-weight:600;">💸 Sales</span>
-              <span style="font-size:14px;font-weight:900;color:#4a8aff;">${formatINR(totalMonthSales)}</span>
+              <span style="font-size:14px;font-weight:900;color:#4a8aff;">${formatINR(allMonthSales)}</span>
             </div>
             <div style="background:#0d1525;border-radius:10px;padding:10px;display:flex;justify-content:space-between;align-items:center;">
               <span style="font-size:11px;color:#4a5a7a;font-weight:600;">🛍 Expenses</span>
@@ -4942,6 +4988,62 @@ function renderAnalytics(sorted){
       </div>` : '<div></div>'}
     </div>` : ''}
 
+    <!-- CREDITORS & DEBTORS FINANCIAL POSITION -->
+    ${(getCreditors().length>0||getDebtors().length>0) ? `<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:16px;padding:14px 16px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <span style="font-size:16px;">⚖️</span>
+        <span style="font-size:14px;font-weight:800;color:#e8eaf0;">Money Flow Summary</span>
+        <span style="font-size:11px;color:#4a5a7a;margin-left:auto;">All-time balances</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div style="background:#1a0808;border:1px solid #5a1a1a;border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:11px;color:#f87171;font-weight:700;margin-bottom:4px;">📤 YOU OWE</div>
+          <div style="font-size:17px;font-weight:900;color:#ef4444;line-height:1;">${formatINR(totalCreditorOwed)}</div>
+          <div style="font-size:10px;color:#7a8aaa;margin-top:3px;">to ${getCreditors().length} supplier${getCreditors().length!==1?'s':''}</div>
+        </div>
+        <div style="background:#081a08;border:1px solid #1a5a1a;border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:11px;color:#4ade80;font-weight:700;margin-bottom:4px;">📥 OWED TO YOU</div>
+          <div style="font-size:17px;font-weight:900;color:#22c55e;line-height:1;">${formatINR(totalDebtorOwed)}</div>
+          <div style="font-size:10px;color:#7a8aaa;margin-top:3px;">from ${getDebtors().length} debtor${getDebtors().length!==1?'s':''}</div>
+        </div>
+        <div style="background:${totalDebtorOwed>=totalCreditorOwed?'#081a08':'#1a0808'};border:1px solid ${totalDebtorOwed>=totalCreditorOwed?'#1a5a1a':'#5a1a1a'};border-radius:12px;padding:12px;text-align:center;">
+          <div style="font-size:11px;color:${totalDebtorOwed>=totalCreditorOwed?'#4ade80':'#f87171'};font-weight:700;margin-bottom:4px;">🏦 NET POSITION</div>
+          <div style="font-size:17px;font-weight:900;color:${totalDebtorOwed>=totalCreditorOwed?'#22c55e':'#ef4444'};line-height:1;">${totalDebtorOwed>=totalCreditorOwed?'+':''}${formatINR(totalDebtorOwed-totalCreditorOwed)}</div>
+          <div style="font-size:10px;color:#7a8aaa;margin-top:3px;">${totalDebtorOwed>=totalCreditorOwed?'net receivable':'net payable'}</div>
+        </div>
+      </div>
+      ${(()=>{
+        // This month creditor/debtor activity
+        const now=new Date();
+        const mo=now.getMonth(),ye=now.getFullYear();
+        let moCredPurch=0,moCredPay=0,moDebtSale=0,moDebtRecv=0;
+        getCreditors().forEach(cr=>(cr.transactions||[]).forEach(t=>{
+          const d=new Date(t.date||"");
+          if(d.getMonth()===mo&&d.getFullYear()===ye){
+            if(t.type==="purchase") moCredPurch+=Number(t.amount)||0;
+            else moCredPay+=Number(t.amount)||0;
+          }
+        }));
+        getDebtors().forEach(dr=>(dr.transactions||[]).forEach(t=>{
+          const d=new Date(t.date||"");
+          if(d.getMonth()===mo&&d.getFullYear()===ye){
+            if(t.type==="sale") moDebtSale+=Number(t.amount)||0;
+            else moDebtRecv+=Number(t.amount)||0;
+          }
+        }));
+        if(!moCredPurch&&!moDebtSale&&!moCredPay&&!moDebtRecv) return \`<div style="font-size:11px;color:#3a4a6a;text-align:center;padding:6px 0;">No creditor/debtor activity this month</div>\`;
+        return \`<div style="border-top:1px solid #1e2a45;padding-top:10px;">
+          <div style="font-size:11px;color:#7a8aaa;font-weight:700;margin-bottom:8px;">THIS MONTH</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            \${moCredPurch?(\`<div style="background:#0d1525;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#f87171;">📦 Purchased (suppliers)</span><span style="font-size:12px;font-weight:800;color:#f87171;">\${formatINR(moCredPurch)}</span></div>\`):""}
+            \${moCredPay?(\`<div style="background:#0d1525;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#60a5fa;">💰 Paid to suppliers</span><span style="font-size:12px;font-weight:800;color:#60a5fa;">\${formatINR(moCredPay)}</span></div>\`):""}
+            \${moDebtSale?(\`<div style="background:#0d1525;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#4ade80;">🛒 Sold (debtors)</span><span style="font-size:12px;font-weight:800;color:#4ade80;">\${formatINR(moDebtSale)}</span></div>\`):""}
+            \${moDebtRecv?(\`<div style="background:#0d1525;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#22c55e;">💸 Received from debtors</span><span style="font-size:12px;font-weight:800;color:#22c55e;">\${formatINR(moDebtRecv)}</span></div>\`):""}
+          </div>
+        </div>\`;
+      })()}
+    </div>` : ""}
+
     <!-- LOW STOCK (full width, compact) -->
     ${(lowStockItems.length>0||outOfStock.length>0) ? `<div style="background:#0a0a00;border:2px solid #854d0e;border-radius:16px;padding:14px;margin-bottom:12px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
@@ -4973,10 +5075,45 @@ let cmpYearB = new Date().getFullYear() - 1;
 
 function cmpAllPurchases(){
   const all=[];
+  // Customer purchases
   customers.forEach(c=>(c.purchases||[]).forEach(p=>{
-    all.push({amount:Number(p.amount),date:(p.date||"").slice(0,10),custId:c.id});
+    all.push({amount:Number(p.amount),date:(p.date||"").slice(0,10),custId:c.id,_src:"customer"});
+  }));
+  // Debtor sales
+  getDebtors().forEach(d=>(d.transactions||[]).filter(t=>t.type==="sale").forEach(t=>{
+    all.push({amount:Number(t.amount),date:(t.date||"").slice(0,10),debtorId:d.id,_src:"debtor"});
   }));
   return all;
+}
+
+// All creditor purchase transactions (expenses)
+function cmpAllCreditorPurchases(){
+  const all=[];
+  getCreditors().forEach(cr=>(cr.transactions||[]).filter(t=>t.type==="purchase").forEach(t=>{
+    all.push({amount:Number(t.amount),date:(t.date||"").slice(0,10),creditorId:cr.id});
+  }));
+  // Also inventory restocks
+  inventoryItems.forEach(item=>(item.stock||[]).forEach(e=>{
+    all.push({amount:(Number(e.qty)||0)*(Number(e.costPerUnit)||0),date:(e.date||"").slice(0,10),_src:"inventory"});
+  }));
+  return all;
+}
+
+// Creditor expense by day/month/year helpers
+function cmpCostByDay(dates){
+  const map={};dates.forEach(d=>map[d]=0);
+  cmpAllCreditorPurchases().forEach(p=>{if(map[p.date]!==undefined)map[p.date]+=p.amount;});
+  return dates.map(d=>map[d]);
+}
+function cmpCostByMonth(year){
+  const arr=Array(12).fill(0);
+  cmpAllCreditorPurchases().forEach(p=>{if(p.date.slice(0,4)===String(year))arr[parseInt(p.date.slice(5,7))-1]+=p.amount;});
+  return arr;
+}
+function cmpCostByYear(years){
+  const map={};years.forEach(y=>map[String(y)]=0);
+  cmpAllCreditorPurchases().forEach(p=>{const y=p.date.slice(0,4);if(map[y]!==undefined)map[y]+=p.amount;});
+  return years.map(y=>map[String(y)]);
 }
 
 function cmpMondayOf(d){const t=new Date(d);t.setHours(0,0,0,0);const day=t.getDay()||7;t.setDate(t.getDate()-day+1);return t;}
@@ -5078,20 +5215,26 @@ function renderCompare(){
     const {days,todayIso,label}=cmpWeekData();
     periodLabel=label;
     const values=cmpRevenueByDay(days);
+    const costs=cmpCostByDay(days);
     const todayIdx=days.indexOf(todayIso);
     const isFutArr=days.map(d=>d>todayIso);
     chartHtml=cmpBuildChart(days,values,label,todayIdx,isFutArr,(iso)=>cmpFmtDay(iso));
     const maxV=Math.max(...values,1);
     const dayRows=days.map((d,i)=>{
-      const v=values[i];
+      const v=values[i],c=costs[i],profit=v-c;
       const isToday=d===todayIso;
       const isFuture=d>todayIso;
       const dn=new Date(d+"T00:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"});
       const txns=allPurch.filter(p=>p.date===d).length;
       return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #0d1220;${isToday?'background:#0f1a0f;':''}">
-        <div style="min-width:140px;"><div style="font-size:13px;font-weight:700;color:${isToday?'#FFD700':'#e8eaf0'};">${dn}${isToday?' <span style="font-size:10px;background:#1a3a1a;color:#4f4;border-radius:10px;padding:1px 7px;">Today</span>':''}</div><div style="font-size:11px;color:#4a5a7a;margin-top:1px;">${txns} transaction${txns!==1?'s':''}</div></div>
-        <div style="flex:1;"><div style="background:#0a0e1a;border-radius:4px;height:8px;"><div style="width:${isFuture?0:Math.round(v/maxV*100)}%;height:100%;background:${isToday?'#FFD700':'#4a8cff'};border-radius:4px;transition:width 0.5s;"></div></div></div>
-        <div style="font-size:13px;font-weight:800;color:${isToday?'#FFD700':v>0?'#e8eaf0':'#2a3a5a'};min-width:70px;text-align:right;">${isFuture?'—':v>0?formatINR(v):'₹0'}</div>
+        <div style="min-width:120px;"><div style="font-size:13px;font-weight:700;color:${isToday?'#FFD700':'#e8eaf0'};">${dn}${isToday?' <span style="font-size:10px;background:#1a3a1a;color:#4f4;border-radius:10px;padding:1px 7px;">Today</span>':''}</div><div style="font-size:11px;color:#4a5a7a;margin-top:1px;">${txns} sale${txns!==1?'s':''}</div></div>
+        <div style="flex:1;"><div style="background:#0a0e1a;border-radius:4px;height:8px;"><div style="width:${isFuture?0:Math.round(v/maxV*100)}%;height:100%;background:${isToday?'#FFD700':'#4a8cff'};border-radius:4px;transition:width 0.5s;"></div></div>
+        ${c>0?`<div style="background:#0a0e1a;border-radius:4px;height:4px;margin-top:2px;"><div style="width:${isFuture?0:Math.round(c/maxV*100)}%;height:100%;background:#ef4444;border-radius:4px;"></div></div>`:""}</div>
+        <div style="text-align:right;min-width:90px;">
+          <div style="font-size:13px;font-weight:800;color:${isToday?'#FFD700':v>0?'#4a8aff':'#2a3a5a'};">  ${isFuture?'—':v>0?formatINR(v):'₹0'}</div>
+          ${!isFuture&&c>0?`<div style="font-size:10px;color:#ef4444;">${formatINR(c)} cost</div>`:""}
+          ${!isFuture&&(v>0||c>0)?`<div style="font-size:10px;font-weight:700;color:${profit>=0?'#22c55e':'#ef4444'};">P: ${profit>=0?'+':''}${formatINR(profit)}</div>`:""}
+        </div>
       </div>`;
     }).join("");
     detailHtml=`<div class="card" style="margin-top:16px;overflow:hidden;"><div style="padding:12px 14px;border-bottom:1px solid #1e2a45;font-size:12px;font-weight:700;color:#7a8aaa;text-transform:uppercase;letter-spacing:1px;">Daily Breakdown</div>${dayRows}</div>`;
@@ -5103,6 +5246,7 @@ function renderCompare(){
     const yr=cmpSelectedYear;
     periodLabel=String(yr);
     const values=cmpRevenueByMonth(yr);
+    const costs=cmpCostByMonth(yr);
     const hlIdx=(yr===nowYear)?nowMon:-1;
     const isFutArr=MONTHS_SHORT.map((_,i)=>yr===nowYear&&i>nowMon);
     const canFwd=yr<nowYear;
@@ -5110,24 +5254,27 @@ function renderCompare(){
     chartHtml=cmpBuildChart(MONTHS_SHORT,values,`All months of ${yr}`,hlIdx,isFutArr,(m)=>m);
     const prevValues=cmpRevenueByMonth(yr-1);
     const monthRows=MONTHS_SHORT.map((m,i)=>{
-      const v=values[i],pv=prevValues[i];
+      const v=values[i],c=costs[i],profit=v-c,pv=prevValues[i];
       const isCur=yr===nowYear&&i===nowMon;
       const isFut=yr===nowYear&&i>nowMon;
       const chg=pv>0?Math.round((v-pv)/pv*100):null;
       const chgTag=isFut?'<span style="color:#2a3a5a;font-size:11px;">—</span>':chg!==null?`<span style="color:${chg>=0?'#4f4':'#f66'};font-size:11px;">${chg>=0?'▲':'▼'}${Math.abs(chg)}%</span>`:(v>0?'<span style="color:#5af;font-size:11px;">New</span>':'<span style="color:#2a3a5a;font-size:11px;">—</span>');
       const txns=allPurch.filter(p=>p.date.slice(0,4)===String(yr)&&parseInt(p.date.slice(5,7))-1===i).length;
+      const profitTag=!isFut&&(v>0||c>0)?`<span style="font-size:10px;font-weight:700;color:${profit>=0?'#22c55e':'#ef4444'};">${profit>=0?'+':''}${formatINR(profit)}</span>`:'';
       return `<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #0d1220;${isCur?'background:#0f1a0f;':''}">
-        <div style="width:40px;font-size:13px;font-weight:700;color:${isCur?'#FFD700':'#e8eaf0'};">${m}</div>
-        <div style="flex:1;"><div style="background:#0a0e1a;border-radius:4px;height:7px;"><div style="width:${isFut?0:Math.round(v/Math.max(...values,1)*100)}%;height:100%;background:${isCur?'#FFD700':'#4a8cff'};border-radius:4px;"></div></div></div>
-        <div style="font-size:12px;font-weight:700;color:${isCur?'#FFD700':v>0?'#e8eaf0':'#2a3a5a'};min-width:72px;text-align:right;">${isFut?'—':v>0?formatINR(v):'₹0'}</div>
-        <div style="font-size:11px;color:#4a5a7a;min-width:30px;text-align:right;">${txns>0?txns+'tx':''}</div>
-        <div style="min-width:50px;text-align:right;">${chgTag}</div>
+        <div style="width:36px;font-size:13px;font-weight:700;color:${isCur?'#FFD700':'#e8eaf0'};">${m}</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px;"><div style="background:#0a0e1a;border-radius:3px;height:6px;"><div style="width:${isFut?0:Math.round(v/Math.max(...values,1)*100)}%;height:100%;background:${isCur?'#FFD700':'#4a8cff'};border-radius:3px;"></div></div>${c>0?`<div style="background:#0a0e1a;border-radius:3px;height:4px;"><div style="width:${isFut?0:Math.round(c/Math.max(...values,1)*100)}%;height:100%;background:#ef4444;border-radius:3px;"></div></div>`:""}</div>
+        <div style="text-align:right;min-width:68px;"><div style="font-size:12px;font-weight:700;color:${isCur?'#FFD700':v>0?'#4a8aff':'#2a3a5a'}">${isFut?'—':v>0?formatINR(v):'₹0'}</div>${!isFut&&c>0?`<div style="font-size:10px;color:#ef4444;">-${formatINR(c)}</div>`:""}</div>
+        <div style="min-width:60px;text-align:right;">${profitTag}</div>
+        <div style="min-width:46px;text-align:right;">${chgTag}</div>
       </div>`;
     }).join("");
     const totalYr=values.reduce((s,v)=>s+v,0);
+    const totalCostYr=costs.reduce((s,v)=>s+v,0);
+    const totalProfitYr=totalYr-totalCostYr;
     const totalPrev=prevValues.reduce((s,v)=>s+v,0);
     const totalChg=totalPrev>0?Math.round((totalYr-totalPrev)/totalPrev*100):null;
-    detailHtml=`<div class="card" style="margin-top:16px;overflow:hidden;"><div style="padding:12px 14px;border-bottom:1px solid #1e2a45;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-size:12px;font-weight:700;color:#7a8aaa;text-transform:uppercase;letter-spacing:1px;">Month-by-Month — ${yr}</span><span style="font-size:11px;color:#4a5a7a;">vs ${yr-1}: ${totalChg!==null?`<span style="color:${totalChg>=0?'#4f4':'#f66'};font-weight:700;">${totalChg>=0?'▲':'▼'}${Math.abs(totalChg)}%</span>`:'—'}</span></div>${monthRows}<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0a0e1a;"><div style="width:40px;font-size:12px;font-weight:800;color:#FFD700;">Total</div><div style="flex:1;"></div><div style="font-size:13px;font-weight:800;color:#FFD700;min-width:72px;text-align:right;">${formatINR(totalYr)}</div><div style="min-width:30px;"></div><div style="min-width:50px;"></div></div></div>`;
+    detailHtml=`<div class="card" style="margin-top:16px;overflow:hidden;"><div style="padding:12px 14px;border-bottom:1px solid #1e2a45;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-size:12px;font-weight:700;color:#7a8aaa;text-transform:uppercase;letter-spacing:1px;">Month-by-Month — ${yr}</span><span style="font-size:11px;color:#4a5a7a;">vs ${yr-1}: ${totalChg!==null?`<span style="color:${totalChg>=0?'#4f4':'#f66'};font-weight:700;">${totalChg>=0?'▲':'▼'}${Math.abs(totalChg)}%</span>`:'—'}</span></div>${monthRows}<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0a0e1a;"><div style="width:36px;font-size:12px;font-weight:800;color:#FFD700;">Total</div><div style="flex:1;"></div><div style="text-align:right;min-width:68px;"><div style="font-size:12px;font-weight:800;color:#4a8aff;">${formatINR(totalYr)}</div><div style="font-size:10px;color:#ef4444;">-${formatINR(totalCostYr)}</div></div><div style="min-width:60px;text-align:right;"><span style="font-size:12px;font-weight:800;color:${totalProfitYr>=0?'#22c55e':'#ef4444'};">${totalProfitYr>=0?'+':''}${formatINR(totalProfitYr)}</span></div><div style="min-width:46px;"></div></div></div>`;
   }
 
   else if(cmpMode==="year"){
@@ -5144,24 +5291,26 @@ function renderCompare(){
     const yearPills=yearPillRange.map(y=>{const isSel=y===baseYear;return `<button onclick="cmpSetMonthYear(${y})" style="cursor:pointer;padding:7px 14px;border-radius:10px;border:1.5px solid ${isSel?'#FFD700':'#1e2a45'};background:${isSel?'#1a1400':'#0a0e1a'};color:${isSel?'#FFD700':'#7a8aaa'};font-size:13px;font-weight:${isSel?800:600};font-family:'Nunito',sans-serif;transition:all 0.15s;">${y}</button>`;}).join("");
     pickerHtml=`<div class="card" style="padding:14px 16px;margin-bottom:16px;"><div style="font-size:11px;color:#4a5a7a;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📅 Select Base Year (shows that year + all previous)</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${yearPills}</div></div>`;
     const values=cmpRevenueByYear(displayYears);
+    const costs=cmpCostByYear(displayYears);
     const hlIdx=displayYears.indexOf(nowYear);
     chartHtml=cmpBuildChart(displayYears.map(String),values,`Revenue by Year (up to ${baseYear})`,hlIdx,displayYears.map(()=>false),(y)=>y);
     const yearRows=displayYears.map((y,i)=>{
-      const v=values[i],prevV=i>0?values[i-1]:null;
+      const v=values[i],c=costs[i],profit=v-c,prevV=i>0?values[i-1]:null;
       const isCur=y===nowYear;
       const chg=prevV!=null&&prevV>0?Math.round((v-prevV)/prevV*100):null;
       const chgTag=chg!==null?`<span style="color:${chg>=0?'#4f4':'#f66'};font-size:11px;font-weight:700;">${chg>=0?'▲':'▼'}${Math.abs(chg)}% vs ${y-1}</span>`:'<span style="color:#4a5a7a;font-size:11px;">—</span>';
       const txns=allPurch.filter(p=>p.date.slice(0,4)===String(y)).length;
       const pct=Math.round(v/Math.max(...values,1)*100);
-      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid #0d1220;${isCur?'background:#0f1a0f;':''}">
-        <div style="min-width:50px;font-size:14px;font-weight:800;color:${isCur?'#FFD700':'#e8eaf0'};">${y}${isCur?' <span style="font-size:9px;background:#1a3a1a;color:#4f4;border-radius:8px;padding:1px 6px;">This Year</span>':''}</div>
-        <div style="flex:1;"><div style="background:#0a0e1a;border-radius:4px;height:9px;"><div style="width:${pct}%;height:100%;background:${isCur?'#FFD700':'#4a8cff'};border-radius:4px;transition:width 0.5s;"></div></div></div>
-        <div style="font-size:13px;font-weight:800;color:${isCur?'#FFD700':v>0?'#e8eaf0':'#2a3a5a'};min-width:80px;text-align:right;">${v>0?formatINR(v):'₹0'}</div>
-        <div style="font-size:11px;color:#4a5a7a;min-width:30px;text-align:right;">${txns>0?txns+'tx':''}</div>
-        <div style="min-width:100px;text-align:right;">${chgTag}</div>
+      const costPct=Math.round(c/Math.max(...values,1)*100);
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #0d1220;${isCur?'background:#0f1a0f;':''}">
+        <div style="min-width:48px;font-size:14px;font-weight:800;color:${isCur?'#FFD700':'#e8eaf0'};">${y}${isCur?' <span style="font-size:9px;background:#1a3a1a;color:#4f4;border-radius:8px;padding:1px 6px;">Now</span>':''}</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px;"><div style="background:#0a0e1a;border-radius:3px;height:7px;"><div style="width:${pct}%;height:100%;background:${isCur?'#FFD700':'#4a8cff'};border-radius:3px;"></div></div>${c>0?`<div style="background:#0a0e1a;border-radius:3px;height:4px;"><div style="width:${costPct}%;height:100%;background:#ef4444;border-radius:3px;"></div></div>`:""}</div>
+        <div style="text-align:right;min-width:72px;"><div style="font-size:12px;font-weight:800;color:${isCur?'#FFD700':'#4a8aff'}">${v>0?formatINR(v):'₹0'}</div>${c>0?`<div style="font-size:10px;color:#ef4444;">-${formatINR(c)}</div>`:""}</div>
+        <div style="min-width:72px;text-align:right;"><span style="font-size:12px;font-weight:700;color:${profit>=0?'#22c55e':'#ef4444'};">${profit>=0?'+':''}${formatINR(profit)}</span></div>
+        <div style="min-width:80px;text-align:right;">${chgTag}</div>
       </div>`;
     }).join("");
-    detailHtml=`<div class="card" style="margin-top:16px;overflow:hidden;"><div style="padding:12px 14px;border-bottom:1px solid #1e2a45;font-size:12px;font-weight:700;color:#7a8aaa;text-transform:uppercase;letter-spacing:1px;">Year-by-Year Comparison</div>${yearRows}</div>`;
+    detailHtml=`<div class="card" style="margin-top:16px;overflow:hidden;"><div style="padding:12px 14px;border-bottom:1px solid #1e2a45;display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#7a8aaa;text-transform:uppercase;letter-spacing:1px;"><span>Year-by-Year Comparison</span><span style="font-size:10px;color:#4a5a7a;"><span style="color:#4a8aff;">■</span> Revenue &nbsp;<span style="color:#ef4444;">■</span> Cost &nbsp;<span style="color:#22c55e;">■</span> Profit</span></div>${yearRows}</div>`;
   }
 
   else if(cmpMode==="years"){
@@ -5222,7 +5371,7 @@ function renderCompare(){
   return `<div>
     <div style="margin-bottom:18px;">
       <h2 style="margin:0 0 3px;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">⚖️ Compare</h2>
-      <div style="font-size:12px;color:#4a5a7a;">Revenue comparison by day · month · year</div>
+      <div style="font-size:12px;color:#4a5a7a;">Revenue · Expenses · Profit — customers, debtors &amp; creditors combined</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
       ${modeBtn("day","📅 Day")}
@@ -5586,6 +5735,49 @@ async function credGSTAutoFill(){
 // ─── CREDITORS MODULE ───────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════
 
+async function debtGSTAutoFill(){
+  const gstinEl   = document.getElementById("dr-gstin");
+  const nameEl    = document.getElementById("dr-name");
+  const addressEl = document.getElementById("dr-address");
+  const statusEl  = document.getElementById("dr-gst-status");
+  const btnEl     = document.getElementById("dr-gst-autofill-btn");
+  if(!gstinEl || !statusEl) return;
+
+  const gstin    = gstinEl.value.trim().toUpperCase();
+  const proxyUrl = getGSTINProxyURL();
+
+  statusEl.style.display = "block";
+  statusEl.style.color   = "#a78bfa";
+  statusEl.textContent   = "⏳ Looking up GSTIN...";
+  if(btnEl) btnEl.disabled = true;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(), 10000);
+    const res = await fetch(`${proxyUrl}?gstin=${encodeURIComponent(gstin)}`, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if(!res.ok){ statusEl.style.color="#ef4444"; statusEl.textContent=`❌ Proxy error (HTTP ${res.status})`; if(btnEl)btnEl.disabled=false; return; }
+    const data = await res.json();
+    if(!data || data.flag===false){ statusEl.style.color="#ef4444"; statusEl.textContent="❌ "+(data?.message||"GSTIN not found."); if(btnEl)btnEl.disabled=false; return; }
+
+    const info = data.data||{};
+    const a    = info.pradr?.addr||{};
+    const addr = [a.bno,a.flno,a.bnm,a.st,a.loc,a.dst,a.stcd,a.pncd].filter(Boolean).join(", ");
+    const name = info.lgnm || info.tradeNam || "";
+
+    if(nameEl && name && !nameEl.value.trim())  nameEl.value = name;
+    if(addressEl && addr) addressEl.value = addr;
+
+    statusEl.style.color   = "#22c55e";
+    statusEl.textContent   = "✅ Autofilled! — "+name;
+  } catch(err){
+    statusEl.style.color = "#ef4444";
+    statusEl.textContent = err.name==="AbortError"?"❌ Timed out":"❌ Network error";
+  }
+  if(btnEl) btnEl.disabled = false;
+}
+
 // ── Storage ──────────────────────────────────────────────────────────────────
 function creditorsKey(){ return storageKey("creditors_v1"); }
 
@@ -5678,9 +5870,6 @@ function renderCreditorsTab(){
         <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${totalCount} supplier${totalCount!==1?"s":""} · Total payable: <span style="color:#f59e0b;font-weight:800;">${formatINR(totalOwed)}</span></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button onclick="openShopIdSearchModal('creditor')" class="btn" style="background:#0a1628;border:2px solid #1e3a6e;color:#60a5fa;padding:10px 16px;font-size:12px;font-weight:800;">
-          🔗 Find by Shop ID
-        </button>
         <button onclick="openAddCreditorModal()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:10px 20px;font-size:13px;font-weight:800;">
           + Add Manually
         </button>
@@ -6181,6 +6370,7 @@ function _crTxRender(creditorId){
           ${tx.syncStatus==="declined"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#7f1d1d44;color:#f87171;">⚠️ Retry Sync</span>`:""}
         </div>
         <div style="font-size:11px;color:#7a8aaa;">📅 ${dateStr}${tx.invoiceNo?` &nbsp;·&nbsp; 🧾 ${hl(tx.invoiceNo)}`:""}</div>
+        ${tx._invItem?`<div style="margin-top:3px;"><span style="background:#0a1020;border:1px solid #1e3a6e;border-radius:5px;padding:2px 8px;font-size:11px;color:#60a5fa;">📦 +${tx._invQty} ${(inventoryItems.find(x=>x.name===tx._invItem)||{}).unit||"unit"} ${escHtml(tx._invItem)}</span></div>`:""}
         ${(tx.syncStatus==="declined" || tx.syncStatus==="local") && cr._fromShopConnect ? `<div style="margin-top:4px;"><button onclick="openRequestAgainModal('${creditorId}','${tx.id||""}',${tx.amount},'${(tx.note||"").replace(/'/g,"\'")}','${tx.date||""}','${(tx.invoiceNo||"").replace(/'/g,"\'")}','${tx.syncReqId}')" style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:6px;color:#f87171;font-size:10px;font-weight:700;padding:3px 8px;">🔄 Request Again</button></div>`:""
         }
       </div>
@@ -6224,9 +6414,12 @@ function openRequestAgainModal(creditorId, txId, amount, note, date, invoiceNo, 
 function openAddTxModal(creditorId, defaultType){
   if(defaultType === "payment") { openSmartPaymentModal(creditorId); return; }
   if(defaultType === "return")  { openReturnModal(creditorId); return; }
-  // Purchase flow
+  // Purchase flow — with optional inventory link
   const today = new Date().toISOString().slice(0,10);
   const cr = getCreditors().find(c=>c.id===creditorId);
+  const invOpts = inventoryItems.map(x=>`<option value="${escHtml(x.name)}">${escHtml(x.name)}${x.unit?" ("+x.unit+")":""} · Stock: ${invGetStock(x.name)}</option>`).join("");
+  const hasInv = inventoryItems.length > 0;
+
   showWideModal(`
     ${modalHeader("📦 Record Purchase from " + escHtml(cr?.name||"Creditor"))}
     <div style="display:flex;flex-direction:column;gap:12px;">
@@ -6234,8 +6427,36 @@ function openAddTxModal(creditorId, defaultType){
       <input type="hidden" id="tx-type" value="purchase" />
 
       <div style="background:#0a0e1a;border:1px solid #92400e33;border-radius:10px;padding:12px;font-size:12px;color:#f59e0b;">
-        📦 Recording a purchase adds to the amount you owe this creditor.
+        📦 Recording a purchase adds to the amount you owe this creditor. Optionally link to inventory to auto-increase stock.
       </div>
+
+      ${hasInv ? `
+      <div style="background:#0a1628;border:1px solid #1e3a6e;border-radius:10px;padding:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <label style="font-size:12px;color:#60a5fa;font-weight:700;">📦 Link to Inventory Item <span style="color:#4a5a7a;font-weight:400;">(optional)</span></label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+            <input type="checkbox" id="tx-inv-link" onchange="crTxToggleInvLink()" style="width:16px;height:16px;accent-color:#60a5fa;" />
+            <span style="font-size:11px;color:#7a8aaa;">Update inventory</span>
+          </label>
+        </div>
+        <div id="tx-inv-fields" style="display:none;display:flex;flex-direction:column;gap:8px;">
+          <select class="input" id="tx-inv-item" onchange="crTxOnItemSelect()" style="margin-bottom:0;">
+            <option value="">— Select item —</option>
+            ${invOpts}
+          </select>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <label style="font-size:10px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:3px;">QTY RECEIVED</label>
+              <input class="input" id="tx-inv-qty" type="number" min="0.01" step="any" placeholder="0" style="margin-bottom:0;" oninput="crTxRecalcAmount()" />
+            </div>
+            <div>
+              <label style="font-size:10px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:3px;">COST PER UNIT (₹)</label>
+              <input class="input" id="tx-inv-cost" type="number" min="0" step="any" placeholder="0" style="margin-bottom:0;" oninput="crTxRecalcAmount()" />
+            </div>
+          </div>
+          <div id="tx-inv-preview" style="font-size:11px;color:#4a5a7a;"></div>
+        </div>
+      </div>` : `<div style="font-size:11px;color:#4a5a7a;padding:4px 0;">💡 Add items to Inventory tab first to link stock updates here.</div>`}
 
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">AMOUNT (₹) *</label>
@@ -6261,6 +6482,40 @@ function openAddTxModal(creditorId, defaultType){
     </div>
   `);
   setTimeout(()=>document.getElementById("tx-amount")?.focus(),100);
+}
+
+function crTxToggleInvLink(){
+  const cb = document.getElementById("tx-inv-link");
+  const fields = document.getElementById("tx-inv-fields");
+  if(fields) fields.style.display = cb?.checked ? "flex" : "none";
+  if(!cb?.checked){ document.getElementById("tx-inv-preview").textContent=""; }
+}
+
+function crTxOnItemSelect(){
+  const name = document.getElementById("tx-inv-item")?.value;
+  const item = inventoryItems.find(x=>x.name===name);
+  if(!item) return;
+  // Pre-fill cost from last stock entry
+  const lastEntry = (item.stock||[]).slice(-1)[0];
+  if(lastEntry?.costPerUnit){ const el=document.getElementById("tx-inv-cost"); if(el) el.value=lastEntry.costPerUnit; }
+  crTxRecalcAmount();
+}
+
+function crTxRecalcAmount(){
+  const qty  = parseFloat(document.getElementById("tx-inv-qty")?.value||"0");
+  const cost = parseFloat(document.getElementById("tx-inv-cost")?.value||"0");
+  const name = document.getElementById("tx-inv-item")?.value||"";
+  const prev = document.getElementById("tx-inv-preview");
+  if(qty>0 && cost>0){
+    const total = qty*cost;
+    const amtEl = document.getElementById("tx-amount");
+    if(amtEl) amtEl.value = total.toFixed(2);
+    const noteEl = document.getElementById("tx-note");
+    if(noteEl && !noteEl.value) noteEl.value = name ? `${name} × ${qty}` : "";
+    if(prev) prev.textContent = `→ ₹${total.toLocaleString("en-IN",{maximumFractionDigits:2})} · Stock will increase by ${qty}`;
+  } else {
+    if(prev) prev.textContent="";
+  }
 }
 
 // ── Smart Payment Modal: shows pending purchase bills, lets user pick & pay ──
@@ -6497,12 +6752,38 @@ function saveCrTransaction(){
   const idx = creditors.findIndex(c=>c.id===creditorId);
   if(idx<0){ notify("❌ Creditor not found"); return; }
 
+  // ── Inventory link (purchase only) ──
+  let invLinked = false;
+  let invItemName = "";
+  if(type === "purchase"){
+    const invLinkCb = document.getElementById("tx-inv-link");
+    if(invLinkCb?.checked){
+      const itemName = document.getElementById("tx-inv-item")?.value?.trim();
+      const qty      = parseFloat(document.getElementById("tx-inv-qty")?.value||"0");
+      const cost     = parseFloat(document.getElementById("tx-inv-cost")?.value||"0");
+      if(!itemName){ notify("⚠️ Select an inventory item or uncheck the inventory link"); return; }
+      if(!(qty>0)){ notify("⚠️ Enter a valid quantity"); return; }
+      // Add stock to inventory
+      const item = inventoryItems.find(x=>x.name===itemName);
+      const unit = item?.unit||"unit";
+      const cat  = item?.category||"General";
+      const sp   = item?.sellingPrice||0;
+      invAddStock(itemName, unit, qty, cost>0?cost:0, date, note||invoiceNo||"", cat, sp, item?.gstRate||0, item?.gstIncluded||"");
+      invLinked = true;
+      invItemName = itemName;
+    }
+  }
+
   const txId = "TX"+Date.now();
   if(!creditors[idx].transactions) creditors[idx].transactions=[];
-  creditors[idx].transactions.push({ id:txId, type, amount, note, date, invoiceNo, createdAt:Date.now(), syncStatus:"local" });
+  creditors[idx].transactions.push({
+    id:txId, type, amount, note, date, invoiceNo,
+    ...(invLinked ? { _invItem: invItemName, _invQty: parseFloat(document.getElementById("tx-inv-qty")?.value||"0") } : {}),
+    createdAt:Date.now(), syncStatus:"local"
+  });
   saveCreditors(creditors);
   closeModal();
-  notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return"} of ${formatINR(amount)} recorded`);
+  notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return"} of ${formatINR(amount)} recorded${invLinked?" · "+invItemName+" stock updated":""}`);
   setTimeout(()=>openCreditorDetail(creditorId),200);
 }
 
@@ -7000,9 +7281,6 @@ function renderDebtorsTab(){
         <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${totalCount} debtor${totalCount!==1?"s":""} · Total receivable: <span style="color:#22c55e;font-weight:800;">${formatINR(totalOwed)}</span></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button onclick="openShopIdSearchModal('debtor')" class="btn" style="background:#0a1628;border:2px solid #1e3a6e;color:#60a5fa;padding:10px 16px;font-size:12px;font-weight:800;">
-          🔗 Find by Shop ID
-        </button>
         <button onclick="openAddDebtorModal()" class="btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:10px 20px;font-size:13px;font-weight:800;">
           + Add Manually
         </button>
@@ -7125,7 +7403,12 @@ function openAddDebtorModal(editId){
         </div>
         <div>
           <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GSTIN</label>
-          <input class="input" id="dr-gstin" placeholder="27XXXXX0000X1ZX" maxlength="15" value="${escHtml(dr?.gstin||"")}" style="margin-bottom:0;text-transform:uppercase;font-family:monospace;" oninput="this.value=this.value.toUpperCase();" />
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input class="input" id="dr-gstin" placeholder="27XXXXX0000X1ZX" maxlength="15" value="${escHtml(dr?.gstin||"")}" style="margin-bottom:0;text-transform:uppercase;font-family:monospace;flex:1;"
+              oninput="this.value=this.value.toUpperCase();const v=isValidGSTIN(this.value);document.getElementById('dr-gst-autofill-btn').style.display=v?'inline-flex':'none';document.getElementById('dr-gst-status').style.display='none';" />
+            <button id="dr-gst-autofill-btn" onclick="debtGSTAutoFill()" style="display:${isValidGSTIN(dr?.gstin||"")?'inline-flex':'none'};align-items:center;gap:4px;padding:9px 11px;border-radius:9px;border:none;background:linear-gradient(135deg,#166534,#22c55e);color:#fff;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;flex-shrink:0;">🔍 Fill</button>
+          </div>
+          <div id="dr-gst-status" style="font-size:10px;margin-top:4px;display:none;"></div>
         </div>
       </div>
 
@@ -7429,6 +7712,7 @@ function _drTxRender(debtorId){
           <span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:${tb.bg};color:${tb.col};">${tx.type}</span>
         </div>
         <div style="font-size:11px;color:#7a8aaa;">📅 ${dateStr}</div>
+        ${tx._invItem?`<div style="margin-top:3px;"><span style="background:#0a1a0a;border:1px solid #1a4a1a;border-radius:5px;padding:2px 8px;font-size:11px;color:#4ade80;">📦 ${tx._invQty} ${(inventoryItems.find(x=>x.name===tx._invItem)||{}).unit||"unit"} ${escHtml(tx._invItem)}</span></div>`:""}
       </div>
       <div style="text-align:right;flex-shrink:0;">
         <div style="font-size:14px;font-weight:800;color:${amtColor};">${isDebit?"-":"+"}${formatINR(tx.amount)}</div>
@@ -7453,6 +7737,36 @@ function openAddDebtTxModal(debtorId, defaultType){
   };
   const typeColors = {sale:"#22c55e",payment:"#60a5fa",return:"#a78bfa"};
 
+  // Inventory section — only for sales
+  const invOpts = inventoryItems.map(x=>`<option value="${escHtml(x.name)}">${escHtml(x.name)}${x.unit?" ("+x.unit+")":""} · Stock: ${invGetStock(x.name)}</option>`).join("");
+  const hasInv = inventoryItems.length > 0;
+  const isSale = defaultType === "sale";
+  const invSection = isSale ? `
+    <div id="drtx-inv-section" style="background:#0a1a0a;border:1px solid #1a4a1a;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="drtx-inv-link" ${hasInv?"":"disabled"} onchange="(function(){const on=document.getElementById('drtx-inv-link').checked;document.getElementById('drtx-inv-fields').style.display=on?'flex':'none';})()" style="width:16px;height:16px;accent-color:#22c55e;" />
+        <span style="font-size:13px;font-weight:700;color:#4ade80;">📦 Deduct from Inventory</span>
+        <span style="font-size:11px;color:#7a8aaa;">${hasInv?"(optional)":"No inventory items yet"}</span>
+      </label>
+      <div id="drtx-inv-fields" style="display:none;flex-direction:column;gap:8px;">
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">ITEM *</label>
+          <select class="input" id="drtx-inv-item" onchange="(function(){const sel=document.getElementById('drtx-inv-item').value;const inv=inventoryItems.find(x=>x.name===sel);if(inv&&inv.sellingPrice>0){const qty=parseFloat(document.getElementById('drtx-inv-qty').value||'0');if(qty>0){document.getElementById('drtx-amount').value=(qty*inv.sellingPrice).toFixed(2);}document.getElementById('drtx-inv-sp').textContent='Selling price: ₹'+inv.sellingPrice+'/'+inv.unit;}else{document.getElementById('drtx-inv-sp').textContent='';};})()" style="margin-bottom:0;">
+            <option value="">— Select item —</option>
+            ${invOpts}
+          </select>
+          <div id="drtx-inv-sp" style="font-size:11px;color:#4ade80;margin-top:3px;"></div>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">QUANTITY *</label>
+          <input class="input" id="drtx-inv-qty" type="number" placeholder="0" min="0.01" step="0.01" style="margin-bottom:0;" oninput="(function(){const sel=document.getElementById('drtx-inv-item').value;const inv=inventoryItems.find(x=>x.name===sel);if(inv&&inv.sellingPrice>0){const qty=parseFloat(document.getElementById('drtx-inv-qty').value||'0');if(qty>0)document.getElementById('drtx-amount').value=(qty*inv.sellingPrice).toFixed(2);}})()"/>
+        </div>
+        <div style="font-size:11px;color:#7a8aaa;background:#070f07;border-radius:6px;padding:8px;">
+          📉 Selecting an item will auto-deduct from stock and auto-fill the amount from its selling price.
+        </div>
+      </div>
+    </div>` : "";
+
   showWideModal(`
     ${modalHeader(typeLabels[defaultType]+" "+escHtml(dr.name))}
     <div style="display:flex;flex-direction:column;gap:12px;">
@@ -7462,6 +7776,8 @@ function openAddDebtTxModal(debtorId, defaultType){
       <div style="background:#0a0e1a;border:1px solid ${typeColors[defaultType]}33;border-radius:10px;padding:12px;font-size:12px;color:${typeColors[defaultType]};">
         ${typeDescs[defaultType]}
       </div>
+
+      ${invSection}
 
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">AMOUNT (₹) *</label>
@@ -7497,6 +7813,27 @@ function saveDebtTransaction(){
   const idx = debtors.findIndex(d=>d.id===debtorId);
   if(idx<0){ notify("❌ Debtor not found","error"); return; }
 
+  // ── Inventory deduction (sale only) ──
+  let invLinked = false;
+  let invItemName = "";
+  let invQty = 0;
+  if(type === "sale"){
+    const invLinkCb = document.getElementById("drtx-inv-link");
+    if(invLinkCb?.checked){
+      const itemName = document.getElementById("drtx-inv-item")?.value?.trim();
+      invQty = parseFloat(document.getElementById("drtx-inv-qty")?.value||"0");
+      if(!itemName){ notify("⚠️ Select an inventory item or uncheck the inventory link"); return; }
+      if(!(invQty>0)){ notify("⚠️ Enter a valid quantity to deduct"); return; }
+      const currentStock = invGetStock(itemName);
+      if(invQty > currentStock){ notify(`⚠️ Not enough stock. Available: ${currentStock}`); return; }
+      // Deduct from inventory
+      const pricePerUnit = invQty > 0 ? amtRaw / invQty : 0;
+      invDeductSold([{name: itemName, qty: invQty, pricePerUnit}], null);
+      invLinked = true;
+      invItemName = itemName;
+    }
+  }
+
   if(!debtors[idx].transactions) debtors[idx].transactions=[];
   debtors[idx].transactions.push({
     id:     "DT"+Date.now()+Math.random().toString(36).slice(2,5),
@@ -7504,11 +7841,12 @@ function saveDebtTransaction(){
     amount: amtRaw,
     note,
     date,
+    ...(invLinked ? { _invItem: invItemName, _invQty: invQty } : {}),
     createdAt: Date.now(),
   });
   saveDebtors(debtors);
   closeModal();
-  notify("✅ "+type.charAt(0).toUpperCase()+type.slice(1)+" of "+formatINR(amtRaw)+" saved");
+  notify("✅ "+type.charAt(0).toUpperCase()+type.slice(1)+" of "+formatINR(amtRaw)+" saved"+(invLinked?" · "+invItemName+" stock deducted":""));
   setTimeout(()=>openDebtorDetail(debtorId), 200);
 }
 
@@ -7662,7 +8000,6 @@ function renderSettings(){
     )}
 
     ${section("Data",
-      row("🔥","Firebase Connection",fbConnected?"Connected · Cloud storage":"Not connected · Local only","showFirebaseSettings()") +
       row("⬇️","Export CSV","Download all customer data","exportCSV()")
     )}
 
