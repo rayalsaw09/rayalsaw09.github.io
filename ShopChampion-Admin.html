@@ -1218,8 +1218,8 @@ async function scHashPassword(phone, password) {
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
 const ADMIN_PASS = "1234";
-const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","inventory","creditors","messages","settings"];
-const TABS_ICON = ["🏆","👥","💳","📊","⚖️","📦","🏦","✉️","⚙️"];
+const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","inventory","creditors","debtors","messages","settings"];
+const TABS_ICON = ["🏆","👥","💳","📊","⚖️","📦","🏦","🧾","✉️","⚙️"];
 let _shopRequestsUnread = 0; // badge count for messages tab
 function getTabs(){
   return TABS_BASE.map((k,i)=>{
@@ -1594,6 +1594,7 @@ function startFirestoreListener() {
   if(authPhone && !invUnsubscribe){
     loadInventoryFromFirestore(null);
     loadCreditorsFromCloud();
+    loadDebtorsFromCloud();
     // Load shop connection requests (messages inbox)
     loadShopRequests();
     // Live listener: get notified when other shops accept our connect requests
@@ -1710,7 +1711,7 @@ window.addEventListener('appinstalled', () => {
 
 // ── Mobile Bottom Nav ──────────────────────────────────────────
 const MOBILE_MAIN_TABS = [0, 1, 2, 5]; // leaderboard, customers, purchase, inventory
-const MOBILE_MORE_TABS = [3, 4, 6, 7, 8];    // analytics, compare, creditors, messages, settings
+const MOBILE_MORE_TABS = [3, 4, 6, 7, 8, 9];    // analytics, compare, creditors, debtors, messages, settings
 
 function mobileTab(i) {
   closeMoreMenu();
@@ -2988,7 +2989,7 @@ function _safeRenderTabImmediate(i) {
 }
 // ─── TABS ─────────────────────────────────────────────────────
 function renderTabs(){const TABS=getTabs();document.getElementById("tab-bar").innerHTML=TABS.map((tab,i)=>`<button class="tab-btn${currentTab===i?" active":""}" onclick="switchTab(${i})">${tab}</button>`).join("");}
-function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}if(i!==6)invPrefillName="";currentTab=i;renderTabs();renderTab(i);}
+function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}if(i!==6&&i!==7)invPrefillName="";currentTab=i;renderTabs();renderTab(i);}
 function renderTab(i){
   const el=document.getElementById("tab-content"),s=getSorted();
   el.style.position="";el.style.overflow="";
@@ -3001,8 +3002,9 @@ function renderTab(i){
   else if(i===4)el.innerHTML=renderCompare();
   else if(i===5)el.innerHTML=renderInventoryTab();
   else if(i===6)el.innerHTML=renderCreditorsTab();
-  else if(i===7)el.innerHTML=renderMessagesTab();
-  else if(i===8)el.innerHTML=renderSettings();
+  else if(i===7)el.innerHTML=renderDebtorsTab();
+  else if(i===8)el.innerHTML=renderMessagesTab();
+  else if(i===9)el.innerHTML=renderSettings();
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
 }
 
@@ -5162,9 +5164,10 @@ function saveShopProfile(){
 }
 
 // Open Search-by-Shop-ID modal for adding creditor/debtor
-async function openShopIdSearchModal(mode){ // mode = 'creditor' | 'customer'
+async function openShopIdSearchModal(mode){ // mode = 'creditor' | 'customer' | 'debtor'
+  const headerTitle = mode==="creditor"?"🔍 Find Creditor by Shop ID":mode==="debtor"?"🔍 Find Debtor by Shop ID":"🔍 Find Customer by Shop ID";
   showWideModal(`
-    ${modalHeader(mode==="creditor"?"🔍 Find Creditor by Shop ID":"🔍 Find Customer by Shop ID")}
+    ${modalHeader(headerTitle)}
     <div style="font-size:12px;color:#7a8aaa;margin-bottom:14px;">Enter the other shop's <strong style="color:#60a5fa;">SC-XXXXXX</strong> ID or their 10-digit phone number.</div>
 
     <div style="display:flex;gap:8px;margin-bottom:8px;">
@@ -5216,13 +5219,15 @@ async function doShopIdSearch(mode){
         <div id="sc-connect-action" style="display:flex;flex-direction:column;gap:8px;">
           <button onclick="addFromShopProfile(${JSON.stringify(profile).replace(/"/g,'&quot;')},'${mode}')" class="btn"
             style="width:100%;background:#0a1628;border:2px solid #2a5aaa;color:#60a5fa;padding:11px;font-size:13px;font-weight:800;">
-            ${mode==="creditor"?"🏦 Add to My Creditors (local only)":"👤 Add to My Customers (local only)"}
+            ${mode==="creditor"?"🏦 Add to My Creditors (local only)":mode==="debtor"?"🧾 Add to My Debtors (local only)":"👤 Add to My Customers (local only)"}
           </button>
           <button onclick="(async()=>{
             const btn=this;btn.disabled=true;btn.textContent='⏳ Sending...';
             const myMode='${mode}';
-            // If I add them as my CREDITOR → I am their CUSTOMER; if I add them as my CUSTOMER → I am their CREDITOR
-            const roleIAmToThem = myMode==='creditor' ? 'customer' : 'creditor';
+            // If I add them as my CREDITOR → I am their CUSTOMER
+            // If I add them as my DEBTOR   → I am their CREDITOR
+            // If I add them as my CUSTOMER → I am their CREDITOR
+            const roleIAmToThem = myMode==='creditor' ? 'customer' : myMode==='debtor' ? 'creditor' : 'creditor';
             const ok=await sendShopConnectRequest(${JSON.stringify(profile).replace(/"/g,'&quot;')},roleIAmToThem,myMode);
             if(ok){btn.style.background='linear-gradient(135deg,#16a34a,#22c55e)';btn.style.color='#fff';btn.textContent='✅ Request Sent! They will see it in their Messages tab.';}
             else{btn.disabled=false;btn.textContent='📨 Send Connect Request (notify them)';}
@@ -5254,6 +5259,16 @@ function addFromShopProfile(profile, mode){
       setVal("cr-address", [profile.address,profile.city].filter(Boolean).join(", ")||"");
       const gstinEl = document.getElementById("cr-gstin");
       if(gstinEl) gstinEl.dispatchEvent(new Event("input"));
+      notify("✅ Profile loaded — review and save");
+    }, 120);
+  } else if(mode==="debtor"){
+    openAddDebtorModal();
+    setTimeout(()=>{
+      const setVal = (id,v)=>{ const el=document.getElementById(id); if(el&&v) el.value=v; };
+      setVal("dr-name",    profile.shopName||"");
+      setVal("dr-phone",   profile.phone||"");
+      setVal("dr-gstin",   profile.gstin||"");
+      setVal("dr-address", [profile.address,profile.city].filter(Boolean).join(", ")||"");
       notify("✅ Profile loaded — review and save");
     }, 120);
   } else if(mode==="customer"){
@@ -6656,6 +6671,664 @@ function printCreditorStatement(id){
 
 // ─── END CREDITORS MODULE ────────────────────────────────────────────────────
 
+// ═══════════════════════════════════════════════════════════════════════════
+// ─── DEBTORS MODULE ─────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Storage ──────────────────────────────────────────────────────────────────
+function debtorsKey(){ return storageKey("debtors_v1"); }
+
+function loadDebtors(){
+  try { const s=localStorage.getItem(debtorsKey()); return s?JSON.parse(s):[]; }
+  catch { return []; }
+}
+
+function saveDebtors(list){
+  try { localStorage.setItem(debtorsKey(), JSON.stringify(list)); } catch {}
+  if(db && authPhone){
+    db.collection("users").doc(authPhone).collection("app_data").doc("debtors")
+      .set({ list, updatedAt: Date.now() }).catch(()=>{});
+  }
+}
+
+function getDebtors(){ return loadDebtors(); }
+
+function loadDebtorsFromCloud(){
+  if(!db || !authPhone) return;
+  db.collection("users").doc(authPhone).collection("app_data").doc("debtors")
+    .get().then(doc=>{
+      if(doc && doc.exists){
+        const data = doc.data();
+        if(data.list) try { localStorage.setItem(debtorsKey(), JSON.stringify(data.list)); } catch {}
+      }
+    }).catch(()=>{});
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function debtBalance(dr){
+  const sold     = (dr.transactions||[]).filter(t=>t.type==="sale").reduce((s,t)=>s+t.amount,0);
+  const received = (dr.transactions||[]).filter(t=>t.type==="payment").reduce((s,t)=>s+t.amount,0);
+  const returned = (dr.transactions||[]).filter(t=>t.type==="return").reduce((s,t)=>s+t.amount,0);
+  return sold - received - returned; // positive = they owe you
+}
+
+function debtTxIcon(type){
+  if(type==="sale")    return "🛒";
+  if(type==="payment") return "💰";
+  if(type==="return")  return "↩️";
+  return "•";
+}
+
+function debtTxColor(type){
+  if(type==="sale")    return "#22c55e";
+  if(type==="payment") return "#60a5fa";
+  if(type==="return")  return "#a78bfa";
+  return "#7a8aaa";
+}
+
+function newDebtorId(){ return "DR" + Date.now() + Math.random().toString(36).slice(2,6).toUpperCase(); }
+
+// ── Main Render ───────────────────────────────────────────────────────────────
+function renderDebtorsTab(){
+  const debtors = getDebtors();
+  const totalOwed   = debtors.reduce((s,d)=>s+Math.max(0,debtBalance(d)),0);
+  const totalCount  = debtors.length;
+  const searchVal   = window._debtSearch || "";
+  const gstFilter   = window._debtGstFilter || "all";
+
+  let filtered = debtors.filter(d=>
+    !searchVal ||
+    d.name.toLowerCase().includes(searchVal.toLowerCase()) ||
+    (d.phone||"").includes(searchVal)
+  );
+  if(gstFilter==="gst")   filtered = filtered.filter(d=>!!d.gstin);
+  if(gstFilter==="nogst") filtered = filtered.filter(d=>!d.gstin);
+
+  filtered.sort((a,b)=>debtBalance(b)-debtBalance(a));
+
+  return `
+  <div style="width:100%;">
+
+    <!-- Header row -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+      <div>
+        <div style="font-size:20px;font-weight:800;color:#e8eaf0;">🧾 Debtors</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${totalCount} debtor${totalCount!==1?"s":""} · Total receivable: <span style="color:#22c55e;font-weight:800;">${formatINR(totalOwed)}</span></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="openShopIdSearchModal('debtor')" class="btn" style="background:#0a1628;border:2px solid #1e3a6e;color:#60a5fa;padding:10px 16px;font-size:12px;font-weight:800;">
+          🔗 Find by Shop ID
+        </button>
+        <button onclick="openAddDebtorModal()" class="btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:10px 20px;font-size:13px;font-weight:800;">
+          + Add Manually
+        </button>
+      </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+      ${_debtSummaryCard("Total Debtors", totalCount, "#a78bfa", "🏢")}
+      ${_debtSummaryCard("Total Receivable", formatINR(totalOwed), "#22c55e", "💰")}
+      ${_debtSummaryCard("Received This Month", formatINR(_debtReceivedThisMonth(debtors)), "#60a5fa", "✅")}
+      ${_debtSummaryCard("Sold This Month", formatINR(_debtSoldThisMonth(debtors)), "#f59e0b", "🛒")}
+    </div>
+
+    <!-- Search -->
+    <div style="margin-bottom:10px;">
+      <input class="input" placeholder="🔍 Search debtor by name or phone..." value="${escHtml(searchVal)}"
+        oninput="window._debtSearch=this.value;renderTab(7)" style="font-size:13px;" />
+    </div>
+
+    <!-- GST filter pills -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔢 GST Status:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${[['all','🏢 All'],['gst','✅ GST Registered'],['nogst','❌ Not Registered']].map(([k,l])=>`
+          <button onclick="window._debtGstFilter='${k}';renderTab(7)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${gstFilter===k?'#22c55e':'#1e2a45'};background:${gstFilter===k?'#022c1a':'transparent'};color:${gstFilter===k?'#22c55e':'#4a5a7a'};font-size:12px;font-weight:${gstFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Debtor list -->
+    ${filtered.length===0 ? `
+      <div style="text-align:center;padding:60px 20px;color:#4a5a7a;">
+        <div style="font-size:48px;margin-bottom:12px;">🧾</div>
+        <div style="font-size:16px;font-weight:700;color:#7a8aaa;">${searchVal?"No debtors found":"No debtors yet"}</div>
+        <div style="font-size:13px;margin-top:6px;">${searchVal?"Try a different search":"Click '+ Add Manually' to add your first debtor"}</div>
+      </div>
+    ` : `
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        ${filtered.map(dr=>_renderDebtorCard(dr)).join("")}
+      </div>
+    `}
+  </div>`;
+}
+
+function _debtSummaryCard(label, value, color, icon){
+  return `<div style="background:#0d1220;border:1px solid #1e2a45;border-radius:14px;padding:14px 16px;">
+    <div style="font-size:20px;margin-bottom:6px;">${icon}</div>
+    <div style="font-size:18px;font-weight:800;color:${color};">${value}</div>
+    <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${label}</div>
+  </div>`;
+}
+
+function _debtReceivedThisMonth(debtors){
+  const now=new Date(); const y=now.getFullYear(),m=now.getMonth();
+  return debtors.reduce((s,d)=>s+(d.transactions||[]).filter(t=>{
+    const dd=new Date(t.date); return t.type==="payment"&&dd.getFullYear()===y&&dd.getMonth()===m;
+  }).reduce((ss,t)=>ss+t.amount,0),0);
+}
+
+function _debtSoldThisMonth(debtors){
+  const now=new Date(); const y=now.getFullYear(),m=now.getMonth();
+  return debtors.reduce((s,d)=>s+(d.transactions||[]).filter(t=>{
+    const dd=new Date(t.date); return t.type==="sale"&&dd.getFullYear()===y&&dd.getMonth()===m;
+  }).reduce((ss,t)=>ss+t.amount,0),0);
+}
+
+function _renderDebtorCard(dr){
+  const bal = debtBalance(dr);
+  const balColor = bal>0?"#22c55e":bal<0?"#f59e0b":"#7a8aaa";
+  const balLabel = bal>0?"They owe you":bal<0?"You owe them":"Settled";
+  const lastTx = (dr.transactions||[]).slice(-1)[0];
+  const initials = dr.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+
+  return `<div style="background:#0d1220;border:1px solid #1e2a45;border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
+    onmouseenter="this.style.borderColor='#2a6a3a'" onmouseleave="this.style.borderColor='#1e2a45'"
+    onclick="openDebtorDetail('${dr.id}')">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <!-- Avatar -->
+      <div style="width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#166534,#22c55e);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;">${initials}</div>
+      <!-- Info -->
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:800;font-size:15px;color:#e8eaf0;">${escHtml(dr.name)}</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">
+          ${dr.phone?`📞 ${dr.phone}`:""}
+          ${dr.gstin?` · 🔢 ${dr.gstin}`:""}
+        </div>
+        ${lastTx?`<div style="font-size:11px;color:#4a5a7a;margin-top:3px;">Last: ${debtTxIcon(lastTx.type)} ${escHtml(lastTx.note||lastTx.type)} · ${new Date(lastTx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>`:""}
+        ${dr._fromShopConnect?`<div style="margin-top:4px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#16653444;color:#4ade80;border:1px solid #22c55e44;">🔗 Linked Shop</span></div>`:""}
+      </div>
+      <!-- Balance -->
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:18px;font-weight:800;color:${balColor};">${formatINR(Math.abs(bal))}</div>
+        <div style="font-size:11px;color:${balColor};margin-top:2px;">${balLabel}</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${(dr.transactions||[]).length} transactions</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Add/Edit Debtor Modal ──────────────────────────────────────────────────────
+function openAddDebtorModal(editId){
+  const debtors = getDebtors();
+  const dr = editId ? debtors.find(d=>d.id===editId) : null;
+  const isEdit = !!dr;
+
+  showWideModal(`
+    ${modalHeader(isEdit?"✏️ Edit Debtor":"🧾 Add New Debtor")}
+    <div style="display:flex;flex-direction:column;gap:12px;">
+
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">DEBTOR NAME *</label>
+        <input class="input" id="dr-name" placeholder="e.g. Patel Traders" value="${escHtml(dr?.name||"")}" style="margin-bottom:0;" />
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">PHONE</label>
+          <input class="input" id="dr-phone" type="tel" placeholder="9876543210" value="${escHtml(dr?.phone||"")}" style="margin-bottom:0;" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GSTIN</label>
+          <input class="input" id="dr-gstin" placeholder="27XXXXX0000X1ZX" maxlength="15" value="${escHtml(dr?.gstin||"")}" style="margin-bottom:0;text-transform:uppercase;font-family:monospace;" oninput="this.value=this.value.toUpperCase();" />
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">ADDRESS</label>
+        <textarea class="input" id="dr-address" placeholder="Shop address..." rows="2" style="margin-bottom:0;resize:vertical;">${escHtml(dr?.address||"")}</textarea>
+      </div>
+
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">NOTES</label>
+        <input class="input" id="dr-notes" placeholder="Any notes about this debtor..." value="${escHtml(dr?.notes||"")}" style="margin-bottom:0;" />
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        ${isEdit?`<button onclick="deleteDebtor('${dr.id}')" class="btn" style="background:#1a0000;border:1px solid #5a1a1a;color:#f66;flex:0.4;">🗑 Delete</button>`:""}
+        <button onclick="saveDebtorModal('${editId||""}')" class="btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;flex:1;font-weight:800;">
+          ${isEdit?"✅ Save Changes":"✅ Add Debtor"}
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+function saveDebtorModal(editId){
+  const name = document.getElementById("dr-name")?.value.trim();
+  if(!name){ notify("⚠️ Name is required"); return; }
+
+  const debtors = getDebtors();
+  const dr = {
+    id:       editId || newDebtorId(),
+    name,
+    phone:    document.getElementById("dr-phone")?.value.trim()||"",
+    gstin:    (document.getElementById("dr-gstin")?.value.trim()||"").toUpperCase(),
+    address:  document.getElementById("dr-address")?.value.trim()||"",
+    notes:    document.getElementById("dr-notes")?.value.trim()||"",
+    createdAt: editId ? (debtors.find(d=>d.id===editId)?.createdAt || Date.now()) : Date.now(),
+    transactions: editId ? (debtors.find(d=>d.id===editId)?.transactions||[]) : [],
+  };
+
+  const idx = debtors.findIndex(d=>d.id===editId);
+  if(idx>=0) debtors[idx]=dr; else debtors.push(dr);
+  saveDebtors(debtors);
+  closeModal();
+  notify(editId?"✅ Debtor updated":"✅ Debtor added");
+  renderTab(7);
+}
+
+function deleteDebtor(id){
+  if(!confirm("Delete this debtor and all their transactions?")) return;
+  const debtors = getDebtors().filter(d=>d.id!==id);
+  saveDebtors(debtors);
+  closeModal();
+  notify("🗑 Debtor deleted");
+  renderTab(7);
+}
+
+// ── Debtor Detail (Tally-style ledger) ───────────────────────────────────────
+let _drTxCurrentFilter = "all";
+
+function _drTxApplyMonthNav(debtorId){
+  const yr=window._drTxNavYear||new Date().getFullYear();
+  const mo=window._drTxNavMonth!=null?window._drTxNavMonth:new Date().getMonth();
+  const now=new Date();
+  const isCurrent=(yr===now.getFullYear()&&mo===now.getMonth());
+  const label=document.getElementById("dr-tx-month-label");
+  if(label) label.textContent=_MONTH_NAMES_FULL[mo]+" "+yr+(isCurrent?" (Current)":"");
+  const fromEl=document.getElementById("dr-tx-from");
+  const toEl=document.getElementById("dr-tx-to");
+  const firstDay=new Date(yr,mo,1);
+  const lastDay=new Date(yr,mo+1,0);
+  const fmt=d=>d.toISOString().slice(0,10);
+  if(fromEl) fromEl.value=fmt(firstDay);
+  if(toEl) toEl.value=fmt(lastDay);
+  _drTxRender(debtorId);
+}
+
+function _drTxShiftMonth(debtorId, dir){
+  if(window._drTxIsCustom){
+    window._drTxIsCustom=false;
+    const cb=document.getElementById("dr-tx-custom-btn");
+    const cr=document.getElementById("dr-tx-custom-range");
+    if(cb){cb.style.color="#7a8aaa";cb.style.border="1px solid #1e2a45";}
+    if(cr) cr.style.display="none";
+  }
+  window._drTxNavMonth=(window._drTxNavMonth!=null?window._drTxNavMonth:new Date().getMonth())+dir;
+  window._drTxNavYear =window._drTxNavYear||new Date().getFullYear();
+  if(window._drTxNavMonth>11){window._drTxNavMonth=0;window._drTxNavYear++;}
+  if(window._drTxNavMonth<0) {window._drTxNavMonth=11;window._drTxNavYear--;}
+  _drTxApplyMonthNav(debtorId);
+}
+
+function _drTxToggleCustomRange(debtorId){
+  window._drTxIsCustom=!window._drTxIsCustom;
+  const cb=document.getElementById("dr-tx-custom-btn");
+  const cr=document.getElementById("dr-tx-custom-range");
+  if(cb){cb.style.color=window._drTxIsCustom?"#22c55e":"#7a8aaa";cb.style.border="1px solid "+(window._drTxIsCustom?"#22c55e":"#1e2a45");}
+  if(cr) cr.style.display=window._drTxIsCustom?"grid":"none";
+  if(!window._drTxIsCustom) _drTxApplyMonthNav(debtorId);
+}
+
+function _drTxOnCustomDate(debtorId){
+  window._drTxIsCustom=true;
+  _drTxRender(debtorId);
+}
+
+function openDebtorDetail(id){
+  const dr = getDebtors().find(d=>d.id===id);
+  if(!dr){ notify("❌ Debtor not found","error"); return; }
+  const bal = debtBalance(dr);
+  const balColor = bal>0?"#22c55e":bal<0?"#f59e0b":"#7a8aaa";
+  const txs = dr.transactions||[];
+
+  showWideModal(`
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:4px;">
+        <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#166534,#22c55e);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">
+          ${dr.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:18px;font-weight:800;color:#e8eaf0;">${escHtml(dr.name)}</div>
+          ${dr._fromShopConnect?`<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#16653444;color:#4ade80;border:1px solid #22c55e44;">🔗 Linked Shop</span>`:""}
+        </div>
+        <button onclick="closeModal()" style="cursor:pointer;background:none;border:none;color:#4a5a7a;font-size:20px;padding:4px;">✕</button>
+      </div>
+
+      <!-- Balance banner -->
+      <div style="background:${bal>0?"#001a0e":"#1a0e00"};border:2px solid ${balColor};border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:12px;color:#7a8aaa;font-weight:700;">${bal>0?"THEY OWE YOU":bal<0?"YOU OWE THEM":"FULLY SETTLED"}</div>
+          <div style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sale</button>
+          <button onclick="openAddDebtTxModal('${id}','payment')" class="btn" style="background:#0a1628;border:1px solid #60a5fa;color:#60a5fa;font-size:12px;padding:8px 12px;">💰 Payment</button>
+          <button onclick="openAddDebtTxModal('${id}','return')"  class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>
+        </div>
+      </div>
+
+      <!-- Debtor info -->
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+        ${dr.phone  ?`<div><span style="color:#7a8aaa;">📞 Phone</span><br><span style="color:#e8eaf0;font-weight:700;">${dr.phone}</span></div>`:""}
+        ${dr.gstin  ?`<div><span style="color:#7a8aaa;">🔢 GSTIN</span><br><span style="color:#e8eaf0;font-weight:700;">${dr.gstin}</span></div>`:""}
+        ${dr.address?`<div style="grid-column:1/-1;"><span style="color:#7a8aaa;">📍 Address</span><br><span style="color:#e8eaf0;">${escHtml(dr.address)}</span></div>`:""}
+        ${dr.notes  ?`<div style="grid-column:1/-1;"><span style="color:#7a8aaa;">📝 Notes</span><br><span style="color:#e8eaf0;">${escHtml(dr.notes)}</span></div>`:""}
+      </div>
+
+      <!-- Transaction history -->
+      <div>
+        <!-- Header row -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:800;color:#e8eaf0;">Transaction History</div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="printDebtorStatement('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">🖨 Print</button>
+            <button onclick="openAddDebtorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>
+          </div>
+        </div>
+
+        <!-- Search bar -->
+        <div style="position:relative;margin-bottom:10px;">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#4a5a7a;font-size:14px;">🔍</span>
+          <input id="dr-tx-search" type="text" placeholder="Search by note, amount or date..."
+            oninput="_drTxRender('${id}')"
+            style="width:100%;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:9px 12px 9px 34px;color:#e8eaf0;font-size:12px;box-sizing:border-box;outline:none;" />
+        </div>
+
+        <!-- Month Navigator -->
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+            <button onclick="_drTxShiftMonth('${id}',-1)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;color:#a0b0d0;font-size:16px;font-weight:800;padding:5px 12px;">&#8249;</button>
+            <div id="dr-tx-month-label" style="flex:1;text-align:center;font-size:13px;font-weight:800;color:#e8eaf0;"></div>
+            <button onclick="_drTxShiftMonth('${id}',1)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;color:#a0b0d0;font-size:16px;font-weight:800;padding:5px 12px;">&#8250;</button>
+            <button onclick="_drTxToggleCustomRange('${id}')" id="dr-tx-custom-btn" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;color:#7a8aaa;font-size:11px;font-weight:700;padding:5px 10px;white-space:nowrap;">&#128197; Custom</button>
+          </div>
+          <div id="dr-tx-custom-range" style="display:none;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <label style="font-size:10px;color:#4a5a7a;font-weight:700;display:block;margin-bottom:3px;">FROM DATE</label>
+              <input id="dr-tx-from" type="date" oninput="_drTxOnCustomDate('${id}')"
+                style="width:100%;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:7px 10px;color:#e8eaf0;font-size:12px;box-sizing:border-box;outline:none;" />
+            </div>
+            <div>
+              <label style="font-size:10px;color:#4a5a7a;font-weight:700;display:block;margin-bottom:3px;">TO DATE</label>
+              <input id="dr-tx-to" type="date" oninput="_drTxOnCustomDate('${id}')"
+                style="width:100%;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:7px 10px;color:#e8eaf0;font-size:12px;box-sizing:border-box;outline:none;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter type tabs -->
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
+          ${["all","sale","payment","return"].map(f=>{
+            const labels={all:"📋 All",sale:"🛒 Sale",payment:"💰 Payment",return:"↩️ Return"};
+            const cnt={all:txs.length,sale:txs.filter(t=>t.type==="sale").length,payment:txs.filter(t=>t.type==="payment").length,return:txs.filter(t=>t.type==="return").length};
+            return `<button id="dr-tf-${f}" onclick="_drTxSetFilter('${id}','${f}')"
+              style="flex:1;cursor:pointer;border-radius:8px;padding:7px 6px;font-size:11px;font-weight:800;
+                     background:${f==="all"?"linear-gradient(135deg,#166534,#22c55e)":"#0a0e1a"};
+                     border:1px solid ${f==="all"?"#22c55e":"#1e2a45"};
+                     color:${f==="all"?"#4ade80":"#4a5a7a"};">
+              ${labels[f]}<br><span style="font-size:10px;opacity:0.7;">(${cnt[f]})</span>
+            </button>`;
+          }).join("")}
+        </div>
+
+        <!-- Summary line -->
+        <div id="dr-tx-summary" style="font-size:11px;color:#4a5a7a;margin-bottom:8px;min-height:16px;"></div>
+
+        <!-- Transaction list -->
+        <div id="dr-tx-list" style="display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;">
+          ${txs.length===0?`<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>`:"⏳"}
+        </div>
+      </div>
+    </div>
+  `);
+  _drTxCurrentFilter="all";
+  (function(debtorId){
+    setTimeout(function(){
+      var now=new Date();
+      window._drTxNavYear=now.getFullYear();
+      window._drTxNavMonth=now.getMonth();
+      window._drTxIsCustom=false;
+      if(typeof _drTxApplyMonthNav==="function") _drTxApplyMonthNav(debtorId);
+    }, 50);
+  })(id);
+}
+
+function _drTxSetFilter(debtorId, filter){
+  _drTxCurrentFilter = filter;
+  const colors={all:"#4ade80",sale:"#22c55e",payment:"#60a5fa",return:"#a78bfa"};
+  ["all","sale","payment","return"].forEach(f=>{
+    const btn=document.getElementById("dr-tf-"+f); if(!btn) return;
+    const active=f===filter;
+    btn.style.background=active?"linear-gradient(135deg,#166534,#22c55e)":"#0a0e1a";
+    btn.style.border="1px solid "+(active?"#22c55e":"#1e2a45");
+    btn.style.color=active?colors[f]:"#4a5a7a";
+  });
+  _drTxRender(debtorId);
+}
+
+function _drTxRender(debtorId){
+  const listEl=document.getElementById("dr-tx-list");
+  const summaryEl=document.getElementById("dr-tx-summary");
+  if(!listEl) return;
+  const dr=getDebtors().find(d=>d.id===debtorId);
+  if(!dr){listEl.innerHTML='<div style="text-align:center;padding:30px;color:#4a5a7a;">Not found</div>';return;}
+
+  const allTxs=(dr.transactions||[]).slice().reverse();
+  const search=(document.getElementById("dr-tx-search")?.value||"").trim().toLowerCase();
+  const fromStr=document.getElementById("dr-tx-from")?.value||"";
+  const toStr=document.getElementById("dr-tx-to")?.value||"";
+  const fromDate=fromStr?new Date(fromStr):null;
+  const toDate=toStr?new Date(toStr+"T23:59:59"):null;
+
+  let filtered=allTxs;
+  if(_drTxCurrentFilter!=="all") filtered=filtered.filter(tx=>tx.type===_drTxCurrentFilter);
+  if(fromDate) filtered=filtered.filter(tx=>new Date(tx.date)>=fromDate);
+  if(toDate)   filtered=filtered.filter(tx=>new Date(tx.date)<=toDate);
+  if(search)   filtered=filtered.filter(tx=>
+    (tx.note||"").toLowerCase().includes(search)||
+    String(tx.amount).includes(search)||
+    (tx.date||"").includes(search)||
+    (tx.type||"").toLowerCase().includes(search)
+  );
+
+  const totalSale=filtered.filter(t=>t.type==="sale").reduce((s,t)=>s+t.amount,0);
+  const totalIn=filtered.filter(t=>t.type==="payment"||t.type==="return").reduce((s,t)=>s+t.amount,0);
+  if(summaryEl) summaryEl.innerHTML=filtered.length===0?"":
+    `<span style="color:#e8eaf0;font-weight:700;">${filtered.length} result${filtered.length>1?"s":""}</span>`+
+    (totalSale?` &nbsp;·&nbsp; <span style="color:#22c55e;">🛒 ${formatINR(totalSale)}</span>`:"")+
+    (totalIn?` &nbsp;·&nbsp; <span style="color:#60a5fa;">💰 ${formatINR(totalIn)}</span>`:"");
+
+  if(filtered.length===0){
+    listEl.innerHTML=`<div style="text-align:center;padding:30px;color:#4a5a7a;">
+      <div style="font-size:28px;margin-bottom:8px;">🔍</div>
+      No transactions match your search/filter.
+      <br><button onclick="_drTxSetFilter('`+debtorId+`','all');var _s=document.getElementById('dr-tx-search');if(_s)_s.value='';window._drTxIsCustom=false;var _cb=document.getElementById('dr-tx-custom-btn');var _cr=document.getElementById('dr-tx-custom-range');if(_cb){_cb.style.color='#7a8aaa';_cb.style.border='1px solid #1e2a45';}if(_cr)_cr.style.display='none';var _now=new Date();window._drTxNavYear=_now.getFullYear();window._drTxNavMonth=_now.getMonth();_drTxApplyMonthNav('`+debtorId+`');"
+        style="margin-top:10px;cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#22c55e;font-size:12px;font-weight:700;padding:7px 14px;">
+        Clear Filters
+      </button>
+    </div>`;
+    return;
+  }
+
+  const origTxs=(dr.transactions||[]);
+  const typeBadge={
+    sale:    {bg:"#14532d33",col:"#4ade80"},
+    payment: {bg:"#1e3a6e33",col:"#60a5fa"},
+    return:  {bg:"#2e106544",col:"#c4b5fd"},
+  };
+
+  listEl.innerHTML=filtered.map(tx=>{
+    const origIdx=origTxs.findIndex(t=>t.id===tx.id);
+    const isDebit=tx.type==="payment"||tx.type==="return";
+    const amtColor=debtTxColor(tx.type);
+    const dateStr=new Date(tx.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
+    const tb=typeBadge[tx.type]||{bg:"#1e2a45",col:"#7a8aaa"};
+    return `<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:20px;flex-shrink:0;">${debtTxIcon(tx.type)}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
+          <span style="font-size:13px;font-weight:700;color:#e8eaf0;">${escHtml(tx.note||tx.type)}</span>
+          <span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:${tb.bg};color:${tb.col};">${tx.type}</span>
+        </div>
+        <div style="font-size:11px;color:#7a8aaa;">📅 ${dateStr}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:14px;font-weight:800;color:${amtColor};">${isDebit?"-":"+"}${formatINR(tx.amount)}</div>
+      </div>
+      <button onclick="deleteDebtTx('${debtorId}',${origIdx});setTimeout(()=>_drTxRender('${debtorId}'),300);"
+        style="cursor:pointer;background:none;border:none;color:#4a5a7a;font-size:14px;padding:2px 6px;" title="Delete">✕</button>
+    </div>`;
+  }).join("");
+}
+
+// ── Add Debtor Transaction Modal ──────────────────────────────────────────────
+function openAddDebtTxModal(debtorId, defaultType){
+  const today = new Date().toISOString().slice(0,10);
+  const dr = getDebtors().find(d=>d.id===debtorId);
+  if(!dr){ notify("❌ Debtor not found","error"); return; }
+
+  const typeLabels = {sale:"🛒 Record Sale to", payment:"💰 Record Payment from", return:"↩️ Record Return from"};
+  const typeDescs  = {
+    sale:    "Recording a sale increases the amount they owe you.",
+    payment: "Recording a payment decreases the amount they owe you.",
+    return:  "Recording a return decreases the amount they owe you.",
+  };
+  const typeColors = {sale:"#22c55e",payment:"#60a5fa",return:"#a78bfa"};
+
+  showWideModal(`
+    ${modalHeader(typeLabels[defaultType]+" "+escHtml(dr.name))}
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <input type="hidden" id="drtx-debtor-id" value="${debtorId}" />
+      <input type="hidden" id="drtx-type" value="${defaultType}" />
+
+      <div style="background:#0a0e1a;border:1px solid ${typeColors[defaultType]}33;border-radius:10px;padding:12px;font-size:12px;color:${typeColors[defaultType]};">
+        ${typeDescs[defaultType]}
+      </div>
+
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">AMOUNT (₹) *</label>
+        <input class="input" id="drtx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
+      </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">DESCRIPTION</label>
+        <input class="input" id="drtx-note" placeholder="e.g. Rice 50kg, Payment via UPI..." style="margin-bottom:0;" />
+      </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">DATE</label>
+        <input class="input" id="drtx-date" type="date" value="${today}" style="margin-bottom:0;" />
+      </div>
+      <button onclick="saveDebtTransaction()" class="btn" style="background:linear-gradient(135deg,#166534,#22c55e);color:#fff;font-weight:800;margin-top:4px;">
+        ✅ Save ${defaultType.charAt(0).toUpperCase()+defaultType.slice(1)}
+      </button>
+    </div>
+  `);
+  setTimeout(()=>document.getElementById("drtx-amount")?.focus(),100);
+}
+
+function saveDebtTransaction(){
+  const debtorId = document.getElementById("drtx-debtor-id")?.value;
+  const type     = document.getElementById("drtx-type")?.value;
+  const amtRaw   = parseFloat(document.getElementById("drtx-amount")?.value||"0");
+  const note     = document.getElementById("drtx-note")?.value.trim()||"";
+  const date     = document.getElementById("drtx-date")?.value||new Date().toISOString().slice(0,10);
+
+  if(!debtorId||!type){ notify("⚠️ Error: missing debtor info","error"); return; }
+  if(isNaN(amtRaw)||amtRaw<=0){ notify("⚠️ Enter a valid amount"); return; }
+
+  const debtors = getDebtors();
+  const idx = debtors.findIndex(d=>d.id===debtorId);
+  if(idx<0){ notify("❌ Debtor not found","error"); return; }
+
+  if(!debtors[idx].transactions) debtors[idx].transactions=[];
+  debtors[idx].transactions.push({
+    id:     "DT"+Date.now()+Math.random().toString(36).slice(2,5),
+    type,
+    amount: amtRaw,
+    note,
+    date,
+    createdAt: Date.now(),
+  });
+  saveDebtors(debtors);
+  closeModal();
+  notify("✅ "+type.charAt(0).toUpperCase()+type.slice(1)+" of "+formatINR(amtRaw)+" saved");
+  setTimeout(()=>openDebtorDetail(debtorId), 200);
+}
+
+function deleteDebtTx(debtorId, origIdx){
+  if(!confirm("Delete this transaction?")) return;
+  const debtors = getDebtors();
+  const idx = debtors.findIndex(d=>d.id===debtorId);
+  if(idx<0) return;
+  debtors[idx].transactions = (debtors[idx].transactions||[]).filter((_,i)=>i!==origIdx);
+  saveDebtors(debtors);
+  notify("🗑 Transaction deleted");
+  setTimeout(()=>openDebtorDetail(debtorId), 200);
+}
+
+function printDebtorStatement(id){
+  const dr = getDebtors().find(d=>d.id===id);
+  if(!dr) return;
+  const bal = debtBalance(dr);
+  const shopName = (appSettings&&appSettings.shopName)||"My Shop";
+  const txs = (dr.transactions||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+
+  let running = 0;
+  const rows = txs.map(tx=>{
+    let dr_amt="", cr_amt="";
+    if(tx.type==="sale"){ running+=tx.amount; dr_amt=formatINR(tx.amount); }
+    else { running-=tx.amount; cr_amt=formatINR(tx.amount); }
+    return `<tr>
+      <td>${new Date(tx.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</td>
+      <td>${escHtml(tx.note||tx.type)}</td>
+      <td style="color:#22c55e;text-align:right;">${dr_amt}</td>
+      <td style="color:#60a5fa;text-align:right;">${cr_amt}</td>
+      <td style="text-align:right;font-weight:700;color:${running>=0?"#22c55e":"#f59e0b"};">${formatINR(Math.abs(running))}</td>
+    </tr>`;
+  }).join("");
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Debtor Statement</title>
+  <style>body{font-family:Arial,sans-serif;padding:24px;color:#111;}h1{margin:0;}table{width:100%;border-collapse:collapse;margin-top:18px;}
+  th,td{border:1px solid #ddd;padding:8px 10px;font-size:13px;}th{background:#f3f4f6;font-weight:700;}
+  .bal{font-size:22px;font-weight:800;color:${bal>=0?"#16a34a":"#d97706"};}
+  </style></head><body>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div><h1>${shopName}</h1><div style="font-size:12px;color:#6b7280;margin-top:4px;">Debtor Statement</div></div>
+    <div style="text-align:right;">
+      <div style="font-size:13px;color:#6b7280;">Debtor: <b>${escHtml(dr.name)}</b></div>
+      ${dr.phone?`<div style="font-size:12px;color:#6b7280;">📞 ${dr.phone}</div>`:""}
+      ${dr.gstin?`<div style="font-size:12px;color:#6b7280;">🔢 ${dr.gstin}</div>`:""}
+      <div style="font-size:12px;color:#6b7280;">Printed: ${new Date().toLocaleDateString("en-IN")}</div>
+    </div>
+  </div>
+  <div style="margin-top:14px;padding:12px;background:#f9fafb;border-radius:8px;display:flex;justify-content:space-between;">
+    <div>Balance: <span class="bal">${formatINR(Math.abs(bal))}</span></div>
+    <div style="font-size:13px;color:#6b7280;">${bal>=0?"They owe you":"You owe them"}</div>
+  </div>
+  <table><thead><tr><th>Date</th><th>Description</th><th style="text-align:right;">Sale (Dr)</th><th style="text-align:right;">Receipt (Cr)</th><th style="text-align:right;">Balance</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+  </body></html>`;
+
+  const w=window.open("","_blank","width=860,height=700");
+  w.document.write(html);
+  w.document.close();
+}
+
+// ─── END DEBTORS MODULE ──────────────────────────────────────────────────────
+
 function renderSettings(){
   const savedPhone = localStorage.getItem("sc_auth_phone") || "";
   const userNumRaw = savedPhone ? localStorage.getItem("sc_usernum_" + savedPhone) || "" : "";
@@ -7898,7 +8571,7 @@ const TRANSLATIONS = {
   en: {
     adminPanel:"Admin Panel", leaderboard:"Leaderboard", customers:"Customers",
     purchase:"Purchase", analytics:"Analytics", compare:"Compare",
-    inventory:"Inventory", creditors:"Creditors",
+    inventory:"Inventory", creditors:"Creditors", debtors:"Debtors",
     messages:"Messages",
     festivals:"Festival Rewards", settings:"Settings", logout:"Logout",
     addCustomer:"+ Add Customer", exportCSV:"⬇ Export CSV", addPurchase:"Add Purchase →",
@@ -10213,6 +10886,21 @@ async function _applyAutoAcceptedReq(doc){
       applied = true;
       notify("✅ " + (p.shopName||"A shop") + " accepted — added to your Creditors!", "success");
     }
+  } else if(req.type === "debtor"){
+    const debtors = getDebtors();
+    if(!debtors.find(d=>d.phone===p.phone && p.phone)){
+      debtors.push({
+        id: newDebtorId(), name: p.shopName||p.shopId||"Shop",
+        phone: p.phone||"", gstin: p.gstin||"",
+        address: [p.address,p.city].filter(Boolean).join(", "),
+        notes: "Auto-added — they accepted your connect request (" + (p.shopId||"") + ")",
+        createdAt:Date.now(), transactions:[],
+        _fromShopConnect:true, _connectedShopId:p.shopId||"",
+      });
+      saveDebtors(debtors);
+      applied = true;
+      notify("✅ " + (p.shopName||"A shop") + " accepted — added to your Debtors!", "success");
+    }
   } else if(req.type === "customer"){
     const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
     if(!allCust.find(c=>c.phone===p.phone && p.phone)){
@@ -10235,6 +10923,7 @@ async function _applyAutoAcceptedReq(doc){
     doc.ref.update({status:"consumed"}).catch(()=>{});
     if(currentTab===1) renderTab(1);
     if(currentTab===6) renderTab(6);
+    if(currentTab===7) renderTab(7);
   } else {
     // Even if already in local list, mark consumed and refresh UI
     // because the direct Firestore write (Step 2 in acceptShopRequest) may have
@@ -10461,6 +11150,27 @@ async function acceptShopRequest(req){
     if (profile.phone) startLinkedLedgerListener(profile.phone, _onLinkedCreditorTx);
   }
 
+  function _autoAddAsDebtor(profile){
+    const debtors = getDebtors();
+    const existing = debtors.find(d=>d.phone===profile.phone && profile.phone);
+    if(existing){ notify(`ℹ️ ${profile.shopName||"This shop"} is already in your Debtors`); return; }
+    debtors.push({
+      id:           newDebtorId(),
+      name:         profile.shopName || profile.shopId || "Unknown Shop",
+      phone:        profile.phone || "",
+      gstin:        profile.gstin || "",
+      address:      [profile.address, profile.city].filter(Boolean).join(", "),
+      notes:        `Auto-added via Shop Connect (${profile.shopId||""})`,
+      createdAt:    Date.now(),
+      transactions: [],
+      _fromShopConnect: true,
+      _connectedShopId: profile.shopId || "",
+      _linkedPhone: profile.phone || "",
+    });
+    saveDebtors(debtors);
+    notify(`✅ ${profile.shopName||"Shop"} added to your Debtors!`);
+  }
+
   function _autoAddAsCustomer(profile){
     const allCustomers = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
     const existing = allCustomers.find(c=>c.phone===profile.phone && profile.phone);
@@ -10496,6 +11206,8 @@ async function acceptShopRequest(req){
   // req.type = what Shop A wants ME to add THEM as
   if(req.type === "creditor"){
     _autoAddAsCreditor(p);   // Shop A wants me to record them as my creditor
+  } else if(req.type === "debtor"){
+    _autoAddAsDebtor(p);     // Shop A wants me to record them as my debtor
   } else if(req.type === "customer"){
     _autoAddAsCustomer(p);   // Shop A wants me to record them as my customer
   }
@@ -10545,6 +11257,32 @@ async function acceptShopRequest(req){
         await shopACredRef.set({list}, {merge:true});
       }
     } catch(e){ console.warn("Direct creditor write to Shop A failed:", e); }
+
+  } else if(roleInShopA === "debtor"){
+    // Shop B should appear in Shop A's DEBTORS — write directly to Shop A's debtors cloud doc
+    const shopAPhone = req.fromPhone;
+    const newDebtId = "DR" + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase();
+    const newDebt = {
+      id: newDebtId,
+      name: myProfile.shopName,
+      phone: myProfile.phone,
+      gstin: myProfile.gstin || "",
+      address: [myProfile.address, myProfile.city].filter(Boolean).join(", "),
+      notes: "Auto-added — they accepted your connect request (" + (myProfile.shopId||"") + ")",
+      createdAt: Date.now(),
+      transactions: [],
+      _fromShopConnect: true,
+      _connectedShopId: myProfile.shopId || "",
+    };
+    try {
+      const shopADebtRef = db.collection("users").doc(shopAPhone).collection("app_data").doc("debtors");
+      const existing = await shopADebtRef.get().catch(()=>null);
+      let list = (existing && existing.exists && existing.data().list) ? existing.data().list : [];
+      if(!list.find(d=>d.phone===myProfile.phone)){
+        list.push(newDebt);
+        await shopADebtRef.set({list}, {merge:true});
+      }
+    } catch(e){ console.warn("Direct debtor write to Shop A failed:", e); }
 
   } else if(roleInShopA === "customer"){
     // Shop B should appear in Shop A's CUSTOMERS — write directly to Shop A's customers collection
@@ -10632,19 +11370,31 @@ function renderMessagesTab(){
         const initials = (p.shopName||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
         // req.type = what they want ME to add THEM as
         // "creditor" → they want me to record them as my creditor (they supply to me)
+        // "debtor"   → they want me to record them as my debtor (they buy from me)
         // "customer" → they want me to record them as my customer (they buy from me)
         const roleLabel = req.type === "creditor"
           ? "add you as their <b style='color:#60a5fa;'>Customer/Debtor</b> — and wants you to add them as your <b style='color:#f59e0b;'>Creditor</b>"
+          : req.type === "debtor"
+          ? "add you as their <b style='color:#f59e0b;'>Creditor</b> — and wants you to add them as your <b style='color:#22c55e;'>Debtor</b>"
           : "add you as their <b style='color:#f59e0b;'>Creditor</b> — and wants you to add them as your <b style='color:#60a5fa;'>Customer/Debtor</b>";
         const roleDesc = req.type === "creditor"
           ? "✅ Accept → <b style='color:#f59e0b;'>They appear in your Creditors</b> (they supply to you) · You appear in their Customers."
+          : req.type === "debtor"
+          ? "✅ Accept → <b style='color:#22c55e;'>They appear in your Debtors</b> (they buy from you) · You appear in their Creditors."
           : "✅ Accept → <b style='color:#60a5fa;'>They appear in your Customers</b> (they buy from you) · You appear in their Creditors.";
         const timeStr = new Date(req.createdAt).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+        const cardBorderColor = req.type==='creditor'?'#92400e':req.type==='debtor'?'#166534':'#1e3a6e';
+        const avatarGrad = req.type==='creditor'?'#92400e,#d97706':req.type==='debtor'?'#166534,#22c55e':'#1e3a6e,#2a5aaa';
+        const badgeBg = req.type==='creditor'?'#92400e33':req.type==='debtor'?'#16653433':'#1e3a6e33';
+        const badgeBorder = req.type==='creditor'?'#d97706':req.type==='debtor'?'#22c55e':'#3a6aee';
+        const badgeColor = req.type==='creditor'?'#fbbf24':req.type==='debtor'?'#4ade80':'#60a5fa';
+        const badgeLabel = req.type==='creditor'?'🏦 Creditor':req.type==='debtor'?'🧾 Debtor':'👤 Customer';
+        const acceptLabel = req.type==='creditor'?'My Creditors':req.type==='debtor'?'My Debtors':'My Customers';
         return `
-          <div style="background:#0d1220;border:2px solid ${req.type==='creditor'?'#92400e':'#1e3a6e'};border-radius:16px;padding:18px;margin-bottom:14px;">
+          <div style="background:#0d1220;border:2px solid ${cardBorderColor};border-radius:16px;padding:18px;margin-bottom:14px;">
             <!-- Shop info -->
             <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
-              <div style="width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,${req.type==='creditor'?'#92400e,#d97706':'#1e3a6e,#2a5aaa'});display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">
+              <div style="width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,${avatarGrad});display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">
                 ${p.shopIcon?`<img src="${p.shopIcon}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;" onerror="this.style.display='none'">`:initials}
               </div>
               <div style="flex:1;min-width:0;">
@@ -10652,8 +11402,8 @@ function renderMessagesTab(){
                 <div style="font-size:12px;color:#60a5fa;font-family:monospace;font-weight:700;">${escHtml(p.shopId||"")}</div>
                 <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">📅 ${timeStr}</div>
               </div>
-              <div style="background:${req.type==='creditor'?'#92400e33':'#1e3a6e33'};border:1px solid ${req.type==='creditor'?'#d97706':'#3a6aee'};border-radius:8px;padding:4px 10px;font-size:11px;font-weight:800;color:${req.type==='creditor'?'#fbbf24':'#60a5fa'};white-space:nowrap;">
-                ${req.type==='creditor'?'🏦 Creditor':'👤 Customer'}
+              <div style="background:${badgeBg};border:1px solid ${badgeBorder};border-radius:8px;padding:4px 10px;font-size:11px;font-weight:800;color:${badgeColor};white-space:nowrap;">
+                ${badgeLabel}
               </div>
             </div>
             <!-- Message -->
@@ -10672,7 +11422,7 @@ function renderMessagesTab(){
             <div style="display:flex;gap:10px;">
               <button onclick="_acceptReqById('${req.id}')" class="btn"
                 style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:12px;font-size:14px;font-weight:800;">
-                ✅ Accept — Add to ${req.type==='creditor'?'My Creditors':'My Customers'}
+                ✅ Accept — Add to ${acceptLabel}
               </button>
               <button onclick="_declineReqById('${req.id}')" class="btn"
                 style="flex:1;background:#1a0a0a;border:1px solid #ef4444;color:#ef4444;padding:12px;font-size:13px;font-weight:700;">
