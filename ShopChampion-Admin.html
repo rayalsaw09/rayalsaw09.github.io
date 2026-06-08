@@ -3277,12 +3277,12 @@ function renderCustomers(sorted,q=""){
   // Count linked customers for live sync badge
   let allCustData = [];
   try { allCustData = JSON.parse(localStorage.getItem(storageKey("customers_v2")) || "[]"); } catch {}
-  const linkedCustCount = allCustData.filter(c => c._fromShopConnect && c.phone).length;
+  const linkedCustCount = 0; // Linked shops removed
   const pendingBanner = linkedCustCount > 0 ? `
     <div style="background:linear-gradient(135deg,#0a1628,#0d1e38);border:2px solid #1e3a6e;border-radius:12px;padding:13px 16px;margin:0 14px 10px;display:flex;align-items:center;gap:12px;">
       <div style="font-size:22px;">🔗</div>
       <div style="flex:1;">
-        <div style="font-size:13px;font-weight:800;color:#60a5fa;">Live Ledger Active — ${linkedCustCount} Linked Shop${linkedCustCount>1?'s':''}</div>
+
         <div style="font-size:11px;color:#4a7aaa;margin-top:2px;">Transactions sync automatically — no accept needed</div>
       </div>
       <div style="font-size:10px;font-weight:800;color:#22c55e;background:#14532d44;border:1px solid #22c55e44;border-radius:6px;padding:3px 8px;">🟢 LIVE</div>
@@ -5227,7 +5227,7 @@ async function doShopIdSearch(mode){
             // If I add them as my DEBTOR   → I am their CREDITOR
             // If I add them as my CUSTOMER → I am their CREDITOR (retail)
             const roleIAmToThem = myMode==='creditor' ? 'debtor' : myMode==='debtor' ? 'creditor' : 'creditor';
-            const ok=await sendShopConnectRequest(${JSON.stringify(profile).replace(/"/g,'&quot;')},roleIAmToThem,myMode);
+            // sendShopConnectRequest removed
             if(ok){btn.style.background='linear-gradient(135deg,#16a34a,#22c55e)';btn.style.color='#fff';btn.textContent='✅ Request Sent! They will see it in their Messages tab.';}
             else{btn.disabled=false;btn.textContent='📨 Send Connect Request (notify them)';}
           })()" class="btn"
@@ -5406,7 +5406,7 @@ function renderCreditorsTab(){
 
   const searchVal   = window._credSearch || "";
   const gstFilter   = window._credGstFilter  || "all"; // 'all' | 'gst' | 'nogst'
-  const linkFilter  = window._credLinkFilter || "all"; // 'all' | 'linked' | 'normal'
+  // linkFilter removed — all shops manage their own creditors independently
 
   let filtered = creditors.filter(c=>
     !searchVal ||
@@ -5416,9 +5416,7 @@ function renderCreditorsTab(){
   // Apply GST filter
   if (gstFilter === 'gst')   filtered = filtered.filter(c => !!c.gstin);
   if (gstFilter === 'nogst') filtered = filtered.filter(c => !c.gstin);
-  // Apply linked/normal filter
-  if (linkFilter === 'linked') filtered = filtered.filter(c => !!c._fromShopConnect && c.id !== "CR_UNRECONCILED");
-  if (linkFilter === 'normal') filtered = filtered.filter(c => !c._fromShopConnect || c.id === "CR_UNRECONCILED");
+  // No link filter — every shop manages its own creditors
 
   // Sort: Unreconciled always first, then highest balance
   filtered.sort((a,b)=>{
@@ -5482,9 +5480,7 @@ function renderCreditorsTab(){
     <div style="margin-bottom:16px;">
       <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔗 Shop Type:</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        ${[['all','🏢 All'],['linked','🔗 Linked Shops'],['normal','👤 Manual Entry']].map(([k,l])=>`
-          <button onclick="window._credLinkFilter='${k}';renderTab(6)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${linkFilter===k?'#60a5fa':'#1e2a45'};background:${linkFilter===k?'#0a1628':'transparent'};color:${linkFilter===k?'#60a5fa':'#4a5a7a'};font-size:12px;font-weight:${linkFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
-        `).join('')}
+
       </div>
     </div>
 
@@ -5551,7 +5547,7 @@ function _renderCreditorCard(cr){
           ${cr.gstin?` · 🔢 ${cr.gstin}`:""}
         </div>
         ${lastTx?`<div style="font-size:11px;color:#4a5a7a;margin-top:3px;">Last: ${credTxIcon(lastTx.type)} ${escHtml(lastTx.note||lastTx.type)} · ${new Date(lastTx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>`:""}
-        ${cr._fromShopConnect?`<div style="margin-top:4px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#1e3a6e44;color:#60a5fa;border:1px solid #2a5aaa44;">🔗 Linked Shop</span></div>`:""
+        ${""
         }
       </div>
       <!-- Balance -->
@@ -5697,9 +5693,7 @@ function deleteCreditor(id){
   saveCreditors(creditors);
   closeModal();
   notify("\uD83D\uDDD1 Creditor deleted");
-  if (cr && cr._fromShopConnect && cr.phone) {
-    sendRemovalNotification(cr.phone, cr.name, "creditor");
-  }
+
   renderTab(6);
 }
 
@@ -5793,13 +5787,9 @@ function openCreditorDetail(id){
           <div style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
         </div>
         ${!isUnrec ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
-          ${cr._fromShopConnect
-            ? `<button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
-               <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>`
-            : `<button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
-               <button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
-               <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>`
-          }
+            <button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
+          <button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
+          <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>
         </div>` : `<div style="font-size:12px;color:#d97706;font-weight:700;">Unreconciled<br>entries</div>`}
       </div>
 
@@ -5979,12 +5969,10 @@ function _crTxRender(creditorId){
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
           <span style="font-size:13px;font-weight:700;color:#e8eaf0;">${hl(tx.note||tx.type)}</span>
           <span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:${tb.bg};color:${tb.col};">${tx.type}</span>
-          ${tx.syncStatus==="pending"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#92400e44;color:#fbbf24;">🟡 Sync Pending</span>`:""}
-          ${(tx.syncStatus==="accepted"||tx.syncStatus==="synced")?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#14532d44;color:#4ade80;">🔗 Live Synced</span>`:""}
-          ${tx.syncStatus==="declined"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#7f1d1d44;color:#f87171;">⚠️ Retry Sync</span>`:""}
+
         </div>
         <div style="font-size:11px;color:#7a8aaa;">📅 ${dateStr}${tx.invoiceNo?` &nbsp;·&nbsp; 🧾 ${hl(tx.invoiceNo)}`:""}</div>
-        ${(tx.syncStatus==="declined" || tx.syncStatus==="local") && cr._fromShopConnect ? `<div style="margin-top:4px;"><button onclick="openRequestAgainModal('${creditorId}','${tx.id||""}',${tx.amount},'${(tx.note||"").replace(/'/g,"\'")}','${tx.date||""}','${(tx.invoiceNo||"").replace(/'/g,"\'")}','${tx.syncReqId}')" style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:6px;color:#f87171;font-size:10px;font-weight:700;padding:3px 8px;">🔄 Request Again</button></div>`:""
+
         }
       </div>
       <div style="text-align:right;flex-shrink:0;">
@@ -5997,49 +5985,12 @@ function _crTxRender(creditorId){
 }
 
 
-function openRequestAgainModal(creditorId, txId, amount, note, date, invoiceNo, reqId){
-  const creditors = getCreditors();
-  const cr = creditors.find(c=>c.id===creditorId);
-  if(!cr){ notify("❌ Creditor not found","error"); return; }
-  showWideModal(`
-    ${modalHeader("🔄 Request Again — " + escHtml(cr.name))}
-    <div style="display:flex;flex-direction:column;gap:14px;">
-      <div style="background:#0a1220;border:1px solid #1e3a6e;border-radius:12px;padding:14px;">
-        <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:4px;">PAYMENT</div>
-        <div style="font-size:22px;font-weight:800;color:#22c55e;">${formatINR(amount)}</div>
-        ${note?`<div style="font-size:12px;color:#a0b0d0;margin-top:4px;">${escHtml(note)}</div>`:""}
-        <div style="font-size:11px;color:#4a5a7a;">${date}</div>
-      </div>
-      <div style="background:#1a0808;border:1px solid #ef444440;border-radius:12px;padding:12px;font-size:13px;color:#fca5a5;">
-        ❌ Previous sync request was declined. You can send up to 3 requests total.
-      </div>
-      <button onclick="sendPaymentSyncRequest('${creditorId}','${txId}',${amount},'${(note||'').replace(/'/g,"\'")}','${date}','${(invoiceNo||'').replace(/'/g,"\'")}','${cr.phone||''}','${reqId}')" class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-size:13px;font-weight:800;padding:12px;">
-        📤 Send Request Again
-      </button>
-      <button onclick="closeModal();setTimeout(()=>openCreditorDetail('${creditorId}'),200)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;color:#7a8aaa;font-size:13px;font-weight:700;padding:10px;">
-        Cancel
-      </button>
-    </div>
-  `);
-}
+function openRequestAgainModal(){} // Linked shops removed
 
 // ── Add Transaction Modal ─────────────────────────────────────────────────────
 function openAddTxModal(creditorId, defaultType){
   if(defaultType === "payment") { openSmartPaymentModal(creditorId); return; }
-  if(defaultType === "return")  {
-    const cr = getCreditors().find(c=>c.id===creditorId);
-    if(cr && cr._fromShopConnect){
-      notify("❌ Return entries are automated for linked shops", "error");
-      return;
-    }
-    openReturnModal(creditorId); return;
-  }
-  // Purchase flow — block for linked shops (automated from their Sale entry)
-  const crCheck = getCreditors().find(c=>c.id===creditorId);
-  if(crCheck && crCheck._fromShopConnect){
-    notify("❌ Purchase entries are automated for linked shops", "error");
-    return;
-  }
+  if(defaultType === "return")  { openReturnModal(creditorId); return; }
   const today = new Date().toISOString().slice(0,10);
   const cr = getCreditors().find(c=>c.id===creditorId);
   showWideModal(`
@@ -6244,7 +6195,6 @@ async function saveSmartPayment(){
     mode, ref,
     _paysBill: selectedBill||"",   // which purchase bill this pays (if selected)
     createdAt: Date.now(),
-    syncStatus: "local",
   };
   if(!cr.transactions) cr.transactions=[];
   cr.transactions.push(tx);
@@ -6252,12 +6202,7 @@ async function saveSmartPayment(){
   closeModal();
   notify(`✅ Payment of ${formatINR(amount)} recorded`,"success");
 
-  // If linked shop — send sync request to creditor (they see it in their Borrows tab)
-  if(cr._fromShopConnect && cr.phone && db && authPhone){
-    setTimeout(()=>openPaymentSyncModal(creditorId, txId, amount, tx.note, date, ref||"", selectedBill), 300);
-  } else {
-    setTimeout(()=>openCreditorDetail(creditorId),200);
-  }
+  setTimeout(()=>openCreditorDetail(creditorId),200);
 }
 
 // ── Return / Debit Note modal ──
@@ -6314,26 +6259,10 @@ function saveCrTransaction(){
 
   const txId = "TX"+Date.now();
   if(!creditors[idx].transactions) creditors[idx].transactions=[];
-  creditors[idx].transactions.push({ id:txId, type, amount, note, date, invoiceNo, createdAt:Date.now(), syncStatus:"local" });
+  creditors[idx].transactions.push({ id:txId, type, amount, note, date, invoiceNo, createdAt:Date.now() });
   saveCreditors(creditors);
 
-  // ── Cross-write to linked creditor's shop for purchase/payment/return ──
-  const cr = creditors[idx];
-  if(cr._fromShopConnect && cr.phone){
-    // purchase and payment already handled by openPurchaseSyncModal/openPaymentSyncModal
-    // Return must be cross-written here since there's no separate sync modal for it
-    if(type === "return"){
-      const crossTx = { id:txId, type:"return", amount, note, date, invoiceNo, createdAt:Date.now() };
-      crossWriteTransaction(cr.phone, crossTx).then(ok => {
-        if(ok) notify("🔗 Return synced to " + (cr.name||cr.phone) + " live!", "success");
-        else   notify("⚠️ Live sync failed — return saved locally", "error");
-      });
-    } else if(type === "purchase"){
-      crossWriteCreditorTx(creditorId, { id:txId, type:"purchase", amount, note, date, invoiceNo, createdAt:Date.now() });
-    } else if(type === "payment"){
-      crossWriteCreditorTx(creditorId, { id:txId, type:"payment", amount, note, date, invoiceNo, createdAt:Date.now() });
-    }
-  }
+
 
   closeModal();
   notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return"} of ${formatINR(amount)} recorded`);
@@ -6411,32 +6340,7 @@ function stopLinkedLedgerListener(theirPhone) {
 // When Shop B (creditor) cross-writes into my ledger, I see it live
 // This is for CUSTOMER VIEW — Shop A is a customer, linked shops cross-write
 // borrows/purchases into my linked_ledger path
-function startAllLinkedLedgerListeners() {
-  if (!db || !authPhone) return;
-
-  // IMPORTANT: Registration order matters — startLinkedLedgerListener keeps only
-  // the FIRST handler registered for a given phone. Debtors must come first because
-  // a linked shop often appears in both Customers AND Debtors; the Debtors handler
-  // (_onLinkedDebtorTx) is the correct one for cross-written purchases/payments.
-
-  // 1. DEBTORS first — highest priority (linked shops write purchases/payments here)
-  const allDebt = getDebtors();
-  allDebt.filter(d => d._fromShopConnect && d.phone).forEach(d => {
-    startLinkedLedgerListener(d.phone, _onLinkedDebtorTx);
-  });
-
-  // 2. CREDITORS — confirmation/response writes from creditor side
-  const allCred = getCreditors();
-  allCred.filter(c => c._fromShopConnect && c.phone).forEach(c => {
-    startLinkedLedgerListener(c.phone, _onLinkedCreditorTx);
-  });
-
-  // 3. CUSTOMERS last — only registers if phone not already taken by Debtors above
-  const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2")) || "[]");
-  allCust.filter(c => c._fromShopConnect && c.phone).forEach(c => {
-    startLinkedLedgerListener(c.phone, _onLinkedCustomerTx);
-  });
-}
+function startAllLinkedLedgerListeners() { /* Linked shops removed */ }
 
 // ─── Handler: Shop B (a creditor) wrote something into MY ledger ─────────────
 // Shop A (our creditor) cross-wrote into our ledger.
@@ -6725,27 +6629,7 @@ function _onLinkedDebtorTx(theirPhone, txs) {
 // Called after Shop A records any purchase/payment/return with a linked creditor
 // Instead of showing a modal and waiting for accept — writes directly, instantly.
 
-async function crossWriteCreditorTx(creditorId, tx) {
-  const cr = getCreditors().find(c => c.id === creditorId);
-  if (!cr || !cr._fromShopConnect || !cr.phone) return;
-
-  const ok = await crossWriteTransaction(cr.phone, tx);
-  if (ok) {
-    // Update local tx syncStatus to "synced"
-    const creditors = getCreditors();
-    const idx = creditors.findIndex(c => c.id === creditorId);
-    if (idx >= 0) {
-      const tIdx = (creditors[idx].transactions || []).findIndex(t => t.id === tx.id);
-      if (tIdx >= 0) {
-        creditors[idx].transactions[tIdx].syncStatus = "synced";
-        saveCreditors(creditors);
-      }
-    }
-    notify("🔗 Synced to " + (cr.name || cr.phone) + " live!", "success");
-  } else {
-    notify("⚠️ Live sync failed — transaction saved locally", "error");
-  }
-}
+async function crossWriteCreditorTx(creditorId, tx) { /* Linked shops removed */ }
 
 // ─── PURCHASE SYNC MODAL (now instant — no accept needed) ────────────────────
 function openPurchaseSyncModal(creditorId, txId, amount, note, date, invoiceNo) {
@@ -6755,11 +6639,9 @@ function openPurchaseSyncModal(creditorId, txId, amount, note, date, invoiceNo) 
   // Find the tx
   const tx = (cr.transactions || []).find(t => t.id === txId) || {
     id: txId, type: "purchase", amount, note, date, invoiceNo,
-    createdAt: Date.now(), syncStatus: "local",
+    createdAt: Date.now(),
   };
-
-  // Auto cross-write silently, no modal needed
-  crossWriteCreditorTx(creditorId, { ...tx, type: "purchase" });
+  // No cross-write — shops independent
   setTimeout(() => openCreditorDetail(creditorId), 200);
 }
 
@@ -6771,10 +6653,9 @@ function openPaymentSyncModal(creditorId, txId, amount, note, date, invoiceNo, s
   const tx = (cr.transactions || []).find(t => t.id === txId) || {
     id: txId, type: "payment", amount, note, date, invoiceNo,
     _paysBill: selectedBill || "",
-    createdAt: Date.now(), syncStatus: "local",
+    createdAt: Date.now(),
   };
-
-  crossWriteCreditorTx(creditorId, { ...tx, type: "payment", _paysBill: selectedBill || "" });
+  // No cross-write — shops independent
   setTimeout(() => openCreditorDetail(creditorId), 200);
 }
 
@@ -6814,10 +6695,7 @@ async function deleteCrTransaction(creditorId, txId) {
   const cr = creditors[idx];
   creditors[idx].transactions = (cr.transactions || []).filter(t => t.id !== txId);
   saveCreditors(creditors);
-  // Cross-delete from their side if linked
-  if (cr._fromShopConnect && cr.phone) {
-    await crossDeleteTransaction(cr.phone, txId);
-  }
+  // No cross-delete — shops are independent
   notify("🗑 Transaction deleted");
   closeModal();
   setTimeout(() => openCreditorDetail(creditorId), 200);
@@ -6957,7 +6835,7 @@ function renderDebtorsTab(){
   const totalCount  = debtors.length;
   const searchVal   = window._debtSearch || "";
   const gstFilter   = window._debtGstFilter  || "all";
-  const linkFilter  = window._debtLinkFilter || "all"; // 'all' | 'linked' | 'normal'
+  // linkFilter removed — all shops manage their own debtors independently
 
   let filtered = debtors.filter(d=>
     !searchVal ||
@@ -6966,9 +6844,7 @@ function renderDebtorsTab(){
   );
   if(gstFilter==="gst")    filtered = filtered.filter(d=>!!d.gstin);
   if(gstFilter==="nogst")  filtered = filtered.filter(d=>!d.gstin);
-  // Apply linked/normal filter
-  if(linkFilter==="linked") filtered = filtered.filter(d=>!!d._fromShopConnect);
-  if(linkFilter==="normal") filtered = filtered.filter(d=>!d._fromShopConnect);
+  // No link filter — every shop manages its own debtors
 
   filtered.sort((a,b)=>debtBalance(b)-debtBalance(a));
 
@@ -7019,9 +6895,7 @@ function renderDebtorsTab(){
     <div style="margin-bottom:16px;">
       <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔗 Shop Type:</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        ${[['all','🏢 All'],['linked','🔗 Linked Shops'],['normal','👤 Manual Entry']].map(([k,l])=>`
-          <button onclick="window._debtLinkFilter='${k}';renderTab(7)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${linkFilter===k?'#4ade80':'#1e2a45'};background:${linkFilter===k?'#022c1a':'transparent'};color:${linkFilter===k?'#4ade80':'#4a5a7a'};font-size:12px;font-weight:${linkFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
-        `).join('')}
+
       </div>
     </div>
 
@@ -7083,7 +6957,7 @@ function _renderDebtorCard(dr){
           ${dr.gstin?` · 🔢 ${dr.gstin}`:""}
         </div>
         ${lastTx?`<div style="font-size:11px;color:#4a5a7a;margin-top:3px;">Last: ${debtTxIcon(lastTx.type)} ${escHtml(lastTx.note||lastTx.type)} · ${new Date(lastTx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>`:""}
-        ${dr._fromShopConnect?`<div style="margin-top:4px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#16653444;color:#4ade80;border:1px solid #22c55e44;">🔗 Linked Shop</span></div>`:""}
+
       </div>
       <!-- Balance -->
       <div style="text-align:right;flex-shrink:0;">
@@ -7172,9 +7046,7 @@ function deleteDebtor(id){
   saveDebtors(debtors);
   closeModal();
   notify("\uD83D\uDDD1 Debtor deleted");
-  if (dr && dr._fromShopConnect && dr.phone) {
-    sendRemovalNotification(dr.phone, dr.name, "debtor");
-  }
+
   renderTab(7);
 }
 
@@ -7243,7 +7115,6 @@ function openDebtorDetail(id){
         </div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:18px;font-weight:800;color:#e8eaf0;">${escHtml(dr.name)}</div>
-          ${dr._fromShopConnect?`<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#16653444;color:#4ade80;border:1px solid #22c55e44;">🔗 Linked Shop</span>`:""}
         </div>
         <button onclick="closeModal()" style="cursor:pointer;background:none;border:none;color:#4a5a7a;font-size:20px;padding:4px;">✕</button>
       </div>
@@ -7255,12 +7126,9 @@ function openDebtorDetail(id){
           <div style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          ${dr._fromShopConnect
-            ? `<button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sale</button>`
-            : `<button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sale</button>
-               <button onclick="openAddDebtTxModal('${id}','payment')" class="btn" style="background:#0a1628;border:1px solid #60a5fa;color:#60a5fa;font-size:12px;padding:8px 12px;">💰 Payment</button>
-               <button onclick="openAddDebtTxModal('${id}','return')"  class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>`
-          }
+          <button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sell</button>
+          <button onclick="openAddDebtTxModal('${id}','payment')" class="btn" style="background:#0a1628;border:1px solid #60a5fa;color:#60a5fa;font-size:12px;padding:8px 12px;">💰 Payment Receipt</button>
+          <button onclick="openAddDebtTxModal('${id}','return')"  class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Returned</button>
         </div>
       </div>
 
@@ -7316,7 +7184,7 @@ function openDebtorDetail(id){
         <!-- Filter type tabs -->
         <div style="display:flex;gap:6px;margin-bottom:10px;">
           ${["all","sale","payment","return"].map(f=>{
-            const labels={all:"📋 All",sale:"🛒 Sale",payment:"💰 Payment",return:"↩️ Return"};
+            const labels={all:"📋 All",sale:"🛒 Sell",payment:"💰 Payment Receipt",return:"↩️ Returned"};
             const cnt={all:txs.length,sale:txs.filter(t=>t.type==="sale").length,payment:txs.filter(t=>t.type==="payment").length,return:txs.filter(t=>t.type==="return").length};
             return `<button id="dr-tf-${f}" onclick="_drTxSetFilter('${id}','${f}')"
               style="flex:1;cursor:pointer;border-radius:8px;padding:7px 6px;font-size:11px;font-weight:800;
@@ -7392,7 +7260,7 @@ function _drTxRender(debtorId){
   const totalIn=filtered.filter(t=>t.type==="payment"||t.type==="return").reduce((s,t)=>s+t.amount,0);
   if(summaryEl) summaryEl.innerHTML=filtered.length===0?"":
     `<span style="color:#e8eaf0;font-weight:700;">${filtered.length} result${filtered.length>1?"s":""}</span>`+
-    (totalSale?` &nbsp;·&nbsp; <span style="color:#22c55e;">🛒 ${formatINR(totalSale)}</span>`:"")+
+    (totalSale?` &nbsp;·&nbsp; <span style="color:#22c55e;">🛒 Sell: ${formatINR(totalSale)}</span>`:"")+
     (totalIn?` &nbsp;·&nbsp; <span style="color:#60a5fa;">💰 ${formatINR(totalIn)}</span>`:"");
 
   if(filtered.length===0){
@@ -7444,7 +7312,7 @@ function openAddDebtTxModal(debtorId, defaultType){
   const dr = getDebtors().find(d=>d.id===debtorId);
   if(!dr){ notify("❌ Debtor not found","error"); return; }
 
-  const typeLabels = {sale:"🛒 Record Sale to", payment:"💰 Record Payment from", return:"↩️ Record Return from"};
+  const typeLabels = {sale:"🛒 Record Sell to", payment:"💰 Record Payment Receipt from", return:"↩️ Record Returned from"};
   const typeDescs  = {
     sale:    "Recording a sale increases the amount they owe you.",
     payment: "Recording a payment decreases the amount they owe you.",
@@ -7455,26 +7323,13 @@ function openAddDebtTxModal(debtorId, defaultType){
   // invDatalist no longer used — custom dropdown per row shows stock qty
   const invDatalist = '';
 
-  const isLinked = !!(dr._fromShopConnect);
-
   // Item rows section (only shown for sale type)
-  // Linked shops: items are MANDATORY (must select at least one item from inventory)
-  // Unlinked shops: items are OPTIONAL
   const itemsSection = defaultType === "sale" ? `
     <div style="border-top:1px solid #1e2a45;padding-top:12px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;">📦 ITEMS SOLD</label>
-        ${isLinked
-          ? `<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#7c2d1233;color:#fca5a5;border:1px solid #7c2d1266;">Required — Linked Shop</span>`
-          : `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#1e2a4533;color:#7a8aaa;border:1px solid #1e2a45;">Optional</span>`
-        }
+        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#1e2a4533;color:#7a8aaa;border:1px solid #1e2a45;">Optional</span>
       </div>
-      ${isLinked
-        ? `<div style="background:#0d0505;border:1px solid #7c2d1244;border-radius:8px;padding:8px 12px;font-size:11px;color:#fca5a5;margin-bottom:8px;">
-            ⚠️ This is a linked shop. You must select items — sale cannot exceed available inventory stock.
-           </div>`
-        : ''
-      }
       ${invDatalist}
       <div id="drtx-items-list"></div>
       <button type="button" onclick="_drtxAddItemRow()"
@@ -7489,7 +7344,7 @@ function openAddDebtTxModal(debtorId, defaultType){
     <div style="display:flex;flex-direction:column;gap:12px;">
       <input type="hidden" id="drtx-debtor-id" value="${debtorId}" />
       <input type="hidden" id="drtx-type" value="${defaultType}" />
-      <input type="hidden" id="drtx-is-linked" value="${isLinked?'1':'0'}" />
+
 
       <div style="background:#0a0e1a;border:1px solid ${typeColors[defaultType]}33;border-radius:10px;padding:12px;font-size:12px;color:${typeColors[defaultType]};">
         ${typeDescs[defaultType]}
@@ -7624,13 +7479,6 @@ function saveDebtTransaction(){
   if(!debtorId||!type){ notify("⚠️ Error: missing debtor info","error"); return; }
   if(isNaN(amtRaw)||amtRaw<=0){ notify("⚠️ Enter a valid amount"); return; }
 
-  // Block disallowed types for linked shops
-  const isLinkedCheck = document.getElementById("drtx-is-linked")?.value === "1";
-  if(isLinkedCheck && type !== "sale"){
-    notify("❌ Linked shops can only have Sale entries in Debtors tab", "error");
-    return;
-  }
-
   // Collect item rows if this is a sale
   const soldItems = [];
   if(type === "sale"){
@@ -7644,13 +7492,9 @@ function saveDebtTransaction(){
 
     const debtors2 = getDebtors();
     const dr = debtors2.find(d=>d.id===debtorId);
-    const isLinked = document.getElementById("drtx-is-linked")?.value === "1";
 
     // Linked shop: items are MANDATORY
-    if(isLinked && soldItems.length === 0){
-      notify("❌ This is a linked shop — you must add at least one item to record a sale", "error");
-      return;
-    }
+
 
     // ── Stock validation ─────────────────────────────────────────────────────
     for(const si of soldItems){
@@ -7687,26 +7531,11 @@ function saveDebtTransaction(){
     invDeductSold(soldItems, dr.id);
   }
 
-  // ── Cross-write to linked debtor's shop so THEY see this as a purchase ──
-  const isLinkedDebt = document.getElementById("drtx-is-linked")?.value === "1";
-  if(isLinkedDebt && debtors[idx].phone && type === "sale"){
-    const crossTx = {
-      id:        txId,
-      type:      "purchase",   // on their side this is a purchase (they bought from us)
-      amount:    amtRaw,
-      note,
-      date,
-      invoiceNo: "",
-      createdAt: Date.now(),
-    };
-    crossWriteTransaction(debtors[idx].phone, crossTx).then(ok => {
-      if(ok) notify("🔗 Synced to " + (debtors[idx].name||debtors[idx].phone) + " live!", "success");
-      else   notify("⚠️ Live sync failed — transaction saved locally", "error");
-    });
-  }
+
 
   closeModal();
-  notify("✅ "+type.charAt(0).toUpperCase()+type.slice(1)+" of "+formatINR(amtRaw)+" saved");
+  const typeName = type==="sale"?"Sell":type==="payment"?"Payment Receipt":type==="return"?"Returned":type;
+  notify("✅ "+typeName+" of "+formatINR(amtRaw)+" saved");
   setTimeout(()=>openDebtorDetail(debtorId), 200);
 }
 
@@ -10831,7 +10660,7 @@ function renderInventoryTab(){
         <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:8px;">🏷️ Purchased From (Creditor) <span style="font-size:10px;color:#4a5a7a;font-weight:400;">— links stock to creditor account</span></div>
         <select class="input" id="inv-creditor-id" style="margin-bottom:0;">
           <option value="">⚠️ Skip — add to Unreconciled</option>
-          ${getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").map(c=>`<option value="${c.id}">${c._fromShopConnect?'🔗 ':' '}${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
+          ${getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").map(c=>`<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
         </select>
         <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">If skipped, a purchase entry will be added under <b style="color:#f59e0b;">Unreconciled Purchases</b> in the Creditors tab.</div>
       </div>
@@ -10967,7 +10796,7 @@ function renderInventoryTab(){
           <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:8px;">🏷️ Purchased From (Creditor) <span style="font-size:10px;color:#4a5a7a;font-weight:400;">— links stock to creditor account</span></div>
           <select class="input" id="inv-creditor-id" style="margin-bottom:0;">
             <option value="">⚠️ Skip — add to Unreconciled</option>
-            ${getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").map(c=>`<option value="${c.id}">${c._fromShopConnect?'🔗 ':' '}${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
+            ${getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").map(c=>`<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
           </select>
           <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">If skipped, a purchase entry will be added under <b style="color:#f59e0b;">Unreconciled Purchases</b> in the Creditors tab.</div>
         </div>
@@ -11126,19 +10955,6 @@ function invSubmitAdd(){
   invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
   _invLogCreditorPurchase(creditorId, name, qty, cost, date, notes);
 
-  // If linked shop creditor, offer sync
-  if(creditorId && cost > 0){
-    const creditors = getCreditors();
-    const cr = creditors.find(c=>c.id===creditorId);
-    if(cr && cr._fromShopConnect && cr.phone && db && authPhone){
-      const totalAmt = Math.round(qty * cost * 100) / 100;
-      const txNote = notes ? `${name} ×${qty} — ${notes}` : `${name} ×${qty} (new inventory)`;
-      const latestTx = (cr.transactions||[]).slice(-1)[0];
-      const txId = latestTx?.id || ("TX"+Date.now());
-      setTimeout(()=>openPurchaseSyncModal(creditorId, txId, totalAmt, txNote, date, ""), 400);
-      return;
-    }
-  }
 }
 
 function invSubmitRestock(){
@@ -11157,23 +10973,6 @@ function invSubmitRestock(){
   const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
   invAddStock(invRestockSelected, unit||(selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
   _invLogCreditorPurchase(creditorId, invRestockSelected, qty, cost, date, notes);
-
-  // If creditor is a linked shop, offer payment sync request
-  if(creditorId && cost > 0){
-    const creditors = getCreditors();
-    const cr = creditors.find(c=>c.id===creditorId);
-    if(cr && cr._fromShopConnect && cr.phone && db && authPhone){
-      const totalAmt = Math.round(qty * cost * 100) / 100;
-      const txNote = notes ? `${invRestockSelected} ×${qty} — ${notes}` : `${invRestockSelected} ×${qty} (inventory purchase)`;
-      // Find the tx we just added to get its id
-      const latestTx = (cr.transactions||[]).slice(-1)[0];
-      const txId = latestTx?.id || ("TX"+Date.now());
-      setTimeout(()=>openPurchaseSyncModal(creditorId, txId, totalAmt, txNote, date, ""), 400);
-      invRestockSelected = null;
-      invRestockSearch = "";
-      return;
-    }
-  }
 
   invRestockSelected = null;
   invRestockSearch = "";
