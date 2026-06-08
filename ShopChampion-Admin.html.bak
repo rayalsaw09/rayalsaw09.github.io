@@ -1374,7 +1374,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
   <div id="sync-banner">
     <div id="sync-status-dot"></div>
     <span style="font-size:12px;color:#4f4;font-weight:700;" id="sync-status-text">Ready</span>
-    <span id="db-status-text" style="display:none;font-size:11px;color:#4a5a7a;margin-left:4px;"></span>
+    <span id="db-status-text" style="font-size:11px;color:#4a5a7a;margin-left:4px;"></span>
     <span style="font-size:11px;color:#556;" id="sync-time"></span>
     <button class="btn" onclick="showFirebaseSettings()" style="display:none;">🔥 Firebase</button>
 
@@ -6745,8 +6745,6 @@ async function saveSmartPayment(){
 function openReturnModal(creditorId){
   const cr = getCreditors().find(c=>c.id===creditorId);
   const today = new Date().toISOString().slice(0,10);
-  const invOpts = inventoryItems.map(x=>`<option value="${escHtml(x.name)}">${escHtml(x.name)}${x.unit?" ("+x.unit+")":""} · Stock: ${invGetStock(x.name)}</option>`).join("");
-  const hasInv = inventoryItems.length > 0;
   showWideModal(`
     ${modalHeader("↩️ Record Return / Debit Note")}
     <div style="display:flex;flex-direction:column;gap:12px;">
@@ -6755,33 +6753,6 @@ function openReturnModal(creditorId){
       <div style="background:#0d0020;border:1px solid #a78bfa33;border-radius:10px;padding:12px;font-size:12px;color:#a78bfa;">
         ↩️ A return reduces the amount you owe (goods sent back / debit note issued).
       </div>
-
-      <!-- Inventory deduction section -->
-      <div style="background:#1a0a0a;border:1px solid #2e1010;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-          <input type="checkbox" id="tx-ret-inv-link" ${hasInv?"":"disabled"} onchange="(function(){const on=document.getElementById('tx-ret-inv-link').checked;document.getElementById('tx-ret-inv-fields').style.display=on?'flex':'none';})()" style="width:16px;height:16px;accent-color:#f87171;" />
-          <span style="font-size:13px;font-weight:700;color:#fca5a5;">📦 Deduct from Inventory</span>
-          <span style="font-size:11px;color:#7a8aaa;">${hasInv?"(optional)":"No inventory items yet"}</span>
-        </label>
-        <div id="tx-ret-inv-fields" style="display:none;flex-direction:column;gap:8px;">
-          <div>
-            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">ITEM *</label>
-            <select class="input" id="tx-ret-inv-item" onchange="(function(){const sel=document.getElementById('tx-ret-inv-item').value;const inv=inventoryItems.find(x=>x.name===sel);if(inv&&inv.sellingPrice>0){const qty=parseFloat(document.getElementById('tx-ret-inv-qty').value||'0');if(qty>0){document.getElementById('tx-amount').value=(qty*inv.sellingPrice).toFixed(2);}document.getElementById('tx-ret-inv-sp').textContent='Selling price: ₹'+inv.sellingPrice+'/'+inv.unit;}else{document.getElementById('tx-ret-inv-sp').textContent='';}})()" style="margin-bottom:0;">
-              <option value="">— Select item —</option>
-              ${invOpts}
-            </select>
-            <div id="tx-ret-inv-sp" style="font-size:11px;color:#fca5a5;margin-top:3px;"></div>
-          </div>
-          <div>
-            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">QUANTITY *</label>
-            <input class="input" id="tx-ret-inv-qty" type="number" placeholder="0" min="0.01" step="0.01" style="margin-bottom:0;" oninput="(function(){const sel=document.getElementById('tx-ret-inv-item').value;const inv=inventoryItems.find(x=>x.name===sel);if(inv&&inv.sellingPrice>0){const qty=parseFloat(document.getElementById('tx-ret-inv-qty').value||'0');if(qty>0)document.getElementById('tx-amount').value=(qty*inv.sellingPrice).toFixed(2);}})()"/>
-          </div>
-          <div style="font-size:11px;color:#7a8aaa;background:#120505;border-radius:6px;padding:8px;">
-            📉 Selecting an item will auto-deduct from stock (you are sending goods back to supplier).
-          </div>
-        </div>
-      </div>
-
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">RETURN AMOUNT (₹) *</label>
         <input class="input" id="tx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
@@ -6828,7 +6799,6 @@ function saveCrTransaction(){
   // ── Inventory link (purchase only) ──
   let invLinked = false;
   let invItemName = "";
-  let invQtyLinked = 0;
   if(type === "purchase"){
     const invLinkCb = document.getElementById("tx-inv-link");
     if(invLinkCb?.checked){
@@ -6845,24 +6815,6 @@ function saveCrTransaction(){
       invAddStock(itemName, unit, qty, cost>0?cost:0, date, note||invoiceNo||"", cat, sp, item?.gstRate||0, item?.gstIncluded||"");
       invLinked = true;
       invItemName = itemName;
-      invQtyLinked = qty;
-    }
-  }
-  if(type === "return"){
-    const invLinkCb = document.getElementById("tx-ret-inv-link");
-    if(invLinkCb?.checked){
-      const itemName = document.getElementById("tx-ret-inv-item")?.value?.trim();
-      const qty      = parseFloat(document.getElementById("tx-ret-inv-qty")?.value||"0");
-      if(!itemName){ notify("⚠️ Select an inventory item or uncheck the inventory link"); return; }
-      if(!(qty>0)){ notify("⚠️ Enter a valid quantity to deduct"); return; }
-      const currentStock = invGetStock(itemName);
-      if(qty > currentStock){ notify(`⚠️ Not enough stock to deduct. Available: ${currentStock}`); return; }
-      // Deduct from inventory (returned goods leave your stock)
-      const pricePerUnit = qty > 0 ? amount / qty : 0;
-      invDeductSold([{name: itemName, qty, pricePerUnit}], null);
-      invLinked = true;
-      invItemName = itemName;
-      invQtyLinked = qty;
     }
   }
 
@@ -6870,12 +6822,12 @@ function saveCrTransaction(){
   if(!creditors[idx].transactions) creditors[idx].transactions=[];
   creditors[idx].transactions.push({
     id:txId, type, amount, note, date, invoiceNo,
-    ...(invLinked ? { _invItem: invItemName, _invQty: invQtyLinked } : {}),
+    ...(invLinked ? { _invItem: invItemName, _invQty: parseFloat(document.getElementById("tx-inv-qty")?.value||"0") } : {}),
     createdAt:Date.now(), syncStatus:"local"
   });
   saveCreditors(creditors);
   closeModal();
-  notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return"} of ${formatINR(amount)} recorded${invLinked?" · "+invItemName+(type==="return"?" stock deducted":" stock updated"):""}`);
+  notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return"} of ${formatINR(amount)} recorded${invLinked?" · "+invItemName+" stock updated":""}`);
   setTimeout(()=>openCreditorDetail(creditorId),200);
 }
 
@@ -7642,7 +7594,7 @@ function openDebtorDetail(id){
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sale</button>
-          <button onclick="openAddDebtTxModal('${id}','payment')" class="btn" style="background:#0a1628;border:1px solid #60a5fa;color:#60a5fa;font-size:12px;padding:8px 12px;">💰 Receipt</button>
+          <button onclick="openAddDebtTxModal('${id}','payment')" class="btn" style="background:#0a1628;border:1px solid #60a5fa;color:#60a5fa;font-size:12px;padding:8px 12px;">💰 Payment</button>
           <button onclick="openAddDebtTxModal('${id}','return')"  class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>
         </div>
       </div>
@@ -7699,7 +7651,7 @@ function openDebtorDetail(id){
         <!-- Filter type tabs -->
         <div style="display:flex;gap:6px;margin-bottom:10px;">
           ${["all","sale","payment","return"].map(f=>{
-            const labels={all:"📋 All",sale:"🛒 Sale",payment:"💰 Receipt",return:"↩️ Return"};
+            const labels={all:"📋 All",sale:"🛒 Sale",payment:"💰 Payment",return:"↩️ Return"};
             const cnt={all:txs.length,sale:txs.filter(t=>t.type==="sale").length,payment:txs.filter(t=>t.type==="payment").length,return:txs.filter(t=>t.type==="return").length};
             return `<button id="dr-tf-${f}" onclick="_drTxSetFilter('${id}','${f}')"
               style="flex:1;cursor:pointer;border-radius:8px;padding:7px 6px;font-size:11px;font-weight:800;
@@ -7776,7 +7728,7 @@ function _drTxRender(debtorId){
   if(summaryEl) summaryEl.innerHTML=filtered.length===0?"":
     `<span style="color:#e8eaf0;font-weight:700;">${filtered.length} result${filtered.length>1?"s":""}</span>`+
     (totalSale?` &nbsp;·&nbsp; <span style="color:#22c55e;">🛒 ${formatINR(totalSale)}</span>`:"")+
-    (totalIn?` &nbsp;·&nbsp; <span style="color:#60a5fa;">💰 Received: ${formatINR(totalIn)}</span>`:"");
+    (totalIn?` &nbsp;·&nbsp; <span style="color:#60a5fa;">💰 ${formatINR(totalIn)}</span>`:"");
 
   if(filtered.length===0){
     listEl.innerHTML=`<div style="text-align:center;padding:30px;color:#4a5a7a;">
@@ -7808,7 +7760,10 @@ function _drTxRender(debtorId){
       <div style="flex:1;min-width:0;">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
           <span style="font-size:13px;font-weight:700;color:#e8eaf0;">${escHtml(tx.note||tx.type)}</span>
-          <span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:${tb.bg};color:${tb.col};">${tx.type==="payment"?"receipt":tx.type}</span>
+          <span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:${tb.bg};color:${tb.col};">${tx.type}</span>
+        </div>
+        <div style="font-size:11px;color:#7a8aaa;">📅 ${dateStr}</div>
+        ${tx._invItem?`<div style="margin-top:3px;"><span style="background:#0a1a0a;border:1px solid #1a4a1a;border-radius:5px;padding:2px 8px;font-size:11px;color:#4ade80;">📦 ${tx._invQty} ${(inventoryItems.find(x=>x.name===tx._invItem)||{}).unit||"unit"} ${escHtml(tx._invItem)}</span></div>`:""}
       </div>
       <div style="text-align:right;flex-shrink:0;">
         <div style="font-size:14px;font-weight:800;color:${amtColor};">${isDebit?"-":"+"}${formatINR(tx.amount)}</div>
@@ -7825,30 +7780,23 @@ function openAddDebtTxModal(debtorId, defaultType){
   const dr = getDebtors().find(d=>d.id===debtorId);
   if(!dr){ notify("❌ Debtor not found","error"); return; }
 
-  const typeLabels = {sale:"🛒 Record Sale to", payment:"💰 Record Receipt from", return:"↩️ Record Return from"};
+  const typeLabels = {sale:"🛒 Record Sale to", payment:"💰 Record Payment from", return:"↩️ Record Return from"};
   const typeDescs  = {
     sale:    "Recording a sale increases the amount they owe you.",
-    payment: "Recording a receipt decreases the amount they owe you.",
+    payment: "Recording a payment decreases the amount they owe you.",
     return:  "Recording a return decreases the amount they owe you.",
   };
   const typeColors = {sale:"#22c55e",payment:"#60a5fa",return:"#a78bfa"};
 
-  // Inventory section — for sales (deduct) and returns (add back)
+  // Inventory section — only for sales
   const invOpts = inventoryItems.map(x=>`<option value="${escHtml(x.name)}">${escHtml(x.name)}${x.unit?" ("+x.unit+")":""} · Stock: ${invGetStock(x.name)}</option>`).join("");
   const hasInv = inventoryItems.length > 0;
   const isSale = defaultType === "sale";
-  const isReturn = defaultType === "return";
-  const invBg = isSale ? "#0a1a0a" : "#0d0020";
-  const invBorder = isSale ? "#1a4a1a" : "#2e1065";
-  const invAccent = isSale ? "#22c55e" : "#a78bfa";
-  const invTextCol = isSale ? "#4ade80" : "#c4b5fd";
-  const invLabel = isSale ? "📦 Deduct from Inventory" : "📦 Add back to Inventory";
-  const invHint = isSale ? "📉 Selecting an item will auto-deduct from stock and auto-fill the amount from its selling price." : "📈 Selecting an item will add the quantity back to stock (customer returned goods).";
-  const invSection = (isSale || isReturn) ? `
-    <div id="drtx-inv-section" style="background:${invBg};border:1px solid ${invBorder};border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+  const invSection = isSale ? `
+    <div id="drtx-inv-section" style="background:#0a1a0a;border:1px solid #1a4a1a;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px;">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-        <input type="checkbox" id="drtx-inv-link" ${hasInv?"":"disabled"} onchange="(function(){const on=document.getElementById('drtx-inv-link').checked;document.getElementById('drtx-inv-fields').style.display=on?'flex':'none';})()" style="width:16px;height:16px;accent-color:${invAccent};" />
-        <span style="font-size:13px;font-weight:700;color:${invTextCol};">${invLabel}</span>
+        <input type="checkbox" id="drtx-inv-link" ${hasInv?"":"disabled"} onchange="(function(){const on=document.getElementById('drtx-inv-link').checked;document.getElementById('drtx-inv-fields').style.display=on?'flex':'none';})()" style="width:16px;height:16px;accent-color:#22c55e;" />
+        <span style="font-size:13px;font-weight:700;color:#4ade80;">📦 Deduct from Inventory</span>
         <span style="font-size:11px;color:#7a8aaa;">${hasInv?"(optional)":"No inventory items yet"}</span>
       </label>
       <div id="drtx-inv-fields" style="display:none;flex-direction:column;gap:8px;">
@@ -7858,14 +7806,14 @@ function openAddDebtTxModal(debtorId, defaultType){
             <option value="">— Select item —</option>
             ${invOpts}
           </select>
-          <div id="drtx-inv-sp" style="font-size:11px;color:${invTextCol};margin-top:3px;"></div>
+          <div id="drtx-inv-sp" style="font-size:11px;color:#4ade80;margin-top:3px;"></div>
         </div>
         <div>
           <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">QUANTITY *</label>
           <input class="input" id="drtx-inv-qty" type="number" placeholder="0" min="0.01" step="0.01" style="margin-bottom:0;" oninput="(function(){const sel=document.getElementById('drtx-inv-item').value;const inv=inventoryItems.find(x=>x.name===sel);if(inv&&inv.sellingPrice>0){const qty=parseFloat(document.getElementById('drtx-inv-qty').value||'0');if(qty>0)document.getElementById('drtx-amount').value=(qty*inv.sellingPrice).toFixed(2);}})()"/>
         </div>
         <div style="font-size:11px;color:#7a8aaa;background:#070f07;border-radius:6px;padding:8px;">
-          ${invHint}
+          📉 Selecting an item will auto-deduct from stock and auto-fill the amount from its selling price.
         </div>
       </div>
     </div>` : "";
@@ -7895,7 +7843,7 @@ function openAddDebtTxModal(debtorId, defaultType){
         <input class="input" id="drtx-date" type="date" value="${today}" style="margin-bottom:0;" />
       </div>
       <button onclick="saveDebtTransaction()" class="btn" style="background:linear-gradient(135deg,#166534,#22c55e);color:#fff;font-weight:800;margin-top:4px;">
-        ✅ Save ${defaultType==="payment"?"Receipt":defaultType.charAt(0).toUpperCase()+defaultType.slice(1)}
+        ✅ Save ${defaultType.charAt(0).toUpperCase()+defaultType.slice(1)}
       </button>
       <button onclick="closeModal()" class="btn" style="background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;padding:12px;">
         ← Cancel
@@ -7923,28 +7871,18 @@ function saveDebtTransaction(){
   let invLinked = false;
   let invItemName = "";
   let invQty = 0;
-  if(type === "sale" || type === "return"){
+  if(type === "sale"){
     const invLinkCb = document.getElementById("drtx-inv-link");
     if(invLinkCb?.checked){
       const itemName = document.getElementById("drtx-inv-item")?.value?.trim();
       invQty = parseFloat(document.getElementById("drtx-inv-qty")?.value||"0");
       if(!itemName){ notify("⚠️ Select an inventory item or uncheck the inventory link"); return; }
-      if(!(invQty>0)){ notify("⚠️ Enter a valid quantity"); return; }
-      if(type === "sale"){
-        const currentStock = invGetStock(itemName);
-        if(invQty > currentStock){ notify(`⚠️ Not enough stock. Available: ${currentStock}`); return; }
-        // Deduct from inventory (sale)
-        const pricePerUnit = invQty > 0 ? amtRaw / invQty : 0;
-        invDeductSold([{name: itemName, qty: invQty, pricePerUnit}], null);
-      } else {
-        // Add back to inventory (customer return)
-        const item = inventoryItems.find(x=>x.name===itemName);
-        const unit = item?.unit||"unit";
-        const cat  = item?.category||"General";
-        const sp   = item?.sellingPrice||0;
-        const costPerUnit = invQty > 0 ? amtRaw / invQty : 0;
-        invAddStock(itemName, unit, invQty, costPerUnit, date, note||"Customer return", cat, sp, item?.gstRate||0, item?.gstIncluded||"");
-      }
+      if(!(invQty>0)){ notify("⚠️ Enter a valid quantity to deduct"); return; }
+      const currentStock = invGetStock(itemName);
+      if(invQty > currentStock){ notify(`⚠️ Not enough stock. Available: ${currentStock}`); return; }
+      // Deduct from inventory
+      const pricePerUnit = invQty > 0 ? amtRaw / invQty : 0;
+      invDeductSold([{name: itemName, qty: invQty, pricePerUnit}], null);
       invLinked = true;
       invItemName = itemName;
     }
@@ -7962,9 +7900,7 @@ function saveDebtTransaction(){
   });
   saveDebtors(debtors);
   closeModal();
-  const typeLabel = type==="payment"?"Receipt":type.charAt(0).toUpperCase()+type.slice(1);
-  const invMsg = invLinked ? ` · ${invItemName} stock ${type==="return"?"added back":"deducted"}` : "";
-  notify("✅ "+typeLabel+" of "+formatINR(amtRaw)+" saved"+invMsg);
+  notify("✅ "+type.charAt(0).toUpperCase()+type.slice(1)+" of "+formatINR(amtRaw)+" saved"+(invLinked?" · "+invItemName+" stock deducted":""));
   setTimeout(()=>openDebtorDetail(debtorId), 200);
 }
 
@@ -14151,583 +14087,5 @@ window.addEventListener('popstate', function(e){
 history.pushState({sc:true}, '');
 </script>
 
-<!-- ═══════════════════════════════════════════════════════════════
-     SHOPCHAMPION ONBOARDING GUIDE SYSTEM
-     Shows on first registration. Language choice: Hindi / English.
-     Each feature is explained verbally (Web Speech) + written text.
-     The active feature's tab/element is highlighted with a spotlight.
-     After tour ends → Replay menu lets user pick language, feature, or skip.
-     Replay button available anytime in Settings tab.
-═══════════════════════════════════════════════════════════════ -->
-<style>
-/* ── Overlay backdrop ── */
-#sc-guide-backdrop {
-  display:none;position:fixed;inset:0;z-index:99990;
-  background:rgba(0,0,0,0.72);backdrop-filter:blur(2px);
-  pointer-events:none;transition:opacity .3s;
-}
-/* ── Spotlight cut-out ── */
-#sc-guide-spotlight {
-  position:fixed;z-index:99991;
-  border-radius:14px;
-  box-shadow:0 0 0 9999px rgba(0,0,0,0.72), 0 0 0 3px #FFD700, 0 0 24px 6px #FFD70088;
-  transition:all .45s cubic-bezier(.4,0,.2,1);
-  pointer-events:none;
-}
-/* ── Speech bubble ── */
-#sc-guide-bubble {
-  display:none;position:fixed;z-index:99999;
-  background:linear-gradient(135deg,#0d1830,#0a1020);
-  border:2px solid #FFD700;border-radius:20px;
-  padding:18px 20px 16px;max-width:340px;min-width:240px;
-  box-shadow:0 8px 40px rgba(0,0,0,.7);
-  font-family:'Segoe UI',sans-serif;
-  transition:all .35s cubic-bezier(.4,0,.2,1);
-}
-#sc-guide-bubble .gb-step {
-  font-size:10px;font-weight:800;color:#FFD700;letter-spacing:1.5px;
-  text-transform:uppercase;margin-bottom:6px;
-}
-#sc-guide-bubble .gb-icon { font-size:28px;margin-bottom:8px;display:block; }
-#sc-guide-bubble .gb-title {
-  font-size:17px;font-weight:800;color:#e8eaf0;margin-bottom:8px;line-height:1.2;
-}
-#sc-guide-bubble .gb-text {
-  font-size:13.5px;color:#b0bcdc;line-height:1.6;margin-bottom:14px;
-}
-#sc-guide-bubble .gb-actions {
-  display:flex;gap:8px;flex-wrap:wrap;
-}
-#sc-guide-bubble .gb-btn-next {
-  flex:1;background:linear-gradient(135deg,#FFD700,#FFA500);
-  color:#1a0a00;border:none;border-radius:10px;
-  padding:10px 14px;font-size:13px;font-weight:800;cursor:pointer;
-  min-width:90px;
-}
-#sc-guide-bubble .gb-btn-skip {
-  background:transparent;color:#4a5a7a;border:1px solid #1e2a45;
-  border-radius:10px;padding:10px 14px;font-size:12px;cursor:pointer;
-}
-#sc-guide-bubble .gb-btn-full-skip {
-  width:100%;background:transparent;color:#3a4a6a;border:none;
-  padding:6px;font-size:11px;cursor:pointer;margin-top:4px;text-align:center;
-}
-/* ── Language picker ── */
-#sc-guide-lang {
-  display:none;position:fixed;inset:0;z-index:99999;
-  background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;
-  flex-direction:column;gap:0;
-}
-#sc-guide-lang-card {
-  background:linear-gradient(135deg,#0d1830,#0a1020);
-  border:2px solid #1e3060;border-radius:24px;
-  padding:28px 24px;max-width:340px;width:90%;text-align:center;
-}
-#sc-guide-lang-card h2 {
-  font-size:20px;font-weight:800;color:#e8eaf0;margin:0 0 6px;
-  font-family:'Rajdhani',sans-serif;
-}
-#sc-guide-lang-card p { font-size:13px;color:#7a8aaa;margin:0 0 20px; }
-.sc-lang-btn {
-  display:block;width:100%;padding:14px;margin-bottom:12px;
-  border-radius:14px;border:2px solid #1e2a45;background:#0a0e1a;
-  color:#e8eaf0;font-size:16px;font-weight:800;cursor:pointer;
-  transition:all .2s;
-}
-.sc-lang-btn:hover,.sc-lang-btn:active { border-color:#FFD700;background:#1a1400;color:#FFD700; }
-.sc-lang-btn .lang-sub { display:block;font-size:11px;font-weight:400;color:#4a5a7a;margin-top:3px; }
-.sc-lang-skip {
-  background:transparent;border:none;color:#3a4a6a;
-  font-size:12px;cursor:pointer;margin-top:8px;padding:8px;
-}
-/* ── Replay menu ── */
-#sc-guide-replay {
-  display:none;position:fixed;inset:0;z-index:99999;
-  background:rgba(0,0,0,.85);align-items:center;justify-content:center;
-}
-#sc-guide-replay-card {
-  background:linear-gradient(135deg,#0d1830,#0a1020);
-  border:2px solid #1e3060;border-radius:24px;
-  padding:24px;max-width:360px;width:92%;
-  max-height:90vh;overflow-y:auto;
-}
-#sc-guide-replay-card h2 {
-  font-size:18px;font-weight:800;color:#e8eaf0;margin:0 0 16px;
-  font-family:'Rajdhani',sans-serif;text-align:center;
-}
-.sc-replay-section-title {
-  font-size:10px;font-weight:800;color:#4a5a7a;
-  text-transform:uppercase;letter-spacing:1.2px;margin:12px 0 8px;
-}
-.sc-replay-row {
-  display:flex;align-items:center;gap:12px;padding:11px 14px;
-  border-radius:12px;background:#0a0e1a;border:1px solid #0d1525;
-  margin-bottom:8px;cursor:pointer;transition:all .18s;
-}
-.sc-replay-row:hover,.sc-replay-row:active { border-color:#FFD700;background:#1a1400; }
-.sc-replay-row .rr-icon { font-size:22px;flex-shrink:0; }
-.sc-replay-row .rr-text { flex:1; }
-.sc-replay-row .rr-title { font-size:14px;font-weight:700;color:#e8eaf0; }
-.sc-replay-row .rr-sub { font-size:11px;color:#4a5a7a;margin-top:2px; }
-.sc-replay-close {
-  display:block;width:100%;padding:12px;margin-top:16px;
-  background:transparent;border:1px solid #1e2a45;border-radius:12px;
-  color:#4a5a7a;font-size:13px;cursor:pointer;
-}
-</style>
-
-<!-- Language picker overlay -->
-<div id="sc-guide-lang" style="display:none;">
-  <div id="sc-guide-lang-card">
-    <div style="font-size:36px;margin-bottom:12px;">👋</div>
-    <h2>Welcome to ShopChampion!</h2>
-    <p id="sc-guide-lang-sub">Choose your language for the introduction tour</p>
-    <button class="sc-lang-btn" onclick="scGuideStartLang('hi')">
-      🇮🇳 हिंदी
-      <span class="lang-sub">Hindi · हिंदी में गाइड</span>
-    </button>
-    <button class="sc-lang-btn" onclick="scGuideStartLang('en')">
-      🇬🇧 English
-      <span class="lang-sub">English guide</span>
-    </button>
-    <button class="sc-lang-skip" onclick="scGuideClose()">Skip introduction →</button>
-  </div>
-</div>
-
-<!-- Backdrop + spotlight -->
-<div id="sc-guide-backdrop"></div>
-<div id="sc-guide-spotlight" style="display:none;"></div>
-
-<!-- Speech bubble -->
-<div id="sc-guide-bubble" style="display:none;">
-  <div class="gb-step" id="sc-gb-step"></div>
-  <span class="gb-icon" id="sc-gb-icon"></span>
-  <div class="gb-title" id="sc-gb-title"></div>
-  <div class="gb-text" id="sc-gb-text"></div>
-  <div class="gb-actions">
-    <button class="gb-btn-skip" onclick="scGuideNext()" id="sc-gb-skip-btn">Skip this ›</button>
-    <button class="gb-btn-next" onclick="scGuideNext()" id="sc-gb-next-btn">Next →</button>
-  </div>
-  <button class="gb-btn-full-skip" onclick="scGuideEndWithReplay()">Skip full introduction ✕</button>
-</div>
-
-<!-- Replay menu -->
-<div id="sc-guide-replay" style="display:none;align-items:center;justify-content:center;">
-  <div id="sc-guide-replay-card">
-    <h2>🎓 Introduction Guide</h2>
-    <div class="sc-replay-section-title" id="sc-rp-lang-title">Language</div>
-    <div class="sc-replay-row" onclick="scGuideStartLang('hi')">
-      <span class="rr-icon">🇮🇳</span>
-      <div class="rr-text">
-        <div class="rr-title">हिंदी</div>
-        <div class="rr-sub">Hindi — पूरी गाइड हिंदी में</div>
-      </div>
-    </div>
-    <div class="sc-replay-row" onclick="scGuideStartLang('en')">
-      <span class="rr-icon">🇬🇧</span>
-      <div class="rr-text">
-        <div class="rr-title">English</div>
-        <div class="rr-sub">Full guide in English</div>
-      </div>
-    </div>
-    <div class="sc-replay-section-title" id="sc-rp-feat-title">Jump to a feature</div>
-    <div id="sc-rp-features"></div>
-    <button class="sc-replay-close" onclick="scGuideCloseReplay()">✕ Close</button>
-  </div>
-</div>
-
-<script>
-// ═══════════════════════════════════════════════════════════════
-// SC GUIDE — Core
-// ═══════════════════════════════════════════════════════════════
-(function(){
-
-// ── Step definitions (icon, tabIndex to highlight, elementId or selector) ──
-const STEPS_EN = [
-  {
-    icon:"🏆", title:"Rankings (Leaderboard)",
-    text:"This is your Leaderboard — see your top customers ranked by their total purchases. The #1 customer gets the crown! Use this to identify your most loyal buyers.",
-    tabIndex:0, targetId:"tab-content"
-  },
-  {
-    icon:"👥", title:"Customers",
-    text:"The Customers tab shows all your registered customers. You can search, view their purchase history, and manage their profiles. Tap any customer to see full details.",
-    tabIndex:1, targetId:"tab-content"
-  },
-  {
-    icon:"💳", title:"Purchase Entry",
-    text:"Record a new purchase here. Select the customer, enter the amount or items bought, and save. This instantly updates their rank on the leaderboard.",
-    tabIndex:2, targetId:"tab-content"
-  },
-  {
-    icon:"📊", title:"Analytics",
-    text:"Analytics gives you charts and insights — daily sales trends, top products, busiest hours, and revenue summaries. Know your shop's performance at a glance.",
-    tabIndex:3, targetId:"tab-content"
-  },
-  {
-    icon:"⚖️", title:"Compare",
-    text:"Compare periods — this week vs last week, this month vs last month. See whether your business is growing or needs attention.",
-    tabIndex:4, targetId:"tab-content"
-  },
-  {
-    icon:"📦", title:"Inventory",
-    text:"Track your stock here. Add items with prices and quantities. You'll get alerts when stock runs low so you never run out of popular products.",
-    tabIndex:5, targetId:"tab-content"
-  },
-  {
-    icon:"🏦", title:"Creditors",
-    text:"Creditors are suppliers or people you owe money to. Record what you owe, set due dates, and track your payables — all in one place.",
-    tabIndex:6, targetId:"tab-content"
-  },
-  {
-    icon:"🧾", title:"Debtors",
-    text:"Debtors are customers who owe you money. Track outstanding dues, send WhatsApp reminders, and keep your receivables organised.",
-    tabIndex:7, targetId:"tab-content"
-  },
-  {
-    icon:"✉️", title:"Messages",
-    text:"Connect with other ShopChampion shops here. Send and receive trade requests, share stock, and build your supplier-buyer network.",
-    tabIndex:8, targetId:"tab-content"
-  },
-  {
-    icon:"⚙️", title:"Settings",
-    text:"Customise your app — change language, theme, shop name, voice announcements, display screen setup, and more. You can also replay this guide anytime from here!",
-    tabIndex:9, targetId:"tab-content"
-  }
-];
-
-const STEPS_HI = [
-  {
-    icon:"🏆", title:"लीडरबोर्ड (Leaderboard)",
-    text:"यह आपका लीडरबोर्ड है — यहाँ आपके सबसे ज़्यादा खरीदारी करने वाले ग्राहक रैंक में दिखते हैं। नंबर 1 ग्राहक को ताज मिलता है! इससे आप अपने सबसे वफ़ादार ग्राहकों को पहचान सकते हैं।",
-    speech:"यह आपका लीडरबोर्ड है। यहाँ आपके सबसे अच्छे ग्राहक रैंक के अनुसार दिखते हैं।",
-    tabIndex:0, targetId:"tab-content"
-  },
-  {
-    icon:"👥", title:"ग्राहक (Customers)",
-    text:"यहाँ आपके सभी रजिस्टर्ड ग्राहकों की सूची है। खोज करें, खरीदारी का इतिहास देखें, और ग्राहक की जानकारी अपडेट करें।",
-    speech:"ग्राहक टैब में आपके सभी ग्राहकों की जानकारी है। किसी भी ग्राहक पर टैप करें और उनकी पूरी जानकारी देखें।",
-    tabIndex:1, targetId:"tab-content"
-  },
-  {
-    icon:"💳", title:"खरीदारी दर्ज करें (Purchase)",
-    text:"यहाँ नई खरीदारी दर्ज करें। ग्राहक चुनें, राशि या आइटम डालें और सेव करें। यह तुरंत लीडरबोर्ड पर अपडेट हो जाता है।",
-    speech:"परचेज़ टैब से नई खरीदारी दर्ज करें। ग्राहक चुनें, रकम भरें, और सेव करें।",
-    tabIndex:2, targetId:"tab-content"
-  },
-  {
-    icon:"📊", title:"विश्लेषण (Analytics)",
-    text:"यहाँ आपके दुकान का पूरा हिसाब है — रोज़ की बिक्री, सबसे लोकप्रिय समान, सबसे व्यस्त घंटे, और कुल कमाई।",
-    speech:"एनालिटिक्स में आपकी दुकान की बिक्री के चार्ट और जानकारी है।",
-    tabIndex:3, targetId:"tab-content"
-  },
-  {
-    icon:"⚖️", title:"तुलना करें (Compare)",
-    text:"इस हफ़्ते और पिछले हफ़्ते की तुलना करें। देखें कि आपका व्यापार बढ़ रहा है या नहीं।",
-    speech:"कम्पेयर टैब से आप अलग-अलग समय की बिक्री की तुलना कर सकते हैं।",
-    tabIndex:4, targetId:"tab-content"
-  },
-  {
-    icon:"📦", title:"इन्वेंटरी (Inventory)",
-    text:"अपना स्टॉक यहाँ ट्रैक करें। आइटम, कीमत और मात्रा डालें। कम स्टॉक होने पर अलर्ट मिलेगा।",
-    speech:"इन्वेंटरी टैब में अपना सामान का स्टॉक रखें। कम होने पर अलर्ट आएगा।",
-    tabIndex:5, targetId:"tab-content"
-  },
-  {
-    icon:"🏦", title:"लेनदार (Creditors)",
-    text:"जिन्हें आपको पैसे देने हैं — सप्लायर या अन्य। उनका हिसाब यहाँ रखें, तारीख़ और राशि के साथ।",
-    speech:"क्रेडिटर्स टैब में वो लोग हैं जिन्हें आप पैसे देते हैं।",
-    tabIndex:6, targetId:"tab-content"
-  },
-  {
-    icon:"🧾", title:"देनदार (Debtors)",
-    text:"जिन ग्राहकों ने उधार लिया है — उनका हिसाब यहाँ है। WhatsApp से याद दिलाएं और बकाया ट्रैक करें।",
-    speech:"डेब्टर्स टैब में वो ग्राहक हैं जिन्होंने उधार लिया है।",
-    tabIndex:7, targetId:"tab-content"
-  },
-  {
-    icon:"✉️", title:"संदेश (Messages)",
-    text:"दूसरे ShopChampion दुकानदारों से जुड़ें। व्यापार के अनुरोध भेजें, स्टॉक शेयर करें।",
-    speech:"मेसेजेस में आप दूसरे दुकानदारों से जुड़ सकते हैं।",
-    tabIndex:8, targetId:"tab-content"
-  },
-  {
-    icon:"⚙️", title:"सेटिंग्स (Settings)",
-    text:"भाषा, थीम, दुकान का नाम, आवाज़ की घोषणाएं, और बहुत कुछ बदलें। इस गाइड को यहाँ से फिर देख सकते हैं!",
-    speech:"सेटिंग्स में आप ऐप को अपनी पसंद के अनुसार सेट कर सकते हैं। यहाँ से यह गाइड दोबारा शुरू कर सकते हैं।",
-    tabIndex:9, targetId:"tab-content"
-  }
-];
-
-// ── State ──
-let _guideLang = 'en';
-let _guideStepIdx = 0;
-let _guideSteps = STEPS_EN;
-let _guideActive = false;
-let _speechUtterance = null;
-
-// ── Public API ──
-window.scGuideInit = function(isNewUser){
-  if(isNewUser && !localStorage.getItem('sc_guide_shown')){
-    setTimeout(()=>{ _showLangPicker(); }, 900);
-  }
-};
-
-window.scGuideOpenReplay = function(){
-  _buildReplayMenu();
-  const el = document.getElementById('sc-guide-replay');
-  el.style.display = 'flex';
-};
-
-window.scGuideStartLang = function(lang){
-  _hideLangPicker();
-  scGuideCloseReplay();
-  _guideLang = lang;
-  _guideSteps = lang === 'hi' ? STEPS_HI : STEPS_EN;
-  _guideStepIdx = 0;
-  _guideActive = true;
-  localStorage.setItem('sc_guide_shown','1');
-  _showBackdrop();
-  _showStep(_guideStepIdx);
-};
-
-window.scGuideStartFrom = function(lang, stepIndex){
-  scGuideCloseReplay();
-  _guideLang = lang;
-  _guideSteps = lang === 'hi' ? STEPS_HI : STEPS_EN;
-  _guideStepIdx = stepIndex;
-  _guideActive = true;
-  _showBackdrop();
-  _showStep(_guideStepIdx);
-};
-
-window.scGuideNext = function(){
-  _stopSpeech();
-  _guideStepIdx++;
-  if(_guideStepIdx >= _guideSteps.length){
-    scGuideEndWithReplay();
-    return;
-  }
-  _showStep(_guideStepIdx);
-};
-
-window.scGuideClose = function(){
-  _stopSpeech();
-  _hideLangPicker();
-  _hideSpotlight();
-  _hideBubble();
-  _hideBackdrop();
-  _guideActive = false;
-  localStorage.setItem('sc_guide_shown','1');
-};
-
-window.scGuideEndWithReplay = function(){
-  _stopSpeech();
-  _hideSpotlight();
-  _hideBubble();
-  _hideBackdrop();
-  _guideActive = false;
-  localStorage.setItem('sc_guide_shown','1');
-  setTimeout(()=>{ _buildReplayMenu(); document.getElementById('sc-guide-replay').style.display='flex'; }, 350);
-};
-
-window.scGuideCloseReplay = function(){
-  document.getElementById('sc-guide-replay').style.display = 'none';
-};
-
-// ── Internal helpers ──
-function _showLangPicker(){
-  document.getElementById('sc-guide-lang').style.display = 'flex';
-}
-function _hideLangPicker(){
-  document.getElementById('sc-guide-lang').style.display = 'none';
-}
-function _showBackdrop(){
-  document.getElementById('sc-guide-backdrop').style.display = 'block';
-}
-function _hideBackdrop(){
-  document.getElementById('sc-guide-backdrop').style.display = 'none';
-}
-
-function _showStep(idx){
-  const step = _guideSteps[idx];
-  if(!step) return;
-
-  // Switch to that tab first
-  if(typeof switchTab === 'function') switchTab(step.tabIndex);
-
-  // After tab renders, position spotlight + bubble
-  requestAnimationFrame(()=>{
-    setTimeout(()=>{
-      _spotlightTab(step.tabIndex);
-      _showBubble(step, idx);
-      _speak(step);
-    }, 350);
-  });
-}
-
-function _spotlightTab(tabIndex){
-  // Highlight the tab button itself
-  const tabBar = document.getElementById('tab-bar');
-  if(!tabBar) return;
-  const buttons = tabBar.querySelectorAll('.tab-btn');
-  const btn = buttons[tabIndex];
-  if(!btn){ _hideSpotlight(); return; }
-  const r = btn.getBoundingClientRect();
-  const sp = document.getElementById('sc-guide-spotlight');
-  sp.style.display = 'block';
-  sp.style.left   = (r.left - 6) + 'px';
-  sp.style.top    = (r.top  - 6) + 'px';
-  sp.style.width  = (r.width  + 12) + 'px';
-  sp.style.height = (r.height + 12) + 'px';
-  // Also highlight bottom-nav if visible
-  const bnav = document.getElementById('bottom-nav');
-  if(bnav && bnav.offsetParent !== null){
-    const navBtns = bnav.querySelectorAll('button, a, [onclick]');
-    // Just highlight the tab bar position on desktop / bottom nav on mobile
-  }
-}
-
-function _hideSpotlight(){
-  document.getElementById('sc-guide-spotlight').style.display='none';
-}
-
-function _showBubble(step, idx){
-  const total = _guideSteps.length;
-  const isLast = idx >= total - 1;
-  const isHi = _guideLang === 'hi';
-
-  document.getElementById('sc-gb-step').textContent =
-    (isHi ? `चरण ${idx+1} / ${total}` : `Step ${idx+1} of ${total}`);
-  document.getElementById('sc-gb-icon').textContent = step.icon;
-  document.getElementById('sc-gb-title').textContent = step.title;
-  document.getElementById('sc-gb-text').textContent = step.text;
-  document.getElementById('sc-gb-next-btn').textContent = isLast
-    ? (isHi ? 'समाप्त ✓' : 'Finish ✓')
-    : (isHi ? 'आगे →' : 'Next →');
-  document.getElementById('sc-gb-skip-btn').textContent =
-    isHi ? 'यह छोड़ें ›' : 'Skip this ›';
-
-  const bubble = document.getElementById('sc-guide-bubble');
-  bubble.style.display = 'block';
-  _positionBubble();
-}
-
-function _positionBubble(){
-  const bubble = document.getElementById('sc-guide-bubble');
-  const sp     = document.getElementById('sc-guide-spotlight');
-  const vw = window.innerWidth, vh = window.innerHeight;
-  const bw = Math.min(340, vw - 32);
-  bubble.style.width = bw + 'px';
-  // Try to place below spotlight; if not enough room, above
-  const spRect = sp.style.display !== 'none'
-    ? { top: parseFloat(sp.style.top)||0, left: parseFloat(sp.style.left)||0,
-        bottom: (parseFloat(sp.style.top)||0)+(parseFloat(sp.style.height)||0) }
-    : { top:0, left:0, bottom:60 };
-  const bubbleH = 220; // approx
-  let top = spRect.bottom + 16;
-  if(top + bubbleH > vh - 20) top = spRect.top - bubbleH - 16;
-  if(top < 12) top = 12;
-  let left = Math.max(16, Math.min(spRect.left, vw - bw - 16));
-  bubble.style.top  = top  + 'px';
-  bubble.style.left = left + 'px';
-}
-
-function _hideBubble(){
-  document.getElementById('sc-guide-bubble').style.display='none';
-}
-
-// ── Web Speech ──
-function _speak(step){
-  _stopSpeech();
-  if(!window.speechSynthesis) return;
-  const text = step.speech || step.text;
-  const utt = new SpeechSynthesisUtterance(text);
-  utt.lang   = _guideLang === 'hi' ? 'hi-IN' : 'en-IN';
-  utt.rate   = 0.92;
-  utt.pitch  = 1.0;
-  utt.volume = 0.95;
-  // Prefer a local voice
-  const voices = window.speechSynthesis.getVoices();
-  const preferred = voices.find(v=> _guideLang==='hi'
-    ? (v.lang.startsWith('hi') && v.localService)
-    : (v.lang.startsWith('en') && v.localService));
-  if(preferred) utt.voice = preferred;
-  _speechUtterance = utt;
-  window.speechSynthesis.speak(utt);
-}
-
-function _stopSpeech(){
-  if(window.speechSynthesis) window.speechSynthesis.cancel();
-  _speechUtterance = null;
-}
-
-// ── Replay menu builder ──
-function _buildReplayMenu(){
-  const isHi = _guideLang === 'hi';
-  document.getElementById('sc-rp-lang-title').textContent =
-    isHi ? 'भाषा चुनें' : 'Choose Language';
-  document.getElementById('sc-rp-feat-title').textContent =
-    isHi ? 'किसी फ़ीचर पर जाएं' : 'Jump to a feature';
-
-  const steps = isHi ? STEPS_HI : STEPS_EN;
-  const container = document.getElementById('sc-rp-features');
-  container.innerHTML = steps.map((s,i)=>`
-    <div class="sc-replay-row" onclick="scGuideStartFrom('${_guideLang}',${i})">
-      <span class="rr-icon">${s.icon}</span>
-      <div class="rr-text">
-        <div class="rr-title">${s.title}</div>
-        <div class="rr-sub">${isHi ? 'फ़ीचर देखें' : 'Show this feature'}</div>
-      </div>
-    </div>
-  `).join('');
-}
-
-// ── Hook into login success — deferred via load event ──
-window.addEventListener('load', function(){
-  const _orig = window.onLoginSuccess;
-  if(typeof _orig === 'function'){
-    window.onLoginSuccess = function(phone){
-      _orig.apply(this, arguments);
-      const isNewReg = (typeof authMode !== 'undefined' && authMode === 'new_user')
-                    || !localStorage.getItem('sc_guide_shown');
-      if(isNewReg) scGuideInit(true);
-    };
-  }
-});
-
-// Also expose globally for Settings replay button
-window._scGuideOpenReplay = window.scGuideOpenReplay;
-
-})();
-</script>
-
-<!-- Inject "Introduction Guide" row into Settings via patch -->
-<script>
-(function(){
-  const _origRenderSettings = window.renderSettings;
-  if(!_origRenderSettings) return;
-  window.renderSettings = function(){
-    let html = _origRenderSettings();
-    // Inject before the footer credit line
-    const anchor = '<div style="text-align:center;padding:20px 0;font-size:12px;color:#2a3a5a;">ShopChampion Pro';
-    const guideRow = `
-      <div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1a2035);border-radius:16px;overflow:hidden;margin-bottom:16px;">
-        <div style="font-size:11px;font-weight:800;color:var(--text-sub,#4a5a7a);text-transform:uppercase;letter-spacing:1px;padding:12px 18px 8px;">Help</div>
-        <div onclick="scGuideOpenReplay()" style="display:flex;align-items:center;gap:14px;padding:15px 18px;cursor:pointer;border-bottom:1px solid var(--border-main,#1a2035);-webkit-tap-highlight-color:transparent;" onmousedown="this.style.background='var(--bg-hover,#0d1525)'" onmouseup="this.style.background=''" onmouseleave="this.style.background=''">
-          <span style="font-size:22px;flex-shrink:0;width:28px;text-align:center;">🎓</span>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:700;color:#e8eaf0;">Introduction Guide</div>
-            <div style="font-size:12px;color:#4a5a7a;margin-top:2px;">Replay the feature tour in Hindi or English</div>
-          </div>
-          <span style="color:#4a5a7a;font-size:16px;flex-shrink:0;">›</span>
-        </div>
-      </div>
-    `;
-    html = html.replace(anchor, guideRow + anchor);
-    return html;
-  };
-})();
-</script>
 </body>
 </html>
