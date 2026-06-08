@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Shop Champion — Admin</title>
 <meta name="app-version" content="v5.1" />
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="ShopChampion" />
-<meta name="theme-color" content="#FFD700" />
+<meta name="theme-color" content="#1d4ed8" id="meta-theme-color" />
 <script>
   // Service Workers require http/https — skip entirely when opened as a local file
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
@@ -85,6 +85,233 @@ const SC_SUPABASE_ANON = "sb_publishable_yxPk_18wrBIPebrJkYn9FQ_91lhKmjE";
     --scrollbar-track: #0a0e1a; --scrollbar-thumb: #2a3560;
     --tab-bar-bg: #0d1220;
   }
+
+  /* ── PRO THEME (default for new users) ── */
+  body.pro-theme {
+    --bg-main: #f4f6fb; --bg-card: #ffffff; --bg-input: #f8f9fc;
+    --bg-row-even: #f8f9fc; --bg-row-odd: #ffffff; --bg-row-hover: #eff3fb;
+    --bg-dark: #eef1f8; --border-main: #e2e8f0; --border-input: #cbd5e1;
+    --text-main: #0f172a; --text-muted: #64748b; --text-dim: #94a3b8;
+    --text-dimmer: #cbd5e1; --text-faint: #e2e8f0;
+    --scrollbar-track: #f1f5f9; --scrollbar-thumb: #cbd5e1;
+    --tab-bar-bg: #ffffff;
+    --pro-accent: #1d4ed8; --pro-accent-bg: #eff6ff; --pro-accent-border: #bfdbfe;
+    --pro-accent-text: #1e40af;
+    font-family: 'DM Sans', sans-serif !important;
+  }
+  body.pro-theme * { font-family: 'DM Sans', sans-serif !important; }
+  body.pro-theme input, body.pro-theme select, body.pro-theme textarea { font-family: 'DM Sans', sans-serif !important; }
+
+  /* Pro theme structural overrides */
+  body.pro-theme #main-header {
+    background: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important;
+  }
+  body.pro-theme #header-shop-icon { display: none !important; }
+  body.pro-theme #header-shop-name {
+    background: none !important;
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: #0f172a !important;
+    color: #0f172a !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 17px !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.2px !important;
+  }
+  body.pro-theme #main-header > div:nth-child(2) > div:last-child {
+    color: #94a3b8 !important;
+    letter-spacing: 0 !important;
+    font-size: 11px !important;
+  }
+  body.pro-theme #tab-bar {
+    background: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding: 0 12px !important;
+    gap: 0 !important;
+  }
+  body.pro-theme .tab-btn {
+    border-radius: 0 !important;
+    border-bottom: 2px solid transparent !important;
+    padding: 10px 14px !important;
+    font-weight: 400 !important;
+    font-size: 12px !important;
+    color: #64748b !important;
+    background: none !important;
+    margin: 0 !important;
+    letter-spacing: 0 !important;
+  }
+  body.pro-theme .tab-btn.active {
+    color: #1d4ed8 !important;
+    border-bottom-color: #1d4ed8 !important;
+    font-weight: 600 !important;
+    background: none !important;
+  }
+  body.pro-theme #tab-content {
+    background: #f4f6fb !important;
+    color: #0f172a !important;
+  }
+  body.pro-theme #sync-banner {
+    background: #f0fdf4 !important;
+    border-bottom: 1px solid #bbf7d0 !important;
+  }
+  body.pro-theme #sync-status-text { color: #16a34a !important; }
+  body.pro-theme #bottom-nav {
+    background: #ffffff !important;
+    border-top: 1px solid #e2e8f0 !important;
+    box-shadow: 0 -1px 8px rgba(0,0,0,0.06) !important;
+  }
+  body.pro-theme .bnav-btn { color: #94a3b8 !important; font-family: 'DM Sans', sans-serif !important; font-size: 10px !important; font-weight: 500 !important; }
+  body.pro-theme .bnav-btn.active { color: #1d4ed8 !important; }
+  body.pro-theme .bnav-btn .bnav-icon { font-size: 20px !important; }
+  body.pro-theme #more-menu { background: #ffffff !important; border-color: #e2e8f0 !important; }
+  body.pro-theme #more-menu::before { background: #e2e8f0 !important; }
+  body.pro-theme .more-menu-btn { background: #f8fafc !important; border-color: #e2e8f0 !important; color: #64748b !important; border-radius: 12px !important; }
+  body.pro-theme .more-menu-btn.active { background: #eff6ff !important; border-color: #bfdbfe !important; color: #1d4ed8 !important; }
+  body.pro-theme .modal-overlay { background: rgba(15,23,42,0.5) !important; }
+  body.pro-theme .modal-box { background: #ffffff !important; border-color: #e2e8f0 !important; }
+  body.pro-theme .input { background: #ffffff !important; border-color: #cbd5e1 !important; color: #0f172a !important; border-radius: 8px !important; }
+  body.pro-theme .btn { font-weight: 500 !important; }
+  body.pro-theme ::-webkit-scrollbar-track { background: #f1f5f9 !important; }
+  body.pro-theme ::-webkit-scrollbar-thumb { background: #cbd5e1 !important; border-radius: 4px !important; }
+  body.pro-theme #customer-page { background: #f4f6fb !important; }
+  body.pro-theme #customer-page-inner { background: #f4f6fb !important; }
+  body.pro-theme #login-screen { background: #f4f6fb !important; }
+  body.pro-theme #notification { background: #fffbeb !important; border-color: #fcd34d !important; color: #78350f !important; }
+  body.pro-theme #pwa-install-banner { background: #1e293b !important; }
+  body.pro-theme #pwa-install-banner div:nth-child(3) { color: #94a3b8 !important; }
+
+  /* Pro theme colour overrides for inline styles */
+  body.pro-theme [style*="background:#0a0e1a"],
+  body.pro-theme [style*="background: #0a0e1a"] { background: #f4f6fb !important; }
+  body.pro-theme [style*="background:#0f1628"],
+  body.pro-theme [style*="background: #0f1628"] { background: #ffffff !important; }
+  body.pro-theme [style*="background:#0d1220"],
+  body.pro-theme [style*="background: #0d1220"] { background: #f8f9fc !important; }
+  body.pro-theme [style*="background:#080c18"],
+  body.pro-theme [style*="background: #080c18"] { background: #eef1f8 !important; }
+  body.pro-theme [style*="background:#0a1628"],
+  body.pro-theme [style*="background: #0a1628"] { background: #eef1f8 !important; }
+  body.pro-theme [style*="background:#0a1a2a"],
+  body.pro-theme [style*="background: #0a1a2a"] { background: #e8f0fc !important; }
+  body.pro-theme [style*="background:#111827"],
+  body.pro-theme [style*="background: #111827"] { background: #f8fafc !important; }
+  body.pro-theme [style*="background:#0a0d14"],
+  body.pro-theme [style*="background: #0a0d14"] { background: #f4f6fb !important; }
+  body.pro-theme [style*="background:#0a1f0a"],
+  body.pro-theme [style*="background: #0a1f0a"] { background: #f0fdf4 !important; }
+  body.pro-theme [style*="background:#0d2a10"],
+  body.pro-theme [style*="background: #0d2a10"] { background: #dcfce7 !important; }
+  body.pro-theme [style*="background:#1e2a45"],
+  body.pro-theme [style*="background: #1e2a45"] { background: #e2e8f0 !important; }
+  body.pro-theme [style*="background:#1a2540"],
+  body.pro-theme [style*="background: #1a2540"] { background: #dbeafe !important; }
+  body.pro-theme [style*="background:#1a2a45"],
+  body.pro-theme [style*="background: #1a2a45"] { background: #dbeafe !important; }
+  body.pro-theme [style*="background:#1a3a1a"],
+  body.pro-theme [style*="background: #1a3a1a"] { background: #dcfce7 !important; }
+  body.pro-theme [style*="background:#1a3a60"],
+  body.pro-theme [style*="background: #1a3a60"] { background: #dbeafe !important; }
+  body.pro-theme [style*="background:#1a4a1a"],
+  body.pro-theme [style*="background: #1a4a1a"] { background: #bbf7d0 !important; }
+  body.pro-theme [style*="background:#2d1b4e"],
+  body.pro-theme [style*="background: #2d1b4e"] { background: #ede9fe !important; }
+  body.pro-theme [style*="background:#1a3a2a"],
+  body.pro-theme [style*="background: #1a3a2a"] { background: #d1fae5 !important; }
+  body.pro-theme [style*="background:#1a0e2a"],
+  body.pro-theme [style*="background: #1a0e2a"] { background: #ede9fe !important; }
+  body.pro-theme [style*="background:#3a1a1a"],
+  body.pro-theme [style*="background: #3a1a1a"] { background: #fee2e2 !important; }
+  body.pro-theme [style*="background:#1a0a0a"],
+  body.pro-theme [style*="background: #1a0a0a"] { background: #fff1f2 !important; }
+  body.pro-theme [style*="background:#1a1400"],
+  body.pro-theme [style*="background: #1a1400"] { background: #fefce8 !important; }
+  body.pro-theme [style*="background:#1a1500"],
+  body.pro-theme [style*="background: #1a1500"] { background: #fefce8 !important; }
+  body.pro-theme [style*="background:#001a2a"],
+  body.pro-theme [style*="background: #001a2a"] { background: #eff6ff !important; }
+  body.pro-theme [style*="background:#0a1628"],
+  body.pro-theme [style*="background: #0a1628"] { background: #eff6ff !important; }
+  body.pro-theme [style*="background:#131d35"],
+  body.pro-theme [style*="background: #131d35"] { background: #f8fafc !important; }
+  body.pro-theme [style*="background:#0a0e1a"];
+  body.pro-theme [style*="background:linear-gradient(135deg,#0a0e1a"] { background: #f4f6fb !important; }
+  body.pro-theme [style*="background:linear-gradient(135deg,#1a4a1a"] { background: #dcfce7 !important; }
+  body.pro-theme [style*="background:linear-gradient(135deg,#16a34a"] { background: linear-gradient(135deg,#16a34a,#22c55e) !important; }
+
+  /* Pro border overrides */
+  body.pro-theme [style*="border:1px solid #1e2a45"],
+  body.pro-theme [style*="border: 1px solid #1e2a45"] { border-color: #e2e8f0 !important; }
+  body.pro-theme [style*="border:1px solid #2a3560"],
+  body.pro-theme [style*="border: 1px solid #2a3560"] { border-color: #cbd5e1 !important; }
+  body.pro-theme [style*="border:1px solid #1a2040"],
+  body.pro-theme [style*="border: 1px solid #1a2040"] { border-color: #e2e8f0 !important; }
+  body.pro-theme [style*="border:2px solid #1e3a6e"],
+  body.pro-theme [style*="border: 2px solid #1e3a6e"] { border-color: #bfdbfe !important; }
+  body.pro-theme [style*="border-bottom:1px solid #1e2a45"],
+  body.pro-theme [style*="border-bottom: 1px solid #1e2a45"] { border-bottom-color: #e2e8f0 !important; }
+  body.pro-theme [style*="border-bottom:1px solid #0d1220"],
+  body.pro-theme [style*="border-bottom: 1px solid #0d1220"] { border-bottom-color: #f1f5f9 !important; }
+  body.pro-theme [style*="border-bottom:1px solid #141c30"],
+  body.pro-theme [style*="border-bottom: 1px solid #141c30"] { border-bottom-color: #f1f5f9 !important; }
+  body.pro-theme [style*="border-left:1px solid #1e2a45"],
+  body.pro-theme [style*="border-left: 1px solid #1e2a45"] { border-left-color: #e2e8f0 !important; }
+  body.pro-theme [style*="border-right:1px solid #1e2a45"],
+  body.pro-theme [style*="border-right: 1px solid #1e2a45"] { border-right-color: #e2e8f0 !important; }
+
+  /* Pro text overrides */
+  body.pro-theme [style*="color:#e8eaf0"],
+  body.pro-theme [style*="color: #e8eaf0"] { color: #0f172a !important; }
+  body.pro-theme [style*="color:#7a8aaa"],
+  body.pro-theme [style*="color: #7a8aaa"] { color: #64748b !important; }
+  body.pro-theme [style*="color:#4a5a7a"],
+  body.pro-theme [style*="color: #4a5a7a"] { color: #94a3b8 !important; }
+  body.pro-theme [style*="color:#2a3a5a"],
+  body.pro-theme [style*="color: #2a3a5a"] { color: #cbd5e1 !important; }
+  body.pro-theme [style*="color:#556"],
+  body.pro-theme [style*="color: #556"] { color: #94a3b8 !important; }
+  body.pro-theme [style*="color:#aaa"],
+  body.pro-theme [style*="color: #aaa"] { color: #94a3b8 !important; }
+  body.pro-theme [style*="color:#ccc"],
+  body.pro-theme [style*="color: #ccc"] { color: #64748b !important; }
+  body.pro-theme [style*="color:#ddd"],
+  body.pro-theme [style*="color: #ddd"] { color: #475569 !important; }
+  body.pro-theme [style*="color:#3a4a6a"],
+  body.pro-theme [style*="color: #3a4a6a"] { color: #64748b !important; }
+  body.pro-theme [style*="color:#5a7aaa"],
+  body.pro-theme [style*="color: #5a7aaa"] { color: #1d4ed8 !important; }
+  body.pro-theme [style*="color:#60a5fa"],
+  body.pro-theme [style*="color: #60a5fa"] { color: #1d4ed8 !important; }
+  body.pro-theme [style*="color:#FFD700"],
+  body.pro-theme [style*="color: #FFD700"] { color: #1d4ed8 !important; }
+  body.pro-theme [style*="color:#4f4"],
+  body.pro-theme [style*="color: #4f4"] { color: #16a34a !important; }
+
+  /* Pro rank badges */
+  body.pro-theme .rank-circle[style*="background:#1a2e50"] { background: #dbeafe !important; color: #1d4ed8 !important; border-color: #bfdbfe !important; }
+  body.pro-theme .rank-circle[style*="background:#1a2840"] { background: #f1f5f9 !important; color: #475569 !important; }
+  body.pro-theme .rank-circle[style*="background:#182238"] { background: #faf5ff !important; color: #7c3aed !important; }
+  body.pro-theme .rank-circle[style*="background:#111827"] { background: #f8fafc !important; color: #94a3b8 !important; }
+  body.pro-theme .db-table th { background: #f8fafc !important; color: #64748b !important; border-bottom-color: #e2e8f0 !important; }
+  body.pro-theme .db-table tr:hover td { background: #f1f5f9 !important; }
+  body.pro-theme .purchase-card { background: #f4f6fb !important; }
+  body.pro-theme .progress-bar-track { background: #e2e8f0 !important; }
+  body.pro-theme .inline-edit { background: #eff6ff !important; border-color: #1d4ed8 !important; color: #0f172a !important; }
+  body.pro-theme .photo-upload-box { background: #f8fafc !important; border-color: #e2e8f0 !important; }
+  body.pro-theme .upload-hint { color: #94a3b8 !important; }
+
+  /* Pro accent: replace gold with blue */
+  body.pro-theme [style*="color:#FFD700"] { color: #1d4ed8 !important; }
+  body.pro-theme [style*="background:linear-gradient(90deg,#FFD700"] { background: linear-gradient(90deg,#1d4ed8,#3b82f6) !important; }
+  body.pro-theme [style*="background:linear-gradient(135deg,#FFD700"] { background: linear-gradient(135deg,#1d4ed8,#3b82f6) !important; }
+  body.pro-theme [style*="border:2px solid #FFD700"],
+  body.pro-theme [style*="border: 2px solid #FFD700"] { border-color: #1d4ed8 !important; }
+  body.pro-theme [style*="border-color:#FFD700"] { border-color: #1d4ed8 !important; }
+
+  /* Pro: login screen */
+  body.pro-theme #login-screen > div { background: #ffffff !important; border-color: #e2e8f0 !important; }
+  body.pro-theme #main-app { background: #f4f6fb !important; }
+
   body.day-theme {
     --bg-main: #f0f2f8; --bg-card: #ffffff; --bg-input: #f8f9fc;
     --bg-row-even: #f5f7fc; --bg-row-odd: #ffffff; --bg-row-hover: #eef1fa;
@@ -1164,20 +1391,20 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
   <!-- Bottom Nav (mobile only) -->
   <nav id="bottom-nav">
     <button class="bnav-btn" id="bnav-0" onclick="mobileTab(0)">
-      <span class="bnav-icon">🏆</span>
-      <span class="bnav-label">Board</span>
+      <span class="bnav-icon" id="bnav-icon-0">🏆</span>
+      <span class="bnav-label" id="bnav-label-0">Board</span>
     </button>
     <button class="bnav-btn" id="bnav-1" onclick="mobileTab(1)">
-      <span class="bnav-icon">👥</span>
-      <span class="bnav-label">Customers</span>
+      <span class="bnav-icon" id="bnav-icon-1">👥</span>
+      <span class="bnav-label" id="bnav-label-1">Customers</span>
     </button>
     <button class="bnav-btn" id="bnav-2" onclick="mobileTab(2)">
-      <span class="bnav-icon">💳</span>
-      <span class="bnav-label">Purchase</span>
+      <span class="bnav-icon" id="bnav-icon-2">💳</span>
+      <span class="bnav-label" id="bnav-label-2">Purchase</span>
     </button>
     <button class="bnav-btn" id="bnav-5" onclick="mobileTab(5)">
-      <span class="bnav-icon">📦</span>
-      <span class="bnav-label">Inventory</span>
+      <span class="bnav-icon" id="bnav-icon-5">📦</span>
+      <span class="bnav-label" id="bnav-label-5">Inventory</span>
     </button>
     <button class="bnav-btn" id="bnav-more" onclick="toggleMoreMenu()">
       <span class="bnav-icon">⋯</span>
@@ -1220,20 +1447,22 @@ const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free P
 const ADMIN_PASS = "1234";
 const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","inventory","creditors","debtors","messages","settings"];
 const TABS_ICON = ["🏆","👥","💳","📊","⚖️","📦","🏦","🧾","✉️","⚙️"];
+const TABS_LABEL_PRO = ["Rankings","Customers","Purchase","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings"];
 let _shopRequestsUnread = 0; // badge count for messages tab
 function getTabs(){
+  const isPro = currentAppStyle === "pro";
   return TABS_BASE.map((k,i)=>{
-    let label = TABS_ICON[i]+" "+t(k);
+    let label = isPro ? TABS_LABEL_PRO[i] : (TABS_ICON[i]+" "+t(k));
     // Low stock badge on inventory tab (index 5)
     if(i===5 && inventoryItems && inventoryItems.length>0){
       const oos = inventoryItems.filter(x=>invGetStock(x.name)<=0).length;
       const low = inventoryItems.filter(x=>{const s=invGetStock(x.name);return s>0&&s<=3;}).length;
-      if(oos>0) label += ` <span style="background:#f66;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;">${oos}</span>`;
-      else if(low>0) label += ` <span style="background:#FFD700;color:#1a0a00;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;">${low}</span>`;
+      if(oos>0) label += ` <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle;">${oos}</span>`;
+      else if(low>0) label += ` <span style="background:${isPro?'#f59e0b':'#FFD700'};color:${isPro?'#fff':'#1a0a00'};border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle;">${low}</span>`;
     }
     // Unread badge on messages tab (index 8)
     if(i===8 && _shopRequestsUnread>0){
-      label += ` <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;">${_shopRequestsUnread}</span>`;
+      label += ` <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle;">${_shopRequestsUnread}</span>`;
     }
     return label;
   });
@@ -1516,6 +1745,7 @@ function saveSettingsToCloud(extraFields) {
     app_settings:      appSettings,
     voice_settings:    voiceSettings,
     theme:             currentTheme,
+    appStyle:          currentAppStyle,
     lang:              currentLang,
     purchase_mode:     getPurchaseMode(),
     sync_data:         { binId: syncBinId, apiKey: syncApiKey },
@@ -1557,7 +1787,8 @@ function loadSettingsFromCloud(cb) {
         if (d.display_settings)  { displaySettings  = { ...displaySettings,  ...d.display_settings  }; }
         if (d.app_settings)      { appSettings       = { ...appSettings,       ...d.app_settings      }; try { localStorage.setItem("sc_app_settings", JSON.stringify(appSettings)); } catch {} }
         if (d.voice_settings)    { voiceSettings     = { ...voiceSettings,     ...d.voice_settings    }; }
-        if (d.theme)             { currentTheme = d.theme; applyTheme(d.theme); }
+        if (d.theme)             { currentTheme = d.theme; if(currentAppStyle!=="pro") applyTheme(d.theme); }
+        if (d.appStyle)          { currentAppStyle = d.appStyle; applyAppStyle(d.appStyle); }
         if (d.lang)              { currentLang  = d.lang; }
         if (d.purchase_mode)     { try { localStorage.setItem(storageKey("purchase_mode"), d.purchase_mode); } catch {} }
         if (d.sync_data)         { syncBinId = d.sync_data.binId || ""; syncApiKey = d.sync_data.apiKey || ""; }
@@ -2148,15 +2379,27 @@ function updateAppHeader() {
   const iconEl = document.getElementById("header-shop-icon");
   const loginNameEl = document.getElementById("login-shop-name");
   const loginIconEl = document.getElementById("login-shop-icon");
+  const isPro = currentAppStyle === "pro";
   if(nameEl) nameEl.textContent = appSettings.shopName;
   if(loginNameEl) loginNameEl.textContent = appSettings.shopName;
   if(iconEl) {
-    if(appSettings.appIcon) iconEl.innerHTML = `<img src="${appSettings.appIcon}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" />`;
-    else iconEl.innerHTML = "🏆";
+    if(appSettings.appIcon) {
+      iconEl.innerHTML = `<img src="${appSettings.appIcon}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" />`;
+      iconEl.style.display = "";
+    } else if(isPro) {
+      // Pro mode: show a clean square logomark
+      iconEl.style.cssText = "width:32px;height:32px;background:#1d4ed8;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;";
+      iconEl.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`;
+    } else {
+      iconEl.style.cssText = "font-size:28px;";
+      iconEl.innerHTML = "🏆";
+    }
   }
   if(loginIconEl) {
     if(appSettings.appIcon) loginIconEl.innerHTML = `<img src="${appSettings.appIcon}" style="width:56px;height:56px;object-fit:cover;border-radius:12px;" />`;
-    else loginIconEl.innerHTML = "🏆";
+    else loginIconEl.innerHTML = isPro
+      ? `<div style="width:56px;height:56px;background:#1d4ed8;border-radius:14px;display:flex;align-items:center;justify-content:center;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>`
+      : "🏆";
   }
   document.title = appSettings.shopName + " — Admin";
 }
@@ -2701,7 +2944,8 @@ function onLoginSuccess(phone) {
   try { const as=localStorage.getItem(storageKey("app_settings"));     if(as) { appSettings={...appSettings,...JSON.parse(as)}; localStorage.setItem("sc_app_settings", JSON.stringify(appSettings)); } } catch {}
   try { const vs=localStorage.getItem(storageKey("voice_settings"));   if(vs) voiceSettings={...voiceSettings,...JSON.parse(vs)};     } catch {}
   try { const sd=localStorage.getItem(storageKey("sync_data"));        if(sd){const p=JSON.parse(sd);syncBinId=p.binId;syncApiKey=p.apiKey;} } catch {}
-  try { const th=localStorage.getItem(storageKey("theme"));            if(th) { currentTheme=th; applyTheme(th); } } catch {}
+  try { const th=localStorage.getItem(storageKey("theme"));            if(th) { currentTheme=th; if(currentAppStyle!=="pro") applyTheme(th); } } catch {}
+  try { const as2=localStorage.getItem(storageKey("appStyle"));        if(as2) { currentAppStyle=as2; applyAppStyle(as2); } else { applyAppStyle("pro"); } } catch {}
   try { const lg=localStorage.getItem(storageKey("lang"));             if(lg) currentLang=lg; } catch {}
   // ── Firebase config — always use config.js values, save to localStorage for UI ──
   try { localStorage.setItem(storageKey("fb_config"), JSON.stringify(SC_FIREBASE_CONFIG)); } catch {}
@@ -3268,6 +3512,7 @@ function renderCustomers(sorted,q=""){
     </div>` : `
     <div style="display:flex;gap:8px;align-items:center;padding:0 14px 12px;flex-wrap:wrap;">
       <button class="btn" onclick="openAddModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:9px 20px;font-size:13px;font-weight:800;flex:1;">+ Add Customer</button>
+      <button class="btn" onclick="openShopIdSearchModal('customer')" style="background:#0a1628;border:2px solid #1e3a6e;color:#60a5fa;padding:9px 14px;font-size:12px;font-weight:800;">🔗 Shop ID</button>
       <button class="btn" onclick="openBulkAddModal()" style="background:#1a3a5c;color:#7ab3ff;border:1px solid #2a5080;padding:9px 14px;font-size:13px;">👥 Bulk</button>
       <button class="btn" onclick="exportCSV()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:9px 12px;font-size:13px;">⬇</button>
       <button class="btn" onclick="custToggleSelectMode()" style="background:#1a2540;color:#f88;border:1px solid #3a2020;padding:9px 12px;font-size:13px;">☑</button>
@@ -3277,12 +3522,12 @@ function renderCustomers(sorted,q=""){
   // Count linked customers for live sync badge
   let allCustData = [];
   try { allCustData = JSON.parse(localStorage.getItem(storageKey("customers_v2")) || "[]"); } catch {}
-  const linkedCustCount = 0; // Linked shops removed
+  const linkedCustCount = allCustData.filter(c => c._fromShopConnect && c.phone).length;
   const pendingBanner = linkedCustCount > 0 ? `
     <div style="background:linear-gradient(135deg,#0a1628,#0d1e38);border:2px solid #1e3a6e;border-radius:12px;padding:13px 16px;margin:0 14px 10px;display:flex;align-items:center;gap:12px;">
       <div style="font-size:22px;">🔗</div>
       <div style="flex:1;">
-
+        <div style="font-size:13px;font-weight:800;color:#60a5fa;">Live Ledger Active — ${linkedCustCount} Linked Shop${linkedCustCount>1?'s':''}</div>
         <div style="font-size:11px;color:#4a7aaa;margin-top:2px;">Transactions sync automatically — no accept needed</div>
       </div>
       <div style="font-size:10px;font-weight:800;color:#22c55e;background:#14532d44;border:1px solid #22c55e44;border-radius:6px;padding:3px 8px;">🟢 LIVE</div>
@@ -3295,7 +3540,7 @@ function renderCustomers(sorted,q=""){
     ${pendingBanner}
     ${headerBtns}
     <div style="padding:0 14px 8px;">
-      <input class="input" id="cust-search" dir="ltr" placeholder="🔍 Search name or phone..." value="${q}" oninput="refreshCustSearch(this.value)" style="text-align:left;" />
+      <input class="input" id="cust-search" dir="ltr" placeholder="🔍 Search name, phone, ID..." value="${q}" oninput="refreshCustSearch(this.value)" style="text-align:left;" />
     </div>
     <div style="padding:0 14px 2px;">${gstPills}${dfPills}</div>
     <div id="cust-list" style="display:flex;flex-direction:column;gap:6px;padding:0 14px;">${list||'<div style="text-align:center;color:#4a5a7a;padding:40px;">No customers found</div>'}</div>
@@ -5227,7 +5472,7 @@ async function doShopIdSearch(mode){
             // If I add them as my DEBTOR   → I am their CREDITOR
             // If I add them as my CUSTOMER → I am their CREDITOR (retail)
             const roleIAmToThem = myMode==='creditor' ? 'debtor' : myMode==='debtor' ? 'creditor' : 'creditor';
-            // sendShopConnectRequest removed
+            const ok=await sendShopConnectRequest(${JSON.stringify(profile).replace(/"/g,'&quot;')},roleIAmToThem,myMode);
             if(ok){btn.style.background='linear-gradient(135deg,#16a34a,#22c55e)';btn.style.color='#fff';btn.textContent='✅ Request Sent! They will see it in their Messages tab.';}
             else{btn.disabled=false;btn.textContent='📨 Send Connect Request (notify them)';}
           })()" class="btn"
@@ -5404,9 +5649,8 @@ function renderCreditorsTab(){
   const unrecEntry = creditors.find(c=>c.id==="CR_UNRECONCILED");
   const unrecBalance = unrecEntry ? credBalance(unrecEntry) : 0;
 
-  const searchVal   = window._credSearch || "";
-  const gstFilter   = window._credGstFilter  || "all"; // 'all' | 'gst' | 'nogst'
-  // linkFilter removed — all shops manage their own creditors independently
+  const searchVal  = window._credSearch || "";
+  const gstFilter  = window._credGstFilter || "all"; // 'all' | 'gst' | 'nogst'
 
   let filtered = creditors.filter(c=>
     !searchVal ||
@@ -5416,7 +5660,6 @@ function renderCreditorsTab(){
   // Apply GST filter
   if (gstFilter === 'gst')   filtered = filtered.filter(c => !!c.gstin);
   if (gstFilter === 'nogst') filtered = filtered.filter(c => !c.gstin);
-  // No link filter — every shop manages its own creditors
 
   // Sort: Unreconciled always first, then highest balance
   filtered.sort((a,b)=>{
@@ -5467,20 +5710,12 @@ function renderCreditorsTab(){
     </div>
 
     <!-- GST filter pills -->
-    <div style="margin-bottom:10px;">
+    <div style="margin-bottom:16px;">
       <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔢 GST Status:</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${[['all','🏢 All'],['gst','✅ GST Registered'],['nogst','❌ Not Registered']].map(([k,l])=>`
           <button onclick="window._credGstFilter='${k}';renderTab(6)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${gstFilter===k?'#a78bfa':'#1e2a45'};background:${gstFilter===k?'#1a0a30':'transparent'};color:${gstFilter===k?'#a78bfa':'#4a5a7a'};font-size:12px;font-weight:${gstFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
         `).join('')}
-      </div>
-    </div>
-
-    <!-- Linked/Normal filter pills -->
-    <div style="margin-bottom:16px;">
-      <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔗 Shop Type:</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-
       </div>
     </div>
 
@@ -5547,7 +5782,7 @@ function _renderCreditorCard(cr){
           ${cr.gstin?` · 🔢 ${cr.gstin}`:""}
         </div>
         ${lastTx?`<div style="font-size:11px;color:#4a5a7a;margin-top:3px;">Last: ${credTxIcon(lastTx.type)} ${escHtml(lastTx.note||lastTx.type)} · ${new Date(lastTx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>`:""}
-        ${""
+        ${cr._fromShopConnect?`<div style="margin-top:4px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#1e3a6e44;color:#60a5fa;border:1px solid #2a5aaa44;">🔗 Linked Shop</span></div>`:""
         }
       </div>
       <!-- Balance -->
@@ -5660,40 +5895,12 @@ function saveCreditorModal(editId){
   renderTab(6);
 }
 
-// ─── Send a removal notification to a linked shop ────────────────────────────
-async function sendRemovalNotification(theirPhone, theirName, removedAs) {
-  if (!db || !authPhone || !theirPhone) return;
-  const myName = (appSettings && appSettings.shopName) || authPhone;
-  const myShopIdVal = (typeof myShopId === "function") ? myShopId() : "";
-  const msgId = "REM" + Date.now() + Math.random().toString(36).slice(2,6).toUpperCase();
-  const msg = {
-    id:        msgId,
-    type:      "removal_notice",
-    status:    "info",
-    fromPhone: authPhone,
-    fromShopId: myShopIdVal,
-    fromName:  myName,
-    toPhone:   theirPhone,
-    removedAs,
-    createdAt: Date.now(),
-  };
-  try {
-    await db.collection("shop_requests").doc(theirPhone).collection("requests").doc(msgId).set(msg);
-  } catch(e1) {
-    try {
-      await db.collection("shop_connect_requests").doc(msgId).set(msg);
-    } catch(e2) { console.warn("sendRemovalNotification failed:", e2); }
-  }
-}
-
 function deleteCreditor(id){
   if(!confirm("Delete this creditor and all their transactions?")) return;
-  const cr = getCreditors().find(c=>c.id===id);
   const creditors = getCreditors().filter(c=>c.id!==id);
   saveCreditors(creditors);
   closeModal();
-  notify("\uD83D\uDDD1 Creditor deleted");
-
+  notify("🗑 Creditor deleted");
   renderTab(6);
 }
 
@@ -5787,7 +5994,7 @@ function openCreditorDetail(id){
           <div style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
         </div>
         ${!isUnrec ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
+          <button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
           <button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
           <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>
         </div>` : `<div style="font-size:12px;color:#d97706;font-weight:700;">Unreconciled<br>entries</div>`}
@@ -5969,10 +6176,12 @@ function _crTxRender(creditorId){
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
           <span style="font-size:13px;font-weight:700;color:#e8eaf0;">${hl(tx.note||tx.type)}</span>
           <span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:${tb.bg};color:${tb.col};">${tx.type}</span>
-
+          ${tx.syncStatus==="pending"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#92400e44;color:#fbbf24;">🟡 Sync Pending</span>`:""}
+          ${(tx.syncStatus==="accepted"||tx.syncStatus==="synced")?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#14532d44;color:#4ade80;">🔗 Live Synced</span>`:""}
+          ${tx.syncStatus==="declined"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#7f1d1d44;color:#f87171;">⚠️ Retry Sync</span>`:""}
         </div>
         <div style="font-size:11px;color:#7a8aaa;">📅 ${dateStr}${tx.invoiceNo?` &nbsp;·&nbsp; 🧾 ${hl(tx.invoiceNo)}`:""}</div>
-
+        ${(tx.syncStatus==="declined" || tx.syncStatus==="local") && cr._fromShopConnect ? `<div style="margin-top:4px;"><button onclick="openRequestAgainModal('${creditorId}','${tx.id||""}',${tx.amount},'${(tx.note||"").replace(/'/g,"\'")}','${tx.date||""}','${(tx.invoiceNo||"").replace(/'/g,"\'")}','${tx.syncReqId}')" style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:6px;color:#f87171;font-size:10px;font-weight:700;padding:3px 8px;">🔄 Request Again</button></div>`:""
         }
       </div>
       <div style="text-align:right;flex-shrink:0;">
@@ -5985,12 +6194,37 @@ function _crTxRender(creditorId){
 }
 
 
-function openRequestAgainModal(){} // Linked shops removed
+function openRequestAgainModal(creditorId, txId, amount, note, date, invoiceNo, reqId){
+  const creditors = getCreditors();
+  const cr = creditors.find(c=>c.id===creditorId);
+  if(!cr){ notify("❌ Creditor not found","error"); return; }
+  showWideModal(`
+    ${modalHeader("🔄 Request Again — " + escHtml(cr.name))}
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="background:#0a1220;border:1px solid #1e3a6e;border-radius:12px;padding:14px;">
+        <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:4px;">PAYMENT</div>
+        <div style="font-size:22px;font-weight:800;color:#22c55e;">${formatINR(amount)}</div>
+        ${note?`<div style="font-size:12px;color:#a0b0d0;margin-top:4px;">${escHtml(note)}</div>`:""}
+        <div style="font-size:11px;color:#4a5a7a;">${date}</div>
+      </div>
+      <div style="background:#1a0808;border:1px solid #ef444440;border-radius:12px;padding:12px;font-size:13px;color:#fca5a5;">
+        ❌ Previous sync request was declined. You can send up to 3 requests total.
+      </div>
+      <button onclick="sendPaymentSyncRequest('${creditorId}','${txId}',${amount},'${(note||'').replace(/'/g,"\'")}','${date}','${(invoiceNo||'').replace(/'/g,"\'")}','${cr.phone||''}','${reqId}')" class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-size:13px;font-weight:800;padding:12px;">
+        📤 Send Request Again
+      </button>
+      <button onclick="closeModal();setTimeout(()=>openCreditorDetail('${creditorId}'),200)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;color:#7a8aaa;font-size:13px;font-weight:700;padding:10px;">
+        Cancel
+      </button>
+    </div>
+  `);
+}
 
 // ── Add Transaction Modal ─────────────────────────────────────────────────────
 function openAddTxModal(creditorId, defaultType){
   if(defaultType === "payment") { openSmartPaymentModal(creditorId); return; }
   if(defaultType === "return")  { openReturnModal(creditorId); return; }
+  // Purchase flow
   const today = new Date().toISOString().slice(0,10);
   const cr = getCreditors().find(c=>c.id===creditorId);
   showWideModal(`
@@ -6195,6 +6429,7 @@ async function saveSmartPayment(){
     mode, ref,
     _paysBill: selectedBill||"",   // which purchase bill this pays (if selected)
     createdAt: Date.now(),
+    syncStatus: "local",
   };
   if(!cr.transactions) cr.transactions=[];
   cr.transactions.push(tx);
@@ -6202,7 +6437,12 @@ async function saveSmartPayment(){
   closeModal();
   notify(`✅ Payment of ${formatINR(amount)} recorded`,"success");
 
-  setTimeout(()=>openCreditorDetail(creditorId),200);
+  // If linked shop — send sync request to creditor (they see it in their Borrows tab)
+  if(cr._fromShopConnect && cr.phone && db && authPhone){
+    setTimeout(()=>openPaymentSyncModal(creditorId, txId, amount, tx.note, date, ref||"", selectedBill), 300);
+  } else {
+    setTimeout(()=>openCreditorDetail(creditorId),200);
+  }
 }
 
 // ── Return / Debit Note modal ──
@@ -6259,11 +6499,8 @@ function saveCrTransaction(){
 
   const txId = "TX"+Date.now();
   if(!creditors[idx].transactions) creditors[idx].transactions=[];
-  creditors[idx].transactions.push({ id:txId, type, amount, note, date, invoiceNo, createdAt:Date.now() });
+  creditors[idx].transactions.push({ id:txId, type, amount, note, date, invoiceNo, createdAt:Date.now(), syncStatus:"local" });
   saveCreditors(creditors);
-
-
-
   closeModal();
   notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return"} of ${formatINR(amount)} recorded`);
   setTimeout(()=>openCreditorDetail(creditorId),200);
@@ -6340,73 +6577,30 @@ function stopLinkedLedgerListener(theirPhone) {
 // When Shop B (creditor) cross-writes into my ledger, I see it live
 // This is for CUSTOMER VIEW — Shop A is a customer, linked shops cross-write
 // borrows/purchases into my linked_ledger path
-function startAllLinkedLedgerListeners() { /* Linked shops removed */ }
+function startAllLinkedLedgerListeners() {
+  if (!db || !authPhone) return;
 
-// ─── Handler: Shop B (a creditor) wrote something into MY ledger ─────────────
-// Shop A (our creditor) cross-wrote into our ledger.
-// This happens when Shop A records a SALE to us from their Debtors tab.
-// On our side: Shop A is our Creditor → add a purchase entry to their creditor record.
-function _onLinkedCreditorTx(theirPhone, txs) {
-  if (!txs || txs.length === 0) return;
-
-  const creditors = getCreditors();
-  const idx = creditors.findIndex(c => c.phone === theirPhone);
-  if (idx < 0) {
-    console.log("[LinkedLedger] Creditor tx from unknown phone:", theirPhone);
-    return;
-  }
-
-  if (!creditors[idx].transactions) creditors[idx].transactions = [];
-
-  let changed = false;
-  txs.forEach(tx => {
-    // Skip if already applied
-    if (creditors[idx].transactions.find(t => t._linkedTxId === tx.id)) return;
-
-    if (tx.type === "purchase") {
-      // Shop A sold to us → record as a purchase on their creditor entry (we owe them)
-      const newTx = {
-        id:          "SYN" + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase(),
-        _linkedTxId: tx.id,
-        type:        "purchase",
-        amount:      tx.amount,
-        note:        (tx.note || "Purchase") + " [Live Sync 🔗]",
-        date:        tx.date,
-        invoiceNo:   tx.invoiceNo || "",
-        createdAt:   tx._writtenAt || Date.now(),
-        syncStatus:  "synced",
-        _syncSource: theirPhone,
-      };
-      creditors[idx].transactions.push(newTx);
-      changed = true;
-      notify("🔗 " + (creditors[idx].name || theirPhone) + " recorded a sale of " + formatINR(tx.amount) + " — added to Creditors!", "success");
-
-    } else if (tx.type === "return") {
-      // Shop A accepted a return from us → record as return on their creditor entry
-      const newTx = {
-        id:          "SYN" + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase(),
-        _linkedTxId: tx.id,
-        type:        "return",
-        amount:      tx.amount,
-        note:        (tx.note || "Return") + " [Live Sync 🔗]",
-        date:        tx.date,
-        invoiceNo:   tx.invoiceNo || "",
-        createdAt:   tx._writtenAt || Date.now(),
-        syncStatus:  "synced",
-        _syncSource: theirPhone,
-      };
-      creditors[idx].transactions.push(newTx);
-      changed = true;
-      notify("↩️ " + (creditors[idx].name || theirPhone) + " recorded a return of " + formatINR(tx.amount), "success");
-    }
-    // Note: "payment" type is not expected here — payments go through crossWriteCreditorTx
-    // which writes to _onLinkedCustomerTx / _onLinkedDebtorTx on the other side
+  // Listen for cross-writes from all my linked CUSTOMERS
+  // (they cross-write when they record purchases from me)
+  const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2")) || "[]");
+  allCust.filter(c => c._fromShopConnect && c.phone).forEach(c => {
+    startLinkedLedgerListener(c.phone, _onLinkedCustomerTx);
   });
 
-  if (changed) {
-    saveCreditors(creditors);
-    if (currentTab === 6) renderTab(6); // refresh Creditors tab if open
-  }
+  // Listen for cross-writes from all my linked CREDITORS
+  // (they cross-write confirmation/response back to me)
+  const allCred = getCreditors();
+  allCred.filter(c => c._fromShopConnect && c.phone).forEach(c => {
+    startLinkedLedgerListener(c.phone, _onLinkedCreditorTx);
+  });
+}
+
+// ─── Handler: Shop B (a creditor) wrote something into MY ledger ─────────────
+// This means they confirmed/responded to something — currently not needed
+// since Shop A is the initiator. Kept for future dispute/response flow.
+function _onLinkedCreditorTx(theirPhone, txs) {
+  // Future: handle dispute flags from creditor side
+  console.log("[LinkedLedger] Creditor", theirPhone, "wrote", txs.length, "txs");
 }
 
 // ─── Handler: Shop A (a customer) wrote into MY ledger ───────────────────────
@@ -6549,87 +6743,31 @@ function _onLinkedCustomerTx(theirPhone, txs) {
   }
 }
 
-// ─── Handler: Shop A (a debtor) wrote into MY ledger ────────────────────────
-// This means they recorded a purchase from me — add a SALE to my Debtors tab
-function _onLinkedDebtorTx(theirPhone, txs) {
-  if (!txs || txs.length === 0) return;
-
-  const debtors = getDebtors();
-  let dr = debtors.find(d => d.phone === theirPhone);
-  if (!dr) {
-    // Debtor not yet in local list — should not normally happen, but guard anyway
-    dr = {
-      id: newDebtorId(), name: theirPhone, phone: theirPhone,
-      transactions: [], createdAt: Date.now(), _fromShopConnect: true,
-    };
-    debtors.push(dr);
-  }
-
-  if (!dr.transactions) dr.transactions = [];
-
-  let changed = false;
-  txs.forEach(tx => {
-    // Skip if already applied
-    if (dr.transactions.find(t => t._linkedTxId === tx.id)) return;
-
-    if (tx.type === "purchase") {
-      // Shop A (debtor) bought from me → record a SALE on their debtor entry
-      dr.transactions.push({
-        id:          "SYN" + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase(),
-        _linkedTxId: tx.id,
-        type:        "sale",
-        amount:      tx.amount,
-        note:        (tx.note || "Purchase") + " [Live Sync 🔗]",
-        date:        tx.date,
-        createdAt:   tx._writtenAt || Date.now(),
-        _syncSource: theirPhone,
-      });
-      changed = true;
-      notify("🔗 " + (dr.name || theirPhone) + " recorded a purchase of " + formatINR(tx.amount) + " — added to Debtors!", "success");
-
-    } else if (tx.type === "payment") {
-      // Shop A sent a payment → record as payment received
-      dr.transactions.push({
-        id:          "SYN" + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase(),
-        _linkedTxId: tx.id,
-        type:        "payment",
-        amount:      tx.amount,
-        note:        (tx.note || "Payment") + " [Live Sync 🔗]",
-        date:        tx.date,
-        createdAt:   tx._writtenAt || Date.now(),
-        _syncSource: theirPhone,
-      });
-      changed = true;
-      notify("💰 " + (dr.name || theirPhone) + " sent payment of " + formatINR(tx.amount) + " — Debtor updated!", "success");
-
-    } else if (tx.type === "return") {
-      // Shop A returned goods → record as return
-      dr.transactions.push({
-        id:          "SYN" + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase(),
-        _linkedTxId: tx.id,
-        type:        "return",
-        amount:      tx.amount,
-        note:        (tx.note || "Return") + " [Live Sync 🔗]",
-        date:        tx.date,
-        createdAt:   tx._writtenAt || Date.now(),
-        _syncSource: theirPhone,
-      });
-      changed = true;
-      notify("↩️ " + (dr.name || theirPhone) + " returned goods worth " + formatINR(tx.amount), "success");
-    }
-  });
-
-  if (changed) {
-    saveDebtors(debtors);
-    if (currentTab === 7) renderTab(7); // refresh Debtors tab if open
-  }
-}
-
 // ─── PURCHASE SYNC — Cross-write to creditor's customer path ─────────────────
 // Called after Shop A records any purchase/payment/return with a linked creditor
 // Instead of showing a modal and waiting for accept — writes directly, instantly.
 
-async function crossWriteCreditorTx(creditorId, tx) { /* Linked shops removed */ }
+async function crossWriteCreditorTx(creditorId, tx) {
+  const cr = getCreditors().find(c => c.id === creditorId);
+  if (!cr || !cr._fromShopConnect || !cr.phone) return;
+
+  const ok = await crossWriteTransaction(cr.phone, tx);
+  if (ok) {
+    // Update local tx syncStatus to "synced"
+    const creditors = getCreditors();
+    const idx = creditors.findIndex(c => c.id === creditorId);
+    if (idx >= 0) {
+      const tIdx = (creditors[idx].transactions || []).findIndex(t => t.id === tx.id);
+      if (tIdx >= 0) {
+        creditors[idx].transactions[tIdx].syncStatus = "synced";
+        saveCreditors(creditors);
+      }
+    }
+    notify("🔗 Synced to " + (cr.name || cr.phone) + " live!", "success");
+  } else {
+    notify("⚠️ Live sync failed — transaction saved locally", "error");
+  }
+}
 
 // ─── PURCHASE SYNC MODAL (now instant — no accept needed) ────────────────────
 function openPurchaseSyncModal(creditorId, txId, amount, note, date, invoiceNo) {
@@ -6639,9 +6777,11 @@ function openPurchaseSyncModal(creditorId, txId, amount, note, date, invoiceNo) 
   // Find the tx
   const tx = (cr.transactions || []).find(t => t.id === txId) || {
     id: txId, type: "purchase", amount, note, date, invoiceNo,
-    createdAt: Date.now(),
+    createdAt: Date.now(), syncStatus: "local",
   };
-  // No cross-write — shops independent
+
+  // Auto cross-write silently, no modal needed
+  crossWriteCreditorTx(creditorId, { ...tx, type: "purchase" });
   setTimeout(() => openCreditorDetail(creditorId), 200);
 }
 
@@ -6653,9 +6793,10 @@ function openPaymentSyncModal(creditorId, txId, amount, note, date, invoiceNo, s
   const tx = (cr.transactions || []).find(t => t.id === txId) || {
     id: txId, type: "payment", amount, note, date, invoiceNo,
     _paysBill: selectedBill || "",
-    createdAt: Date.now(),
+    createdAt: Date.now(), syncStatus: "local",
   };
-  // No cross-write — shops independent
+
+  crossWriteCreditorTx(creditorId, { ...tx, type: "payment", _paysBill: selectedBill || "" });
   setTimeout(() => openCreditorDetail(creditorId), 200);
 }
 
@@ -6695,7 +6836,10 @@ async function deleteCrTransaction(creditorId, txId) {
   const cr = creditors[idx];
   creditors[idx].transactions = (cr.transactions || []).filter(t => t.id !== txId);
   saveCreditors(creditors);
-  // No cross-delete — shops are independent
+  // Cross-delete from their side if linked
+  if (cr._fromShopConnect && cr.phone) {
+    await crossDeleteTransaction(cr.phone, txId);
+  }
   notify("🗑 Transaction deleted");
   closeModal();
   setTimeout(() => openCreditorDetail(creditorId), 200);
@@ -6834,17 +6978,15 @@ function renderDebtorsTab(){
   const totalOwed   = debtors.reduce((s,d)=>s+Math.max(0,debtBalance(d)),0);
   const totalCount  = debtors.length;
   const searchVal   = window._debtSearch || "";
-  const gstFilter   = window._debtGstFilter  || "all";
-  // linkFilter removed — all shops manage their own debtors independently
+  const gstFilter   = window._debtGstFilter || "all";
 
   let filtered = debtors.filter(d=>
     !searchVal ||
     d.name.toLowerCase().includes(searchVal.toLowerCase()) ||
     (d.phone||"").includes(searchVal)
   );
-  if(gstFilter==="gst")    filtered = filtered.filter(d=>!!d.gstin);
-  if(gstFilter==="nogst")  filtered = filtered.filter(d=>!d.gstin);
-  // No link filter — every shop manages its own debtors
+  if(gstFilter==="gst")   filtered = filtered.filter(d=>!!d.gstin);
+  if(gstFilter==="nogst") filtered = filtered.filter(d=>!d.gstin);
 
   filtered.sort((a,b)=>debtBalance(b)-debtBalance(a));
 
@@ -6882,20 +7024,12 @@ function renderDebtorsTab(){
     </div>
 
     <!-- GST filter pills -->
-    <div style="margin-bottom:10px;">
+    <div style="margin-bottom:16px;">
       <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔢 GST Status:</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${[['all','🏢 All'],['gst','✅ GST Registered'],['nogst','❌ Not Registered']].map(([k,l])=>`
           <button onclick="window._debtGstFilter='${k}';renderTab(7)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${gstFilter===k?'#22c55e':'#1e2a45'};background:${gstFilter===k?'#022c1a':'transparent'};color:${gstFilter===k?'#22c55e':'#4a5a7a'};font-size:12px;font-weight:${gstFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
         `).join('')}
-      </div>
-    </div>
-
-    <!-- Linked/Normal filter pills -->
-    <div style="margin-bottom:16px;">
-      <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔗 Shop Type:</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-
       </div>
     </div>
 
@@ -6957,7 +7091,7 @@ function _renderDebtorCard(dr){
           ${dr.gstin?` · 🔢 ${dr.gstin}`:""}
         </div>
         ${lastTx?`<div style="font-size:11px;color:#4a5a7a;margin-top:3px;">Last: ${debtTxIcon(lastTx.type)} ${escHtml(lastTx.note||lastTx.type)} · ${new Date(lastTx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>`:""}
-
+        ${dr._fromShopConnect?`<div style="margin-top:4px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#16653444;color:#4ade80;border:1px solid #22c55e44;">🔗 Linked Shop</span></div>`:""}
       </div>
       <!-- Balance -->
       <div style="text-align:right;flex-shrink:0;">
@@ -7041,12 +7175,10 @@ function saveDebtorModal(editId){
 
 function deleteDebtor(id){
   if(!confirm("Delete this debtor and all their transactions?")) return;
-  const dr = getDebtors().find(d=>d.id===id);
   const debtors = getDebtors().filter(d=>d.id!==id);
   saveDebtors(debtors);
   closeModal();
-  notify("\uD83D\uDDD1 Debtor deleted");
-
+  notify("🗑 Debtor deleted");
   renderTab(7);
 }
 
@@ -7106,8 +7238,8 @@ function openDebtorDetail(id){
   const balColor = bal>0?"#22c55e":bal<0?"#f59e0b":"#7a8aaa";
   const txs = dr.transactions||[];
 
-  showFullPageModal(`
-    <div style="display:flex;flex-direction:column;gap:14px;max-width:860px;margin:0 auto;padding:16px;">
+  showWideModal(`
+    <div style="display:flex;flex-direction:column;gap:14px;">
       <!-- Header -->
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:4px;">
         <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#166534,#22c55e);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">
@@ -7115,6 +7247,7 @@ function openDebtorDetail(id){
         </div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:18px;font-weight:800;color:#e8eaf0;">${escHtml(dr.name)}</div>
+          ${dr._fromShopConnect?`<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#16653444;color:#4ade80;border:1px solid #22c55e44;">🔗 Linked Shop</span>`:""}
         </div>
         <button onclick="closeModal()" style="cursor:pointer;background:none;border:none;color:#4a5a7a;font-size:20px;padding:4px;">✕</button>
       </div>
@@ -7126,9 +7259,9 @@ function openDebtorDetail(id){
           <div style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sell</button>
-          <button onclick="openAddDebtTxModal('${id}','payment')" class="btn" style="background:#0a1628;border:1px solid #60a5fa;color:#60a5fa;font-size:12px;padding:8px 12px;">💰 Payment Receipt</button>
-          <button onclick="openAddDebtTxModal('${id}','return')"  class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Returned</button>
+          <button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sale</button>
+          <button onclick="openAddDebtTxModal('${id}','payment')" class="btn" style="background:#0a1628;border:1px solid #60a5fa;color:#60a5fa;font-size:12px;padding:8px 12px;">💰 Payment</button>
+          <button onclick="openAddDebtTxModal('${id}','return')"  class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>
         </div>
       </div>
 
@@ -7184,7 +7317,7 @@ function openDebtorDetail(id){
         <!-- Filter type tabs -->
         <div style="display:flex;gap:6px;margin-bottom:10px;">
           ${["all","sale","payment","return"].map(f=>{
-            const labels={all:"📋 All",sale:"🛒 Sell",payment:"💰 Payment Receipt",return:"↩️ Returned"};
+            const labels={all:"📋 All",sale:"🛒 Sale",payment:"💰 Payment",return:"↩️ Return"};
             const cnt={all:txs.length,sale:txs.filter(t=>t.type==="sale").length,payment:txs.filter(t=>t.type==="payment").length,return:txs.filter(t=>t.type==="return").length};
             return `<button id="dr-tf-${f}" onclick="_drTxSetFilter('${id}','${f}')"
               style="flex:1;cursor:pointer;border-radius:8px;padding:7px 6px;font-size:11px;font-weight:800;
@@ -7200,7 +7333,7 @@ function openDebtorDetail(id){
         <div id="dr-tx-summary" style="font-size:11px;color:#4a5a7a;margin-bottom:8px;min-height:16px;"></div>
 
         <!-- Transaction list -->
-        <div id="dr-tx-list" style="display:flex;flex-direction:column;gap:8px;">
+        <div id="dr-tx-list" style="display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;">
           ${txs.length===0?`<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>`:"⏳"}
         </div>
       </div>
@@ -7260,7 +7393,7 @@ function _drTxRender(debtorId){
   const totalIn=filtered.filter(t=>t.type==="payment"||t.type==="return").reduce((s,t)=>s+t.amount,0);
   if(summaryEl) summaryEl.innerHTML=filtered.length===0?"":
     `<span style="color:#e8eaf0;font-weight:700;">${filtered.length} result${filtered.length>1?"s":""}</span>`+
-    (totalSale?` &nbsp;·&nbsp; <span style="color:#22c55e;">🛒 Sell: ${formatINR(totalSale)}</span>`:"")+
+    (totalSale?` &nbsp;·&nbsp; <span style="color:#22c55e;">🛒 ${formatINR(totalSale)}</span>`:"")+
     (totalIn?` &nbsp;·&nbsp; <span style="color:#60a5fa;">💰 ${formatINR(totalIn)}</span>`:"");
 
   if(filtered.length===0){
@@ -7312,7 +7445,7 @@ function openAddDebtTxModal(debtorId, defaultType){
   const dr = getDebtors().find(d=>d.id===debtorId);
   if(!dr){ notify("❌ Debtor not found","error"); return; }
 
-  const typeLabels = {sale:"🛒 Record Sell to", payment:"💰 Record Payment Receipt from", return:"↩️ Record Returned from"};
+  const typeLabels = {sale:"🛒 Record Sale to", payment:"💰 Record Payment from", return:"↩️ Record Return from"};
   const typeDescs  = {
     sale:    "Recording a sale increases the amount they owe you.",
     payment: "Recording a payment decreases the amount they owe you.",
@@ -7320,41 +7453,19 @@ function openAddDebtTxModal(debtorId, defaultType){
   };
   const typeColors = {sale:"#22c55e",payment:"#60a5fa",return:"#a78bfa"};
 
-  // invDatalist no longer used — custom dropdown per row shows stock qty
-  const invDatalist = '';
-
-  // Item rows section (only shown for sale type)
-  const itemsSection = defaultType === "sale" ? `
-    <div style="border-top:1px solid #1e2a45;padding-top:12px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <label style="font-size:11px;color:#7a8aaa;font-weight:700;">📦 ITEMS SOLD</label>
-        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#1e2a4533;color:#7a8aaa;border:1px solid #1e2a45;">Optional</span>
-      </div>
-      ${invDatalist}
-      <div id="drtx-items-list"></div>
-      <button type="button" onclick="_drtxAddItemRow()"
-        style="width:100%;padding:8px;border-radius:10px;border:1px dashed #166534;background:transparent;color:#22c55e;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:4px;">
-        ➕ Add Item
-      </button>
-      <div id="drtx-items-total" style="display:none;background:#001a0e;border:1px solid #16653455;border-radius:10px;padding:10px 14px;font-size:13px;color:#4ade80;text-align:right;font-weight:800;margin-bottom:4px;"></div>
-    </div>` : '';
-
   showWideModal(`
     ${modalHeader(typeLabels[defaultType]+" "+escHtml(dr.name))}
     <div style="display:flex;flex-direction:column;gap:12px;">
       <input type="hidden" id="drtx-debtor-id" value="${debtorId}" />
       <input type="hidden" id="drtx-type" value="${defaultType}" />
 
-
       <div style="background:#0a0e1a;border:1px solid ${typeColors[defaultType]}33;border-radius:10px;padding:12px;font-size:12px;color:${typeColors[defaultType]};">
         ${typeDescs[defaultType]}
       </div>
 
-      ${itemsSection}
-
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">AMOUNT (₹) *</label>
-        <input class="input" id="drtx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" oninput="_drtxAmountEdited=true" />
+        <input class="input" id="drtx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
       </div>
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">DESCRIPTION</label>
@@ -7369,104 +7480,7 @@ function openAddDebtTxModal(debtorId, defaultType){
       </button>
     </div>
   `);
-  window._drtxAmountEdited = false;
-  setTimeout(()=>{ if(defaultType!=="sale") document.getElementById("drtx-amount")?.focus(); },100);
-}
-
-// ── Debtor sale modal item row helpers ───────────────────────────────────────
-function _drtxAddItemRow(){
-  const list = document.getElementById("drtx-items-list");
-  if(!list) return;
-  const rowId = "drtx-row-"+Date.now();
-  const div = document.createElement("div");
-  div.id = rowId;
-  div.className = "drtx-item-row";
-  div.style.cssText = "position:relative;margin-bottom:8px;";
-  div.innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 80px 90px 28px;gap:6px;align-items:center;">
-      <div style="position:relative;">
-        <input class="input drtx-iname" placeholder="Item name" autocomplete="off"
-          style="margin:0;font-size:12px;padding:7px 10px;width:100%;box-sizing:border-box;"
-          oninput="_drtxItemSearch(this,'${rowId}')"
-          onfocus="_drtxItemSearch(this,'${rowId}')"
-          onblur="setTimeout(()=>_drtxHideItemDd('${rowId}'),180)" />
-        <div id="drtxdd-${rowId}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#111827;border:1px solid #22c55e44;border-radius:8px;z-index:9999;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px #000a;margin-top:2px;"></div>
-      </div>
-      <input class="input drtx-iqty" type="number" placeholder="Qty" min="0.01" step="0.01"
-        style="margin:0;font-size:12px;padding:7px 8px;text-align:center;"
-        oninput="_drtxUpdateTotal()" />
-      <input class="input drtx-iprice" type="number" placeholder="₹/unit" min="0" step="0.01"
-        style="margin:0;font-size:12px;padding:7px 8px;text-align:right;"
-        oninput="_drtxUpdateTotal()" />
-      <button type="button" onclick="this.closest('.drtx-item-row').remove();_drtxUpdateTotal();"
-        style="background:#1a0a0a;border:1px solid #3a1a1a;color:#f66;border-radius:7px;cursor:pointer;font-size:14px;width:28px;height:28px;flex-shrink:0;">✕</button>
-    </div>`;
-  list.appendChild(div);
-}
-
-function _drtxItemSearch(inp, rowId){
-  const q = inp.value.trim().toLowerCase();
-  const dd = document.getElementById("drtxdd-"+rowId);
-  if(!dd) return;
-  const items = inventoryItems;
-  const filtered = q ? items.filter(x=>x.name.toLowerCase().includes(q)) : items;
-  if(!filtered.length){ dd.style.display="none"; return; }
-  dd.style.display="block";
-  dd.innerHTML = filtered.map(x=>{
-    const stock = invGetStock(x.name);
-    const sc = stock<=0?"#e03030":stock<=3?"#f59e0b":"#22c55e";
-    const unit = x.unit||"";
-    return `<div onmousedown="_drtxItemSelect('${rowId}',this)"
-      data-name="${x.name.replace(/"/g,'&quot;')}"
-      data-price="${x.sellingPrice||x.costPerUnit||0}"
-      style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #1e2a45;display:flex;justify-content:space-between;align-items:center;font-size:13px;"
-      onmouseover="this.style.background='#1e2a45'" onmouseout="this.style.background=''">
-      <span style="color:#e8eaf0;font-weight:600;">${x.name}</span>
-      <span style="font-size:11px;color:${sc};font-weight:700;white-space:nowrap;margin-left:10px;">Stock: ${stock}${unit?" "+unit:""}</span>
-    </div>`;
-  }).join("");
-}
-
-function _drtxItemSelect(rowId, el){
-  const row = document.getElementById(rowId);
-  if(!row) return;
-  const name = el.getAttribute("data-name");
-  const price = el.getAttribute("data-price");
-  const nameEl = row.querySelector(".drtx-iname");
-  const priceEl = row.querySelector(".drtx-iprice");
-  if(nameEl) nameEl.value = name;
-  if(priceEl && !parseFloat(priceEl.value)) priceEl.value = price;
-  _drtxHideItemDd(rowId);
-  _drtxUpdateTotal();
-  row.querySelector(".drtx-iqty")?.focus();
-}
-
-function _drtxHideItemDd(rowId){
-  const dd = document.getElementById("drtxdd-"+rowId);
-  if(dd) dd.style.display="none";
-}
-
-function _drtxUpdateTotal(){
-  const rows = document.querySelectorAll(".drtx-item-row");
-  let total = 0;
-  rows.forEach(row=>{
-    const qty = parseFloat(row.querySelector(".drtx-iqty")?.value||"0")||0;
-    const price = parseFloat(row.querySelector(".drtx-iprice")?.value||"0")||0;
-    total += qty * price;
-  });
-  const totalEl = document.getElementById("drtx-items-total");
-  if(!totalEl) return;
-  if(rows.length > 0 && total > 0){
-    totalEl.style.display = "block";
-    totalEl.textContent = "Items Total: ₹" + total.toLocaleString("en-IN", {minimumFractionDigits:2,maximumFractionDigits:2});
-    // Auto-fill amount field if user hasn't manually edited it
-    if(!window._drtxAmountEdited){
-      const amtEl = document.getElementById("drtx-amount");
-      if(amtEl) amtEl.value = total.toFixed(2);
-    }
-  } else {
-    totalEl.style.display = "none";
-  }
+  setTimeout(()=>document.getElementById("drtx-amount")?.focus(),100);
 }
 
 function saveDebtTransaction(){
@@ -7479,63 +7493,22 @@ function saveDebtTransaction(){
   if(!debtorId||!type){ notify("⚠️ Error: missing debtor info","error"); return; }
   if(isNaN(amtRaw)||amtRaw<=0){ notify("⚠️ Enter a valid amount"); return; }
 
-  // Collect item rows if this is a sale
-  const soldItems = [];
-  if(type === "sale"){
-    const rows = document.querySelectorAll(".drtx-item-row");
-    rows.forEach(row=>{
-      const nm    = row.querySelector(".drtx-iname")?.value.trim()||"";
-      const qty   = parseFloat(row.querySelector(".drtx-iqty")?.value||"0")||0;
-      const price = parseFloat(row.querySelector(".drtx-iprice")?.value||"0")||0;
-      if(nm && qty > 0) soldItems.push({name:nm, qty, pricePerUnit:price});
-    });
-
-    const debtors2 = getDebtors();
-    const dr = debtors2.find(d=>d.id===debtorId);
-
-    // Linked shop: items are MANDATORY
-
-
-    // ── Stock validation ─────────────────────────────────────────────────────
-    for(const si of soldItems){
-      const inv = inventoryItems.find(x=>x.name===si.name);
-      if(!inv) continue; // item not in inventory — allow (manual entry)
-      const available = invGetStock(si.name);
-      if(si.qty > available){
-        notify(`❌ Not enough stock for "${si.name}". Available: ${available} ${inv.unit||"units"}`, "error");
-        return;
-      }
-    }
-  }
-
   const debtors = getDebtors();
   const idx = debtors.findIndex(d=>d.id===debtorId);
   if(idx<0){ notify("❌ Debtor not found","error"); return; }
 
-  const txId = "DT"+Date.now()+Math.random().toString(36).slice(2,5);
   if(!debtors[idx].transactions) debtors[idx].transactions=[];
   debtors[idx].transactions.push({
-    id:        txId,
+    id:     "DT"+Date.now()+Math.random().toString(36).slice(2,5),
     type,
-    amount:    amtRaw,
+    amount: amtRaw,
     note,
     date,
     createdAt: Date.now(),
-    soldItems: soldItems.length ? soldItems : undefined,
   });
   saveDebtors(debtors);
-
-  // Deduct from inventory after saving
-  if(soldItems.length){
-    const dr = debtors[idx];
-    invDeductSold(soldItems, dr.id);
-  }
-
-
-
   closeModal();
-  const typeName = type==="sale"?"Sell":type==="payment"?"Payment Receipt":type==="return"?"Returned":type;
-  notify("✅ "+typeName+" of "+formatINR(amtRaw)+" saved");
+  notify("✅ "+type.charAt(0).toUpperCase()+type.slice(1)+" of "+formatINR(amtRaw)+" saved");
   setTimeout(()=>openDebtorDetail(debtorId), 200);
 }
 
@@ -7605,6 +7578,8 @@ function renderSettings(){
   const userNumRaw = savedPhone ? localStorage.getItem("sc_usernum_" + savedPhone) || "" : "";
   const displayUID = userNumRaw ? "#" + String(userNumRaw).slice(-6) : "—";
   const themeIcon = document.body.classList.contains("day-theme") ? "🌙 Dark Mode" : "☀️ Light Mode";
+  const isProStyle = currentAppStyle === "pro";
+  const styleLabel = isProStyle ? "Professional (current)" : "Game / Classic (current)";
   const curLang = localStorage.getItem("sc_lang") || "en";
   const langNames = {en:"English",hi:"हिंदी",mr:"मराठी",gu:"ગુજરાતી"};
   const curLangName = langNames[curLang] || "English";
@@ -7650,7 +7625,24 @@ function renderSettings(){
     )}
 
     ${section("Appearance",
-      row("🎨","Theme",themeIcon,"toggleTheme();renderTab(6)") +
+      `<div style="padding:16px 18px;border-bottom:1px solid var(--border-main, #1a2035);">
+        <div style="font-size:13px;font-weight:600;color:var(--text-main,#e8eaf0);margin-bottom:10px;">App Style</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <button onclick="applyAppStyle('pro')" style="cursor:pointer;padding:14px 10px;border-radius:12px;border:2px solid ${isProStyle?'#1d4ed8':'#e2e8f0'};background:${isProStyle?'#eff6ff':'transparent'};text-align:center;transition:all 0.2s;">
+            <div style="font-size:22px;margin-bottom:6px;">🏢</div>
+            <div style="font-size:12px;font-weight:700;color:${isProStyle?'#1d4ed8':'var(--text-main,#e8eaf0)'};margin-bottom:2px;">Professional</div>
+            <div style="font-size:10px;color:var(--text-muted,#64748b);">Clean · Business</div>
+            ${isProStyle?`<div style="margin-top:6px;background:#1d4ed8;color:#fff;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;display:inline-block;">Active</div>`:''}
+          </button>
+          <button onclick="applyAppStyle('game')" style="cursor:pointer;padding:14px 10px;border-radius:12px;border:2px solid ${!isProStyle?'#FFD700':'#1e2a45'};background:${!isProStyle?'#1a1400':'transparent'};text-align:center;transition:all 0.2s;">
+            <div style="font-size:22px;margin-bottom:6px;">🏆</div>
+            <div style="font-size:12px;font-weight:700;color:${!isProStyle?'#FFD700':'var(--text-main,#e8eaf0)'};margin-bottom:2px;">Game</div>
+            <div style="font-size:10px;color:var(--text-muted,#64748b);">Bold · Classic</div>
+            ${!isProStyle?`<div style="margin-top:6px;background:#FFD700;color:#1a0a00;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;display:inline-block;">Active</div>`:''}
+          </button>
+        </div>
+      </div>` +
+      (isProStyle ? '' : row("🎨","Theme",themeIcon,"toggleTheme();renderTab(9)")) +
       row("🌐","Language",`Current: ${curLangName}`,"toggleLangMenu()") +
       row("🔡","Text Size","Adjust app font size","openTextSizeModal()")
     )}
@@ -8061,7 +8053,6 @@ function removeAppIcon(){
 function closeModal(){document.getElementById("modal-container").innerHTML="";}
 function showModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:440px;">${html}</div></div>`;}
 function showWideModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:min(960px,95vw);max-height:95vh;">${html}</div></div>`;}
-function showFullPageModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" style="padding:0;align-items:stretch;"><div class="modal-box" style="width:100%;max-width:100%;height:100%;max-height:100%;border-radius:0;overflow-y:auto;">${html}</div></div>`;}
 function modalHeader(t){return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><div class="modal-title">${t}</div><button onclick="closeModal()" style="background:none;border:none;color:#7a8aaa;cursor:pointer;font-size:20px;">✕</button></div>`;}
 
 // ─── ADD / EDIT CUSTOMER ──────────────────────────────────────
@@ -8798,10 +8789,62 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
 document.addEventListener("DOMContentLoaded", updateAppHeader);
 
 // ─── THEME ────────────────────────────────────────────────────
+// appStyle: "pro" (default) or "game"
+// colorMode: "night" or "day" (only used in game style)
 let currentTheme = localStorage.getItem(storageKey("theme")) || "night";
+let currentAppStyle = localStorage.getItem(storageKey("appStyle")) || "pro";
+
+function applyAppStyle(style) {
+  currentAppStyle = style;
+  document.body.classList.toggle("pro-theme", style === "pro");
+  // When switching to pro, force day-like readable mode; game keeps its night/day toggle
+  if (style === "pro") {
+    document.body.classList.remove("day-theme");
+    const mc = document.getElementById("meta-theme-color");
+    if (mc) mc.setAttribute("content", "#1d4ed8");
+  } else {
+    // restore game theme colour mode
+    applyTheme(currentTheme);
+    const mc = document.getElementById("meta-theme-color");
+    if (mc) mc.setAttribute("content", currentTheme === "day" ? "#f0f2f8" : "#FFD700");
+  }
+  localStorage.setItem(storageKey("appStyle"), style);
+  updateBottomNavIcons();
+  updateAppHeader();
+  renderTabs();
+  renderTab(currentTab);
+  saveSettingsToCloud();
+}
+
+// SVG icons for pro bottom nav
+const BNAV_PRO_ICONS = {
+  0: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M5 3h14l-1.5 9H6.5L5 3z"/><path d="M9 12a3 3 0 0 0 6 0"/></svg>`,
+  1: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  2: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
+  5: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
+};
+const BNAV_PRO_LABELS = { 0: "Rankings", 1: "Customers", 2: "Purchase", 5: "Inventory" };
+const BNAV_GAME_ICONS = { 0: "🏆", 1: "👥", 2: "💳", 5: "📦" };
+const BNAV_GAME_LABELS = { 0: "Board", 1: "Customers", 2: "Purchase", 5: "Inventory" };
+
+function updateBottomNavIcons() {
+  const isPro = currentAppStyle === "pro";
+  [0,1,2,5].forEach(i => {
+    const iconEl = document.getElementById("bnav-icon-" + i);
+    const labelEl = document.getElementById("bnav-label-" + i);
+    if (iconEl) iconEl.innerHTML = isPro ? BNAV_PRO_ICONS[i] : BNAV_GAME_ICONS[i];
+    if (iconEl) iconEl.style.fontSize = isPro ? "0" : "22px"; // SVG sized internally
+    if (labelEl) labelEl.textContent = isPro ? BNAV_PRO_LABELS[i] : BNAV_GAME_LABELS[i];
+  });
+}
+
+
 function applyTheme(t) {
   currentTheme = t;
-  document.body.classList.toggle("day-theme", t === "day");
+  // Only toggle day-theme if in game style
+  if (currentAppStyle !== "pro") {
+    document.body.classList.toggle("day-theme", t === "day");
+  }
   const btn = document.getElementById("theme-btn");
   if (btn) btn.textContent = t === "day" ? "🌙" : "☀️";
   localStorage.setItem(storageKey("theme"), t);
@@ -8811,7 +8854,11 @@ function toggleTheme() {
   applyTheme(currentTheme === "night" ? "day" : "night");
 }
 // Apply on load
-document.addEventListener("DOMContentLoaded", () => applyTheme(currentTheme));
+document.addEventListener("DOMContentLoaded", () => {
+  applyAppStyle(currentAppStyle);
+  if (currentAppStyle !== "pro") applyTheme(currentTheme);
+  updateBottomNavIcons();
+});
 
 // ─── LANGUAGE ─────────────────────────────────────────────────
 const LANGUAGES = {
@@ -10660,7 +10707,7 @@ function renderInventoryTab(){
         <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:8px;">🏷️ Purchased From (Creditor) <span style="font-size:10px;color:#4a5a7a;font-weight:400;">— links stock to creditor account</span></div>
         <select class="input" id="inv-creditor-id" style="margin-bottom:0;">
           <option value="">⚠️ Skip — add to Unreconciled</option>
-          ${getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").map(c=>`<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
+          ${getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").map(c=>`<option value="${c.id}">${c._fromShopConnect?'🔗 ':' '}${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
         </select>
         <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">If skipped, a purchase entry will be added under <b style="color:#f59e0b;">Unreconciled Purchases</b> in the Creditors tab.</div>
       </div>
@@ -10796,7 +10843,7 @@ function renderInventoryTab(){
           <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:8px;">🏷️ Purchased From (Creditor) <span style="font-size:10px;color:#4a5a7a;font-weight:400;">— links stock to creditor account</span></div>
           <select class="input" id="inv-creditor-id" style="margin-bottom:0;">
             <option value="">⚠️ Skip — add to Unreconciled</option>
-            ${getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").map(c=>`<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
+            ${getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").map(c=>`<option value="${c.id}">${c._fromShopConnect?'🔗 ':' '}${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
           </select>
           <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">If skipped, a purchase entry will be added under <b style="color:#f59e0b;">Unreconciled Purchases</b> in the Creditors tab.</div>
         </div>
@@ -10955,6 +11002,19 @@ function invSubmitAdd(){
   invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
   _invLogCreditorPurchase(creditorId, name, qty, cost, date, notes);
 
+  // If linked shop creditor, offer sync
+  if(creditorId && cost > 0){
+    const creditors = getCreditors();
+    const cr = creditors.find(c=>c.id===creditorId);
+    if(cr && cr._fromShopConnect && cr.phone && db && authPhone){
+      const totalAmt = Math.round(qty * cost * 100) / 100;
+      const txNote = notes ? `${name} ×${qty} — ${notes}` : `${name} ×${qty} (new inventory)`;
+      const latestTx = (cr.transactions||[]).slice(-1)[0];
+      const txId = latestTx?.id || ("TX"+Date.now());
+      setTimeout(()=>openPurchaseSyncModal(creditorId, txId, totalAmt, txNote, date, ""), 400);
+      return;
+    }
+  }
 }
 
 function invSubmitRestock(){
@@ -10973,6 +11033,23 @@ function invSubmitRestock(){
   const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
   invAddStock(invRestockSelected, unit||(selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
   _invLogCreditorPurchase(creditorId, invRestockSelected, qty, cost, date, notes);
+
+  // If creditor is a linked shop, offer payment sync request
+  if(creditorId && cost > 0){
+    const creditors = getCreditors();
+    const cr = creditors.find(c=>c.id===creditorId);
+    if(cr && cr._fromShopConnect && cr.phone && db && authPhone){
+      const totalAmt = Math.round(qty * cost * 100) / 100;
+      const txNote = notes ? `${invRestockSelected} ×${qty} — ${notes}` : `${invRestockSelected} ×${qty} (inventory purchase)`;
+      // Find the tx we just added to get its id
+      const latestTx = (cr.transactions||[]).slice(-1)[0];
+      const txId = latestTx?.id || ("TX"+Date.now());
+      setTimeout(()=>openPurchaseSyncModal(creditorId, txId, totalAmt, txNote, date, ""), 400);
+      invRestockSelected = null;
+      invRestockSearch = "";
+      return;
+    }
+  }
 
   invRestockSelected = null;
   invRestockSearch = "";
@@ -11099,25 +11176,11 @@ async function loadShopRequests(){
     for(const doc of snap3b.docs) await _applyAutoAcceptedReq(doc);
   } catch(e4){ /* rules or index issue */ }
 
-  // ── Path 4: info/removal notices sent to me ────────────────────────────────
-  try {
-    const snap4 = await db.collection("shop_requests").doc(authPhone).collection("requests")
-      .where("status","==","info").get();
-    combined.push(...snap4.docs.map(d=>({id:d.id,...d.data(),_path:"sub"})));
-  } catch(e5) {}
-  try {
-    const snap5 = await db.collection("shop_connect_requests")
-      .where("toPhone","==",authPhone)
-      .where("status","==","info")
-      .get();
-    combined.push(...snap5.docs.map(d=>({id:d.id,...d.data(),_path:"flat"})));
-  } catch(e6) {}
-
   // Deduplicate by id and sort newest first
   const seen = new Set();
   _shopRequestsCache = combined.filter(r=>{ if(seen.has(r.id)) return false; seen.add(r.id); return true; })
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  _shopRequestsUnread = _shopRequestsCache.filter(r=>r.status==="pending").length;
+  _shopRequestsUnread = _shopRequestsCache.length;
   renderTabs();
 }
 
@@ -11179,7 +11242,7 @@ async function _applyAutoAcceptedReq(doc){
     doc.ref.update({status:"consumed"}).catch(()=>{});
     if(currentTab===1) renderTab(1);
     if(currentTab===6) renderTab(6);
-    if(currentTab===8) renderTab(8);
+    if(currentTab===7) renderTab(7);
   } else {
     // Even if already in local list, mark consumed and refresh UI
     // because the direct Firestore write (Step 2 in acceptShopRequest) may have
@@ -11425,8 +11488,6 @@ async function acceptShopRequest(req){
     });
     saveDebtors(debtors);
     notify(`✅ ${profile.shopName||"Shop"} added to your Debtors!`);
-    // Start live ledger listener — route to Debtors handler, NOT Customers
-    if (profile.phone) startLinkedLedgerListener(profile.phone, _onLinkedDebtorTx);
   }
 
   function _autoAddAsCustomer(profile){
@@ -11455,9 +11516,7 @@ async function acceptShopRequest(req){
     // NOTE: Do NOT write to Firestore here — the onSnapshot listener on
     // startFirestoreListener() will auto-sync it once it lands in Firestore
     // Start live ledger listener for this newly linked customer
-    // Only register if no Debtor listener is already active for this phone
-    // (same shop can appear in both Customers + Debtors; Debtors handler takes priority)
-    if (profile.phone && !_linkedLedgerListeners[profile.phone]) startLinkedLedgerListener(profile.phone, _onLinkedCustomerTx);
+    if (profile.phone) startLinkedLedgerListener(profile.phone, _onLinkedCustomerTx);
     // via Step 2 below.  A double-write causes a duplicate customer entry.
     notify(`✅ ${profile.shopName||"Shop"} added to your Customers!`);
   }
@@ -11581,7 +11640,7 @@ async function acceptShopRequest(req){
   _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==req.id);
   _shopRequestsUnread = _shopRequestsCache.length;
   renderTabs();
-  if(currentTab===8) renderTab(8);
+  if(currentTab===7) renderTab(7);
 }
 
 // ── Decline a request ─────────────────────────────────────────────────────────
@@ -11599,7 +11658,7 @@ async function declineShopRequest(req){
   _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==req.id);
   _shopRequestsUnread = _shopRequestsCache.length;
   renderTabs();
-  if(currentTab===8) renderTab(8);
+  if(currentTab===7) renderTab(7);
   notify("🚫 Request declined");
 }
 
@@ -11619,44 +11678,13 @@ function renderMessagesTab(){
     </div>`;
   }
 
-  const pendingReqs = reqs.filter(r=>r.status==="pending");
-  const infoReqs    = reqs.filter(r=>r.status==="info");
-
-  const infoHtml = infoReqs.map(msg=>{
-    const timeStr = new Date(msg.createdAt).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
-    const removedLabel = msg.removedAs==="creditor"
-      ? "their <b style='color:#f59e0b;'>Creditor</b>"
-      : msg.removedAs==="debtor"
-      ? "their <b style='color:#22c55e;'>Debtor</b>"
-      : "their list";
-    return `
-      <div style="background:#0d1220;border:2px solid #7c2d12;border-radius:14px;padding:16px;margin-bottom:12px;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
-          <div style="font-size:28px;">🔕</div>
-          <div style="flex:1;">
-            <div style="font-size:14px;font-weight:800;color:#fbbf24;">Shop Removed You</div>
-            <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">📅 ${timeStr}</div>
-          </div>
-          <button onclick="_dismissInfoMsg('${msg.id}','${msg._path||'sub'}')"
-            style="cursor:pointer;background:#1a0a0a;border:1px solid #5a1a1a;border-radius:8px;color:#f87171;font-size:12px;font-weight:700;padding:6px 12px;">
-            ✕ Dismiss
-          </button>
-        </div>
-        <div style="background:#1a0a00;border:1px solid #7c2d1255;border-radius:10px;padding:12px;font-size:13px;color:#fcd34d;line-height:1.6;">
-          <b style="color:#fbbf24;">${escHtml(msg.fromName||msg.fromPhone||"A shop")}</b>
-          has removed you from ${removedLabel} in their account.<br>
-          <span style="font-size:12px;color:#9a7a4a;">Your records are unaffected — only their copy was removed.</span>
-        </div>
-      </div>`;
-  }).join("");
-
-  const pendingHtml = pendingReqs.length === 0
+  const pendingHtml = reqs.length === 0
     ? `<div style="text-align:center;padding:60px 20px;color:#4a5a7a;">
         <div style="font-size:48px;margin-bottom:12px;">✉️</div>
         <div style="font-size:15px;font-weight:700;color:#7a8aaa;margin-bottom:6px;">No pending requests</div>
         <div style="font-size:12px;">When another shop adds you as a creditor or customer, their request will appear here.</div>
       </div>`
-    : pendingReqs.map(req=>{
+    : reqs.map(req=>{
         const p = req.fromProfile || {};
         const initials = (p.shopName||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
         // req.type = what they want ME to add THEM as
@@ -11730,7 +11758,7 @@ function renderMessagesTab(){
         <div style="font-size:20px;font-weight:800;color:#e8eaf0;">✉️ Messages</div>
         <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">Connection requests from other ShopChampion shops</div>
       </div>
-      <button onclick="loadShopRequests().then(()=>renderTab(8))" class="btn"
+      <button onclick="loadShopRequests().then(()=>renderTab(7))" class="btn"
         style="background:#0a1628;border:1px solid #1e3a6e;color:#60a5fa;padding:8px 14px;font-size:12px;font-weight:800;">
         🔄 Refresh
       </button>
@@ -11742,14 +11770,9 @@ function renderMessagesTab(){
       <b style="color:#e8eaf0;">Accept</b> → their shop is automatically saved in your account with all details (name, phone, GSTIN, address).<br>
       <b style="color:#e8eaf0;">Decline</b> → request is removed, nothing is saved.
     </div>
-    <!-- Info / removal notices -->
-    ${infoReqs.length>0?`<div style="margin-bottom:20px;">
-      <div style="font-size:13px;font-weight:800;color:#fbbf24;margin-bottom:12px;">🔔 Notifications (${infoReqs.length})</div>
-      ${infoHtml}
-    </div>`:""}
     <!-- Pending requests -->
     <div>
-      ${pendingReqs.length>0?`<div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:12px;">📬 Pending Requests (${pendingReqs.length})</div>`:""}
+      ${reqs.length>0?`<div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:12px;">📬 Pending Requests (${reqs.length})</div>`:""}
       ${pendingHtml}
     </div>
   </div>`;
@@ -11760,22 +11783,6 @@ function _acceptReqById(id){
   const req = _shopRequestsCache.find(r=>r.id===id);
   if(req) acceptShopRequest(req);
 }
-
-async function _dismissInfoMsg(id, path){
-  if(!db || !authPhone) return;
-  try {
-    if(path === "flat"){
-      await db.collection("shop_connect_requests").doc(id).update({ status:"dismissed" });
-    } else {
-      await db.collection("shop_requests").doc(authPhone).collection("requests").doc(id).update({ status:"dismissed" });
-    }
-  } catch(e){ console.warn("dismiss info msg error:", e); }
-  _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==id);
-  _shopRequestsUnread = _shopRequestsCache.filter(r=>r.status==="pending").length;
-  renderTabs();
-  renderTab(8);
-}
-
 function _declineReqById(id){
   const req = _shopRequestsCache.find(r=>r.id===id);
   if(req) declineShopRequest(req);
