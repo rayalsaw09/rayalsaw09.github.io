@@ -14304,6 +14304,9 @@ history.pushState({sc:true}, '');
   <span class="gb-icon" id="sc-gb-icon"></span>
   <div class="gb-title" id="sc-gb-title"></div>
   <div class="gb-text" id="sc-gb-text"></div>
+  <!-- Detail expansion -->
+  <div id="sc-gb-detail" style="display:none;font-size:12.5px;color:#8a9cc0;line-height:1.65;margin-bottom:12px;padding:10px 12px;background:#060c18;border-radius:10px;border:1px solid #1a2540;"></div>
+  <button id="sc-gb-more-btn" onclick="scGuideToggleDetail()" style="width:100%;background:transparent;border:1px dashed #1e2a45;border-radius:8px;color:#4a6a9a;font-size:11.5px;padding:7px;cursor:pointer;margin-bottom:10px;"></button>
   <div class="gb-actions">
     <button class="gb-btn-skip" onclick="scGuideNext()" id="sc-gb-skip-btn">Skip this ›</button>
     <button class="gb-btn-next" onclick="scGuideNext()" id="sc-gb-next-btn">Next →</button>
@@ -14346,52 +14349,72 @@ history.pushState({sc:true}, '');
 const STEPS_EN = [
   {
     icon:"🏆", title:"Rankings (Leaderboard)",
-    text:"This is your Leaderboard — see your top customers ranked by their total purchases. The #1 customer gets the crown! Use this to identify your most loyal buyers.",
+    text:"This is your Leaderboard — it ranks all your customers by their total purchases. The #1 buyer gets a crown 👑. Use this every day to instantly spot your most loyal customers.",
+    detail:"The Leaderboard is the heart of ShopChampion. Every time you record a purchase, that customer automatically moves up or down the ranking in real time. You can filter by this week, this month, or all time. You can also set up a display screen — like a TV at the counter — that shows the leaderboard live so customers are motivated to buy more and claim the top spot. Tap any customer's name to jump straight to their full profile and purchase history.",
+    speech:"This is your Leaderboard. It ranks all your customers by how much they have bought. The number one buyer gets a crown. Every time you enter a purchase, the rankings update automatically in real time.",
     tabIndex:0, targetId:"tab-content"
   },
   {
     icon:"👥", title:"Customers",
-    text:"The Customers tab shows all your registered customers. You can search, view their purchase history, and manage their profiles. Tap any customer to see full details.",
+    text:"All your customers live here. Search by name, view their full purchase history, edit their details, or delete a record. Every customer has their own profile card.",
+    detail:"The Customers tab is your complete customer database. You can add new customers manually with their name, phone number, and photo. Use the search bar to find anyone instantly — it works even if you type just the first two letters. Tap a customer to open their profile: you will see every purchase they have made, their total spend, their current rank, and how many days since their last visit. You can also send them a WhatsApp message directly from here. If a customer asks to be removed, you can delete their record safely.",
+    speech:"The Customers tab has your full customer database. Search for anyone, view their purchase history, edit their details, and see how long it has been since their last visit.",
     tabIndex:1, targetId:"tab-content"
   },
   {
     icon:"💳", title:"Purchase Entry",
-    text:"Record a new purchase here. Select the customer, enter the amount or items bought, and save. This instantly updates their rank on the leaderboard.",
+    text:"Record every sale here. Pick the customer, enter the amount or select items from inventory, and tap Save. The leaderboard updates instantly.",
+    detail:"Purchase Entry is what you will use most often — every time a customer buys something, record it here. Start typing the customer name and it will appear in the list. You can enter a simple rupee amount, or if you have inventory set up, select specific items and quantities so stock is deducted automatically. You can also attach a bill number or note. Once saved, the customer's rank updates live on the leaderboard. If you made a mistake, you can edit or delete a purchase from the customer's profile. This tab also supports quick-entry mode for busy shops.",
+    speech:"Purchase Entry is where you record every sale. Select the customer, enter the amount or pick items from your inventory, and save. The leaderboard rank updates instantly.",
     tabIndex:2, targetId:"tab-content"
   },
   {
     icon:"📊", title:"Analytics",
-    text:"Analytics gives you charts and insights — daily sales trends, top products, busiest hours, and revenue summaries. Know your shop's performance at a glance.",
+    text:"Understand your business with charts — daily revenue, busiest hours, top customers, and sales trends over time. All in one clear view.",
+    detail:"Analytics turns your sales data into easy-to-read charts and numbers. See your total revenue for today, this week, and this month. Find out which hours of the day are busiest so you can plan staff accordingly. Discover which customers bring in the most money and which products sell fastest. The trend line shows whether your revenue is growing or falling compared to the previous period. You can switch between bar charts and line graphs. All data is live — it updates as soon as a new purchase is entered. Use this tab every week to make smarter decisions for your shop.",
+    speech:"Analytics shows your business performance as charts and numbers. See your daily revenue, busiest hours, top customers, and whether your sales are growing or falling compared to before.",
     tabIndex:3, targetId:"tab-content"
   },
   {
     icon:"⚖️", title:"Compare",
-    text:"Compare periods — this week vs last week, this month vs last month. See whether your business is growing or needs attention.",
+    text:"Side-by-side comparison of any two periods — this week vs last week, this month vs last month. See exactly where your business stands.",
+    detail:"The Compare tab lets you place two time periods side by side so you can measure growth objectively. Compare this week against last week, or this month against the same month last year. You will see total sales, number of transactions, and average purchase value for each period, with a percentage change so you know immediately if things are up or down. This is especially useful at the end of each month to report progress, or to understand whether a promotion you ran actually improved sales. You can also compare individual customers across periods to see if a loyal buyer is spending more or less.",
+    speech:"The Compare tab lets you put two time periods side by side — this week against last week, this month against last month — and see the exact difference in sales and transactions.",
     tabIndex:4, targetId:"tab-content"
   },
   {
     icon:"📦", title:"Inventory",
-    text:"Track your stock here. Add items with prices and quantities. You'll get alerts when stock runs low so you never run out of popular products.",
+    text:"Manage your stock — add items with price, quantity, and category. Get low-stock alerts automatically so you never run out of what's selling.",
+    detail:"The Inventory tab is your digital stock register. Add every product you sell with its name, selling price, purchase cost, and current quantity. You can organise items into categories like Groceries, Electronics, or Clothing. When stock drops to 3 or below, a warning badge appears on the Inventory tab so you notice immediately. When you record a purchase and select items, the quantities are deducted automatically — no manual counting needed. You can also export your inventory as a CSV spreadsheet. This tab helps you understand which products are moving fast and which are sitting idle, so you order smarter.",
+    speech:"Inventory is your digital stock register. Add items with their price and quantity. When stock runs low, you get an automatic alert badge on the tab. Quantities deduct automatically when you record a purchase.",
     tabIndex:5, targetId:"tab-content"
   },
   {
     icon:"🏦", title:"Creditors",
-    text:"Creditors are suppliers or people you owe money to. Record what you owe, set due dates, and track your payables — all in one place.",
+    text:"Track everyone you owe money to — suppliers, lenders, or others. Record the amount, due date, and payment status so nothing slips through.",
+    detail:"Creditors are people or businesses that have given you goods or money on credit — typically your suppliers. In this tab you can add each creditor with the amount owed, the date it was taken, and when it is due. You can mark partial payments and see the remaining balance clearly. If a payment is overdue, it shows in red so you can act fast. This prevents the common problem of forgetting supplier dues until they call. You can add notes like invoice numbers or delivery details next to each entry. Keeping this updated means you always know your exact outstanding payables.",
+    speech:"Creditors are the people you owe money to, like your suppliers. Record the amount, due date, and payment status here. Overdue amounts show in red so you never miss a payment.",
     tabIndex:6, targetId:"tab-content"
   },
   {
     icon:"🧾", title:"Debtors",
-    text:"Debtors are customers who owe you money. Track outstanding dues, send WhatsApp reminders, and keep your receivables organised.",
+    text:"Track customers who owe you money. See the full list of outstanding dues, send WhatsApp payment reminders, and mark payments when received.",
+    detail:"Debtors are customers who have taken goods on credit and have not paid yet. In this tab you can add a debtor with their name, phone number, amount owed, and due date. You will see the total outstanding amount clearly at the top. When a customer pays — fully or partially — you can record the payment and the balance updates automatically. The most powerful feature here is the WhatsApp reminder: with one tap, a pre-written message is sent to the customer's number reminding them of the due amount. This saves you the awkward phone call and gets results faster. You can also see the full payment history for each debtor.",
+    speech:"Debtors are customers who owe you money. Add their name, amount, and due date. Send a WhatsApp reminder with one tap, and mark payments when they come in. The outstanding balance updates automatically.",
     tabIndex:7, targetId:"tab-content"
   },
   {
     icon:"✉️", title:"Messages",
-    text:"Connect with other ShopChampion shops here. Send and receive trade requests, share stock, and build your supplier-buyer network.",
+    text:"Connect with other ShopChampion businesses. Send and receive trade requests, share stock availability, and build your local supplier-buyer network.",
+    detail:"The Messages tab is a business network built into ShopChampion. Search for another shop using their ShopChampion ID and send a connection request. Once connected, you can send trade messages — for example, asking a supplier if a product is available, or telling a buyer that your stock has arrived. You can share your Shop ID from the Settings tab so other businesses can find you. This is especially useful for small retailers who source from local wholesalers — instead of calling around, you can check availability and place requests directly through the app. All messages are tied to your account and synced across devices.",
+    speech:"Messages connects you with other ShopChampion businesses. Search by Shop ID, send trade requests, ask about stock availability, and build your local supplier and buyer network.",
     tabIndex:8, targetId:"tab-content"
   },
   {
     icon:"⚙️", title:"Settings",
-    text:"Customise your app — change language, theme, shop name, voice announcements, display screen setup, and more. You can also replay this guide anytime from here!",
+    text:"Personalise everything — language, theme, shop name, voice announcements, display screen, billing, and more. Replay this guide anytime from here.",
+    detail:"Settings is where you make ShopChampion truly yours. Change the app language to Hindi, Marathi, or Gujarati. Switch between Professional and Game themes. Set your shop name and icon that appears at the top. Enable voice announcements so the app reads out the customer name and purchase amount aloud when you save — great for busy counters. Configure the display screen to show your leaderboard on a connected TV. Set up billing preferences including paper size, GST type, and auto-WhatsApp receipts. You can also export all your customer data as a CSV, and manage purchase history. And of course — tap Introduction Guide here any time to replay this full tour.",
+    speech:"Settings lets you personalise the entire app. Change language, theme, shop name, and enable voice announcements. Set up your display screen, billing preferences, and data export. You can also replay this introduction guide from here anytime.",
     tabIndex:9, targetId:"tab-content"
   }
 ];
@@ -14399,62 +14422,72 @@ const STEPS_EN = [
 const STEPS_HI = [
   {
     icon:"🏆", title:"लीडरबोर्ड (Leaderboard)",
-    text:"यह आपका लीडरबोर्ड है — यहाँ आपके सबसे ज़्यादा खरीदारी करने वाले ग्राहक रैंक में दिखते हैं। नंबर 1 ग्राहक को ताज मिलता है! इससे आप अपने सबसे वफ़ादार ग्राहकों को पहचान सकते हैं।",
-    speech:"यह आपका लीडरबोर्ड है। यहाँ आपके सबसे अच्छे ग्राहक रैंक के अनुसार दिखते हैं।",
+    text:"यह आपका लीडरबोर्ड है — यहाँ आपके सभी ग्राहक उनकी कुल खरीदारी के हिसाब से रैंक में दिखते हैं। सबसे ऊपर वाले ग्राहक को 👑 ताज मिलता है और वो आपका सबसे वफ़ादार ग्राहक है।",
+    detail:"लीडरबोर्ड ShopChampion का सबसे ख़ास फ़ीचर है। जैसे ही आप कोई खरीदारी दर्ज करते हैं, उस ग्राहक की रैंक तुरंत बदल जाती है — बिल्कुल लाइव। आप इसे इस हफ़्ते, इस महीने, या पूरे समय के हिसाब से फ़िल्टर कर सकते हैं। आप एक TV या डिस्प्ले स्क्रीन भी कनेक्ट कर सकते हैं जो काउंटर पर लाइव लीडरबोर्ड दिखाए — इससे ग्राहक और ज़्यादा खरीदारी करने के लिए प्रेरित होते हैं। किसी भी ग्राहक के नाम पर टैप करें और उनकी पूरी खरीदारी का इतिहास देखें।",
+    speech:"यह आपका लीडरबोर्ड है। यहाँ सभी ग्राहक उनकी कुल खरीदारी के अनुसार रैंक में दिखते हैं। जैसे ही आप कोई खरीदारी दर्ज करते हैं, रैंकिंग तुरंत अपडेट हो जाती है।",
     tabIndex:0, targetId:"tab-content"
   },
   {
     icon:"👥", title:"ग्राहक (Customers)",
-    text:"यहाँ आपके सभी रजिस्टर्ड ग्राहकों की सूची है। खोज करें, खरीदारी का इतिहास देखें, और ग्राहक की जानकारी अपडेट करें।",
-    speech:"ग्राहक टैब में आपके सभी ग्राहकों की जानकारी है। किसी भी ग्राहक पर टैप करें और उनकी पूरी जानकारी देखें।",
+    text:"यहाँ आपके सभी ग्राहकों की पूरी जानकारी है। नाम से खोजें, खरीदारी का इतिहास देखें, जानकारी बदलें, या ग्राहक हटाएं। हर ग्राहक का अपना प्रोफ़ाइल कार्ड है।",
+    detail:"ग्राहक टैब आपकी पूरी कस्टमर डायरी है। नया ग्राहक जोड़ते समय उनका नाम, मोबाइल नंबर और फ़ोटो डालें। सर्च बार से कोई भी ग्राहक तुरंत मिलता है — बस दो अक्षर टाइप करें। किसी ग्राहक पर टैप करें तो उनका पूरा प्रोफ़ाइल खुलेगा: हर खरीदारी की तारीख़ और रकम, कुल खर्च, मौजूदा रैंक, और आखिरी बार कब आए थे। यहाँ से सीधे WhatsApp पर मैसेज भी भेज सकते हैं। अगर कोई ग्राहक हटाना हो तो उनका रिकॉर्ड सुरक्षित तरीके से डिलीट किया जा सकता है।",
+    speech:"ग्राहक टैब आपकी पूरी कस्टमर डायरी है। नाम से खोजें, किसी पर भी टैप करके उनकी पूरी खरीदारी का इतिहास, कुल खर्च, और आखिरी विज़िट देखें। यहाँ से WhatsApp पर मैसेज भी भेज सकते हैं।",
     tabIndex:1, targetId:"tab-content"
   },
   {
     icon:"💳", title:"खरीदारी दर्ज करें (Purchase)",
-    text:"यहाँ नई खरीदारी दर्ज करें। ग्राहक चुनें, राशि या आइटम डालें और सेव करें। यह तुरंत लीडरबोर्ड पर अपडेट हो जाता है।",
-    speech:"परचेज़ टैब से नई खरीदारी दर्ज करें। ग्राहक चुनें, रकम भरें, और सेव करें।",
+    text:"हर बिक्री यहाँ दर्ज करें। ग्राहक चुनें, रकम या इन्वेंटरी से आइटम चुनें, और सेव करें। लीडरबोर्ड तुरंत अपडेट हो जाता है।",
+    detail:"परचेज़ टैब वो जगह है जो आप रोज़ सबसे ज़्यादा इस्तेमाल करेंगे। ग्राहक का नाम टाइप करते ही वो सूची में आ जाएगा। आप सिर्फ़ रुपये की रकम डाल सकते हैं, या अगर इन्वेंटरी सेट है तो सामान और मात्रा चुनें — स्टॉक अपने आप कम हो जाएगा। बिल नंबर या नोट भी जोड़ सकते हैं। सेव होते ही ग्राहक की रैंक लाइव बदल जाती है। गलती हो जाए तो ग्राहक के प्रोफ़ाइल में जाकर खरीदारी एडिट या डिलीट कर सकते हैं। व्यस्त दुकानों के लिए क्विक-एंट्री मोड भी है।",
+    speech:"परचेज़ टैब में हर बिक्री दर्ज करें। ग्राहक चुनें, रकम या आइटम भरें, और सेव करें। ग्राहक की रैंक तुरंत बदल जाती है। गलती होने पर ग्राहक के प्रोफ़ाइल से एडिट भी कर सकते हैं।",
     tabIndex:2, targetId:"tab-content"
   },
   {
-    icon:"📊", title:"विश्लेषण (Analytics)",
-    text:"यहाँ आपके दुकान का पूरा हिसाब है — रोज़ की बिक्री, सबसे लोकप्रिय समान, सबसे व्यस्त घंटे, और कुल कमाई।",
-    speech:"एनालिटिक्स में आपकी दुकान की बिक्री के चार्ट और जानकारी है।",
+    icon:"📊", title:"एनालिटिक्स (Analytics)",
+    text:"अपनी दुकान की पूरी तस्वीर देखें — रोज़ की कमाई, सबसे व्यस्त घंटे, सबसे ज़्यादा खर्च करने वाले ग्राहक, और बिक्री का ट्रेंड।",
+    detail:"एनालिटिक्स टैब आपके सेल्स डेटा को आसान चार्ट और नंबरों में बदल देता है। आज, इस हफ़्ते, और इस महीने की कुल कमाई एक नज़र में देखें। पता करें कि दिन के किस समय दुकान सबसे व्यस्त रहती है — इससे स्टाफ़ की प्लानिंग आसान होती है। जानें कि कौन से ग्राहक सबसे ज़्यादा पैसे लाते हैं और कौन से प्रोडक्ट सबसे तेज़ बिकते हैं। ट्रेंड लाइन बताती है कि पिछले हफ़्ते या महीने के मुकाबले कमाई बढ़ी है या घटी। यह टैब हर हफ़्ते देखें ताकि आप अपनी दुकान के बारे में सही फ़ैसले ले सकें।",
+    speech:"एनालिटिक्स में आपकी दुकान की पूरी बिक्री चार्ट के रूप में दिखती है। रोज़ की कमाई, सबसे व्यस्त घंटे, टॉप ग्राहक, और पिछले महीने से तुलना — सब कुछ यहाँ है।",
     tabIndex:3, targetId:"tab-content"
   },
   {
     icon:"⚖️", title:"तुलना करें (Compare)",
-    text:"इस हफ़्ते और पिछले हफ़्ते की तुलना करें। देखें कि आपका व्यापार बढ़ रहा है या नहीं।",
-    speech:"कम्पेयर टैब से आप अलग-अलग समय की बिक्री की तुलना कर सकते हैं।",
+    text:"दो अलग-अलग समय की बिक्री की तुलना करें — इस हफ़्ते बनाम पिछले हफ़्ते, इस महीने बनाम पिछले महीने। देखें कि व्यापार बढ़ रहा है या नहीं।",
+    detail:"कम्पेयर टैब आपको दो समयों को साथ-साथ रखकर देखने देता है। इस हफ़्ते और पिछले हफ़्ते की कुल बिक्री, लेन-देन की संख्या, और औसत खरीदारी की रकम देखें — साथ में प्रतिशत बदलाव भी दिखता है। महीने के आखिर में यह बेहद काम आता है — पूरे महीने का हिसाब एक नज़र में। अगर आपने कोई ऑफ़र या स्कीम चलाई थी तो देख सकते हैं कि उससे बिक्री सच में बढ़ी या नहीं। किसी ग्राहक की भी दो समयों में तुलना कर सकते हैं।",
+    speech:"कम्पेयर टैब से दो समयों की बिक्री साथ-साथ देखें — इस हफ़्ते बनाम पिछले हफ़्ते, या इस महीने बनाम पिछले महीने। प्रतिशत बदलाव भी दिखता है।",
     tabIndex:4, targetId:"tab-content"
   },
   {
     icon:"📦", title:"इन्वेंटरी (Inventory)",
-    text:"अपना स्टॉक यहाँ ट्रैक करें। आइटम, कीमत और मात्रा डालें। कम स्टॉक होने पर अलर्ट मिलेगा।",
-    speech:"इन्वेंटरी टैब में अपना सामान का स्टॉक रखें। कम होने पर अलर्ट आएगा।",
+    text:"अपने स्टॉक का पूरा हिसाब यहाँ रखें। हर आइटम की कीमत, मात्रा और कैटेगरी डालें। कम स्टॉक होने पर अपने आप अलर्ट आता है।",
+    detail:"इन्वेंटरी टैब आपकी डिजिटल स्टॉक रजिस्टर है। हर प्रोडक्ट का नाम, बिक्री मूल्य, खरीद मूल्य और मौजूदा मात्रा डालें। आइटम को कैटेगरी में बाँटें जैसे किराना, इलेक्ट्रॉनिक्स, कपड़े। जब स्टॉक 3 या उससे कम हो जाए तो इन्वेंटरी टैब पर वॉर्निंग बैज आ जाता है। जब आप परचेज़ में आइटम चुनते हैं, स्टॉक अपने आप कम हो जाता है — अलग से गिनने की ज़रूरत नहीं। इन्वेंटरी को CSV में एक्सपोर्ट भी कर सकते हैं। इससे पता चलता है कि कौन सा सामान जल्दी बिकता है और कौन सा धीरे — जिससे आप स्मार्ट तरीके से ऑर्डर कर सकते हैं।",
+    speech:"इन्वेंटरी टैब आपकी डिजिटल स्टॉक रजिस्टर है। हर प्रोडक्ट की कीमत और मात्रा डालें। स्टॉक कम होने पर अलर्ट आता है, और खरीदारी में आइटम चुनने पर मात्रा अपने आप घटती है।",
     tabIndex:5, targetId:"tab-content"
   },
   {
-    icon:"🏦", title:"लेनदार (Creditors)",
-    text:"जिन्हें आपको पैसे देने हैं — सप्लायर या अन्य। उनका हिसाब यहाँ रखें, तारीख़ और राशि के साथ।",
-    speech:"क्रेडिटर्स टैब में वो लोग हैं जिन्हें आप पैसे देते हैं।",
+    icon:"🏦", title:"लेनदार / क्रेडिटर्स (Creditors)",
+    text:"जिन्हें आपको पैसे देने हैं — सप्लायर, होलसेलर, या कोई भी — उनका पूरा हिसाब यहाँ रखें। रकम, तारीख़, और भुगतान की स्थिति ट्रैक करें।",
+    detail:"क्रेडिटर्स वो लोग हैं जिन्होंने आपको उधार सामान या पैसे दिए हैं — आमतौर पर आपके सप्लायर। इस टैब में हर क्रेडिटर का नाम, बकाया रकम, लेने की तारीख़, और देय तारीख़ डालें। आंशिक भुगतान रिकॉर्ड कर सकते हैं और बाकी बैलेंस साफ़ दिखता है। अगर देय तारीख़ निकल गई हो तो लाल रंग में दिखता है ताकि आप तुरंत ध्यान दें। इनवॉइस नंबर या डिलीवरी की जानकारी भी नोट में लिख सकते हैं। इसे अपडेट रखने से आपको हमेशा पता रहता है कि आपको कुल कितना देना बाकी है।",
+    speech:"क्रेडिटर्स में वो लोग हैं जिन्हें आपको पैसे देने हैं, जैसे सप्लायर। रकम, देय तारीख़ और भुगतान की स्थिति दर्ज करें। समय पर न दिया तो लाल रंग में दिखेगा।",
     tabIndex:6, targetId:"tab-content"
   },
   {
-    icon:"🧾", title:"देनदार (Debtors)",
-    text:"जिन ग्राहकों ने उधार लिया है — उनका हिसाब यहाँ है। WhatsApp से याद दिलाएं और बकाया ट्रैक करें।",
-    speech:"डेब्टर्स टैब में वो ग्राहक हैं जिन्होंने उधार लिया है।",
+    icon:"🧾", title:"देनदार / डेब्टर्स (Debtors)",
+    text:"जिन ग्राहकों ने उधार लिया है उनका हिसाब यहाँ है। बकाया रकम देखें, WhatsApp पर याद दिलाएं, और भुगतान आने पर दर्ज करें।",
+    detail:"डेब्टर्स वो ग्राहक हैं जिन्होंने सामान उधार लिया है और अभी तक पैसे नहीं दिए। नाम, मोबाइल नंबर, रकम और देय तारीख़ डालें। ऊपर कुल बकाया रकम साफ़ दिखती है। जब ग्राहक पैसे दे — पूरे या कुछ — तो भुगतान दर्ज करें, बैलेंस अपने आप अपडेट होगा। सबसे काम की बात यह है कि एक टैप में WhatsApp पर पहले से लिखा मैसेज भेज सकते हैं जो ग्राहक को बकाया याद दिलाता है — इससे फ़ोन पर असहज बात नहीं करनी पड़ती। हर देनदार की पूरी पेमेंट हिस्ट्री भी देख सकते हैं।",
+    speech:"डेब्टर्स में वो ग्राहक हैं जिन्होंने उधार लिया है। नाम, रकम और तारीख़ डालें। एक टैप में WhatsApp पर याद दिलाएं और भुगतान आने पर दर्ज करें। बैलेंस अपने आप अपडेट होता है।",
     tabIndex:7, targetId:"tab-content"
   },
   {
-    icon:"✉️", title:"संदेश (Messages)",
-    text:"दूसरे ShopChampion दुकानदारों से जुड़ें। व्यापार के अनुरोध भेजें, स्टॉक शेयर करें।",
-    speech:"मेसेजेस में आप दूसरे दुकानदारों से जुड़ सकते हैं।",
+    icon:"✉️", title:"मैसेज (Messages)",
+    text:"दूसरे ShopChampion दुकानदारों से जुड़ें। ट्रेड रिक्वेस्ट भेजें, स्टॉक की उपलब्धता पूछें, और अपना सप्लायर-बायर नेटवर्क बनाएं।",
+    detail:"मैसेज टैब ShopChampion के अंदर एक बिज़नेस नेटवर्क है। दूसरी दुकान को उनके ShopChampion ID से सर्च करें और कनेक्शन रिक्वेस्ट भेजें। एक बार जुड़ने के बाद ट्रेड मैसेज भेज सकते हैं — जैसे किसी सप्लायर से पूछना कि फलाँ सामान उपलब्ध है क्या, या किसी बायर को बताना कि आपका स्टॉक आ गया। अपनी दुकान का ID सेटिंग्स में मिलता है — उसे शेयर करें ताकि लोग आपको खोज सकें। यह छोटे रिटेलर के लिए बहुत उपयोगी है जो लोकल होलसेलर से सामान मंगाते हैं — फ़ोन पर कॉल करने की जगह ऐप से ही स्टॉक की जाँच और रिक्वेस्ट भेज सकते हैं।",
+    speech:"मैसेज टैब में आप दूसरे ShopChampion दुकानदारों से जुड़ सकते हैं। उनकी Shop ID से खोजें, ट्रेड रिक्वेस्ट भेजें, और स्टॉक की उपलब्धता पूछें।",
     tabIndex:8, targetId:"tab-content"
   },
   {
     icon:"⚙️", title:"सेटिंग्स (Settings)",
-    text:"भाषा, थीम, दुकान का नाम, आवाज़ की घोषणाएं, और बहुत कुछ बदलें। इस गाइड को यहाँ से फिर देख सकते हैं!",
-    speech:"सेटिंग्स में आप ऐप को अपनी पसंद के अनुसार सेट कर सकते हैं। यहाँ से यह गाइड दोबारा शुरू कर सकते हैं।",
+    text:"ऐप को अपने हिसाब से सेट करें — भाषा, थीम, दुकान का नाम, आवाज़ की घोषणाएं, डिस्प्ले स्क्रीन, बिलिंग, और बहुत कुछ। यह गाइड यहाँ से कभी भी दोबारा देख सकते हैं।",
+    detail:"सेटिंग्स में आप ShopChampion को पूरी तरह अपनी पसंद का बना सकते हैं। भाषा हिंदी, मराठी, गुजराती या अंग्रेज़ी में बदलें। प्रोफ़ेशनल और गेम थीम में से चुनें। दुकान का नाम और आइकन सेट करें। आवाज़ की घोषणाएं चालू करें — जब भी खरीदारी सेव होगी, ऐप ग्राहक का नाम और रकम ज़ोर से बोलेगा। TV स्क्रीन से कनेक्ट करके लाइव लीडरबोर्ड डिस्प्ले सेट करें। बिलिंग में पेपर साइज़, GST टाइप, और WhatsApp रसीद ऑटो-भेजने की सेटिंग करें। सारे ग्राहकों का डेटा CSV में एक्सपोर्ट भी कर सकते हैं। और यहाँ 'Introduction Guide' पर टैप करके यह पूरी गाइड कभी भी दोबारा देख सकते हैं।",
+    speech:"सेटिंग्स में ऐप को पूरी तरह अपनी पसंद का बनाएं। भाषा, थीम, दुकान का नाम, आवाज़ की घोषणाएं, डिस्प्ले स्क्रीन और बिलिंग सेट करें। Introduction Guide से यह पूरी गाइड कभी भी दोबारा देख सकते हैं।",
     tabIndex:9, targetId:"tab-content"
   }
 ];
@@ -14608,10 +14641,42 @@ function _showBubble(step, idx){
   document.getElementById('sc-gb-skip-btn').textContent =
     isHi ? 'यह छोड़ें ›' : 'Skip this ›';
 
+  // Detail panel — reset to collapsed each new step
+  const detailEl  = document.getElementById('sc-gb-detail');
+  const moreBtn   = document.getElementById('sc-gb-more-btn');
+  detailEl.style.display = 'none';
+  window._scGuideDetailOpen = false;
+  if(step.detail){
+    detailEl.textContent = step.detail;
+    moreBtn.style.display = 'block';
+    moreBtn.textContent = isHi ? '📖 और जानें ▾' : '📖 Tell me more ▾';
+  } else {
+    moreBtn.style.display = 'none';
+  }
+
   const bubble = document.getElementById('sc-guide-bubble');
   bubble.style.display = 'block';
   _positionBubble();
 }
+
+window.scGuideToggleDetail = function(){
+  const detailEl = document.getElementById('sc-gb-detail');
+  const moreBtn  = document.getElementById('sc-gb-more-btn');
+  const isHi     = _guideLang === 'hi';
+  const open     = !window._scGuideDetailOpen;
+  window._scGuideDetailOpen = open;
+  detailEl.style.display = open ? 'block' : 'none';
+  moreBtn.textContent = open
+    ? (isHi ? '📖 कम करें ▴' : '📖 Show less ▴')
+    : (isHi ? '📖 और जानें ▾' : '📖 Tell me more ▾');
+  if(open){
+    const step = _guideSteps[_guideStepIdx];
+    if(step && step.detail) _speak({speech: step.detail, text: step.detail});
+  } else {
+    _stopSpeech();
+  }
+  _positionBubble();
+};
 
 function _positionBubble(){
   const bubble = document.getElementById('sc-guide-bubble');
