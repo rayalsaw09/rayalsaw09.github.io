@@ -6414,25 +6414,27 @@ function stopLinkedLedgerListener(theirPhone) {
 function startAllLinkedLedgerListeners() {
   if (!db || !authPhone) return;
 
-  // Listen for cross-writes from all my linked CUSTOMERS
-  // (they cross-write when they record purchases from me)
-  const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2")) || "[]");
-  allCust.filter(c => c._fromShopConnect && c.phone).forEach(c => {
-    startLinkedLedgerListener(c.phone, _onLinkedCustomerTx);
+  // IMPORTANT: Registration order matters — startLinkedLedgerListener keeps only
+  // the FIRST handler registered for a given phone. Debtors must come first because
+  // a linked shop often appears in both Customers AND Debtors; the Debtors handler
+  // (_onLinkedDebtorTx) is the correct one for cross-written purchases/payments.
+
+  // 1. DEBTORS first — highest priority (linked shops write purchases/payments here)
+  const allDebt = getDebtors();
+  allDebt.filter(d => d._fromShopConnect && d.phone).forEach(d => {
+    startLinkedLedgerListener(d.phone, _onLinkedDebtorTx);
   });
 
-  // Listen for cross-writes from all my linked CREDITORS
-  // (they cross-write confirmation/response back to me)
+  // 2. CREDITORS — confirmation/response writes from creditor side
   const allCred = getCreditors();
   allCred.filter(c => c._fromShopConnect && c.phone).forEach(c => {
     startLinkedLedgerListener(c.phone, _onLinkedCreditorTx);
   });
 
-  // Listen for cross-writes from all my linked DEBTORS
-  // (they cross-write when they record a purchase from me — i.e. I sold to them)
-  const allDebt = getDebtors();
-  allDebt.filter(d => d._fromShopConnect && d.phone).forEach(d => {
-    startLinkedLedgerListener(d.phone, _onLinkedDebtorTx);
+  // 3. CUSTOMERS last — only registers if phone not already taken by Debtors above
+  const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2")) || "[]");
+  allCust.filter(c => c._fromShopConnect && c.phone).forEach(c => {
+    startLinkedLedgerListener(c.phone, _onLinkedCustomerTx);
   });
 }
 
@@ -11557,7 +11559,9 @@ async function acceptShopRequest(req){
     // NOTE: Do NOT write to Firestore here — the onSnapshot listener on
     // startFirestoreListener() will auto-sync it once it lands in Firestore
     // Start live ledger listener for this newly linked customer
-    if (profile.phone) startLinkedLedgerListener(profile.phone, _onLinkedCustomerTx);
+    // Only register if no Debtor listener is already active for this phone
+    // (same shop can appear in both Customers + Debtors; Debtors handler takes priority)
+    if (profile.phone && !_linkedLedgerListeners[profile.phone]) startLinkedLedgerListener(profile.phone, _onLinkedCustomerTx);
     // via Step 2 below.  A double-write causes a duplicate customer entry.
     notify(`✅ ${profile.shopName||"Shop"} added to your Customers!`);
   }
