@@ -5224,10 +5224,10 @@ async function doShopIdSearch(mode){
           <button onclick="(async()=>{
             const btn=this;btn.disabled=true;btn.textContent='⏳ Sending...';
             const myMode='${mode}';
-            // If I add them as my CREDITOR → I am their CUSTOMER
+            // If I add them as my CREDITOR → I am their DEBTOR (B2B: supplier↔buyer)
             // If I add them as my DEBTOR   → I am their CREDITOR
-            // If I add them as my CUSTOMER → I am their CREDITOR
-            const roleIAmToThem = myMode==='creditor' ? 'customer' : myMode==='debtor' ? 'creditor' : 'creditor';
+            // If I add them as my CUSTOMER → I am their CREDITOR (retail)
+            const roleIAmToThem = myMode==='creditor' ? 'debtor' : myMode==='debtor' ? 'creditor' : 'creditor';
             const ok=await sendShopConnectRequest(${JSON.stringify(profile).replace(/"/g,'&quot;')},roleIAmToThem,myMode);
             if(ok){btn.style.background='linear-gradient(135deg,#16a34a,#22c55e)';btn.style.color='#fff';btn.textContent='✅ Request Sent! They will see it in their Messages tab.';}
             else{btn.disabled=false;btn.textContent='📨 Send Connect Request (notify them)';}
