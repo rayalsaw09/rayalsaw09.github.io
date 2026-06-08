@@ -3233,7 +3233,34 @@ function _safeRenderTabImmediate(i) {
 }
 // ─── TABS ─────────────────────────────────────────────────────
 function renderTabs(){const TABS=getTabs();document.getElementById("tab-bar").innerHTML=TABS.map((tab,i)=>`<button class="tab-btn${currentTab===i?" active":""}" onclick="switchTab(${i})">${tab}</button>`).join("");}
-function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}if(i!==6&&i!==7)invPrefillName="";currentTab=i;renderTabs();renderTab(i);}
+function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}if(i!==6&&i!==7)invPrefillName="";window._pageStack=[];currentTab=i;renderTabs();renderTab(i);}
+
+// ─── PAGE HISTORY ENGINE ──────────────────────────────────────────────────────
+// Enables full-screen detail pages with proper back navigation.
+// Each entry: { type: 'creditorDetail'|'debtorDetail', id: string }
+// or          { type: 'tab', tabIndex: number }
+window._pageStack = [];
+
+function _pushPage(entry){
+  window._pageStack.push(entry);
+}
+
+function goBack(){
+  closeModal(); // close any open modal first
+  const prev = window._pageStack.pop();
+  if(!prev){ renderTab(currentTab); return; }
+  if(prev.type === 'creditorDetail'){ openCreditorDetail(prev.id); }
+  else if(prev.type === 'debtorDetail'){ openDebtorDetail(prev.id); }
+  else if(prev.type === 'tab'){ renderTab(prev.tabIndex); }
+  else { renderTab(currentTab); }
+}
+
+function _backBtn(label){
+  return `<button onclick="goBack()" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:none;border:none;color:#60a5fa;font-size:14px;font-weight:700;padding:0 0 14px 0;letter-spacing:0.01em;">
+    <span style="font-size:18px;line-height:1;">&#8592;</span> ${label}
+  </button>`;
+}
+// ─────────────────────────────────────────────────────────────────────────────
 function renderTab(i){
   const el=document.getElementById("tab-content"),s=getSorted();
   el.style.position="";el.style.overflow="";
@@ -6164,11 +6191,19 @@ function openCreditorDetail(id){
 
   const bal = credBalance(cr);
   const balColor = bal>0?"#f59e0b":bal<0?"#22c55e":"#7a8aaa";
-  const txs = (cr.transactions||[]).slice().reverse(); // newest first
+  const txs = (cr.transactions||[]).slice().reverse();
 
   const isUnrec = cr.id === "CR_UNRECONCILED";
-  showWideModal(`
-    ${modalHeader((isUnrec?"⚠️ ":"🏦 ")+escHtml(cr.name))}
+
+  // Record where we came from (only if not already on a detail page for same id)
+  const stackTop = window._pageStack[window._pageStack.length-1];
+  if(!stackTop || stackTop.id !== id){
+    window._pageStack.push({type:'tab', tabIndex:6});
+  }
+
+  const tabEl = document.getElementById("tab-content");
+  tabEl.innerHTML = `<div style="padding:16px 14px 80px;max-width:700px;margin:0 auto;">
+    ${_backBtn("Creditors")}
     <div style="display:flex;flex-direction:column;gap:16px;">
 
       ${isUnrec ? `<div style="background:#92400e22;border:1px solid #d97706;border-radius:12px;padding:12px 16px;font-size:13px;color:#fbbf24;font-weight:700;">
@@ -6259,14 +6294,14 @@ function openCreditorDetail(id){
         <div id="cr-tx-summary" style="font-size:11px;color:#4a5a7a;margin-bottom:8px;min-height:16px;"></div>
 
         <!-- Transaction list (rendered by JS) -->
-        <div id="cr-tx-list" style="display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;">
+        <div id="cr-tx-list" style="display:flex;flex-direction:column;gap:8px;">
           ${txs.length===0?`<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>`:"⏳"}
         </div>
       </div>
     </div>
-  `);
+  </div>`;
   _crTxCurrentFilter="all";
-  // Default to current month - use setTimeout so DOM+functions are ready, pass real id variable
+  // Default to current month
   (function(creditorId){
     setTimeout(function(){
       var now=new Date();
@@ -6479,6 +6514,9 @@ function openAddTxModal(creditorId, defaultType){
       <button onclick="saveCrTransaction()" class="btn" style="background:linear-gradient(135deg,#d97706,#f59e0b);color:#1a0a00;font-weight:800;margin-top:4px;">
         📦 Save Purchase
       </button>
+      <button onclick="closeModal()" class="btn" style="background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;padding:12px;">
+        ← Cancel
+      </button>
     </div>
   `);
   setTimeout(()=>document.getElementById("tx-amount")?.focus(),100);
@@ -6630,6 +6668,9 @@ function openSmartPaymentModal(creditorId){
         style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-size:14px;font-weight:800;padding:14px;">
         💰 Record Payment & Notify Creditor
       </button>
+      <button onclick="closeModal()" class="btn" style="background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;padding:12px;">
+        ← Cancel
+      </button>
     </div>
   `);
   setTimeout(()=>document.getElementById("spm-amount")?.focus(),100);
@@ -6732,6 +6773,9 @@ function openReturnModal(creditorId){
       </div>
       <button onclick="saveCrTransaction()" class="btn" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;font-weight:800;margin-top:4px;">
         ↩️ Save Return
+      </button>
+      <button onclick="closeModal()" class="btn" style="background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;padding:12px;">
+        ← Cancel
       </button>
     </div>
   `);
@@ -7521,7 +7565,15 @@ function openDebtorDetail(id){
   const balColor = bal>0?"#22c55e":bal<0?"#f59e0b":"#7a8aaa";
   const txs = dr.transactions||[];
 
-  showWideModal(`
+  // Record where we came from
+  const stackTop = window._pageStack[window._pageStack.length-1];
+  if(!stackTop || stackTop.id !== id){
+    window._pageStack.push({type:'tab', tabIndex:7});
+  }
+
+  const tabEl = document.getElementById("tab-content");
+  tabEl.innerHTML = `<div style="padding:16px 14px 80px;max-width:700px;margin:0 auto;">
+    ${_backBtn("Debtors")}
     <div style="display:flex;flex-direction:column;gap:14px;">
       <!-- Header -->
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:4px;">
@@ -7532,7 +7584,6 @@ function openDebtorDetail(id){
           <div style="font-size:18px;font-weight:800;color:#e8eaf0;">${escHtml(dr.name)}</div>
           ${dr._fromShopConnect?`<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#16653444;color:#4ade80;border:1px solid #22c55e44;">🔗 Linked Shop</span>`:""}
         </div>
-        <button onclick="closeModal()" style="cursor:pointer;background:none;border:none;color:#4a5a7a;font-size:20px;padding:4px;">✕</button>
       </div>
 
       <!-- Balance banner -->
@@ -7616,12 +7667,12 @@ function openDebtorDetail(id){
         <div id="dr-tx-summary" style="font-size:11px;color:#4a5a7a;margin-bottom:8px;min-height:16px;"></div>
 
         <!-- Transaction list -->
-        <div id="dr-tx-list" style="display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;">
+        <div id="dr-tx-list" style="display:flex;flex-direction:column;gap:8px;">
           ${txs.length===0?`<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>`:"⏳"}
         </div>
       </div>
     </div>
-  `);
+  </div>`;
   _drTxCurrentFilter="all";
   (function(debtorId){
     setTimeout(function(){
@@ -7793,6 +7844,9 @@ function openAddDebtTxModal(debtorId, defaultType){
       </div>
       <button onclick="saveDebtTransaction()" class="btn" style="background:linear-gradient(135deg,#166534,#22c55e);color:#fff;font-weight:800;margin-top:4px;">
         ✅ Save ${defaultType.charAt(0).toUpperCase()+defaultType.slice(1)}
+      </button>
+      <button onclick="closeModal()" class="btn" style="background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;padding:12px;">
+        ← Cancel
       </button>
     </div>
   `);
