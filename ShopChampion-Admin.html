@@ -1231,8 +1231,8 @@ function getTabs(){
       if(oos>0) label += ` <span style="background:#f66;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;">${oos}</span>`;
       else if(low>0) label += ` <span style="background:#FFD700;color:#1a0a00;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;">${low}</span>`;
     }
-    // Unread badge on messages tab (index 7)
-    if(i===7 && _shopRequestsUnread>0){
+    // Unread badge on messages tab (index 8)
+    if(i===8 && _shopRequestsUnread>0){
       label += ` <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:800;vertical-align:middle;">${_shopRequestsUnread}</span>`;
     }
     return label;
@@ -3268,7 +3268,6 @@ function renderCustomers(sorted,q=""){
     </div>` : `
     <div style="display:flex;gap:8px;align-items:center;padding:0 14px 12px;flex-wrap:wrap;">
       <button class="btn" onclick="openAddModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:9px 20px;font-size:13px;font-weight:800;flex:1;">+ Add Customer</button>
-      <button class="btn" onclick="openShopIdSearchModal('customer')" style="background:#0a1628;border:2px solid #1e3a6e;color:#60a5fa;padding:9px 14px;font-size:12px;font-weight:800;">🔗 Shop ID</button>
       <button class="btn" onclick="openBulkAddModal()" style="background:#1a3a5c;color:#7ab3ff;border:1px solid #2a5080;padding:9px 14px;font-size:13px;">👥 Bulk</button>
       <button class="btn" onclick="exportCSV()" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:9px 12px;font-size:13px;">⬇</button>
       <button class="btn" onclick="custToggleSelectMode()" style="background:#1a2540;color:#f88;border:1px solid #3a2020;padding:9px 12px;font-size:13px;">☑</button>
@@ -5405,8 +5404,9 @@ function renderCreditorsTab(){
   const unrecEntry = creditors.find(c=>c.id==="CR_UNRECONCILED");
   const unrecBalance = unrecEntry ? credBalance(unrecEntry) : 0;
 
-  const searchVal  = window._credSearch || "";
-  const gstFilter  = window._credGstFilter || "all"; // 'all' | 'gst' | 'nogst'
+  const searchVal   = window._credSearch || "";
+  const gstFilter   = window._credGstFilter  || "all"; // 'all' | 'gst' | 'nogst'
+  const linkFilter  = window._credLinkFilter || "all"; // 'all' | 'linked' | 'normal'
 
   let filtered = creditors.filter(c=>
     !searchVal ||
@@ -5416,6 +5416,9 @@ function renderCreditorsTab(){
   // Apply GST filter
   if (gstFilter === 'gst')   filtered = filtered.filter(c => !!c.gstin);
   if (gstFilter === 'nogst') filtered = filtered.filter(c => !c.gstin);
+  // Apply linked/normal filter
+  if (linkFilter === 'linked') filtered = filtered.filter(c => !!c._fromShopConnect && c.id !== "CR_UNRECONCILED");
+  if (linkFilter === 'normal') filtered = filtered.filter(c => !c._fromShopConnect || c.id === "CR_UNRECONCILED");
 
   // Sort: Unreconciled always first, then highest balance
   filtered.sort((a,b)=>{
@@ -5466,11 +5469,21 @@ function renderCreditorsTab(){
     </div>
 
     <!-- GST filter pills -->
-    <div style="margin-bottom:16px;">
+    <div style="margin-bottom:10px;">
       <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔢 GST Status:</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${[['all','🏢 All'],['gst','✅ GST Registered'],['nogst','❌ Not Registered']].map(([k,l])=>`
           <button onclick="window._credGstFilter='${k}';renderTab(6)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${gstFilter===k?'#a78bfa':'#1e2a45'};background:${gstFilter===k?'#1a0a30':'transparent'};color:${gstFilter===k?'#a78bfa':'#4a5a7a'};font-size:12px;font-weight:${gstFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Linked/Normal filter pills -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔗 Shop Type:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${[['all','🏢 All'],['linked','🔗 Linked Shops'],['normal','👤 Manual Entry']].map(([k,l])=>`
+          <button onclick="window._credLinkFilter='${k}';renderTab(6)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${linkFilter===k?'#60a5fa':'#1e2a45'};background:${linkFilter===k?'#0a1628':'transparent'};color:${linkFilter===k?'#60a5fa':'#4a5a7a'};font-size:12px;font-weight:${linkFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
         `).join('')}
       </div>
     </div>
@@ -5651,12 +5664,42 @@ function saveCreditorModal(editId){
   renderTab(6);
 }
 
+// ─── Send a removal notification to a linked shop ────────────────────────────
+async function sendRemovalNotification(theirPhone, theirName, removedAs) {
+  if (!db || !authPhone || !theirPhone) return;
+  const myName = (appSettings && appSettings.shopName) || authPhone;
+  const myShopIdVal = (typeof myShopId === "function") ? myShopId() : "";
+  const msgId = "REM" + Date.now() + Math.random().toString(36).slice(2,6).toUpperCase();
+  const msg = {
+    id:        msgId,
+    type:      "removal_notice",
+    status:    "info",
+    fromPhone: authPhone,
+    fromShopId: myShopIdVal,
+    fromName:  myName,
+    toPhone:   theirPhone,
+    removedAs,
+    createdAt: Date.now(),
+  };
+  try {
+    await db.collection("shop_requests").doc(theirPhone).collection("requests").doc(msgId).set(msg);
+  } catch(e1) {
+    try {
+      await db.collection("shop_connect_requests").doc(msgId).set(msg);
+    } catch(e2) { console.warn("sendRemovalNotification failed:", e2); }
+  }
+}
+
 function deleteCreditor(id){
   if(!confirm("Delete this creditor and all their transactions?")) return;
+  const cr = getCreditors().find(c=>c.id===id);
   const creditors = getCreditors().filter(c=>c.id!==id);
   saveCreditors(creditors);
   closeModal();
-  notify("🗑 Creditor deleted");
+  notify("\uD83D\uDDD1 Creditor deleted");
+  if (cr && cr._fromShopConnect && cr.phone) {
+    sendRemovalNotification(cr.phone, cr.name, "creditor");
+  }
   renderTab(6);
 }
 
@@ -5750,9 +5793,15 @@ function openCreditorDetail(id){
           <div style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
         </div>
         ${!isUnrec ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
-          <button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
-          <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>
+          ${cr._fromShopConnect
+            ? `<div style="font-size:11px;color:#4ade80;font-weight:700;background:#16653422;border:1px solid #22c55e44;border-radius:10px;padding:8px 12px;text-align:center;line-height:1.5;">
+                🔗 Linked Shop<br><span style="color:#7a8aaa;font-weight:400;">Entries auto-sync from their side</span>
+               </div>
+               <button onclick="openAddTxModal('${id}','return')" class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>`
+            : `<button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
+               <button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
+               <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>`
+          }
         </div>` : `<div style="font-size:12px;color:#d97706;font-weight:700;">Unreconciled<br>entries</div>`}
       </div>
 
@@ -6349,6 +6398,13 @@ function startAllLinkedLedgerListeners() {
   allCred.filter(c => c._fromShopConnect && c.phone).forEach(c => {
     startLinkedLedgerListener(c.phone, _onLinkedCreditorTx);
   });
+
+  // Listen for cross-writes from all my linked DEBTORS
+  // (they cross-write when they record a purchase from me — i.e. I sold to them)
+  const allDebt = getDebtors();
+  allDebt.filter(d => d._fromShopConnect && d.phone).forEach(d => {
+    startLinkedLedgerListener(d.phone, _onLinkedDebtorTx);
+  });
 }
 
 // ─── Handler: Shop B (a creditor) wrote something into MY ledger ─────────────
@@ -6496,6 +6552,82 @@ function _onLinkedCustomerTx(theirPhone, txs) {
       if (mi >= 0) customers[mi] = cust; else customers.push(cust);
     }
     if (currentTab === 1) renderTab(1);
+  }
+}
+
+// ─── Handler: Shop A (a debtor) wrote into MY ledger ────────────────────────
+// This means they recorded a purchase from me — add a SALE to my Debtors tab
+function _onLinkedDebtorTx(theirPhone, txs) {
+  if (!txs || txs.length === 0) return;
+
+  const debtors = getDebtors();
+  let dr = debtors.find(d => d.phone === theirPhone);
+  if (!dr) {
+    // Debtor not yet in local list — should not normally happen, but guard anyway
+    dr = {
+      id: newDebtorId(), name: theirPhone, phone: theirPhone,
+      transactions: [], createdAt: Date.now(), _fromShopConnect: true,
+    };
+    debtors.push(dr);
+  }
+
+  if (!dr.transactions) dr.transactions = [];
+
+  let changed = false;
+  txs.forEach(tx => {
+    // Skip if already applied
+    if (dr.transactions.find(t => t._linkedTxId === tx.id)) return;
+
+    if (tx.type === "purchase") {
+      // Shop A (debtor) bought from me → record a SALE on their debtor entry
+      dr.transactions.push({
+        id:          "SYN" + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase(),
+        _linkedTxId: tx.id,
+        type:        "sale",
+        amount:      tx.amount,
+        note:        (tx.note || "Purchase") + " [Live Sync 🔗]",
+        date:        tx.date,
+        createdAt:   tx._writtenAt || Date.now(),
+        _syncSource: theirPhone,
+      });
+      changed = true;
+      notify("🔗 " + (dr.name || theirPhone) + " recorded a purchase of " + formatINR(tx.amount) + " — added to Debtors!", "success");
+
+    } else if (tx.type === "payment") {
+      // Shop A sent a payment → record as payment received
+      dr.transactions.push({
+        id:          "SYN" + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase(),
+        _linkedTxId: tx.id,
+        type:        "payment",
+        amount:      tx.amount,
+        note:        (tx.note || "Payment") + " [Live Sync 🔗]",
+        date:        tx.date,
+        createdAt:   tx._writtenAt || Date.now(),
+        _syncSource: theirPhone,
+      });
+      changed = true;
+      notify("💰 " + (dr.name || theirPhone) + " sent payment of " + formatINR(tx.amount) + " — Debtor updated!", "success");
+
+    } else if (tx.type === "return") {
+      // Shop A returned goods → record as return
+      dr.transactions.push({
+        id:          "SYN" + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase(),
+        _linkedTxId: tx.id,
+        type:        "return",
+        amount:      tx.amount,
+        note:        (tx.note || "Return") + " [Live Sync 🔗]",
+        date:        tx.date,
+        createdAt:   tx._writtenAt || Date.now(),
+        _syncSource: theirPhone,
+      });
+      changed = true;
+      notify("↩️ " + (dr.name || theirPhone) + " returned goods worth " + formatINR(tx.amount), "success");
+    }
+  });
+
+  if (changed) {
+    saveDebtors(debtors);
+    if (currentTab === 3) renderTab(3); // refresh Debtors tab if open
   }
 }
 
@@ -6734,15 +6866,19 @@ function renderDebtorsTab(){
   const totalOwed   = debtors.reduce((s,d)=>s+Math.max(0,debtBalance(d)),0);
   const totalCount  = debtors.length;
   const searchVal   = window._debtSearch || "";
-  const gstFilter   = window._debtGstFilter || "all";
+  const gstFilter   = window._debtGstFilter  || "all";
+  const linkFilter  = window._debtLinkFilter || "all"; // 'all' | 'linked' | 'normal'
 
   let filtered = debtors.filter(d=>
     !searchVal ||
     d.name.toLowerCase().includes(searchVal.toLowerCase()) ||
     (d.phone||"").includes(searchVal)
   );
-  if(gstFilter==="gst")   filtered = filtered.filter(d=>!!d.gstin);
-  if(gstFilter==="nogst") filtered = filtered.filter(d=>!d.gstin);
+  if(gstFilter==="gst")    filtered = filtered.filter(d=>!!d.gstin);
+  if(gstFilter==="nogst")  filtered = filtered.filter(d=>!d.gstin);
+  // Apply linked/normal filter
+  if(linkFilter==="linked") filtered = filtered.filter(d=>!!d._fromShopConnect);
+  if(linkFilter==="normal") filtered = filtered.filter(d=>!d._fromShopConnect);
 
   filtered.sort((a,b)=>debtBalance(b)-debtBalance(a));
 
@@ -6780,11 +6916,21 @@ function renderDebtorsTab(){
     </div>
 
     <!-- GST filter pills -->
-    <div style="margin-bottom:16px;">
+    <div style="margin-bottom:10px;">
       <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔢 GST Status:</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${[['all','🏢 All'],['gst','✅ GST Registered'],['nogst','❌ Not Registered']].map(([k,l])=>`
           <button onclick="window._debtGstFilter='${k}';renderTab(7)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${gstFilter===k?'#22c55e':'#1e2a45'};background:${gstFilter===k?'#022c1a':'transparent'};color:${gstFilter===k?'#22c55e':'#4a5a7a'};font-size:12px;font-weight:${gstFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Linked/Normal filter pills -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔗 Shop Type:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${[['all','🏢 All'],['linked','🔗 Linked Shops'],['normal','👤 Manual Entry']].map(([k,l])=>`
+          <button onclick="window._debtLinkFilter='${k}';renderTab(7)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${linkFilter===k?'#4ade80':'#1e2a45'};background:${linkFilter===k?'#022c1a':'transparent'};color:${linkFilter===k?'#4ade80':'#4a5a7a'};font-size:12px;font-weight:${linkFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
         `).join('')}
       </div>
     </div>
@@ -6931,10 +7077,14 @@ function saveDebtorModal(editId){
 
 function deleteDebtor(id){
   if(!confirm("Delete this debtor and all their transactions?")) return;
+  const dr = getDebtors().find(d=>d.id===id);
   const debtors = getDebtors().filter(d=>d.id!==id);
   saveDebtors(debtors);
   closeModal();
-  notify("🗑 Debtor deleted");
+  notify("\uD83D\uDDD1 Debtor deleted");
+  if (dr && dr._fromShopConnect && dr.phone) {
+    sendRemovalNotification(dr.phone, dr.name, "debtor");
+  }
   renderTab(7);
 }
 
@@ -7015,9 +7165,15 @@ function openDebtorDetail(id){
           <div style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sale</button>
-          <button onclick="openAddDebtTxModal('${id}','payment')" class="btn" style="background:#0a1628;border:1px solid #60a5fa;color:#60a5fa;font-size:12px;padding:8px 12px;">💰 Payment</button>
-          <button onclick="openAddDebtTxModal('${id}','return')"  class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>
+          ${dr._fromShopConnect
+            ? `<div style="font-size:11px;color:#4ade80;font-weight:700;background:#16653422;border:1px solid #22c55e44;border-radius:10px;padding:8px 12px;text-align:center;line-height:1.5;">
+                🔗 Linked Shop<br><span style="color:#7a8aaa;font-weight:400;">Entries auto-sync from their side</span>
+               </div>
+               <button onclick="openAddDebtTxModal('${id}','return')" class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>`
+            : `<button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sale</button>
+               <button onclick="openAddDebtTxModal('${id}','payment')" class="btn" style="background:#0a1628;border:1px solid #60a5fa;color:#60a5fa;font-size:12px;padding:8px 12px;">💰 Payment</button>
+               <button onclick="openAddDebtTxModal('${id}','return')"  class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>`
+          }
         </div>
       </div>
 
@@ -7209,19 +7365,57 @@ function openAddDebtTxModal(debtorId, defaultType){
   };
   const typeColors = {sale:"#22c55e",payment:"#60a5fa",return:"#a78bfa"};
 
+  // Build inventory datalist for item autocomplete
+  const invNames = inventoryItems.map(x=>x.name);
+  const invDatalist = invNames.length
+    ? `<datalist id="drtx-inv-names">${invNames.map(n=>`<option value="${n.replace(/"/g,'&quot;')}">`).join('')}</datalist>`
+    : '';
+
+  const isLinked = !!(dr._fromShopConnect);
+
+  // Item rows section (only shown for sale type)
+  // Linked shops: items are MANDATORY (must select at least one item from inventory)
+  // Unlinked shops: items are OPTIONAL
+  const itemsSection = defaultType === "sale" ? `
+    <div style="border-top:1px solid #1e2a45;padding-top:12px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;">📦 ITEMS SOLD</label>
+        ${isLinked
+          ? `<span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#7c2d1233;color:#fca5a5;border:1px solid #7c2d1266;">Required — Linked Shop</span>`
+          : `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#1e2a4533;color:#7a8aaa;border:1px solid #1e2a45;">Optional</span>`
+        }
+      </div>
+      ${isLinked
+        ? `<div style="background:#0d0505;border:1px solid #7c2d1244;border-radius:8px;padding:8px 12px;font-size:11px;color:#fca5a5;margin-bottom:8px;">
+            ⚠️ This is a linked shop. You must select items — sale cannot exceed available inventory stock.
+           </div>`
+        : ''
+      }
+      ${invDatalist}
+      <div id="drtx-items-list"></div>
+      <button type="button" onclick="_drtxAddItemRow()"
+        style="width:100%;padding:8px;border-radius:10px;border:1px dashed #166534;background:transparent;color:#22c55e;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:4px;">
+        ➕ Add Item
+      </button>
+      <div id="drtx-items-total" style="display:none;background:#001a0e;border:1px solid #16653455;border-radius:10px;padding:10px 14px;font-size:13px;color:#4ade80;text-align:right;font-weight:800;margin-bottom:4px;"></div>
+    </div>` : '';
+
   showWideModal(`
     ${modalHeader(typeLabels[defaultType]+" "+escHtml(dr.name))}
     <div style="display:flex;flex-direction:column;gap:12px;">
       <input type="hidden" id="drtx-debtor-id" value="${debtorId}" />
       <input type="hidden" id="drtx-type" value="${defaultType}" />
+      <input type="hidden" id="drtx-is-linked" value="${isLinked?'1':'0'}" />
 
       <div style="background:#0a0e1a;border:1px solid ${typeColors[defaultType]}33;border-radius:10px;padding:12px;font-size:12px;color:${typeColors[defaultType]};">
         ${typeDescs[defaultType]}
       </div>
 
+      ${itemsSection}
+
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">AMOUNT (₹) *</label>
-        <input class="input" id="drtx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
+        <input class="input" id="drtx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" oninput="_drtxAmountEdited=true" />
       </div>
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">DESCRIPTION</label>
@@ -7236,7 +7430,64 @@ function openAddDebtTxModal(debtorId, defaultType){
       </button>
     </div>
   `);
-  setTimeout(()=>document.getElementById("drtx-amount")?.focus(),100);
+  window._drtxAmountEdited = false;
+  setTimeout(()=>{ if(defaultType!=="sale") document.getElementById("drtx-amount")?.focus(); },100);
+}
+
+// ── Debtor sale modal item row helpers ───────────────────────────────────────
+function _drtxAddItemRow(){
+  const list = document.getElementById("drtx-items-list");
+  if(!list) return;
+  const rowId = "drtx-row-"+Date.now();
+  const div = document.createElement("div");
+  div.id = rowId;
+  div.className = "drtx-item-row";
+  div.style.cssText = "display:grid;grid-template-columns:1fr 80px 90px 28px;gap:6px;margin-bottom:6px;align-items:center;";
+  div.innerHTML = `
+    <input class="input drtx-iname" list="drtx-inv-names" placeholder="Item name" style="margin:0;font-size:12px;padding:7px 10px;"
+      oninput="_drtxAutoFillPrice(this)" />
+    <input class="input drtx-iqty" type="number" placeholder="Qty" min="0.01" step="0.01" style="margin:0;font-size:12px;padding:7px 8px;text-align:center;"
+      oninput="_drtxUpdateTotal()" />
+    <input class="input drtx-iprice" type="number" placeholder="₹/unit" min="0" step="0.01" style="margin:0;font-size:12px;padding:7px 8px;text-align:right;"
+      oninput="_drtxUpdateTotal()" />
+    <button type="button" onclick="this.closest('.drtx-item-row').remove();_drtxUpdateTotal();"
+      style="background:#1a0a0a;border:1px solid #3a1a1a;color:#f66;border-radius:7px;cursor:pointer;font-size:14px;width:28px;height:28px;flex-shrink:0;">✕</button>`;
+  list.appendChild(div);
+}
+
+function _drtxAutoFillPrice(nameEl){
+  const name = nameEl.value.trim();
+  const row = nameEl.closest(".drtx-item-row");
+  if(!row) return;
+  const priceEl = row.querySelector(".drtx-iprice");
+  const inv = inventoryItems.find(x=>x.name===name);
+  if(inv && priceEl && !parseFloat(priceEl.value)){
+    priceEl.value = inv.sellingPrice || inv.costPerUnit || "";
+  }
+  _drtxUpdateTotal();
+}
+
+function _drtxUpdateTotal(){
+  const rows = document.querySelectorAll(".drtx-item-row");
+  let total = 0;
+  rows.forEach(row=>{
+    const qty = parseFloat(row.querySelector(".drtx-iqty")?.value||"0")||0;
+    const price = parseFloat(row.querySelector(".drtx-iprice")?.value||"0")||0;
+    total += qty * price;
+  });
+  const totalEl = document.getElementById("drtx-items-total");
+  if(!totalEl) return;
+  if(rows.length > 0 && total > 0){
+    totalEl.style.display = "block";
+    totalEl.textContent = "Items Total: ₹" + total.toLocaleString("en-IN", {minimumFractionDigits:2,maximumFractionDigits:2});
+    // Auto-fill amount field if user hasn't manually edited it
+    if(!window._drtxAmountEdited){
+      const amtEl = document.getElementById("drtx-amount");
+      if(amtEl) amtEl.value = total.toFixed(2);
+    }
+  } else {
+    totalEl.style.display = "none";
+  }
 }
 
 function saveDebtTransaction(){
@@ -7249,20 +7500,61 @@ function saveDebtTransaction(){
   if(!debtorId||!type){ notify("⚠️ Error: missing debtor info","error"); return; }
   if(isNaN(amtRaw)||amtRaw<=0){ notify("⚠️ Enter a valid amount"); return; }
 
+  // Collect item rows if this is a sale
+  const soldItems = [];
+  if(type === "sale"){
+    const rows = document.querySelectorAll(".drtx-item-row");
+    rows.forEach(row=>{
+      const nm    = row.querySelector(".drtx-iname")?.value.trim()||"";
+      const qty   = parseFloat(row.querySelector(".drtx-iqty")?.value||"0")||0;
+      const price = parseFloat(row.querySelector(".drtx-iprice")?.value||"0")||0;
+      if(nm && qty > 0) soldItems.push({name:nm, qty, pricePerUnit:price});
+    });
+
+    const debtors2 = getDebtors();
+    const dr = debtors2.find(d=>d.id===debtorId);
+    const isLinked = document.getElementById("drtx-is-linked")?.value === "1";
+
+    // Linked shop: items are MANDATORY
+    if(isLinked && soldItems.length === 0){
+      notify("❌ This is a linked shop — you must add at least one item to record a sale", "error");
+      return;
+    }
+
+    // ── Stock validation ─────────────────────────────────────────────────────
+    for(const si of soldItems){
+      const inv = inventoryItems.find(x=>x.name===si.name);
+      if(!inv) continue; // item not in inventory — allow (manual entry)
+      const available = invGetStock(si.name);
+      if(si.qty > available){
+        notify(`❌ Not enough stock for "${si.name}". Available: ${available} ${inv.unit||"units"}`, "error");
+        return;
+      }
+    }
+  }
+
   const debtors = getDebtors();
   const idx = debtors.findIndex(d=>d.id===debtorId);
   if(idx<0){ notify("❌ Debtor not found","error"); return; }
 
   if(!debtors[idx].transactions) debtors[idx].transactions=[];
   debtors[idx].transactions.push({
-    id:     "DT"+Date.now()+Math.random().toString(36).slice(2,5),
+    id:        "DT"+Date.now()+Math.random().toString(36).slice(2,5),
     type,
-    amount: amtRaw,
+    amount:    amtRaw,
     note,
     date,
     createdAt: Date.now(),
+    soldItems: soldItems.length ? soldItems : undefined,
   });
   saveDebtors(debtors);
+
+  // Deduct from inventory after saving
+  if(soldItems.length){
+    const dr = debtors[idx];
+    invDeductSold(soldItems, dr.id);
+  }
+
   closeModal();
   notify("✅ "+type.charAt(0).toUpperCase()+type.slice(1)+" of "+formatINR(amtRaw)+" saved");
   setTimeout(()=>openDebtorDetail(debtorId), 200);
@@ -10857,11 +11149,25 @@ async function loadShopRequests(){
     for(const doc of snap3b.docs) await _applyAutoAcceptedReq(doc);
   } catch(e4){ /* rules or index issue */ }
 
+  // ── Path 4: info/removal notices sent to me ────────────────────────────────
+  try {
+    const snap4 = await db.collection("shop_requests").doc(authPhone).collection("requests")
+      .where("status","==","info").get();
+    combined.push(...snap4.docs.map(d=>({id:d.id,...d.data(),_path:"sub"})));
+  } catch(e5) {}
+  try {
+    const snap5 = await db.collection("shop_connect_requests")
+      .where("toPhone","==",authPhone)
+      .where("status","==","info")
+      .get();
+    combined.push(...snap5.docs.map(d=>({id:d.id,...d.data(),_path:"flat"})));
+  } catch(e6) {}
+
   // Deduplicate by id and sort newest first
   const seen = new Set();
   _shopRequestsCache = combined.filter(r=>{ if(seen.has(r.id)) return false; seen.add(r.id); return true; })
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  _shopRequestsUnread = _shopRequestsCache.length;
+  _shopRequestsUnread = _shopRequestsCache.filter(r=>r.status==="pending").length;
   renderTabs();
 }
 
@@ -10923,7 +11229,7 @@ async function _applyAutoAcceptedReq(doc){
     doc.ref.update({status:"consumed"}).catch(()=>{});
     if(currentTab===1) renderTab(1);
     if(currentTab===6) renderTab(6);
-    if(currentTab===7) renderTab(7);
+    if(currentTab===8) renderTab(8);
   } else {
     // Even if already in local list, mark consumed and refresh UI
     // because the direct Firestore write (Step 2 in acceptShopRequest) may have
@@ -11169,6 +11475,8 @@ async function acceptShopRequest(req){
     });
     saveDebtors(debtors);
     notify(`✅ ${profile.shopName||"Shop"} added to your Debtors!`);
+    // Start live ledger listener — route to Debtors handler, NOT Customers
+    if (profile.phone) startLinkedLedgerListener(profile.phone, _onLinkedDebtorTx);
   }
 
   function _autoAddAsCustomer(profile){
@@ -11321,7 +11629,7 @@ async function acceptShopRequest(req){
   _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==req.id);
   _shopRequestsUnread = _shopRequestsCache.length;
   renderTabs();
-  if(currentTab===7) renderTab(7);
+  if(currentTab===8) renderTab(8);
 }
 
 // ── Decline a request ─────────────────────────────────────────────────────────
@@ -11339,7 +11647,7 @@ async function declineShopRequest(req){
   _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==req.id);
   _shopRequestsUnread = _shopRequestsCache.length;
   renderTabs();
-  if(currentTab===7) renderTab(7);
+  if(currentTab===8) renderTab(8);
   notify("🚫 Request declined");
 }
 
@@ -11359,13 +11667,44 @@ function renderMessagesTab(){
     </div>`;
   }
 
-  const pendingHtml = reqs.length === 0
+  const pendingReqs = reqs.filter(r=>r.status==="pending");
+  const infoReqs    = reqs.filter(r=>r.status==="info");
+
+  const infoHtml = infoReqs.map(msg=>{
+    const timeStr = new Date(msg.createdAt).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+    const removedLabel = msg.removedAs==="creditor"
+      ? "their <b style='color:#f59e0b;'>Creditor</b>"
+      : msg.removedAs==="debtor"
+      ? "their <b style='color:#22c55e;'>Debtor</b>"
+      : "their list";
+    return `
+      <div style="background:#0d1220;border:2px solid #7c2d12;border-radius:14px;padding:16px;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+          <div style="font-size:28px;">🔕</div>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:800;color:#fbbf24;">Shop Removed You</div>
+            <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">📅 ${timeStr}</div>
+          </div>
+          <button onclick="_dismissInfoMsg('${msg.id}','${msg._path||'sub'}')"
+            style="cursor:pointer;background:#1a0a0a;border:1px solid #5a1a1a;border-radius:8px;color:#f87171;font-size:12px;font-weight:700;padding:6px 12px;">
+            ✕ Dismiss
+          </button>
+        </div>
+        <div style="background:#1a0a00;border:1px solid #7c2d1255;border-radius:10px;padding:12px;font-size:13px;color:#fcd34d;line-height:1.6;">
+          <b style="color:#fbbf24;">${escHtml(msg.fromName||msg.fromPhone||"A shop")}</b>
+          has removed you from ${removedLabel} in their account.<br>
+          <span style="font-size:12px;color:#9a7a4a;">Your records are unaffected — only their copy was removed.</span>
+        </div>
+      </div>`;
+  }).join("");
+
+  const pendingHtml = pendingReqs.length === 0
     ? `<div style="text-align:center;padding:60px 20px;color:#4a5a7a;">
         <div style="font-size:48px;margin-bottom:12px;">✉️</div>
         <div style="font-size:15px;font-weight:700;color:#7a8aaa;margin-bottom:6px;">No pending requests</div>
         <div style="font-size:12px;">When another shop adds you as a creditor or customer, their request will appear here.</div>
       </div>`
-    : reqs.map(req=>{
+    : pendingReqs.map(req=>{
         const p = req.fromProfile || {};
         const initials = (p.shopName||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
         // req.type = what they want ME to add THEM as
@@ -11439,7 +11778,7 @@ function renderMessagesTab(){
         <div style="font-size:20px;font-weight:800;color:#e8eaf0;">✉️ Messages</div>
         <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">Connection requests from other ShopChampion shops</div>
       </div>
-      <button onclick="loadShopRequests().then(()=>renderTab(7))" class="btn"
+      <button onclick="loadShopRequests().then(()=>renderTab(8))" class="btn"
         style="background:#0a1628;border:1px solid #1e3a6e;color:#60a5fa;padding:8px 14px;font-size:12px;font-weight:800;">
         🔄 Refresh
       </button>
@@ -11451,9 +11790,14 @@ function renderMessagesTab(){
       <b style="color:#e8eaf0;">Accept</b> → their shop is automatically saved in your account with all details (name, phone, GSTIN, address).<br>
       <b style="color:#e8eaf0;">Decline</b> → request is removed, nothing is saved.
     </div>
+    <!-- Info / removal notices -->
+    ${infoReqs.length>0?`<div style="margin-bottom:20px;">
+      <div style="font-size:13px;font-weight:800;color:#fbbf24;margin-bottom:12px;">🔔 Notifications (${infoReqs.length})</div>
+      ${infoHtml}
+    </div>`:""}
     <!-- Pending requests -->
     <div>
-      ${reqs.length>0?`<div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:12px;">📬 Pending Requests (${reqs.length})</div>`:""}
+      ${pendingReqs.length>0?`<div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:12px;">📬 Pending Requests (${pendingReqs.length})</div>`:""}
       ${pendingHtml}
     </div>
   </div>`;
@@ -11464,6 +11808,22 @@ function _acceptReqById(id){
   const req = _shopRequestsCache.find(r=>r.id===id);
   if(req) acceptShopRequest(req);
 }
+
+async function _dismissInfoMsg(id, path){
+  if(!db || !authPhone) return;
+  try {
+    if(path === "flat"){
+      await db.collection("shop_connect_requests").doc(id).update({ status:"dismissed" });
+    } else {
+      await db.collection("shop_requests").doc(authPhone).collection("requests").doc(id).update({ status:"dismissed" });
+    }
+  } catch(e){ console.warn("dismiss info msg error:", e); }
+  _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==id);
+  _shopRequestsUnread = _shopRequestsCache.filter(r=>r.status==="pending").length;
+  renderTabs();
+  renderTab(8);
+}
+
 function _declineReqById(id){
   const req = _shopRequestsCache.find(r=>r.id===id);
   if(req) declineShopRequest(req);
