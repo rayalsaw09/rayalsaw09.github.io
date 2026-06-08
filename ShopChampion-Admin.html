@@ -5031,16 +5031,16 @@ function renderAnalytics(sorted){
             else moDebtRecv+=Number(t.amount)||0;
           }
         }));
-        if(!moCredPurch&&!moDebtSale&&!moCredPay&&!moDebtRecv) return \`<div style="font-size:11px;color:#3a4a6a;text-align:center;padding:6px 0;">No creditor/debtor activity this month</div>\`;
-        return \`<div style="border-top:1px solid #1e2a45;padding-top:10px;">
+        if(!moCredPurch&&!moDebtSale&&!moCredPay&&!moDebtRecv) return `<div style="font-size:11px;color:#3a4a6a;text-align:center;padding:6px 0;">No creditor/debtor activity this month</div>`;
+        return `<div style="border-top:1px solid #1e2a45;padding-top:10px;">
           <div style="font-size:11px;color:#7a8aaa;font-weight:700;margin-bottom:8px;">THIS MONTH</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-            \${moCredPurch?(\`<div style="background:#0d1525;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#f87171;">📦 Purchased (suppliers)</span><span style="font-size:12px;font-weight:800;color:#f87171;">\${formatINR(moCredPurch)}</span></div>\`):""}
-            \${moCredPay?(\`<div style="background:#0d1525;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#60a5fa;">💰 Paid to suppliers</span><span style="font-size:12px;font-weight:800;color:#60a5fa;">\${formatINR(moCredPay)}</span></div>\`):""}
-            \${moDebtSale?(\`<div style="background:#0d1525;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#4ade80;">🛒 Sold (debtors)</span><span style="font-size:12px;font-weight:800;color:#4ade80;">\${formatINR(moDebtSale)}</span></div>\`):""}
-            \${moDebtRecv?(\`<div style="background:#0d1525;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#22c55e;">💸 Received from debtors</span><span style="font-size:12px;font-weight:800;color:#22c55e;">\${formatINR(moDebtRecv)}</span></div>\`):""}
+            ${moCredPurch?(`<div style="background:#0d1525;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#f87171;">📦 Purchased (suppliers)</span><span style="font-size:12px;font-weight:800;color:#f87171;">${formatINR(moCredPurch)}</span></div>`):""}
+            ${moCredPay?(`<div style="background:#0d1525;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#60a5fa;">💰 Paid to suppliers</span><span style="font-size:12px;font-weight:800;color:#60a5fa;">${formatINR(moCredPay)}</span></div>`):""}
+            ${moDebtSale?(`<div style="background:#0d1525;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#4ade80;">🛒 Sold (debtors)</span><span style="font-size:12px;font-weight:800;color:#4ade80;">${formatINR(moDebtSale)}</span></div>`):""}
+            ${moDebtRecv?(`<div style="background:#0d1525;border-radius:8px;padding:8px 10px;display:flex;justify-content:space-between;"><span style="font-size:11px;color:#22c55e;">💸 Received from debtors</span><span style="font-size:12px;font-weight:800;color:#22c55e;">${formatINR(moDebtRecv)}</span></div>`):""}
           </div>
-        </div>\`;
+        </div>`;
       })()}
     </div>` : ""}
 
