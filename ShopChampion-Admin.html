@@ -3273,14 +3273,18 @@ function renderCustomers(sorted,q=""){
     </div>`;
 
   const pendingReqs = window._pendingPayReqs || [];
-  const pendingBanner = pendingReqs.length > 0 ? `
-    <div onclick="openPendingPaymentRequests()" style="cursor:pointer;background:linear-gradient(135deg,#14532d,#166534);border:2px solid #22c55e;border-radius:12px;padding:13px 16px;margin:0 14px 10px;display:flex;align-items:center;gap:12px;" onmouseenter="this.style.borderColor='#4ade80'" onmouseleave="this.style.borderColor='#22c55e'">
-      <div style="font-size:24px;">📨</div>
+  // Count linked customers for live sync badge
+  let allCustData = [];
+  try { allCustData = JSON.parse(localStorage.getItem(storageKey("customers_v2")) || "[]"); } catch {}
+  const linkedCustCount = allCustData.filter(c => c._fromShopConnect && c.phone).length;
+  const pendingBanner = linkedCustCount > 0 ? `
+    <div style="background:linear-gradient(135deg,#0a1628,#0d1e38);border:2px solid #1e3a6e;border-radius:12px;padding:13px 16px;margin:0 14px 10px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:22px;">🔗</div>
       <div style="flex:1;">
-        <div style="font-size:14px;font-weight:800;color:#4ade80;">${pendingReqs.length} Payment Request${pendingReqs.length>1?'s':''} Waiting</div>
-        <div style="font-size:12px;color:#86efac;margin-top:2px;">Linked shops sent you payment entries to confirm</div>
+        <div style="font-size:13px;font-weight:800;color:#60a5fa;">Live Ledger Active — ${linkedCustCount} Linked Shop${linkedCustCount>1?'s':''}</div>
+        <div style="font-size:11px;color:#4a7aaa;margin-top:2px;">Transactions sync automatically — no accept needed</div>
       </div>
-      <div style="font-size:20px;font-weight:800;color:#4ade80;background:#14532d;border-radius:8px;padding:4px 10px;">${pendingReqs.length}</div>
+      <div style="font-size:10px;font-weight:800;color:#22c55e;background:#14532d44;border:1px solid #22c55e44;border-radius:6px;padding:3px 8px;">🟢 LIVE</div>
     </div>` : "";
 
   return `<div>
@@ -5914,11 +5918,11 @@ function _crTxRender(creditorId){
           <span style="font-size:13px;font-weight:700;color:#e8eaf0;">${hl(tx.note||tx.type)}</span>
           <span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:${tb.bg};color:${tb.col};">${tx.type}</span>
           ${tx.syncStatus==="pending"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#92400e44;color:#fbbf24;">🟡 Sync Pending</span>`:""}
-          ${tx.syncStatus==="accepted"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#14532d44;color:#4ade80;">🔗 Synced</span>`:""}
-          ${tx.syncStatus==="declined"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#7f1d1d44;color:#f87171;">❌ Declined</span>`:""}
+          ${(tx.syncStatus==="accepted"||tx.syncStatus==="synced")?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#14532d44;color:#4ade80;">🔗 Live Synced</span>`:""}
+          ${tx.syncStatus==="declined"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#7f1d1d44;color:#f87171;">⚠️ Retry Sync</span>`:""}
         </div>
         <div style="font-size:11px;color:#7a8aaa;">📅 ${dateStr}${tx.invoiceNo?` &nbsp;·&nbsp; 🧾 ${hl(tx.invoiceNo)}`:""}</div>
-        ${tx.syncStatus==="declined" && tx.syncReqId ? `<div style="margin-top:4px;"><button onclick="openRequestAgainModal('${creditorId}','${tx.id||""}',${tx.amount},'${(tx.note||"").replace(/'/g,"\'")}','${tx.date||""}','${(tx.invoiceNo||"").replace(/'/g,"\'")}','${tx.syncReqId}')" style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:6px;color:#f87171;font-size:10px;font-weight:700;padding:3px 8px;">🔄 Request Again</button></div>`:""
+        ${(tx.syncStatus==="declined" || tx.syncStatus==="local") && cr._fromShopConnect ? `<div style="margin-top:4px;"><button onclick="openRequestAgainModal('${creditorId}','${tx.id||""}',${tx.amount},'${(tx.note||"").replace(/'/g,"\'")}','${tx.date||""}','${(tx.invoiceNo||"").replace(/'/g,"\'")}','${tx.syncReqId}')" style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:6px;color:#f87171;font-size:10px;font-weight:700;padding:3px 8px;">🔄 Request Again</button></div>`:""
         }
       </div>
       <div style="text-align:right;flex-shrink:0;">
@@ -6243,421 +6247,343 @@ function saveCrTransaction(){
   setTimeout(()=>openCreditorDetail(creditorId),200);
 }
 
-// ─── PAYMENT SYNC REQUEST SYSTEM ────────────────────────────────────────────
-// Firebase: payment_sync_requests/{reqId}
-// Fields: fromPhone, toPhone, creditorId, amount, note, date, invoiceNo, txId, type, status, attempts, createdAt
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── CROSS-WRITE LIVE LEDGER ENGINE ──────────────────────────────────────────
+// Each shop owns their own Firestore data. When two shops are linked, Shop A
+// writes directly into Shop B's users/{phone}/linked_ledger/{myPhone}/transactions
+// and vice-versa. onSnapshot on both sides fires instantly — no accept needed.
+// ═══════════════════════════════════════════════════════════════════════════════
 
-function openPaymentSyncModal(creditorId, txId, amount, note, date, invoiceNo, selectedBill){
-  const creditors = getCreditors();
-  const cr = creditors.find(c=>c.id===creditorId);
-  if(!cr) return;
-  const safeBill = selectedBill||"";
-  showWideModal(`
-    ${modalHeader("🔗 Sync Payment with " + escHtml(cr.name))}
-    <div style="display:flex;flex-direction:column;gap:14px;">
-      <div style="background:#0a1220;border:1px solid #1e3a6e;border-radius:12px;padding:14px;">
-        <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:4px;">PAYMENT RECORDED</div>
-        <div style="font-size:22px;font-weight:800;color:#22c55e;">${formatINR(amount)}</div>
-        ${note?`<div style="font-size:12px;color:#a0b0d0;margin-top:4px;">${escHtml(note)}</div>`:""}
-        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${date}${invoiceNo?" · "+invoiceNo:""}</div>
-        ${safeBill?`<div style="font-size:11px;color:#22c55e;margin-top:4px;">📌 Against bill: ${escHtml(safeBill)}</div>`:""}
-      </div>
-      <div style="background:#001a0a;border:1px solid #16a34a33;border-radius:12px;padding:14px;font-size:13px;color:#a7f3d0;">
-        <div style="font-size:12px;font-weight:800;color:#22c55e;margin-bottom:6px;">🔗 ${escHtml(cr.name)} is a connected shop</div>
-        Sending this request will notify <strong>${escHtml(cr.name)}</strong>. When they accept, the payment will be reflected in their Borrows tab and the pending amount will decrease automatically.
-      </div>
-      <button onclick="sendPaymentSyncRequest('${creditorId}','${txId}',${amount},'${(note||'').replace(/'/g,"\'")  }','${date}','${(invoiceNo||'').replace(/'/g,"\'")}','${cr.phone}',undefined,'${safeBill}')" class="btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-size:14px;font-weight:800;padding:13px;">
-        📤 Send Payment Notification to ${escHtml(cr.name)}
-      </button>
-      <button onclick="closeModal();setTimeout(()=>openCreditorDetail('${creditorId}'),200)" style="cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;color:#7a8aaa;font-size:13px;font-weight:700;padding:11px;">
-        Skip — Save for myself only
-      </button>
-    </div>
-  `);
-}
+// ─── CROSS-WRITE ENGINE — Core Functions ────────────────────────────────────
 
-async function sendPaymentSyncRequest(creditorId, txId, amount, note, date, invoiceNo, toPhone, retryReqId, selectedBill){
-  if(!db || !authPhone){ notify("❌ Not connected to Firebase","error"); return; }
-  const creditors = getCreditors();
-  const cr = creditors.find(c=>c.id===creditorId);
-  const resolvedToPhone = toPhone || cr?.phone;
-  if(!resolvedToPhone){ notify("❌ Creditor phone not found","error"); return; }
-
-  // Check existing attempt count
-  let existingAttempts = 0;
-  if(retryReqId){
-    const existSnap = await db.collection("payment_sync_requests").doc(retryReqId).get().catch(()=>null);
-    if(existSnap?.exists) existingAttempts = existSnap.data().attempts||0;
-  }
-  if(existingAttempts >= 3){ notify("⚠️ Max 3 sync requests allowed per transaction","error"); return; }
-
-  const reqId = retryReqId || ("PSR"+Date.now()+Math.random().toString(36).slice(2,6).toUpperCase());
-  const req = {
-    fromPhone: authPhone,
-    toPhone: resolvedToPhone,
-    creditorId, txId, amount,
-    note: note||"Payment",
-    date, invoiceNo: invoiceNo||"",
-    type: "payment",
-    selectedBill: selectedBill||"",
-    status: "pending",
-    attempts: existingAttempts+1,
-    fromShopName: (window.appSettings?.shopName)||authPhone,
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  };
-
+// Write a transaction directly into the other shop's ledger path in Firestore
+// Path: users/{theirPhone}/linked_ledger/{myPhone}/transactions/{txId}
+async function crossWriteTransaction(theirPhone, tx) {
+  if (!db || !authPhone || !theirPhone) return false;
   try {
-    await db.collection("payment_sync_requests").doc(reqId).set(req, {merge:true});
-    // Mark local tx
-    const credList = getCreditors();
-    const cIdx = credList.findIndex(c=>c.id===creditorId);
-    if(cIdx>=0){
-      const tIdx = (credList[cIdx].transactions||[]).findIndex(t=>t.id===txId);
-      if(tIdx>=0){ credList[cIdx].transactions[tIdx].syncStatus="pending"; credList[cIdx].transactions[tIdx].syncReqId=reqId; }
-      saveCreditors(credList);
-    }
-    notify(`📤 Sync request sent! (Attempt ${existingAttempts+1}/3)`,"success");
-    closeModal();
-    setTimeout(()=>openCreditorDetail(creditorId),200);
-    listenPaymentSyncResponse(reqId, creditorId, txId);
-  } catch(e){
-    notify("❌ Failed: "+e.message,"error");
-    // Auto-show rules fix modal for permission errors
-    if(e.message && (e.message.toLowerCase().includes("permission") || e.message.toLowerCase().includes("insufficient"))){
-      setTimeout(()=>_showFirestoreRulesError(e.message), 400);
-    }
+    const ref = db.collection("users").doc(theirPhone)
+                  .collection("linked_ledger").doc(authPhone)
+                  .collection("transactions").doc(tx.id);
+    await ref.set({
+      ...tx,
+      _writtenBy: authPhone,
+      _writtenAt: Date.now(),
+    });
+    return true;
+  } catch(e) {
+    console.warn("crossWrite failed:", e);
+    return false;
   }
 }
 
-function listenPaymentSyncResponse(reqId, creditorId, txId){
-  if(!db) return;
-  const unsub = db.collection("payment_sync_requests").doc(reqId).onSnapshot(snap=>{
-    if(!snap.exists) return;
-    const d = snap.data();
-    if(d.status==="accepted"){
-      // ── Update creditor transaction syncStatus ──
-      const credList = getCreditors();
-      const cIdx = credList.findIndex(c=>c.id===creditorId);
-      if(cIdx>=0){
-        const tIdx = (credList[cIdx].transactions||[]).findIndex(t=>t.syncReqId===reqId);
-        if(tIdx>=0) credList[cIdx].transactions[tIdx].syncStatus="accepted";
-        saveCreditors(credList);
-      }
+// Delete (or flag-as-deleted) a transaction from the other shop's ledger
+async function crossDeleteTransaction(theirPhone, txId) {
+  if (!db || !authPhone || !theirPhone) return;
+  try {
+    await db.collection("users").doc(theirPhone)
+            .collection("linked_ledger").doc(authPhone)
+            .collection("transactions").doc(txId)
+            .update({ _deleted: true, _deletedAt: Date.now() });
+  } catch(e) { console.warn("crossDelete failed:", e); }
+}
 
-      // ── Auto-add Shop B to MY customers tab — only for purchase syncs ──
-      // For payment syncs, they already exist as a customer (added during purchase sync).
-      // d.acceptedByProfile is written by acceptPaymentSyncRequest on Shop B's side
-      const reqType = d.type || "purchase";
-      const p = d.acceptedByProfile || {};
-      const acceptorPhone = d.toPhone || p.phone;
-      if(acceptorPhone && reqType === "purchase"){
-        const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
-        // Check both localStorage AND in-memory customers array to prevent duplicates
-        const alreadyExists = allCust.find(c=>c.phone===acceptorPhone) ||
-                              (typeof customers!=="undefined" && customers.find(c=>c.phone===acceptorPhone));
-        if(!alreadyExists){
-          const nc = {
-            id: "C"+Date.now(),
-            name: p.shopName || p.shopId || d.toShopName || acceptorPhone,
-            phone: acceptorPhone,
-            gstin: p.gstin || "",
-            gstName: p.shopName || "",
-            gstAddress: [p.address, p.city].filter(Boolean).join(", "),
-            points: 0,
-            totalSpend: 0,
-            purchases: [],
-            borrows: [],
-            createdAt: Date.now(),
-            notes: "Auto-added via payment sync accept",
-            _fromShopConnect: true,
-            _connectedShopId: p.shopId || "",
-          };
-          allCust.push(nc);
-          try{ localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allCust)); }catch(e){}
-          // NOTE: Do NOT write to Firestore here — onSnapshot listener would double-add
-          if(typeof customers!=="undefined") customers.push(nc);
-          notify("✅ Payment synced & " + (nc.name) + " added to your Customers! 🔗","success");
-          if(currentTab===1) renderTab(1);
-        } else {
-          notify("✅ Payment synced! Both ledgers now match. 🔗","success");
-        }
-      } else {
-        notify("✅ Payment synced! Both ledgers now match. 🔗","success");
-      }
+// Listen to transactions that OTHER shops have cross-written into MY ledger
+// Path: users/{myPhone}/linked_ledger/{theirPhone}/transactions
+let _linkedLedgerListeners = {}; // theirPhone -> unsubscribe fn
 
-      if(currentTab===6) renderTab(6);
-      unsub();
-    } else if(d.status==="declined"){
-      notify("❌ Sync request declined by the other shop.","error");
-      const credList = getCreditors();
-      const cIdx = credList.findIndex(c=>c.id===creditorId);
-      if(cIdx>=0){
-        const tIdx = (credList[cIdx].transactions||[]).findIndex(t=>t.syncReqId===reqId);
-        if(tIdx>=0) credList[cIdx].transactions[tIdx].syncStatus="declined";
-        saveCreditors(credList);
-      }
-      if(currentTab===6) renderTab(6);
-      unsub();
-    }
+function startLinkedLedgerListener(theirPhone, onTx) {
+  if (!db || !authPhone || !theirPhone) return;
+  if (_linkedLedgerListeners[theirPhone]) return; // already listening
+
+  const unsub = db.collection("users").doc(authPhone)
+    .collection("linked_ledger").doc(theirPhone)
+    .collection("transactions")
+    .onSnapshot(snap => {
+      const txs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                           .filter(t => !t._deleted);
+      onTx(theirPhone, txs);
+    }, err => console.warn("linked_ledger listener error:", err));
+
+  _linkedLedgerListeners[theirPhone] = unsub;
+}
+
+function stopLinkedLedgerListener(theirPhone) {
+  if (_linkedLedgerListeners[theirPhone]) {
+    _linkedLedgerListeners[theirPhone]();
+    delete _linkedLedgerListeners[theirPhone];
+  }
+}
+
+// ─── Start listeners for all linked creditors ────────────────────────────────
+// When Shop B (creditor) cross-writes into my ledger, I see it live
+// This is for CUSTOMER VIEW — Shop A is a customer, linked shops cross-write
+// borrows/purchases into my linked_ledger path
+function startAllLinkedLedgerListeners() {
+  if (!db || !authPhone) return;
+
+  // Listen for cross-writes from all my linked CUSTOMERS
+  // (they cross-write when they record purchases from me)
+  const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2")) || "[]");
+  allCust.filter(c => c._fromShopConnect && c.phone).forEach(c => {
+    startLinkedLedgerListener(c.phone, _onLinkedCustomerTx);
+  });
+
+  // Listen for cross-writes from all my linked CREDITORS
+  // (they cross-write confirmation/response back to me)
+  const allCred = getCreditors();
+  allCred.filter(c => c._fromShopConnect && c.phone).forEach(c => {
+    startLinkedLedgerListener(c.phone, _onLinkedCreditorTx);
   });
 }
 
-// ─── Cleanup: delete stale pending requests this shop sent with old wrong roles ─────────────────
-// Stale = sent by ME, still "pending", older than 10 minutes (i.e. from before current session)
-async function cleanupStaleSentRequests(){
-  if(!db || !authPhone) return;
-  try {
-    // Delete from flat collection
-    const snap = await db.collection("shop_connect_requests")
-      .where("fromPhone","==",authPhone)
-      .where("status","==","pending")
-      .get();
-    const batch = db.batch();
-    snap.docs.forEach(doc=>{
-      const age = Date.now() - (doc.data().createdAt||0);
-      if(age > 10*60*1000) batch.delete(doc.ref); // older than 10 min
-    });
-    await batch.commit().catch(()=>{});
-  } catch(e){ /* ignore */ }
+// ─── Handler: Shop B (a creditor) wrote something into MY ledger ─────────────
+// This means they confirmed/responded to something — currently not needed
+// since Shop A is the initiator. Kept for future dispute/response flow.
+function _onLinkedCreditorTx(theirPhone, txs) {
+  // Future: handle dispute flags from creditor side
+  console.log("[LinkedLedger] Creditor", theirPhone, "wrote", txs.length, "txs");
 }
 
-// ─── On-load sweep: catch any payment sync requests accepted while we were offline ─────────────
-async function sweepAcceptedPaymentSyncRequests(){
-  if(!db || !authPhone) return;
-  try {
-    // Find all accepted PSRs that I SENT (fromPhone == me) in the last 30 days
-    const cutoff = Date.now() - 30*24*60*60*1000;
-    const snap = await db.collection("payment_sync_requests")
-      .where("fromPhone","==",authPhone)
-      .where("status","==","accepted")
-      .get();
-    for(const doc of snap.docs){
-      const d = doc.data();
-      const p = d.acceptedByProfile || {};
-      const acceptorPhone = d.toPhone || p.phone;
-      if(!acceptorPhone) continue;
-      const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
-      // Check both localStorage and in-memory customers array
-      const alreadyExists = allCust.find(c=>c.phone===acceptorPhone) ||
-                            (typeof customers!=="undefined" && customers.find(c=>c.phone===acceptorPhone));
-      if(!alreadyExists){
-        const nc = {
-          id: "C"+Date.now(),
-          name: p.shopName || p.shopId || acceptorPhone,
-          phone: acceptorPhone,
-          gstin: p.gstin || "",
-          gstName: p.shopName || "",
-          gstAddress: [p.address, p.city].filter(Boolean).join(", "),
-          points: 0, totalSpend: 0, purchases: [], borrows: [],
-          createdAt: Date.now(),
-          notes: "Auto-added via payment sync accept",
-          _fromShopConnect: true,
-          _connectedShopId: p.shopId || "",
-        };
-        allCust.push(nc);
-        try{ localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allCust)); }catch(e){}
-        // NOTE: Do NOT write to Firestore here — onSnapshot listener would double-add
-        if(typeof customers!=="undefined") customers.push(nc);
-        if(currentTab===1) renderTab(1);
-        if(currentTab===6) renderTab(6);
-      }
-    }
-  } catch(e){ console.warn("sweepAcceptedPaymentSyncRequests:", e); }
-}
+// ─── Handler: Shop A (a customer) wrote into MY ledger ───────────────────────
+// This means they recorded a purchase/payment — update MY customers tab live
+function _onLinkedCustomerTx(theirPhone, txs) {
+  if (!txs || txs.length === 0) return;
 
-// ─── INCOMING REQUESTS LISTENER (Customers tab badge) ────────────────────────
-let _payReqListener = null;
-function startPaymentRequestListener(){
-  if(!db || !authPhone || _payReqListener) return;
-  _payReqListener = db.collection("payment_sync_requests")
-    .where("toPhone","==",authPhone)
-    .where("status","==","pending")
-    .onSnapshot(snap=>{
-      const count = snap.size;
-      window._pendingPayReqs = snap.docs.map(d=>({id:d.id,...d.data()}));
-      // Badge on Customers tab button
-      const TABS = getTabs();
-      const tabBtns = document.querySelectorAll(".tab-btn");
-      TABS.forEach((t,i)=>{
-        if(t.toLowerCase().includes("customer") && tabBtns[i]){
-          tabBtns[i].innerHTML = t + (count>0?`<span style="display:inline-block;background:#ef4444;color:#fff;border-radius:8px;font-size:9px;font-weight:800;padding:1px 5px;margin-left:4px;vertical-align:middle;">${count}</span>`:"");
-        }
-      });
-      if(currentTab===1) renderTab(1);
-    });
-}
+  let allCust = [];
+  try { allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2")) || "[]"); } catch {}
 
-async function acceptPaymentSyncRequest(reqId){
-  if(!db || !authPhone){ notify("❌ Not logged in","error"); return; }
-  const snap = await db.collection("payment_sync_requests").doc(reqId).get().catch(()=>null);
-  if(!snap?.exists){ notify("❌ Request not found","error"); return; }
-  const req = snap.data();
-
-  // Find or create the customer record for the sender (Shop A)
-  let allData = [];
-  try { allData = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]"); } catch{}
-  let cust = allData.find(c=>c.phone===req.fromPhone);
-  if(!cust){
-    cust = { id:"C"+Date.now(), name:req.fromShopName||req.fromPhone, phone:req.fromPhone,
-             purchases:[], borrows:[], totalSpend:0, createdAt:Date.now(), _fromShopConnect:true };
-    allData.push(cust);
-  }
-  if(!cust.borrows)   cust.borrows=[];
-  if(!cust.purchases) cust.purchases=[];
-
-  const reqType = req.type || "purchase"; // "purchase" or "payment"
-  let notifyMsg = "";
-
-  if(reqType === "payment"){
-    // ── Shop A sent a payment — reduce pending borrow amount ──
-    const payAmt = Number(req.amount)||0;
-    const targetBillId = req.selectedBill||""; // which specific borrow they're paying
-    let remaining = payAmt;
-
-    // Try to apply to the targeted borrow first
-    const applyToBorrow = (b) => {
-      if(remaining<=0) return;
-      const owed = Math.max(0, Number(b.amount) - (b.amountPaid||0));
-      const apply = Math.min(owed, remaining);
-      b.amountPaid = (b.amountPaid||0) + apply;
-      remaining -= apply;
-      if(b.amountPaid >= b.amount - 0.01){
-        // Fully paid — convert to purchase
-        b.status = "returned"; b.returnedAt = new Date().toISOString();
-        if(!cust.purchases) cust.purchases=[];
-        cust.purchases.push({
-          id: "PAY"+Date.now()+Math.random().toString(36).slice(2,4),
-          amount: Number(b.amount),
-          bill: b.bill,
-          notes: (b.notes||"") + " [Payment received]",
-          date: req.date || new Date().toISOString().slice(0,10),
-          createdAt: Date.now(),
-          _fromBorrowId: b.id,
-          _syncSource: req.fromPhone,
-          _syncReqId: reqId,
-        });
-        cust.totalSpend = (cust.purchases||[]).reduce((s,p)=>s+(p.amount||0),0);
-      } else {
-        b.status = "partial";
-      }
+  let cust = allCust.find(c => c.phone === theirPhone);
+  if (!cust) {
+    // Customer not yet in local list — create a placeholder
+    cust = {
+      id: "C" + Date.now(), name: theirPhone, phone: theirPhone,
+      purchases: [], borrows: [], totalSpend: 0, createdAt: Date.now(),
+      _fromShopConnect: true,
     };
-
-    // Apply to targeted borrow (if specified)
-    const pending = cust.borrows.filter(b=>b.status==="pending_payment"||b.status==="pending"||b.status==="partial");
-    if(targetBillId){
-      const target = pending.find(b=>b.id===targetBillId||b.bill===targetBillId);
-      if(target) applyToBorrow(target);
-    }
-    // If still remaining, apply to oldest pending borrows
-    if(remaining>0){
-      pending.sort((a,b)=>new Date(a.date)-new Date(b.date));
-      for(const b of pending){ applyToBorrow(b); if(remaining<=0) break; }
-    }
-    notifyMsg = `✅ Payment of ${formatINR(payAmt)} from ${req.fromShopName||req.fromPhone} applied. Borrow updated.`;
-
-  } else {
-    // ── Shop A recorded a purchase — add to MY Borrows (they owe me) ──
-    const borrowId = "SYN"+Date.now();
-    cust.borrows.push({
-      id:         borrowId,
-      amount:     req.amount,
-      amountPaid: 0,
-      bill:       req.invoiceNo || "Synced Invoice",
-      notes:      (req.note||"Purchase") + " [Synced from " + (req.fromShopName||req.fromPhone) + "]",
-      date:       req.date,
-      recordedAt: Date.now(),
-      status:     "pending_payment",
-      _syncedReqId: reqId,
-      _syncSource:  req.fromPhone,
-      _syncType:    "purchase",
-    });
-    notifyMsg = "✅ Accepted! Added to Borrows — will move to purchases once they pay.";
+    allCust.push(cust);
   }
 
-  // Persist
-  try { localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allData)); } catch{}
-  const memIdx = customers.findIndex(c=>c.id===cust.id);
-  if(memIdx>=0) customers[memIdx]=cust; else customers.push(cust);
-  if(db && authPhone){
-    await db.collection("users").doc(authPhone).collection("customers").doc(cust.id).set(cust,{merge:true}).catch(()=>{});
-  }
+  if (!cust.borrows) cust.borrows = [];
+  if (!cust.purchases) cust.purchases = [];
 
-  // Write back profile so Shop A can auto-add me to their customers
-  const myProfile = {
-    phone:    authPhone,
-    shopId:   (typeof myShopId === "function") ? myShopId() : "",
-    shopName: (window.appSettings && window.appSettings.shopName) || authPhone,
-    shopIcon: (window.appSettings && window.appSettings.appIcon) || "",
-    gstin:    (window.appSettings && window.appSettings.shopGstin) || "",
-    city:     (window.appSettings && window.appSettings.shopCity)  || "",
-    address:  (window.appSettings && window.appSettings.shopAddress) || "",
-  };
-  await db.collection("payment_sync_requests").doc(reqId).update({
-    status: "accepted",
-    resolvedAt: Date.now(),
-    acceptedByProfile: myProfile
+  let changed = false;
+  txs.forEach(tx => {
+    const existsBorrow  = cust.borrows.find(b => b._linkedTxId === tx.id);
+    const existsPurchase = cust.purchases.find(p => p._linkedTxId === tx.id);
+    if (existsBorrow || existsPurchase) return; // already applied
+
+    if (tx.type === "purchase") {
+      // Shop A bought from me → add to their borrows in MY customer record
+      const borrowId = "SYN" + Date.now() + Math.random().toString(36).slice(2,4).toUpperCase();
+      cust.borrows.push({
+        id: borrowId,
+        _linkedTxId: tx.id,
+        amount: tx.amount,
+        amountPaid: 0,
+        bill: tx.invoiceNo || "Synced Invoice",
+        notes: (tx.note || "Purchase") + " [Live Sync 🔗]",
+        date: tx.date,
+        recordedAt: tx._writtenAt || Date.now(),
+        status: "pending_payment",
+        _syncSource: theirPhone,
+        _syncType: "purchase",
+      });
+      changed = true;
+      notify("🔗 " + (cust.name || theirPhone) + " recorded a purchase of " + formatINR(tx.amount), "success");
+
+    } else if (tx.type === "payment") {
+      // Shop A sent a payment → reduce their borrows
+      const payAmt = Number(tx.amount) || 0;
+      let remaining = payAmt;
+      const pending = cust.borrows.filter(b =>
+        b.status === "pending_payment" || b.status === "pending" || b.status === "partial"
+      ).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      // Try targeted borrow first
+      if (tx._paysBill) {
+        const target = pending.find(b => b.id === tx._paysBill || b.bill === tx._paysBill || b._linkedTxId === tx._paysBill);
+        if (target && remaining > 0) {
+          const owed = Math.max(0, Number(target.amount) - (target.amountPaid || 0));
+          const apply = Math.min(owed, remaining);
+          target.amountPaid = (target.amountPaid || 0) + apply;
+          remaining -= apply;
+          if (target.amountPaid >= target.amount - 0.01) {
+            target.status = "returned";
+            cust.totalSpend = (cust.totalSpend || 0) + Number(target.amount);
+          } else {
+            target.status = "partial";
+          }
+        }
+      }
+      // Apply remaining to oldest borrows
+      for (const b of pending) {
+        if (remaining <= 0) break;
+        if (b.status === "returned") continue;
+        const owed = Math.max(0, Number(b.amount) - (b.amountPaid || 0));
+        const apply = Math.min(owed, remaining);
+        b.amountPaid = (b.amountPaid || 0) + apply;
+        remaining -= apply;
+        if (b.amountPaid >= b.amount - 0.01) {
+          b.status = "returned";
+          cust.totalSpend = (cust.totalSpend || 0) + Number(b.amount);
+        } else {
+          b.status = "partial";
+        }
+      }
+      // Mark this payment tx so we don't re-apply
+      cust.borrows.push({
+        id: "PAYMARK" + Date.now(),
+        _linkedTxId: tx.id,
+        amount: 0, amountPaid: 0, status: "returned",
+        _isPaymentMarker: true,
+        notes: "Payment marker — " + formatINR(payAmt),
+        date: tx.date,
+      });
+      changed = true;
+      notify("💰 " + (cust.name || theirPhone) + " sent payment of " + formatINR(payAmt) + " — borrow updated!", "success");
+
+    } else if (tx.type === "return") {
+      // Shop A returned goods → reduce their borrows
+      const retAmt = Number(tx.amount) || 0;
+      let remaining = retAmt;
+      const pending = cust.borrows.filter(b =>
+        b.status === "pending_payment" || b.status === "pending" || b.status === "partial"
+      ).sort((a, b) => new Date(a.date) - new Date(b.date));
+      for (const b of pending) {
+        if (remaining <= 0) break;
+        const owed = Math.max(0, Number(b.amount) - (b.amountPaid || 0));
+        const apply = Math.min(owed, remaining);
+        b.amountPaid = (b.amountPaid || 0) + apply;
+        remaining -= apply;
+        if (b.amountPaid >= b.amount - 0.01) b.status = "returned";
+        else b.status = "partial";
+      }
+      cust.borrows.push({
+        id: "RETMARK" + Date.now(),
+        _linkedTxId: tx.id, amount: 0, amountPaid: 0,
+        status: "returned", _isReturnMarker: true,
+        notes: "Return marker — " + formatINR(retAmt), date: tx.date,
+      });
+      changed = true;
+      notify("↩️ " + (cust.name || theirPhone) + " returned goods worth " + formatINR(retAmt), "success");
+    }
   });
-  notify(notifyMsg,"success");
-  closeModal();
-  if(currentTab===1) renderTab(1);
+
+  if (changed) {
+    try { localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allCust)); } catch {}
+    // Sync to Firestore
+    if (db && authPhone) {
+      db.collection("users").doc(authPhone).collection("customers").doc(cust.id)
+        .set(cust, { merge: true }).catch(() => {});
+    }
+    if (typeof customers !== "undefined") {
+      const mi = customers.findIndex(c => c.id === cust.id);
+      if (mi >= 0) customers[mi] = cust; else customers.push(cust);
+    }
+    if (currentTab === 1) renderTab(1);
+  }
 }
 
-async function declinePaymentSyncRequest(reqId){
-  if(!db) return;
-  await db.collection("payment_sync_requests").doc(reqId).update({status:"declined", resolvedAt:Date.now()}).catch(()=>{});
-  notify("❌ Payment request declined.");
-  closeModal();
-  if(currentTab===1) renderTab(1);
+// ─── PURCHASE SYNC — Cross-write to creditor's customer path ─────────────────
+// Called after Shop A records any purchase/payment/return with a linked creditor
+// Instead of showing a modal and waiting for accept — writes directly, instantly.
+
+async function crossWriteCreditorTx(creditorId, tx) {
+  const cr = getCreditors().find(c => c.id === creditorId);
+  if (!cr || !cr._fromShopConnect || !cr.phone) return;
+
+  const ok = await crossWriteTransaction(cr.phone, tx);
+  if (ok) {
+    // Update local tx syncStatus to "synced"
+    const creditors = getCreditors();
+    const idx = creditors.findIndex(c => c.id === creditorId);
+    if (idx >= 0) {
+      const tIdx = (creditors[idx].transactions || []).findIndex(t => t.id === tx.id);
+      if (tIdx >= 0) {
+        creditors[idx].transactions[tIdx].syncStatus = "synced";
+        saveCreditors(creditors);
+      }
+    }
+    notify("🔗 Synced to " + (cr.name || cr.phone) + " live!", "success");
+  } else {
+    notify("⚠️ Live sync failed — transaction saved locally", "error");
+  }
 }
 
-function openPendingPaymentRequests(){
-  const reqs = window._pendingPayReqs||[];
-  if(reqs.length===0){ notify("✅ No pending payment requests."); return; }
-  const html = reqs.map(r=>{
-    const isPurchase = (r.type||"purchase")==="purchase";
-    const typeColor  = isPurchase?"#f59e0b":"#22c55e";
-    const typeLabel  = isPurchase?"📦 Purchase Sync":"💰 Payment Received";
-    const typeDesc   = isPurchase
-      ? "They recorded a purchase from you. Accept to add to Borrows."
-      : "They sent a payment. Accept to reduce their borrow balance.";
-    const acceptLabel = isPurchase?"✅ Accept — Add to Borrows":"✅ Accept — Apply Payment";
-    return `
-    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px;margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
-        <div style="flex:1;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-            <span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:8px;background:${typeColor}22;color:${typeColor};border:1px solid ${typeColor}44;">${typeLabel}</span>
-          </div>
-          <div style="font-size:14px;font-weight:800;color:#e8eaf0;">${escHtml(r.fromShopName||r.fromPhone)}</div>
-          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">📞 ${r.fromPhone} · ${r.date}</div>
-          ${r.note?`<div style="font-size:12px;color:#a0b0d0;margin-top:3px;">${escHtml(r.note)}</div>`:""}
-          ${r.invoiceNo?`<div style="font-size:11px;color:#60a5fa;">Ref: ${escHtml(r.invoiceNo)}</div>`:""}
-          ${r.selectedBill?`<div style="font-size:11px;color:#22c55e;margin-top:2px;">📌 Against bill: ${escHtml(r.selectedBill)}</div>`:""}
-          <div style="font-size:11px;color:#4a5a7a;margin-top:4px;">${typeDesc}</div>
-          <div style="font-size:10px;color:#f59e0b;margin-top:3px;">Attempt ${r.attempts||1}/3</div>
-        </div>
-        <div style="font-size:22px;font-weight:800;color:${typeColor};white-space:nowrap;">${formatINR(r.amount)}</div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:10px;">
-        <button onclick="acceptPaymentSyncRequest('${r.id}')" class="btn" style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;font-size:13px;font-weight:800;padding:10px;">${acceptLabel}</button>
-        <button onclick="declinePaymentSyncRequest('${r.id}')" class="btn" style="background:#1a0808;border:1px solid #ef444460;color:#f87171;font-size:13px;font-weight:700;padding:10px 14px;">❌ Decline</button>
-      </div>
-    </div>`;
-  }).join("");
-  showWideModal(`${modalHeader("📨 Incoming Requests from Linked Shops")}<div>${html}</div>`);
+// ─── PURCHASE SYNC MODAL (now instant — no accept needed) ────────────────────
+function openPurchaseSyncModal(creditorId, txId, amount, note, date, invoiceNo) {
+  const cr = getCreditors().find(c => c.id === creditorId);
+  if (!cr) return;
+
+  // Find the tx
+  const tx = (cr.transactions || []).find(t => t.id === txId) || {
+    id: txId, type: "purchase", amount, note, date, invoiceNo,
+    createdAt: Date.now(), syncStatus: "local",
+  };
+
+  // Auto cross-write silently, no modal needed
+  crossWriteCreditorTx(creditorId, { ...tx, type: "purchase" });
+  setTimeout(() => openCreditorDetail(creditorId), 200);
 }
 
-function deleteCrTx(creditorId, txIndex){
-  if(!confirm("Delete this transaction?")) return;
+// ─── PAYMENT SYNC (instant cross-write) ──────────────────────────────────────
+function openPaymentSyncModal(creditorId, txId, amount, note, date, invoiceNo, selectedBill) {
+  const cr = getCreditors().find(c => c.id === creditorId);
+  if (!cr) return;
+
+  const tx = (cr.transactions || []).find(t => t.id === txId) || {
+    id: txId, type: "payment", amount, note, date, invoiceNo,
+    _paysBill: selectedBill || "",
+    createdAt: Date.now(), syncStatus: "local",
+  };
+
+  crossWriteCreditorTx(creditorId, { ...tx, type: "payment", _paysBill: selectedBill || "" });
+  setTimeout(() => openCreditorDetail(creditorId), 200);
+}
+
+// ─── COMPATIBILITY STUBS (old code still calls these) ────────────────────────
+async function sendPurchaseSyncRequest(creditorId, txId, amount, note, date, invoiceNo, toPhone) {
+  openPurchaseSyncModal(creditorId, txId, amount, note, date, invoiceNo);
+}
+async function sendPaymentSyncRequest(creditorId, txId, amount, note, date, invoiceNo, toPhone, retryReqId, selectedBill) {
+  openPaymentSyncModal(creditorId, txId, amount, note, date, invoiceNo, selectedBill);
+}
+function listenPurchaseSyncResponse() {}
+function listenPaymentSyncResponse() {}
+async function sweepAcceptedPaymentSyncRequests() {}
+let _payReqListener = null;
+function startPaymentRequestListener() {
+  // Start cross-write listeners for all linked shops instead
+  setTimeout(startAllLinkedLedgerListeners, 500);
+}
+async function acceptPaymentSyncRequest() {}
+async function declinePaymentSyncRequest() {}
+function openPendingPaymentRequests() {
+  notify("✅ Live sync active — no pending requests needed.", "success");
+}
+function openRequestAgainModal(creditorId, txId, amount, note, date, invoiceNo, reqId) {
+  // Re-attempt cross-write
+  const cr = getCreditors().find(c => c.id === creditorId);
+  if (!cr) return;
+  const tx = (cr.transactions || []).find(t => t.id === txId);
+  if (tx) crossWriteCreditorTx(creditorId, tx);
+}
+
+// ─── DELETE A CREDITOR TRANSACTION (also removes from their side) ─────────────
+async function deleteCrTransaction(creditorId, txId) {
   const creditors = getCreditors();
-  const cr = creditors.find(c=>c.id===creditorId);
-  if(!cr) return;
-  cr.transactions.splice(txIndex,1);
+  const idx = creditors.findIndex(c => c.id === creditorId);
+  if (idx < 0) return;
+  const cr = creditors[idx];
+  creditors[idx].transactions = (cr.transactions || []).filter(t => t.id !== txId);
   saveCreditors(creditors);
+  // Cross-delete from their side if linked
+  if (cr._fromShopConnect && cr.phone) {
+    await crossDeleteTransaction(cr.phone, txId);
+  }
   notify("🗑 Transaction deleted");
   closeModal();
-  setTimeout(()=>openCreditorDetail(creditorId),200);
+  setTimeout(() => openCreditorDetail(creditorId), 200);
 }
 
 // ── Print Statement ───────────────────────────────────────────────────────────
@@ -10093,7 +10019,7 @@ function invSubmitAdd(){
       const txNote = notes ? `${name} ×${qty} — ${notes}` : `${name} ×${qty} (new inventory)`;
       const latestTx = (cr.transactions||[]).slice(-1)[0];
       const txId = latestTx?.id || ("TX"+Date.now());
-      setTimeout(()=>openPaymentSyncModal(creditorId, txId, totalAmt, txNote, date, ""), 400);
+      setTimeout(()=>openPurchaseSyncModal(creditorId, txId, totalAmt, txNote, date, ""), 400);
       return;
     }
   }
@@ -10126,7 +10052,7 @@ function invSubmitRestock(){
       // Find the tx we just added to get its id
       const latestTx = (cr.transactions||[]).slice(-1)[0];
       const txId = latestTx?.id || ("TX"+Date.now());
-      setTimeout(()=>openPaymentSyncModal(creditorId, txId, totalAmt, txNote, date, ""), 400);
+      setTimeout(()=>openPurchaseSyncModal(creditorId, txId, totalAmt, txNote, date, ""), 400);
       invRestockSelected = null;
       invRestockSearch = "";
       return;
@@ -10527,9 +10453,12 @@ async function acceptShopRequest(req){
       transactions: [],
       _fromShopConnect: true,
       _connectedShopId: profile.shopId || "",
+      _linkedPhone: profile.phone || "",
     });
     saveCreditors(creditors);
     notify(`✅ ${profile.shopName||"Shop"} added to your Creditors!`);
+    // Start live ledger listener for this newly linked creditor
+    if (profile.phone) startLinkedLedgerListener(profile.phone, _onLinkedCreditorTx);
   }
 
   function _autoAddAsCustomer(profile){
@@ -10551,11 +10480,14 @@ async function acceptShopRequest(req){
       notes:      `Auto-added via Shop Connect (${profile.shopId||""})`,
       _fromShopConnect: true,
       _connectedShopId: profile.shopId || "",
+      _linkedPhone: profile.phone || "",
     };
     allCustomers.push(newCust);
     try { localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allCustomers)); } catch {}
     // NOTE: Do NOT write to Firestore here — the onSnapshot listener on
     // startFirestoreListener() will auto-sync it once it lands in Firestore
+    // Start live ledger listener for this newly linked customer
+    if (profile.phone) startLinkedLedgerListener(profile.phone, _onLinkedCustomerTx);
     // via Step 2 below.  A double-write causes a duplicate customer entry.
     notify(`✅ ${profile.shopName||"Shop"} added to your Customers!`);
   }
