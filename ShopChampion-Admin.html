@@ -6439,11 +6439,70 @@ function startAllLinkedLedgerListeners() {
 }
 
 // ─── Handler: Shop B (a creditor) wrote something into MY ledger ─────────────
-// This means they confirmed/responded to something — currently not needed
-// since Shop A is the initiator. Kept for future dispute/response flow.
+// Shop A (our creditor) cross-wrote into our ledger.
+// This happens when Shop A records a SALE to us from their Debtors tab.
+// On our side: Shop A is our Creditor → add a purchase entry to their creditor record.
 function _onLinkedCreditorTx(theirPhone, txs) {
-  // Future: handle dispute flags from creditor side
-  console.log("[LinkedLedger] Creditor", theirPhone, "wrote", txs.length, "txs");
+  if (!txs || txs.length === 0) return;
+
+  const creditors = getCreditors();
+  const idx = creditors.findIndex(c => c.phone === theirPhone);
+  if (idx < 0) {
+    console.log("[LinkedLedger] Creditor tx from unknown phone:", theirPhone);
+    return;
+  }
+
+  if (!creditors[idx].transactions) creditors[idx].transactions = [];
+
+  let changed = false;
+  txs.forEach(tx => {
+    // Skip if already applied
+    if (creditors[idx].transactions.find(t => t._linkedTxId === tx.id)) return;
+
+    if (tx.type === "purchase") {
+      // Shop A sold to us → record as a purchase on their creditor entry (we owe them)
+      const newTx = {
+        id:          "SYN" + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase(),
+        _linkedTxId: tx.id,
+        type:        "purchase",
+        amount:      tx.amount,
+        note:        (tx.note || "Purchase") + " [Live Sync 🔗]",
+        date:        tx.date,
+        invoiceNo:   tx.invoiceNo || "",
+        createdAt:   tx._writtenAt || Date.now(),
+        syncStatus:  "synced",
+        _syncSource: theirPhone,
+      };
+      creditors[idx].transactions.push(newTx);
+      changed = true;
+      notify("🔗 " + (creditors[idx].name || theirPhone) + " recorded a sale of " + formatINR(tx.amount) + " — added to Creditors!", "success");
+
+    } else if (tx.type === "return") {
+      // Shop A accepted a return from us → record as return on their creditor entry
+      const newTx = {
+        id:          "SYN" + Date.now() + Math.random().toString(36).slice(2,5).toUpperCase(),
+        _linkedTxId: tx.id,
+        type:        "return",
+        amount:      tx.amount,
+        note:        (tx.note || "Return") + " [Live Sync 🔗]",
+        date:        tx.date,
+        invoiceNo:   tx.invoiceNo || "",
+        createdAt:   tx._writtenAt || Date.now(),
+        syncStatus:  "synced",
+        _syncSource: theirPhone,
+      };
+      creditors[idx].transactions.push(newTx);
+      changed = true;
+      notify("↩️ " + (creditors[idx].name || theirPhone) + " recorded a return of " + formatINR(tx.amount), "success");
+    }
+    // Note: "payment" type is not expected here — payments go through crossWriteCreditorTx
+    // which writes to _onLinkedCustomerTx / _onLinkedDebtorTx on the other side
+  });
+
+  if (changed) {
+    saveCreditors(creditors);
+    if (currentTab === 6) renderTab(6); // refresh Creditors tab if open
+  }
 }
 
 // ─── Handler: Shop A (a customer) wrote into MY ledger ───────────────────────
@@ -7175,8 +7234,8 @@ function openDebtorDetail(id){
   const balColor = bal>0?"#22c55e":bal<0?"#f59e0b":"#7a8aaa";
   const txs = dr.transactions||[];
 
-  showWideModal(`
-    <div style="display:flex;flex-direction:column;gap:14px;">
+  showFullPageModal(`
+    <div style="display:flex;flex-direction:column;gap:14px;max-width:860px;margin:0 auto;padding:16px;">
       <!-- Header -->
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:4px;">
         <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#166534,#22c55e);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">
@@ -7273,7 +7332,7 @@ function openDebtorDetail(id){
         <div id="dr-tx-summary" style="font-size:11px;color:#4a5a7a;margin-bottom:8px;min-height:16px;"></div>
 
         <!-- Transaction list -->
-        <div id="dr-tx-list" style="display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow-y:auto;">
+        <div id="dr-tx-list" style="display:flex;flex-direction:column;gap:8px;">
           ${txs.length===0?`<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>`:"⏳"}
         </div>
       </div>
@@ -7393,11 +7452,8 @@ function openAddDebtTxModal(debtorId, defaultType){
   };
   const typeColors = {sale:"#22c55e",payment:"#60a5fa",return:"#a78bfa"};
 
-  // Build inventory datalist for item autocomplete
-  const invNames = inventoryItems.map(x=>x.name);
-  const invDatalist = invNames.length
-    ? `<datalist id="drtx-inv-names">${invNames.map(n=>`<option value="${n.replace(/"/g,'&quot;')}">`).join('')}</datalist>`
-    : '';
+  // invDatalist no longer used — custom dropdown per row shows stock qty
+  const invDatalist = '';
 
   const isLinked = !!(dr._fromShopConnect);
 
@@ -7470,29 +7526,69 @@ function _drtxAddItemRow(){
   const div = document.createElement("div");
   div.id = rowId;
   div.className = "drtx-item-row";
-  div.style.cssText = "display:grid;grid-template-columns:1fr 80px 90px 28px;gap:6px;margin-bottom:6px;align-items:center;";
+  div.style.cssText = "position:relative;margin-bottom:8px;";
   div.innerHTML = `
-    <input class="input drtx-iname" list="drtx-inv-names" placeholder="Item name" style="margin:0;font-size:12px;padding:7px 10px;"
-      oninput="_drtxAutoFillPrice(this)" />
-    <input class="input drtx-iqty" type="number" placeholder="Qty" min="0.01" step="0.01" style="margin:0;font-size:12px;padding:7px 8px;text-align:center;"
-      oninput="_drtxUpdateTotal()" />
-    <input class="input drtx-iprice" type="number" placeholder="₹/unit" min="0" step="0.01" style="margin:0;font-size:12px;padding:7px 8px;text-align:right;"
-      oninput="_drtxUpdateTotal()" />
-    <button type="button" onclick="this.closest('.drtx-item-row').remove();_drtxUpdateTotal();"
-      style="background:#1a0a0a;border:1px solid #3a1a1a;color:#f66;border-radius:7px;cursor:pointer;font-size:14px;width:28px;height:28px;flex-shrink:0;">✕</button>`;
+    <div style="display:grid;grid-template-columns:1fr 80px 90px 28px;gap:6px;align-items:center;">
+      <div style="position:relative;">
+        <input class="input drtx-iname" placeholder="Item name" autocomplete="off"
+          style="margin:0;font-size:12px;padding:7px 10px;width:100%;box-sizing:border-box;"
+          oninput="_drtxItemSearch(this,'${rowId}')"
+          onfocus="_drtxItemSearch(this,'${rowId}')"
+          onblur="setTimeout(()=>_drtxHideItemDd('${rowId}'),180)" />
+        <div id="drtxdd-${rowId}" style="display:none;position:absolute;top:100%;left:0;right:0;background:#111827;border:1px solid #22c55e44;border-radius:8px;z-index:9999;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px #000a;margin-top:2px;"></div>
+      </div>
+      <input class="input drtx-iqty" type="number" placeholder="Qty" min="0.01" step="0.01"
+        style="margin:0;font-size:12px;padding:7px 8px;text-align:center;"
+        oninput="_drtxUpdateTotal()" />
+      <input class="input drtx-iprice" type="number" placeholder="₹/unit" min="0" step="0.01"
+        style="margin:0;font-size:12px;padding:7px 8px;text-align:right;"
+        oninput="_drtxUpdateTotal()" />
+      <button type="button" onclick="this.closest('.drtx-item-row').remove();_drtxUpdateTotal();"
+        style="background:#1a0a0a;border:1px solid #3a1a1a;color:#f66;border-radius:7px;cursor:pointer;font-size:14px;width:28px;height:28px;flex-shrink:0;">✕</button>
+    </div>`;
   list.appendChild(div);
 }
 
-function _drtxAutoFillPrice(nameEl){
-  const name = nameEl.value.trim();
-  const row = nameEl.closest(".drtx-item-row");
+function _drtxItemSearch(inp, rowId){
+  const q = inp.value.trim().toLowerCase();
+  const dd = document.getElementById("drtxdd-"+rowId);
+  if(!dd) return;
+  const items = inventoryItems;
+  const filtered = q ? items.filter(x=>x.name.toLowerCase().includes(q)) : items;
+  if(!filtered.length){ dd.style.display="none"; return; }
+  dd.style.display="block";
+  dd.innerHTML = filtered.map(x=>{
+    const stock = invGetStock(x.name);
+    const sc = stock<=0?"#e03030":stock<=3?"#f59e0b":"#22c55e";
+    const unit = x.unit||"";
+    return `<div onmousedown="_drtxItemSelect('${rowId}',this)"
+      data-name="${x.name.replace(/"/g,'&quot;')}"
+      data-price="${x.sellingPrice||x.costPerUnit||0}"
+      style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #1e2a45;display:flex;justify-content:space-between;align-items:center;font-size:13px;"
+      onmouseover="this.style.background='#1e2a45'" onmouseout="this.style.background=''">
+      <span style="color:#e8eaf0;font-weight:600;">${x.name}</span>
+      <span style="font-size:11px;color:${sc};font-weight:700;white-space:nowrap;margin-left:10px;">Stock: ${stock}${unit?" "+unit:""}</span>
+    </div>`;
+  }).join("");
+}
+
+function _drtxItemSelect(rowId, el){
+  const row = document.getElementById(rowId);
   if(!row) return;
+  const name = el.getAttribute("data-name");
+  const price = el.getAttribute("data-price");
+  const nameEl = row.querySelector(".drtx-iname");
   const priceEl = row.querySelector(".drtx-iprice");
-  const inv = inventoryItems.find(x=>x.name===name);
-  if(inv && priceEl && !parseFloat(priceEl.value)){
-    priceEl.value = inv.sellingPrice || inv.costPerUnit || "";
-  }
+  if(nameEl) nameEl.value = name;
+  if(priceEl && !parseFloat(priceEl.value)) priceEl.value = price;
+  _drtxHideItemDd(rowId);
   _drtxUpdateTotal();
+  row.querySelector(".drtx-iqty")?.focus();
+}
+
+function _drtxHideItemDd(rowId){
+  const dd = document.getElementById("drtxdd-"+rowId);
+  if(dd) dd.style.display="none";
 }
 
 function _drtxUpdateTotal(){
@@ -8136,6 +8232,7 @@ function removeAppIcon(){
 function closeModal(){document.getElementById("modal-container").innerHTML="";}
 function showModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:440px;">${html}</div></div>`;}
 function showWideModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:min(960px,95vw);max-height:95vh;">${html}</div></div>`;}
+function showFullPageModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" style="padding:0;align-items:stretch;"><div class="modal-box" style="width:100%;max-width:100%;height:100%;max-height:100%;border-radius:0;overflow-y:auto;">${html}</div></div>`;}
 function modalHeader(t){return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><div class="modal-title">${t}</div><button onclick="closeModal()" style="background:none;border:none;color:#7a8aaa;cursor:pointer;font-size:20px;">✕</button></div>`;}
 
 // ─── ADD / EDIT CUSTOMER ──────────────────────────────────────
