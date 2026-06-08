@@ -1710,7 +1710,7 @@ window.addEventListener('appinstalled', () => {
 
 // ── Mobile Bottom Nav ──────────────────────────────────────────
 const MOBILE_MAIN_TABS = [0, 1, 2, 5]; // leaderboard, customers, purchase, inventory
-const MOBILE_MORE_TABS = [3, 4, 6];    // analytics, compare, settings
+const MOBILE_MORE_TABS = [3, 4, 6, 7, 8];    // analytics, compare, creditors, messages, settings
 
 function mobileTab(i) {
   closeMoreMenu();
@@ -6345,13 +6345,18 @@ function listenPaymentSyncResponse(reqId, creditorId, txId){
         saveCreditors(credList);
       }
 
-      // ── Auto-add Shop B (the accepting shop) to MY customers tab ──
+      // ── Auto-add Shop B to MY customers tab — only for purchase syncs ──
+      // For payment syncs, they already exist as a customer (added during purchase sync).
       // d.acceptedByProfile is written by acceptPaymentSyncRequest on Shop B's side
+      const reqType = d.type || "purchase";
       const p = d.acceptedByProfile || {};
       const acceptorPhone = d.toPhone || p.phone;
-      if(acceptorPhone){
+      if(acceptorPhone && reqType === "purchase"){
         const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
-        if(!allCust.find(c=>c.phone===acceptorPhone)){
+        // Check both localStorage AND in-memory customers array to prevent duplicates
+        const alreadyExists = allCust.find(c=>c.phone===acceptorPhone) ||
+                              (typeof customers!=="undefined" && customers.find(c=>c.phone===acceptorPhone));
+        if(!alreadyExists){
           const nc = {
             id: "C"+Date.now(),
             name: p.shopName || p.shopId || d.toShopName || acceptorPhone,
@@ -6362,6 +6367,7 @@ function listenPaymentSyncResponse(reqId, creditorId, txId){
             points: 0,
             totalSpend: 0,
             purchases: [],
+            borrows: [],
             createdAt: Date.now(),
             notes: "Auto-added via payment sync accept",
             _fromShopConnect: true,
@@ -6369,7 +6375,8 @@ function listenPaymentSyncResponse(reqId, creditorId, txId){
           };
           allCust.push(nc);
           try{ localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allCust)); }catch(e){}
-          if(db && authPhone) customersCol().doc(nc.id).set(nc).catch(()=>{});
+          // NOTE: Do NOT write to Firestore here — onSnapshot listener would double-add
+          if(typeof customers!=="undefined") customers.push(nc);
           notify("✅ Payment synced & " + (nc.name) + " added to your Customers! 🔗","success");
           if(currentTab===1) renderTab(1);
         } else {
@@ -6431,7 +6438,10 @@ async function sweepAcceptedPaymentSyncRequests(){
       const acceptorPhone = d.toPhone || p.phone;
       if(!acceptorPhone) continue;
       const allCust = JSON.parse(localStorage.getItem(storageKey("customers_v2"))||"[]");
-      if(!allCust.find(c=>c.phone===acceptorPhone)){
+      // Check both localStorage and in-memory customers array
+      const alreadyExists = allCust.find(c=>c.phone===acceptorPhone) ||
+                            (typeof customers!=="undefined" && customers.find(c=>c.phone===acceptorPhone));
+      if(!alreadyExists){
         const nc = {
           id: "C"+Date.now(),
           name: p.shopName || p.shopId || acceptorPhone,
@@ -6439,7 +6449,7 @@ async function sweepAcceptedPaymentSyncRequests(){
           gstin: p.gstin || "",
           gstName: p.shopName || "",
           gstAddress: [p.address, p.city].filter(Boolean).join(", "),
-          points: 0, totalSpend: 0, purchases: [],
+          points: 0, totalSpend: 0, purchases: [], borrows: [],
           createdAt: Date.now(),
           notes: "Auto-added via payment sync accept",
           _fromShopConnect: true,
@@ -6447,7 +6457,8 @@ async function sweepAcceptedPaymentSyncRequests(){
         };
         allCust.push(nc);
         try{ localStorage.setItem(storageKey("customers_v2"), JSON.stringify(allCust)); }catch(e){}
-        if(db && authPhone) customersCol().doc(nc.id).set(nc).catch(()=>{});
+        // NOTE: Do NOT write to Firestore here — onSnapshot listener would double-add
+        if(typeof customers!=="undefined") customers.push(nc);
         if(currentTab===1) renderTab(1);
         if(currentTab===6) renderTab(6);
       }
@@ -10283,13 +10294,13 @@ async function _applyAutoAcceptedReq(doc){
         id:"C"+Date.now(), name:p.shopName||p.shopId||"Shop",
         phone:p.phone||"", gstin:p.gstin||"", gstName:p.shopName||"",
         gstAddress:[p.address,p.city].filter(Boolean).join(", "),
-        points:0, totalSpend:0, purchases:[], createdAt:Date.now(),
+        points:0, totalSpend:0, purchases:[], borrows:[], createdAt:Date.now(),
         notes:"Auto-added — they accepted your connect request (" + (p.shopId||"") + ")",
         _fromShopConnect:true, _connectedShopId:p.shopId||"",
       };
       allCust.push(nc);
       try{ localStorage.setItem(storageKey("customers_v2"),JSON.stringify(allCust)); }catch(e){}
-      if(db && authPhone) customersCol().doc(nc.id).set(nc).catch(()=>{});
+      // NOTE: Do NOT write to Firestore — onSnapshot would double-add
       applied = true;
       notify("✅ " + (p.shopName||"A shop") + " accepted — added to your Customers!", "success");
     }
