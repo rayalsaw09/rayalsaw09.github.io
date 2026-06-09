@@ -1400,7 +1400,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
     </button>
     <button class="bnav-btn" id="bnav-2" onclick="mobileTab(2)">
       <span class="bnav-icon" id="bnav-icon-2">💳</span>
-      <span class="bnav-label" id="bnav-label-2">Sales</span>
+      <span class="bnav-label" id="bnav-label-2">Cust. Sales</span>
     </button>
     <button class="bnav-btn" id="bnav-5" onclick="mobileTab(5)">
       <span class="bnav-icon" id="bnav-icon-5">📦</span>
@@ -6627,44 +6627,33 @@ async function confirmMoveUnrec(){
   const checked = [...document.querySelectorAll('.unrec-tx-chk:checked')].map(c => parseInt(c.dataset.idx));
   if(!checked.length){ notify('No entries selected','warn'); return; }
 
-  const phone = authPhone || localStorage.getItem("sc_auth_phone");
-  const db = firebase.firestore();
-  const creditorRef = db.collection('users').doc(phone).collection('creditors');
+  const allCreditors = getCreditors();
+  const unrecCr = allCreditors.find(c => c.id === 'CR_UNRECONCILED');
+  if(!unrecCr){ notify('Unreconciled record not found','error'); return; }
 
-  const unrecDoc = await creditorRef.doc('CR_UNRECONCILED').get();
-  if(!unrecDoc.exists){ notify('Unreconciled record not found','error'); return; }
-
-  const unrecData = unrecDoc.data();
-  const allTx = unrecData.transactions || [];
-
-  // Split into moving and keeping
+  const allTx = unrecCr.transactions || [];
   const toMove = checked.map(i => allTx[i]);
   const toKeep = allTx.filter((_,i) => !checked.includes(i));
 
-  // Add toMove entries to target creditor
-  const targetDoc = await creditorRef.doc(targetId).get();
-  if(!targetDoc.exists){ notify('Target creditor not found','error'); return; }
-  const targetData = targetDoc.data();
-  const targetTx = targetData.transactions || [];
+  const targetCr = allCreditors.find(c => c.id === targetId);
+  if(!targetCr){ notify('Target creditor not found','error'); return; }
 
-  const batch = db.batch();
+  // Move transactions to target creditor
+  targetCr.transactions = [...(targetCr.transactions || []), ...toMove];
 
-  // Update target creditor
-  batch.update(creditorRef.doc(targetId), {
-    transactions: [...targetTx, ...toMove]
-  });
-
-  // Update or delete unreconciled
+  // Update or remove unreconciled entry
+  let updatedList;
   if(toKeep.length === 0){
-    batch.delete(creditorRef.doc('CR_UNRECONCILED'));
+    updatedList = allCreditors.filter(c => c.id !== 'CR_UNRECONCILED');
   } else {
-    batch.update(creditorRef.doc('CR_UNRECONCILED'), { transactions: toKeep });
+    unrecCr.transactions = toKeep;
+    updatedList = allCreditors;
   }
 
-  await batch.commit();
+  saveCreditors(updatedList);
 
   closeModal();
-  notify(`✅ ${toMove.length} entr${toMove.length===1?'y':'ies'} moved to ${targetData.name}`, 'success');
+  notify(`✅ ${toMove.length} entr${toMove.length===1?'y':'ies'} moved to ${targetCr.name}`, 'success');
   setTimeout(() => renderTab('creditors'), 300);
 }
 
@@ -7425,6 +7414,17 @@ function openRequestAgainModal(creditorId, txId, amount, note, date, invoiceNo, 
 }
 
 // ─── DELETE A CREDITOR TRANSACTION (also removes from their side) ─────────────
+function deleteCrTx(creditorId, origIdx){
+  if(!confirm("Delete this transaction?")) return;
+  const creditors = getCreditors();
+  const idx = creditors.findIndex(c => c.id === creditorId);
+  if(idx < 0) return;
+  creditors[idx].transactions = (creditors[idx].transactions || []).filter((_,i) => i !== origIdx);
+  saveCreditors(creditors);
+  notify("🗑 Transaction deleted");
+  setTimeout(() => openCreditorDetail(creditorId), 200);
+}
+
 async function deleteCrTransaction(creditorId, txId) {
   const creditors = getCreditors();
   const idx = creditors.findIndex(c => c.id === creditorId);
