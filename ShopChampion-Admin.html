@@ -2622,6 +2622,7 @@ let authConfirmResult = null;
 let recaptchaVerifier  = null;
 let authMode = ""; // "new_user" | "forgot"
 let authPhone = "";
+let _loginSuccessFired = false; // guard: prevent double auto-login from DOMContentLoaded + window.load
 // ─── PER-ACCOUNT STORAGE KEY ─────────────────────────────────
 // All localStorage keys are prefixed with the logged-in phone number
 // so two accounts on the same browser never share data.
@@ -2936,6 +2937,8 @@ async function setNewPassword() {
 }
 
 function onLoginSuccess(phone) {
+  if(_loginSuccessFired) return;
+  _loginSuccessFired = true;
   document.getElementById("login-screen").style.display = "none";
   document.getElementById("main-app").style.display = "block";
 
@@ -3048,6 +3051,7 @@ function doLogout() {
   localStorage.removeItem("sc_auth_phone");
   localStorage.removeItem("sc_auth_uid");
   authPhone = ""; // clear in-memory phone so storageKey() resets
+  _loginSuccessFired = false; // allow next login to proceed
   // Unsubscribe inventory real-time listener
   if(invUnsubscribe){ try{ invUnsubscribe(); } catch(e){} invUnsubscribe=null; }
   // Unsubscribe shop-connect listeners
@@ -5909,6 +5913,7 @@ function renderCreditorsTab(){
   const totalCount = creditors.filter(c=>c.id!=="CR_UNRECONCILED").length;
   const unrecEntry = creditors.find(c=>c.id==="CR_UNRECONCILED");
   const unrecBalance = unrecEntry ? credBalance(unrecEntry) : 0;
+  const unrecTxCount = unrecEntry ? (unrecEntry.transactions||[]).length : 0;
 
   const searchVal  = window._credSearch || "";
   const gstFilter  = window._credGstFilter || "all"; // 'all' | 'gst' | 'nogst'
@@ -5952,11 +5957,11 @@ function renderCreditorsTab(){
       ${_credSummaryCard("Paid This Month", formatINR(_credPaidThisMonth(creditors)), "#22c55e", "✅")}
       ${_credSummaryCard("Purchased This Month", formatINR(_credPurchasedThisMonth(creditors)), "#60a5fa", "📦")}
     </div>
-    ${unrecBalance>0 ? `<div onclick="openCreditorDetail('CR_UNRECONCILED')" style="cursor:pointer;background:#1a0e00;border:2px solid #d97706;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;" onmouseenter="this.style.borderColor='#fbbf24'" onmouseleave="this.style.borderColor='#d97706'">
+    ${unrecTxCount>0 ? `<div onclick="openCreditorDetail('CR_UNRECONCILED')" style="cursor:pointer;background:#1a0e00;border:2px solid #d97706;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;" onmouseenter="this.style.borderColor='#fbbf24'" onmouseleave="this.style.borderColor='#d97706'">
       <span style="font-size:24px;">⚠️</span>
       <div style="flex:1;">
         <div style="font-size:13px;font-weight:800;color:#fbbf24;">Unreconciled Purchases — ${formatINR(unrecBalance)}</div>
-        <div style="font-size:12px;color:#d97706;margin-top:2px;">${(unrecEntry.transactions||[]).length} entr${(unrecEntry.transactions||[]).length===1?'y':'ies'} without a creditor. Tap to review.</div>
+        <div style="font-size:12px;color:#d97706;margin-top:2px;">${unrecTxCount} entr${unrecTxCount===1?'y':'ies'} without a creditor. Tap to review.</div>
       </div>
       <span style="color:#d97706;font-size:16px;">›</span>
     </div>` : ""}
@@ -6622,7 +6627,7 @@ async function confirmMoveUnrec(){
   const checked = [...document.querySelectorAll('.unrec-tx-chk:checked')].map(c => parseInt(c.dataset.idx));
   if(!checked.length){ notify('No entries selected','warn'); return; }
 
-  const phone = getActivePhone();
+  const phone = authPhone || localStorage.getItem("sc_auth_phone");
   const db = firebase.firestore();
   const creditorRef = db.collection('users').doc(phone).collection('creditors');
 
@@ -9888,19 +9893,25 @@ document.addEventListener("DOMContentLoaded", () => {
       authPhone = savedPhone;
       (async () => {
         try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 6000);
           const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(savedPhone)}&select=blocked`, {
-            headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+            headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON },
+            signal: controller.signal
           });
-          const rows = await res.json();
-          if (rows && rows.length > 0 && rows[0].blocked === true) {
-            localStorage.removeItem("sc_auth_phone");
-            document.getElementById("auth-phone").value = savedPhone;
-            const errEl = document.getElementById("auth-phone-err");
-            if (errEl) { errEl.innerHTML = "🚫 Your account has been blocked. Contact the shop owner."; errEl.style.display = "block"; }
-            authShowStep("phone");
-            return;
+          clearTimeout(timer);
+          if (res.ok) {
+            const rows = await res.json();
+            if (rows && rows.length > 0 && rows[0].blocked === true) {
+              localStorage.removeItem("sc_auth_phone");
+              document.getElementById("auth-phone").value = savedPhone;
+              const errEl = document.getElementById("auth-phone-err");
+              if (errEl) { errEl.innerHTML = "🚫 Your account has been blocked. Contact the shop owner."; errEl.style.display = "block"; }
+              authShowStep("phone");
+              return;
+            }
           }
-        } catch(e) { /* network error — allow cached login */ }
+        } catch(e) { /* network error or timeout — allow cached login */ }
         onLoginSuccess(savedPhone);
       })();
       return;
