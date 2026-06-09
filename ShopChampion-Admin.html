@@ -4943,7 +4943,7 @@ function renderAnalytics(sorted){
         <div style="background:#0a0e1a;border:1px solid #3a1a1a;border-radius:14px;padding:14px 12px;flex:1;">
           <div style="font-size:18px;margin-bottom:2px;">📦</div>
           <div style="font-size:20px;font-weight:900;color:#f87171;line-height:1;">${formatINR(totalYearCost)}</div>
-          <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">Total Purchases (${yr})</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:3px;font-weight:600;">Stock Expenses (${yr})</div>
         </div>
         <div style="background:#0a0e1a;border:1px solid #2a2a0a;border-radius:14px;padding:14px 12px;flex:1;">
           <div style="font-size:18px;margin-bottom:2px;">🏪</div>
@@ -6252,7 +6252,7 @@ function openCreditorDetail(id){
 
       ${isUnrec ? `<div style="background:#92400e22;border:1px solid #d97706;border-radius:12px;padding:12px 16px;font-size:13px;color:#fbbf24;font-weight:700;">
         ⚠️ These are inventory purchases with no supplier assigned.<br>
-        <span style="font-size:12px;font-weight:400;color:#f59e0b;margin-top:4px;display:block;">To reconcile: add the supplier as a creditor, then manually add those purchase entries to their account.</span>
+        <span style="font-size:12px;font-weight:400;color:#f59e0b;margin-top:4px;display:block;">Tap <b>Move to Creditor</b> below to reassign all or selected entries to an existing supplier.</span>
       </div>` : ""}
 
       <!-- Balance banner -->
@@ -6265,7 +6265,10 @@ function openCreditorDetail(id){
           <button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
           <button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
           <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>
-        </div>` : `<div style="font-size:12px;color:#d97706;font-weight:700;">Unreconciled<br>entries</div>`}
+        </div>` : `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+          <div style="font-size:11px;color:#d97706;font-weight:700;">⚠️ Unassigned entries</div>
+          <button onclick="openMoveUnrecModal()" class="btn" style="background:#92400e;border:1px solid #d97706;color:#fbbf24;font-size:12px;font-weight:800;padding:7px 14px;border-radius:8px;">🔀 Move to Creditor</button>
+        </div>`}
       </div>
 
       <!-- Creditor info -->
@@ -6546,6 +6549,118 @@ function openRequestAgainModal(creditorId, txId, amount, note, date, invoiceNo, 
       </button>
     </div>
   `);
+}
+
+// ── Move Unreconciled Entries to Creditor ─────────────────────────────────────
+function openMoveUnrecModal(){
+  const creditors = getCreditors().filter(c => c.id !== "CR_UNRECONCILED");
+  if(!creditors.length){
+    showModal(`
+      <div style="text-align:center;padding:20px 10px;">
+        <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
+        <div style="font-size:15px;font-weight:800;color:#fbbf24;margin-bottom:8px;">No Creditors Found</div>
+        <div style="font-size:13px;color:#7a8aaa;margin-bottom:20px;">You need to add at least one creditor before moving entries.</div>
+        <button onclick="closeModal();setTimeout(()=>openAddCreditorModal(),200)" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;padding:10px 20px;">+ Add Creditor</button>
+      </div>
+    `);
+    return;
+  }
+  const unrecCr = getCreditors().find(c => c.id === "CR_UNRECONCILED");
+  const txList = unrecCr ? (unrecCr.transactions || []) : [];
+  if(!txList.length){
+    showModal(`<div style="text-align:center;padding:20px;font-size:14px;color:#7a8aaa;">No unreconciled entries to move.</div>`);
+    return;
+  }
+
+  const optionsHtml = creditors.map(c =>
+    `<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`
+  ).join('');
+
+  const txRows = txList.map((tx,i) => `
+    <label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#0a0e1a;border-radius:8px;border:1px solid #1e2a45;cursor:pointer;">
+      <input type="checkbox" class="unrec-tx-chk" data-idx="${i}" checked style="width:16px;height:16px;accent-color:#f59e0b;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:700;color:#e8eaf0;">${escHtml(tx.note||tx.invoice||'Purchase')}</div>
+        <div style="font-size:11px;color:#7a8aaa;">${tx.date||''}</div>
+      </div>
+      <div style="font-size:13px;font-weight:800;color:#f87171;">−${formatINR(Number(tx.amount)||0)}</div>
+    </label>
+  `).join('');
+
+  showModal(`
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div style="font-size:16px;font-weight:900;color:#fbbf24;">🔀 Move to Creditor</div>
+      <div style="font-size:12px;color:#7a8aaa;">Select which entries to move and choose the target supplier.</div>
+
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#a0b0d0;margin-bottom:6px;">Target Creditor</div>
+        <select id="move-unrec-target" style="width:100%;background:#0a0e1a;border:1px solid #2a3a6a;border-radius:8px;color:#e8eaf0;font-size:13px;padding:9px 12px;">
+          ${optionsHtml}
+        </select>
+      </div>
+
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:12px;font-weight:700;color:#a0b0d0;">Entries (${txList.length})</div>
+          <button onclick="document.querySelectorAll('.unrec-tx-chk').forEach(c=>c.checked=true)" style="background:none;border:none;color:#60a5fa;font-size:11px;font-weight:700;cursor:pointer;">Select All</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;">${txRows}</div>
+      </div>
+
+      <div style="display:flex;gap:10px;">
+        <button onclick="closeModal()" style="flex:1;cursor:pointer;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;color:#7a8aaa;font-size:13px;font-weight:700;padding:10px;">Cancel</button>
+        <button onclick="confirmMoveUnrec()" style="flex:2;cursor:pointer;background:linear-gradient(135deg,#d97706,#f59e0b);border:none;border-radius:10px;color:#1a0a00;font-size:13px;font-weight:900;padding:10px;">✅ Move Selected</button>
+      </div>
+    </div>
+  `);
+}
+
+async function confirmMoveUnrec(){
+  const targetId = document.getElementById('move-unrec-target')?.value;
+  if(!targetId){ notify('Please select a target creditor','warn'); return; }
+
+  const checked = [...document.querySelectorAll('.unrec-tx-chk:checked')].map(c => parseInt(c.dataset.idx));
+  if(!checked.length){ notify('No entries selected','warn'); return; }
+
+  const phone = getActivePhone();
+  const db = firebase.firestore();
+  const creditorRef = db.collection('users').doc(phone).collection('creditors');
+
+  const unrecDoc = await creditorRef.doc('CR_UNRECONCILED').get();
+  if(!unrecDoc.exists){ notify('Unreconciled record not found','error'); return; }
+
+  const unrecData = unrecDoc.data();
+  const allTx = unrecData.transactions || [];
+
+  // Split into moving and keeping
+  const toMove = checked.map(i => allTx[i]);
+  const toKeep = allTx.filter((_,i) => !checked.includes(i));
+
+  // Add toMove entries to target creditor
+  const targetDoc = await creditorRef.doc(targetId).get();
+  if(!targetDoc.exists){ notify('Target creditor not found','error'); return; }
+  const targetData = targetDoc.data();
+  const targetTx = targetData.transactions || [];
+
+  const batch = db.batch();
+
+  // Update target creditor
+  batch.update(creditorRef.doc(targetId), {
+    transactions: [...targetTx, ...toMove]
+  });
+
+  // Update or delete unreconciled
+  if(toKeep.length === 0){
+    batch.delete(creditorRef.doc('CR_UNRECONCILED'));
+  } else {
+    batch.update(creditorRef.doc('CR_UNRECONCILED'), { transactions: toKeep });
+  }
+
+  await batch.commit();
+
+  closeModal();
+  notify(`✅ ${toMove.length} entr${toMove.length===1?'y':'ies'} moved to ${targetData.name}`, 'success');
+  setTimeout(() => renderTab('creditors'), 300);
 }
 
 // ── Add Transaction Modal ─────────────────────────────────────────────────────
