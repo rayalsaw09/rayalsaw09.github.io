@@ -6129,6 +6129,14 @@ function saveCreditorModal(editId){
   }
 
   const creditors = getCreditors();
+
+  // Duplicate name check (case-insensitive, skip self when editing)
+  const dupCr = creditors.find(c => c.name.trim().toLowerCase() === name.toLowerCase() && c.id !== editId && !c._archived);
+  if(dupCr){
+    notify("⚠️ Creditor \"" + name + "\" already exists");
+    document.getElementById("cr-name")?.focus();
+    return;
+  }
   const cr = {
     id:       editId || newCreditorId(),
     name,
@@ -7965,6 +7973,14 @@ function saveDebtorModal(editId){
   if(!name){ notify("⚠️ Name is required"); return; }
 
   const debtors = getDebtors();
+
+  // Duplicate name check (case-insensitive, skip self when editing)
+  const dupDr = debtors.find(d => d.name.trim().toLowerCase() === name.toLowerCase() && d.id !== editId && !d._archived);
+  if(dupDr){
+    notify("⚠️ Debtor \"" + name + "\" already exists");
+    document.getElementById("dr-name")?.focus();
+    return;
+  }
   const dr = {
     id:       editId || newDebtorId(),
     name,
@@ -9092,6 +9108,11 @@ async function saveNewCustomer(){
   const id=rawId?rawId.toUpperCase():autoId();
   if(idExists(id,null)){notify("❌ ID already exists — try another or click 🎲 Auto","error");return;}
   if(rawId && isDeletedId(id)){notify("❌ This ID was used by a deleted customer and cannot be reused. Please choose a different ID or click 🎲 Auto","error");return;}
+  // Duplicate name check
+  const dupCust = customers.find(c => c.name && c.name.trim().toLowerCase() === name.toLowerCase());
+  if(dupCust){
+    if(!confirm(`⚠️ A customer named "${name}" already exists (ID: ${dupCust.id}). Add anyway?`)) return;
+  }
   const phone=document.getElementById("m-phone")?.value.trim()||"";
   // FIX 30: Duplicate phone check
   if(phone && customers.some(c=>c.phone && c.phone===phone)){
@@ -11186,7 +11207,7 @@ function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellin
     inventoryItems.push(item);
   }
   item.unit = unit||item.unit;
-  if(category && category.trim()) item.category = category.trim();
+  if(category && category.trim()) item.category = category.trim().replace(/\b\w/g,c=>c.toUpperCase());
   if(sellingPrice && Number(sellingPrice)>0) item.sellingPrice = Number(sellingPrice);
   // Save GST settings on item
   if(gstRate !== undefined && gstRate !== null) item.gstRate = Number(gstRate)||0;
@@ -11286,7 +11307,7 @@ function invEditCategory(name){
   const allCats = [...new Set(inventoryItems.map(x=>x.category||"General").filter(Boolean))].sort();
   const suggestion = allCats.length ? "\n\nExisting: "+allCats.join(", ") : "";
   const nc = prompt("Category for \""+name+"\":"+suggestion, item.category||"General");
-  if(nc!==null){ item.category=(nc.trim()||"General"); saveInventory(); safeRenderTab(currentTab); }
+  if(nc!==null){ item.category=(nc.trim()||"General").replace(/\b\w/g,c=>c.toUpperCase()); saveInventory(); safeRenderTab(currentTab); }
 }
 
 // Cost value of current stock for an item: stock_qty * avg_cost_per_unit
@@ -11945,7 +11966,7 @@ function renderInventoryTab(){
 
 function invSubmitAdd(){
   const name=(document.getElementById("inv-name").value||"").trim();
-  const category=(document.getElementById("inv-category").value||"").trim()||"General";
+  const category=((document.getElementById("inv-category").value||"").trim()||"General").replace(/\b\w/g,c=>c.toUpperCase());
   const qty=parseFloat(document.getElementById("inv-qty").value||"0");
   const unit=(document.getElementById("inv-unit").value||"").trim();
   const cost=parseFloat(document.getElementById("inv-cost").value||"0");
@@ -11955,6 +11976,13 @@ function invSubmitAdd(){
   const gstRate=parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
   const gstIncluded=document.getElementById("inv-gst-included")?.value||"exclusive";
   if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
+  // Duplicate item name check (case-insensitive)
+  const _dupItem = inventoryItems.find(x=>x.name.trim().toLowerCase()===name.toLowerCase());
+  if(_dupItem){
+    notify("⚠️ Item "" + name + "" already exists — use 🔄 Restock to add stock");
+    document.getElementById("inv-name").focus();
+    return;
+  }
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
   const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
   invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
