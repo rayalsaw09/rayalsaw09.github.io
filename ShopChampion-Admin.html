@@ -11979,7 +11979,7 @@ function invSubmitAdd(){
   // Duplicate item name check (case-insensitive)
   const _dupItem = inventoryItems.find(x=>x.name.trim().toLowerCase()===name.toLowerCase());
   if(_dupItem){
-    notify("⚠️ Item "" + name + "" already exists — use 🔄 Restock to add stock");
+    notify("⚠️ Item \"" + name + "\" already exists — use 🔄 Restock to add stock");
     document.getElementById("inv-name").focus();
     return;
   }
