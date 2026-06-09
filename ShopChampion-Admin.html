@@ -6352,7 +6352,6 @@ function _crTxRender(creditorId){
     (tx.type||"").toLowerCase().includes(search)
   );
 
-  // Summary
   const totalPurchase=filtered.filter(t=>t.type==="purchase").reduce((s,t)=>s+t.amount,0);
   const totalOut=filtered.filter(t=>t.type==="payment"||t.type==="return").reduce((s,t)=>s+t.amount,0);
   if(summaryEl) summaryEl.innerHTML=filtered.length===0?"":
@@ -6382,40 +6381,100 @@ function _crTxRender(creditorId){
   }
 
   const origTxs=(cr.transactions||[]);
-  const typeBadge={
-    purchase:{bg:"#92400e33",col:"#fbbf24"},
-    payment: {bg:"#14532d33",col:"#4ade80"},
-    return:  {bg:"#2e106544",col:"#c4b5fd"},
+
+  // Compute running balance (oldest→newest for calc, then reverse for display)
+  const forBalance=[...filtered].reverse();
+  // Opening balance = balance from all transactions NOT in filtered set
+  const filteredIds=new Set(filtered.map(t=>t.id));
+  let openingBal=0;
+  origTxs.forEach(t=>{
+    if(filteredIds.has(t.id)) return;
+    if(t.type==="purchase") openingBal+=t.amount;
+    else if(t.type==="payment"||t.type==="return") openingBal-=t.amount;
+  });
+  const runMap={};
+  let run=openingBal;
+  forBalance.forEach(tx=>{
+    if(tx.type==="purchase") run+=tx.amount;
+    else if(tx.type==="payment"||tx.type==="return") run-=tx.amount;
+    runMap[tx.id]=run;
+  });
+
+  const typeCfg={
+    purchase:{label:"Purchase", debit:true,  bg:"#92400e22",col:"#fbbf24",icon:"📦"},
+    payment: {label:"Payment",  debit:false, bg:"#14532d22",col:"#4ade80",icon:"💰"},
+    return:  {label:"Return",   debit:false, bg:"#2e106522",col:"#c4b5fd",icon:"↩️"},
   };
 
-  listEl.innerHTML=filtered.map(tx=>{
+  // Tally-style compact ledger table
+  const rows = filtered.map(tx=>{
     const origIdx=origTxs.findIndex(t=>t.id===tx.id);
-    const isCredit=tx.type==="payment"||tx.type==="return";
-    const amtColor=credTxColor(tx.type);
-    const dateStr=new Date(tx.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
-    const tb=typeBadge[tx.type]||{bg:"#1e2a45",col:"#7a8aaa"};
-    return `<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
-      <div style="font-size:20px;flex-shrink:0;">${credTxIcon(tx.type)}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
-          <span style="font-size:13px;font-weight:700;color:#e8eaf0;">${hl(tx.note||tx.type)}</span>
-          <span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:${tb.bg};color:${tb.col};">${tx.type}</span>
-          ${tx.syncStatus==="pending"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#92400e44;color:#fbbf24;">🟡 Sync Pending</span>`:""}
-          ${(tx.syncStatus==="accepted"||tx.syncStatus==="synced")?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#14532d44;color:#4ade80;">🔗 Live Synced</span>`:""}
-          ${tx.syncStatus==="declined"?`<span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:#7f1d1d44;color:#f87171;">⚠️ Retry Sync</span>`:""}
+    const cfg=typeCfg[tx.type]||{label:tx.type,debit:true,bg:"#1e2a4522",col:"#7a8aaa",icon:"📋"};
+    const d=new Date(tx.date+"T00:00:00");
+    const dateShort=d.toLocaleDateString("en-IN",{day:"2-digit",month:"short"});
+    const runBal=runMap[tx.id]||0;
+    const runColor=runBal>0?"#f59e0b":runBal<0?"#22c55e":"#7a8aaa";
+    const runLabel=runBal>0?"Dr":runBal<0?"Cr":"✓";
+    const rowId="cr-row-"+tx.id;
+    const detailId="cr-det-"+tx.id;
+    const syncBadge=tx.syncStatus==="pending"?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#92400e44;color:#fbbf24;margin-left:4px;">⏳Sync</span>':
+      (tx.syncStatus==="accepted"||tx.syncStatus==="synced")?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#14532d44;color:#4ade80;margin-left:4px;">🔗Live</span>':
+      tx.syncStatus==="declined"?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#7f1d1d44;color:#f87171;margin-left:4px;">⚠️Retry</span>':'';
+
+    return `<div>
+      <div id="${rowId}" onclick="(function(){var d=document.getElementById('${detailId}');var open=d.style.display!=='none';document.querySelectorAll('[id^=cr-det-]').forEach(function(x){x.style.display='none';document.getElementById('cr-row-'+x.id.slice(7)).style.background='transparent';});if(!open){d.style.display='block';document.getElementById('${rowId}').style.background='#0a1828';};})()"
+        style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;">
+        <div style="font-size:11px;color:#6a7a9a;font-family:monospace;white-space:nowrap;">${dateShort}</div>
+        <div style="min-width:0;">
+          <div style="font-size:12.5px;font-weight:600;color:#cdd5e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${hl(tx.note||cfg.label)}${syncBadge}</div>
+          ${tx.invoiceNo?`<div style="font-size:10px;color:#4a5a7a;">🧾 ${hl(tx.invoiceNo)}</div>`:""}
         </div>
-        <div style="font-size:11px;color:#7a8aaa;">📅 ${dateStr}${tx.invoiceNo?` &nbsp;·&nbsp; 🧾 ${hl(tx.invoiceNo)}`:""}</div>
-        ${tx._invItem?`<div style="margin-top:3px;"><span style="background:#0a1020;border:1px solid #1e3a6e;border-radius:5px;padding:2px 8px;font-size:11px;color:#60a5fa;">📦 +${tx._invQty} ${(inventoryItems.find(x=>x.name===tx._invItem)||{}).unit||"unit"} ${escHtml(tx._invItem)}</span></div>`:""}
-        ${(tx.syncStatus==="declined" || tx.syncStatus==="local") && cr._fromShopConnect ? `<div style="margin-top:4px;"><button onclick="openRequestAgainModal('${creditorId}','${tx.id||""}',${tx.amount},'${(tx.note||"").replace(/'/g,"\'")}','${tx.date||""}','${(tx.invoiceNo||"").replace(/'/g,"\'")}','${tx.syncReqId}')" style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:6px;color:#f87171;font-size:10px;font-weight:700;padding:3px 8px;">🔄 Request Again</button></div>`:""
-        }
+        <div style="text-align:right;font-size:12px;font-weight:700;color:#fbbf24;">${cfg.debit?formatINR(tx.amount):""}</div>
+        <div style="text-align:right;font-size:12px;font-weight:700;color:#4ade80;">${!cfg.debit?formatINR(tx.amount):""}</div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;font-weight:800;color:${runColor};">${formatINR(Math.abs(runBal))}</div>
+          <div style="font-size:9px;color:${runColor};font-weight:700;">${runLabel}</div>
+        </div>
+        <div style="text-align:center;font-size:11px;color:#3a4a6a;">▾</div>
       </div>
-      <div style="text-align:right;flex-shrink:0;">
-        <div style="font-size:14px;font-weight:800;color:${amtColor};">${isCredit?"-":"+"}${formatINR(tx.amount)}</div>
+      <div id="${detailId}" style="display:none;background:#060d1a;border-bottom:1px solid #0d1525;padding:10px 14px;font-size:12px;">
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+          <div><span style="color:#4a5a7a;">Date</span><br><span style="color:#e8eaf0;font-weight:700;">${new Date(tx.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span></div>
+          <div><span style="color:#4a5a7a;">Type</span><br><span style="font-size:11px;padding:2px 8px;border-radius:5px;background:${cfg.bg};color:${cfg.col};font-weight:700;">${cfg.icon} ${cfg.label}</span></div>
+          <div><span style="color:#4a5a7a;">Amount</span><br><span style="color:${cfg.col};font-weight:800;">${formatINR(tx.amount)}</span></div>
+          ${tx.invoiceNo?`<div><span style="color:#4a5a7a;">Invoice</span><br><span style="color:#e8eaf0;font-weight:700;">🧾 ${escHtml(tx.invoiceNo)}</span></div>`:""}
+          ${tx._invItem?`<div><span style="color:#4a5a7a;">Inventory</span><br><span style="color:#60a5fa;font-weight:700;">📦 ${escHtml(tx._invItem)} × ${tx._invQty}</span></div>`:""}
+        </div>
+        ${tx.note?`<div style="color:#7a8aaa;margin-bottom:8px;">📝 ${escHtml(tx.note)}</div>`:""}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${(tx.syncStatus==="declined"||tx.syncStatus==="local")&&cr._fromShopConnect?`<button onclick="openRequestAgainModal('${creditorId}','${tx.id||""}',${tx.amount},'${(tx.note||"").replace(/'/g,"\'")}','${tx.date||""}','${(tx.invoiceNo||"").replace(/'/g,"\'")}','${tx.syncReqId}')" style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:6px;color:#f87171;font-size:11px;font-weight:700;padding:5px 10px;">🔄 Request Again</button>`:""}
+          <button onclick="deleteCrTx('${creditorId}',${origIdx});setTimeout(()=>_crTxRender('${creditorId}'),300);" style="cursor:pointer;background:#1a0808;border:1px solid #5a1a1a;border-radius:6px;color:#f66;font-size:11px;font-weight:700;padding:5px 10px;">🗑 Delete</button>
+        </div>
       </div>
-      <button onclick="deleteCrTx('${creditorId}',${origIdx});setTimeout(()=>_crTxRender('${creditorId}'),300);"
-        style="cursor:pointer;background:none;border:none;color:#4a5a7a;font-size:14px;padding:2px 6px;" title="Delete">✕</button>
     </div>`;
   }).join("");
+
+  // Column header + totals footer
+  const colHeader=`<div style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;gap:4px;padding:5px 10px 5px;border-bottom:2px solid #1e2a45;">
+    <div style="font-size:9px;font-weight:800;color:#4a5a7a;text-transform:uppercase;">Date</div>
+    <div style="font-size:9px;font-weight:800;color:#4a5a7a;text-transform:uppercase;">Description</div>
+    <div style="font-size:9px;font-weight:800;color:#fbbf24;text-align:right;text-transform:uppercase;">Debit</div>
+    <div style="font-size:9px;font-weight:800;color:#4ade80;text-align:right;text-transform:uppercase;">Credit</div>
+    <div style="font-size:9px;font-weight:800;color:#a0b0d0;text-align:right;text-transform:uppercase;">Balance</div>
+    <div></div>
+  </div>`;
+  const finalBal=runMap[filtered[0]?.id]||0;
+  const finalColor=finalBal>0?"#f59e0b":finalBal<0?"#22c55e":"#7a8aaa";
+  const totalsRow=`<div style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;gap:4px;padding:7px 10px;border-top:2px solid #1e2a45;background:#0a0e1a;">
+    <div></div>
+    <div style="font-size:11px;font-weight:800;color:#7a8aaa;">TOTAL</div>
+    <div style="text-align:right;font-size:11px;font-weight:800;color:#fbbf24;">${formatINR(totalPurchase)}</div>
+    <div style="text-align:right;font-size:11px;font-weight:800;color:#4ade80;">${formatINR(totalOut)}</div>
+    <div style="text-align:right;"><div style="font-size:12px;font-weight:800;color:${finalColor};">${formatINR(Math.abs(finalBal))}</div><div style="font-size:9px;color:${finalColor};font-weight:700;">${finalBal>0?"Dr":finalBal<0?"Cr":"✓"}</div></div>
+    <div></div>
+  </div>`;
+
+  listEl.innerHTML=`<div style="background:#08101e;border:1px solid #1e2a45;border-radius:10px;overflow:hidden;">${colHeader}${rows}${totalsRow}</div>`;
 }
 
 
@@ -7791,32 +7850,91 @@ function _drTxRender(debtorId){
   }
 
   const origTxs=(dr.transactions||[]);
-  const typeBadge={
-    sale:    {bg:"#14532d33",col:"#4ade80"},
-    payment: {bg:"#1e3a6e33",col:"#60a5fa"},
-    return:  {bg:"#2e106544",col:"#c4b5fd"},
+
+  // Compute running balance (oldest→newest for calc, newest-first for display)
+  const filteredIds=new Set(filtered.map(t=>t.id));
+  let openingBal=0;
+  origTxs.forEach(t=>{
+    if(filteredIds.has(t.id)) return;
+    if(t.type==="sale") openingBal+=t.amount;
+    else if(t.type==="payment"||t.type==="return") openingBal-=t.amount;
+  });
+  const forBalance=[...filtered].reverse();
+  const runMap={};
+  let run=openingBal;
+  forBalance.forEach(tx=>{
+    if(tx.type==="sale") run+=tx.amount;
+    else if(tx.type==="payment"||tx.type==="return") run-=tx.amount;
+    runMap[tx.id]=run;
+  });
+
+  const typeCfg={
+    sale:    {label:"Sale",    debit:true,  bg:"#14532d22",col:"#4ade80",icon:"🛒"},
+    payment: {label:"Receipt", debit:false, bg:"#1e3a6e22",col:"#60a5fa",icon:"💰"},
+    return:  {label:"Return",  debit:false, bg:"#2e106522",col:"#c4b5fd",icon:"↩️"},
   };
 
-  listEl.innerHTML=filtered.map(tx=>{
+  const rows=filtered.map(tx=>{
     const origIdx=origTxs.findIndex(t=>t.id===tx.id);
-    const isDebit=tx.type==="payment"||tx.type==="return";
-    const amtColor=debtTxColor(tx.type);
-    const dateStr=new Date(tx.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
-    const tb=typeBadge[tx.type]||{bg:"#1e2a45",col:"#7a8aaa"};
-    return `<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:12px;">
-      <div style="font-size:20px;flex-shrink:0;">${debtTxIcon(tx.type)}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
-          <span style="font-size:13px;font-weight:700;color:#e8eaf0;">${escHtml(tx.note||tx.type)}</span>
-          <span style="font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:${tb.bg};color:${tb.col};">${tx.type==="payment"?"receipt":tx.type}</span>
+    const cfg=typeCfg[tx.type]||{label:tx.type,debit:true,bg:"#1e2a4522",col:"#7a8aaa",icon:"📋"};
+    const d=new Date(tx.date+"T00:00:00");
+    const dateShort=d.toLocaleDateString("en-IN",{day:"2-digit",month:"short"});
+    const runBal=runMap[tx.id]||0;
+    const runColor=runBal>0?"#22c55e":runBal<0?"#f59e0b":"#7a8aaa";
+    const runLabel=runBal>0?"Dr":runBal<0?"Cr":"✓";
+    const rowId="dr-row-"+tx.id;
+    const detailId="dr-det-"+tx.id;
+    return `<div>
+      <div id="${rowId}" onclick="(function(){var d=document.getElementById('${detailId}');var open=d.style.display!=='none';document.querySelectorAll('[id^=dr-det-]').forEach(function(x){x.style.display='none';document.getElementById('dr-row-'+x.id.slice(7)).style.background='transparent';});if(!open){d.style.display='block';document.getElementById('${rowId}').style.background='#08180e';};})()"
+        style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;">
+        <div style="font-size:11px;color:#6a7a9a;font-family:monospace;white-space:nowrap;">${dateShort}</div>
+        <div style="min-width:0;">
+          <div style="font-size:12.5px;font-weight:600;color:#cdd5e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(tx.note||cfg.label)}</div>
+          ${tx.invoiceNo?`<div style="font-size:10px;color:#4a5a7a;">🧾 ${escHtml(tx.invoiceNo)}</div>`:""}
+        </div>
+        <div style="text-align:right;font-size:12px;font-weight:700;color:#4ade80;">${cfg.debit?formatINR(tx.amount):""}</div>
+        <div style="text-align:right;font-size:12px;font-weight:700;color:#60a5fa;">${!cfg.debit?formatINR(tx.amount):""}</div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;font-weight:800;color:${runColor};">${formatINR(Math.abs(runBal))}</div>
+          <div style="font-size:9px;color:${runColor};font-weight:700;">${runLabel}</div>
+        </div>
+        <div style="text-align:center;font-size:11px;color:#3a4a6a;">▾</div>
       </div>
-      <div style="text-align:right;flex-shrink:0;">
-        <div style="font-size:14px;font-weight:800;color:${amtColor};">${isDebit?"-":"+"}${formatINR(tx.amount)}</div>
+      <div id="${detailId}" style="display:none;background:#060d0a;border-bottom:1px solid #0d1525;padding:10px 14px;font-size:12px;">
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
+          <div><span style="color:#4a5a7a;">Date</span><br><span style="color:#e8eaf0;font-weight:700;">${new Date(tx.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span></div>
+          <div><span style="color:#4a5a7a;">Type</span><br><span style="font-size:11px;padding:2px 8px;border-radius:5px;background:${cfg.bg};color:${cfg.col};font-weight:700;">${cfg.icon} ${cfg.label}</span></div>
+          <div><span style="color:#4a5a7a;">Amount</span><br><span style="color:${cfg.col};font-weight:800;">${formatINR(tx.amount)}</span></div>
+          ${tx._invItem?`<div><span style="color:#4a5a7a;">Inventory</span><br><span style="color:#60a5fa;font-weight:700;">📦 ${escHtml(tx._invItem)} × ${tx._invQty}</span></div>`:""}
+        </div>
+        ${tx.note?`<div style="color:#7a8aaa;margin-bottom:8px;">📝 ${escHtml(tx.note)}</div>`:""}
+        <button onclick="deleteDebtTx('${debtorId}',${origIdx});setTimeout(()=>_drTxRender('${debtorId}'),300);" style="cursor:pointer;background:#1a0808;border:1px solid #5a1a1a;border-radius:6px;color:#f66;font-size:11px;font-weight:700;padding:5px 10px;">🗑 Delete</button>
       </div>
-      <button onclick="deleteDebtTx('${debtorId}',${origIdx});setTimeout(()=>_drTxRender('${debtorId}'),300);"
-        style="cursor:pointer;background:none;border:none;color:#4a5a7a;font-size:14px;padding:2px 6px;" title="Delete">✕</button>
     </div>`;
   }).join("");
+
+  const totalSale2=filtered.filter(t=>t.type==="sale").reduce((s,t)=>s+t.amount,0);
+  const totalIn2=filtered.filter(t=>t.type==="payment"||t.type==="return").reduce((s,t)=>s+t.amount,0);
+  const colHeader=`<div style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;gap:4px;padding:5px 10px;border-bottom:2px solid #1e2a45;">
+    <div style="font-size:9px;font-weight:800;color:#4a5a7a;text-transform:uppercase;">Date</div>
+    <div style="font-size:9px;font-weight:800;color:#4a5a7a;text-transform:uppercase;">Description</div>
+    <div style="font-size:9px;font-weight:800;color:#4ade80;text-align:right;text-transform:uppercase;">Sale</div>
+    <div style="font-size:9px;font-weight:800;color:#60a5fa;text-align:right;text-transform:uppercase;">Receipt</div>
+    <div style="font-size:9px;font-weight:800;color:#a0b0d0;text-align:right;text-transform:uppercase;">Balance</div>
+    <div></div>
+  </div>`;
+  const finalBal=runMap[filtered[0]?.id]||0;
+  const finalColor=finalBal>0?"#22c55e":finalBal<0?"#f59e0b":"#7a8aaa";
+  const totalsRow=`<div style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;gap:4px;padding:7px 10px;border-top:2px solid #1e2a45;background:#0a0e1a;">
+    <div></div>
+    <div style="font-size:11px;font-weight:800;color:#7a8aaa;">TOTAL</div>
+    <div style="text-align:right;font-size:11px;font-weight:800;color:#4ade80;">${formatINR(totalSale2)}</div>
+    <div style="text-align:right;font-size:11px;font-weight:800;color:#60a5fa;">${formatINR(totalIn2)}</div>
+    <div style="text-align:right;"><div style="font-size:12px;font-weight:800;color:${finalColor};">${formatINR(Math.abs(finalBal))}</div><div style="font-size:9px;color:${finalColor};font-weight:700;">${finalBal>0?"Dr":finalBal<0?"Cr":"✓"}</div></div>
+    <div></div>
+  </div>`;
+
+  listEl.innerHTML=`<div style="background:#08101e;border:1px solid #1e2a45;border-radius:10px;overflow:hidden;">${colHeader}${rows}${totalsRow}</div>`;
 }
 
 // ── Add Debtor Transaction Modal ──────────────────────────────────────────────
