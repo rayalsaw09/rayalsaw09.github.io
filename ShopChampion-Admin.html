@@ -3107,7 +3107,49 @@ function safeRenderTab(i) {
   if (window._renderDebounceTimer) clearTimeout(window._renderDebounceTimer);
   window._renderDebounceTimer = setTimeout(() => _safeRenderTabImmediate(i), 40);
 }
+
+// ── Detail-page guard ─────────────────────────────────────────────────────────
+// Track which detail page is currently open so safeRenderTab won't blow it away.
+// Set by openCreditorDetail / openDebtorDetail, cleared by switchTab / goBack.
+window._scDetailPage = null; // { type: 'creditor'|'debtor', id: string } | null
 function _safeRenderTabImmediate(i) {
+  // ── Detail-page guard ──────────────────────────────────────────────────────
+  // If a creditor/debtor detail page is open and the re-render is for the same
+  // tab (6 = creditors, 7 = debtors), silently refresh the data inside the
+  // detail instead of wiping it back to the list.
+  const dp = window._scDetailPage;
+  if (dp) {
+    const detailTab = dp.type === 'creditor' ? 6 : 7;
+    if (i === detailTab) {
+      // Refresh only the running balance banner and the transaction list so
+      // the user stays on the detail page.
+      if (dp.type === 'creditor') {
+        const cr = getCreditors().find(c => c.id === dp.id);
+        if (cr) {
+          // Update balance banner text if element exists
+          const balEl = document.getElementById('sc-cr-bal-amt');
+          if (balEl) {
+            const bal = credBalance(cr);
+            balEl.textContent = formatINR(Math.abs(bal));
+          }
+          // Re-render transaction list only
+          if (typeof _crTxRender === 'function') _crTxRender(dp.id);
+        }
+      } else {
+        const dr = getDebtors().find(d => d.id === dp.id);
+        if (dr) {
+          const balEl = document.getElementById('sc-dr-bal-amt');
+          if (balEl) {
+            const bal = debtBalance(dr);
+            balEl.textContent = formatINR(Math.abs(bal));
+          }
+          if (typeof _drTxRender === 'function') _drTxRender(dp.id);
+        }
+      }
+      return; // do NOT wipe tab-content
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
   // If the user has focus inside any input/textarea in the tab, skip re-render
   // to prevent auto-resetting fields like the shop name input.
   const active = document.activeElement;
@@ -3233,7 +3275,7 @@ function _safeRenderTabImmediate(i) {
 }
 // ─── TABS ─────────────────────────────────────────────────────
 function renderTabs(){const TABS=getTabs();document.getElementById("tab-bar").innerHTML=TABS.map((tab,i)=>`<button class="tab-btn${currentTab===i?" active":""}" onclick="switchTab(${i})">${tab}</button>`).join("");}
-function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}if(i!==6&&i!==7)invPrefillName="";window._pageStack=[];currentTab=i;renderTabs();renderTab(i);}
+function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}if(i!==6&&i!==7)invPrefillName="";window._pageStack=[];window._scDetailPage=null;currentTab=i;renderTabs();renderTab(i);}
 
 // ─── PAGE HISTORY ENGINE ──────────────────────────────────────────────────────
 // Enables full-screen detail pages with proper back navigation.
@@ -3248,11 +3290,11 @@ function _pushPage(entry){
 function goBack(){
   closeModal(); // close any open modal first
   const prev = window._pageStack.pop();
-  if(!prev){ renderTab(currentTab); return; }
+  if(!prev){ window._scDetailPage=null; renderTab(currentTab); return; }
   if(prev.type === 'creditorDetail'){ openCreditorDetail(prev.id); }
   else if(prev.type === 'debtorDetail'){ openDebtorDetail(prev.id); }
-  else if(prev.type === 'tab'){ renderTab(prev.tabIndex); }
-  else { renderTab(currentTab); }
+  else if(prev.type === 'tab'){ window._scDetailPage=null; renderTab(prev.tabIndex); }
+  else { window._scDetailPage=null; renderTab(currentTab); }
 }
 
 function _backBtn(label){
@@ -6200,6 +6242,8 @@ function openCreditorDetail(id){
   if(!stackTop || stackTop.id !== id){
     window._pageStack.push({type:'tab', tabIndex:6});
   }
+  // Guard: tell safeRenderTab we are on a detail page so it won't wipe us
+  window._scDetailPage = { type: 'creditor', id };
 
   const tabEl = document.getElementById("tab-content");
   tabEl.innerHTML = `<div style="padding:16px 14px 80px;max-width:700px;margin:0 auto;">
@@ -6215,7 +6259,7 @@ function openCreditorDetail(id){
       <div style="background:${bal>0?"#1a0e00":"#001a0e"};border:2px solid ${balColor};border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
         <div>
           <div style="font-size:12px;color:#7a8aaa;font-weight:700;">${bal>0?"AMOUNT YOU OWE":bal<0?"THEY OWE YOU":"FULLY SETTLED"}</div>
-          <div style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
+          <div id="sc-cr-bal-amt" style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
         </div>
         ${!isUnrec ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
@@ -7677,6 +7721,8 @@ function openDebtorDetail(id){
   if(!stackTop || stackTop.id !== id){
     window._pageStack.push({type:'tab', tabIndex:7});
   }
+  // Guard: tell safeRenderTab we are on a detail page so it won't wipe us
+  window._scDetailPage = { type: 'debtor', id };
 
   const tabEl = document.getElementById("tab-content");
   tabEl.innerHTML = `<div style="padding:16px 14px 80px;max-width:700px;margin:0 auto;">
@@ -7697,7 +7743,7 @@ function openDebtorDetail(id){
       <div style="background:${bal>0?"#001a0e":"#1a0e00"};border:2px solid ${balColor};border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
         <div>
           <div style="font-size:12px;color:#7a8aaa;font-weight:700;">${bal>0?"THEY OWE YOU":bal<0?"YOU OWE THEM":"FULLY SETTLED"}</div>
-          <div style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
+          <div id="sc-dr-bal-amt" style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sale</button>
