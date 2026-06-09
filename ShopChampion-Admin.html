@@ -1447,7 +1447,7 @@ const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free P
 const ADMIN_PASS = "1234";
 const TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings"];
 const TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️"];
-const TABS_LABEL_PRO = ["Rankings","Customers","Sales","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings"];
+const TABS_LABEL_PRO = ["Rankings","Customers","Cust. Sales","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings"];
 let _shopRequestsUnread = 0; // badge count for messages tab
 function getTabs(){
   const isPro = currentAppStyle === "pro";
@@ -4755,8 +4755,8 @@ function renderAnalytics(sorted){
       if((e.date||"").slice(0,4)===yr) totalYearCost+=cost;
     });
   });
-  // Creditor purchase transactions (avoid double-count if linked to inventory)
-  getCreditors().forEach(cr=>(cr.transactions||[]).filter(t=>t.type==="purchase"&&!t._invItem).forEach(t=>{
+  // Creditor purchase transactions (avoid double-count if linked to inventory; exclude unreconciled)
+  getCreditors().filter(cr => cr.id !== "CR_UNRECONCILED").forEach(cr=>(cr.transactions||[]).filter(t=>t.type==="purchase"&&!t._invItem).forEach(t=>{
     const d = new Date(t.date||"");
     if(d.getMonth()===thisMonth && d.getFullYear()===thisYear) totalMonthCost+=Number(t.amount)||0;
     if(d.getMonth()===prevMonth && d.getFullYear()===prevMonthYear) totalPrevMonthCost+=Number(t.amount)||0;
@@ -9562,7 +9562,7 @@ const BNAV_PRO_ICONS = {
   2: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
   5: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
 };
-const BNAV_PRO_LABELS = { 0: "Rankings", 1: "Customers", 2: "Sales", 5: "Inventory" };
+const BNAV_PRO_LABELS = { 0: "Rankings", 1: "Customers", 2: "Cust. Sales", 5: "Inventory" };
 const BNAV_GAME_ICONS = { 0: "🏆", 1: "👥", 2: "💳", 5: "📦" };
 const BNAV_GAME_LABELS = { 0: "Board", 1: "Customers", 2: "Purchase", 5: "Inventory" };
 
@@ -9628,7 +9628,7 @@ const LANGUAGES = {
 const TRANSLATIONS = {
   en: {
     adminPanel:"Admin Panel", leaderboard:"Leaderboard", customers:"Customers",
-    purchase:"Sales", analytics:"Analytics", compare:"Compare",
+    purchase:"Cust. Sales", analytics:"Analytics", compare:"Compare",
     inventory:"Inventory", creditors:"Creditors", debtors:"Debtors",
     messages:"Messages",
     festivals:"Festival Rewards", settings:"Settings", logout:"Logout",
