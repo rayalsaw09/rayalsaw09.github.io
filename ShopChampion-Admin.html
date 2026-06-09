@@ -4745,17 +4745,10 @@ function renderAnalytics(sorted){
   // IMPORTANT: exclude _fromInventory and _invItem flags to prevent double-counting
   // When unreconciled purchases (tagged _fromInventory:true) are moved to a real creditor,
   // they must still be excluded here since their cost is already in inventory stock entries.
+  // Purchase cost: only creditor cash-only purchases count as direct expenses.
+  // Inventory stock entries are NOT counted here — stock is an asset, not an expense
+  // until sold. COGS per item is shown in the item P&L section below.
   let totalMonthCost=0, totalPrevMonthCost=0, totalYearCost=0;
-  inventoryItems.forEach(item=>{
-    (item.stock||[]).forEach(e=>{
-      const d = new Date(e.date||"");
-      const cost = (Number(e.qty)||0)*(Number(e.costPerUnit)||0);
-      if(d.getMonth()===thisMonth && d.getFullYear()===thisYear) totalMonthCost+=cost;
-      if(d.getMonth()===prevMonth && d.getFullYear()===prevMonthYear) totalPrevMonthCost+=cost;
-      if((e.date||"").slice(0,4)===yr) totalYearCost+=cost;
-    });
-  });
-  // Creditor cash-only purchases: skip inventory-linked and unreconciled-origin transactions
   getCreditors().filter(cr => cr.id !== "CR_UNRECONCILED").forEach(cr=>(cr.transactions||[]).filter(t=>
     t.type==="purchase" && !t._invItem && !t._fromInventory
   ).forEach(t=>{
@@ -4876,13 +4869,7 @@ function renderAnalytics(sorted){
       if(m>=0&&m<12) monthlySales[m]+=Number(t.amount)||0;
     }
   }));
-  inventoryItems.forEach(item=>(item.stock||[]).forEach(e=>{
-    if((e.date||"").slice(0,4)===yr){
-      const m=parseInt((e.date||"").slice(5,7))-1;
-      if(m>=0&&m<12) monthlyCost[m]+=(Number(e.qty)||0)*(Number(e.costPerUnit)||0);
-    }
-  }));
-  // Creditor cash-only purchases for monthly chart (same exclusion rule)
+  // Monthly chart cost: creditor cash-only purchases only (inventory stock = asset, not expense)
   getCreditors().filter(cr=>cr.id!=="CR_UNRECONCILED").forEach(cr=>(cr.transactions||[]).filter(t=>
     t.type==="purchase"&&!t._invItem&&!t._fromInventory
   ).forEach(t=>{
@@ -5145,17 +5132,13 @@ function cmpAllPurchases(){
 }
 
 // All creditor purchase transactions (expenses)
+// Inventory stock entries are assets, not expenses — excluded here
 function cmpAllCreditorPurchases(){
   const all=[];
-  // Only cash-only creditor purchases (not inventory-linked or unreconciled-origin)
   getCreditors().filter(cr=>cr.id!=="CR_UNRECONCILED").forEach(cr=>(cr.transactions||[]).filter(t=>
     t.type==="purchase" && !t._invItem && !t._fromInventory
   ).forEach(t=>{
     all.push({amount:Number(t.amount),date:(t.date||"").slice(0,10),creditorId:cr.id});
-  }));
-  // Inventory restocks (covers _fromInventory and _invItem transactions)
-  inventoryItems.forEach(item=>(item.stock||[]).forEach(e=>{
-    all.push({amount:(Number(e.qty)||0)*(Number(e.costPerUnit)||0),date:(e.date||"").slice(0,10),_src:"inventory"});
   }));
   return all;
 }
