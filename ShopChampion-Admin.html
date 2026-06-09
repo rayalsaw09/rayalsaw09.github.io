@@ -4790,13 +4790,13 @@ function renderAnalytics(sorted){
 
   // ── Creditor/Debtor balance summary ──
   let totalCreditorOwed=0, totalDebtorOwed=0;
-  getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").forEach(cr=>{
+  getCreditors().filter(c=>c.id!=="CR_UNRECONCILED"&&!c._archived).forEach(cr=>{
     const txs=cr.transactions||[];
     const purchases=txs.filter(t=>t.type==="purchase").reduce((s,t)=>s+Number(t.amount),0);
     const payments=txs.filter(t=>t.type==="payment"||t.type==="return").reduce((s,t)=>s+Number(t.amount),0);
     totalCreditorOwed+=Math.max(0,purchases-payments);
   });
-  getDebtors().forEach(dr=>{
+  getDebtors().filter(d=>!d._archived).forEach(dr=>{
     const txs=dr.transactions||[];
     const sales=txs.filter(t=>t.type==="sale").reduce((s,t)=>s+Number(t.amount),0);
     const received=txs.filter(t=>t.type==="payment"||t.type==="return").reduce((s,t)=>s+Number(t.amount),0);
@@ -5897,8 +5897,8 @@ function newCreditorId(){ return "CR" + Date.now() + Math.random().toString(36).
 // ── Main Render ───────────────────────────────────────────────────────────────
 function renderCreditorsTab(){
   const creditors = getCreditors();
-  const totalOwed = creditors.filter(c=>c.id!=="CR_UNRECONCILED").reduce((s,c)=>s+Math.max(0,credBalance(c)),0);
-  const totalCount = creditors.filter(c=>c.id!=="CR_UNRECONCILED").length;
+  const totalOwed = creditors.filter(c=>c.id!=="CR_UNRECONCILED"&&!c._archived).reduce((s,c)=>s+Math.max(0,credBalance(c)),0);
+  const totalCount = creditors.filter(c=>c.id!=="CR_UNRECONCILED"&&!c._archived).length;
   const unrecEntry = creditors.find(c=>c.id==="CR_UNRECONCILED");
   const unrecBalance = unrecEntry ? credBalance(unrecEntry) : 0;
   const unrecTxCount = unrecEntry ? (unrecEntry.transactions||[]).length : 0;
@@ -5906,10 +5906,14 @@ function renderCreditorsTab(){
   const searchVal  = window._credSearch || "";
   const gstFilter  = window._credGstFilter || "all"; // 'all' | 'gst' | 'nogst'
 
+  const showArchived = window._credShowArchived || false;
+  const archivedCount = creditors.filter(c=>c._archived && c.id!=="CR_UNRECONCILED").length;
+
   let filtered = creditors.filter(c=>
-    !searchVal ||
+    (showArchived ? c._archived : !c._archived) &&
+    (!searchVal ||
     c.name.toLowerCase().includes(searchVal.toLowerCase()) ||
-    (c.phone||"").includes(searchVal)
+    (c.phone||"").includes(searchVal))
   );
   // Apply GST filter
   if (gstFilter === 'gst')   filtered = filtered.filter(c => !!c.gstin);
@@ -5932,9 +5936,8 @@ function renderCreditorsTab(){
         <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${totalCount} supplier${totalCount!==1?"s":""} · Total payable: <span style="color:#f59e0b;font-weight:800;">${formatINR(totalOwed)}</span></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button onclick="openAddCreditorModal()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:10px 20px;font-size:13px;font-weight:800;">
-          + Add Manually
-        </button>
+        ${archivedCount>0 ? `<button onclick="window._credShowArchived=!window._credShowArchived;renderTab(6)" style="cursor:pointer;border-radius:20px;padding:8px 14px;border:1px solid ${showArchived?'#d97706':'#1e2a45'};background:${showArchived?'#1a0e00':'transparent'};color:${showArchived?'#fbbf24':'#4a5a7a'};font-size:12px;font-weight:700;">📦 Archived (${archivedCount})</button>` : ''}
+        ${!showArchived ? `<button onclick="openAddCreditorModal()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:10px 20px;font-size:13px;font-weight:800;">+ Add Manually</button>` : ''}
       </div>
     </div>
 
@@ -5945,7 +5948,7 @@ function renderCreditorsTab(){
       ${_credSummaryCard("Paid This Month", formatINR(_credPaidThisMonth(creditors)), "#22c55e", "✅")}
       ${_credSummaryCard("Purchased This Month", formatINR(_credPurchasedThisMonth(creditors)), "#60a5fa", "📦")}
     </div>
-    ${unrecTxCount>0 ? `<div onclick="openCreditorDetail('CR_UNRECONCILED')" style="cursor:pointer;background:#1a0e00;border:2px solid #d97706;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;" onmouseenter="this.style.borderColor='#fbbf24'" onmouseleave="this.style.borderColor='#d97706'">
+    ${!showArchived && unrecTxCount>0 ? `<div onclick="openCreditorDetail('CR_UNRECONCILED')" style="cursor:pointer;background:#1a0e00;border:2px solid #d97706;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;" onmouseenter="this.style.borderColor='#fbbf24'" onmouseleave="this.style.borderColor='#d97706'">
       <span style="font-size:24px;">⚠️</span>
       <div style="flex:1;">
         <div style="font-size:13px;font-weight:800;color:#fbbf24;">Unreconciled Purchases — ${formatINR(unrecBalance)}</div>
@@ -6013,10 +6016,11 @@ function _renderCreditorCard(cr){
   const balLabel = bal>0?"You owe":bal<0?"They owe you":"Settled";
   const lastTx = (cr.transactions||[]).slice(-1)[0];
   const isUnrec = cr.id === "CR_UNRECONCILED";
+  const isArchived = !!cr._archived;
   const initials = isUnrec ? "⚠️" : cr.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-  const borderColor = isUnrec ? "#92400e" : "#1e2a45";
-  const cardBg = isUnrec ? "#1a0e00" : "#0d1220";
-  const hoverBorder = isUnrec ? "#d97706" : "#2a3a6a";
+  const borderColor = isArchived ? "#2a2a2a" : isUnrec ? "#92400e" : "#1e2a45";
+  const cardBg = isArchived ? "#0a0a0a" : isUnrec ? "#1a0e00" : "#0d1220";
+  const hoverBorder = isArchived ? "#3a3a3a" : isUnrec ? "#d97706" : "#2a3a6a";
 
   return `<div style="background:${cardBg};border:1px solid ${borderColor};border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
     onmouseenter="this.style.borderColor='${hoverBorder}'" onmouseleave="this.style.borderColor='${borderColor}'"
@@ -6038,9 +6042,13 @@ function _renderCreditorCard(cr){
       </div>
       <!-- Balance -->
       <div style="text-align:right;flex-shrink:0;">
+        ${isArchived ? `<span style="font-size:10px;font-weight:800;color:#b45309;background:#1a0e00;border-radius:20px;padding:3px 8px;border:1px solid #92400e;">📦 ARCHIVED</span>
+        <div style="margin-top:6px;">
+          <button onclick="event.stopPropagation();unarchiveCreditor('${cr.id}')" style="cursor:pointer;font-size:11px;font-weight:700;color:#22c55e;background:#052a14;border:1px solid #16a34a;border-radius:8px;padding:4px 10px;">↩ Restore</button>
+        </div>` : `
         <div style="font-size:18px;font-weight:800;color:${balColor};">${formatINR(Math.abs(bal))}</div>
         <div style="font-size:11px;color:${balColor};margin-top:2px;">${balLabel}</div>
-        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${(cr.transactions||[]).length} transactions</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${(cr.transactions||[]).length} transactions</div>`}
       </div>
     </div>
   </div>`;
@@ -6146,13 +6154,220 @@ function saveCreditorModal(editId){
   renderTab(6);
 }
 
-function deleteCreditor(id){
-  if(!confirm("Delete this creditor and all their transactions?")) return;
-  const creditors = getCreditors().filter(c=>c.id!==id);
+// ── Archive helper ────────────────────────────────────────────────────────────
+function archiveCreditor(id){
+  const creditors = getCreditors();
+  const cr = creditors.find(c=>c.id===id);
+  if(!cr) return;
+  cr._archived = true;
   saveCreditors(creditors);
   closeModal();
-  notify("🗑 Creditor deleted");
+  notify("📦 " + cr.name + " archived");
   renderTab(6);
+}
+
+function archiveDebtor(id){
+  const debtors = getDebtors();
+  const dr = debtors.find(d=>d.id===id);
+  if(!dr) return;
+  dr._archived = true;
+  saveDebtors(debtors);
+  closeModal();
+  notify("📦 " + dr.name + " archived");
+  renderTab(7);
+}
+
+function unarchiveCreditor(id){
+  const creditors = getCreditors();
+  const cr = creditors.find(c=>c.id===id);
+  if(!cr) return;
+  delete cr._archived;
+  saveCreditors(creditors);
+  notify("✅ " + cr.name + " restored");
+  renderTab(6);
+}
+
+function unarchiveDebtor(id){
+  const debtors = getDebtors();
+  const dr = debtors.find(d=>d.id===id);
+  if(!dr) return;
+  delete dr._archived;
+  saveDebtors(debtors);
+  notify("✅ " + dr.name + " restored");
+  renderTab(7);
+}
+
+// ── Smart delete: analyse impact, show appropriate modal ──────────────────────
+function deleteCreditor(id){
+  const creditors = getCreditors();
+  const cr = creditors.find(c=>c.id===id);
+  if(!cr) return;
+
+  // Skip smart flow for unreconciled entry — just archive it
+  if(id === "CR_UNRECONCILED"){
+    if(!confirm("Archive unreconciled purchases?")) return;
+    archiveCreditor(id); return;
+  }
+
+  const txs = cr.transactions || [];
+  if(txs.length === 0){
+    // No transactions — safe simple delete
+    if(!confirm("Delete " + cr.name + "? This cannot be undone.")) return;
+    saveCreditors(creditors.filter(c=>c.id!==id));
+    closeModal();
+    notify("🗑 " + cr.name + " deleted");
+    renderTab(6);
+    return;
+  }
+
+  // Has transactions — calculate stock impact
+  // Collect all _invItem-linked and _fromInventory-linked stock additions from this creditor
+  const stockImpact = {}; // itemName -> qty that would be removed
+  txs.filter(t=>t.type==="purchase").forEach(t=>{
+    if(t._invItem && t._invQty){
+      stockImpact[t._invItem] = (stockImpact[t._invItem]||0) + Number(t._invQty);
+    }
+    if(t._fromInventory && t._invItem && t._invQty){
+      // already covered above
+    }
+  });
+
+  // Also check inventory items' stock entries tagged to this creditor (if any)
+  // (Currently stock entries don't tag creditorId, so this is future-proof placeholder)
+
+  // Check if any reversal would cause negative stock
+  const negativeItems = [];
+  const safeItems = [];
+  Object.entries(stockImpact).forEach(([name, qtyToReverse])=>{
+    const currentStock = invGetStock(name);
+    const afterDelete = currentStock - qtyToReverse;
+    if(afterDelete < 0){
+      negativeItems.push({name, current: currentStock, toReverse: qtyToReverse, after: afterDelete});
+    } else if(qtyToReverse > 0){
+      safeItems.push({name, current: currentStock, toReverse: qtyToReverse, after: afterDelete});
+    }
+  });
+
+  const txTotal = txs.filter(t=>t.type==="purchase").reduce((s,t)=>s+Number(t.amount),0);
+  const txCount = txs.length;
+
+  if(negativeItems.length > 0){
+    // Archive only — stock would go negative
+    showModal(`
+      <div style="font-family:'Nunito',sans-serif;padding:4px 0;">
+        <div style="font-size:16px;font-weight:900;color:#f87171;margin-bottom:4px;">⚠️ Cannot Delete</div>
+        <div style="font-size:13px;color:#7a8aaa;margin-bottom:14px;">Deleting <strong style="color:#e8eaf0;">${escHtml(cr.name)}</strong> would cause stock to go negative — items from this supplier have already been sold.</div>
+
+        <div style="background:#1a0808;border:1px solid #5a1a1a;border-radius:10px;padding:10px;margin-bottom:14px;">
+          <div style="font-size:11px;color:#f87171;font-weight:700;margin-bottom:8px;">ITEMS THAT WOULD GO NEGATIVE:</div>
+          ${negativeItems.map(x=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #2a1a1a;">
+              <span style="font-size:12px;color:#fca5a5;font-weight:700;">${escHtml(x.name)}</span>
+              <span style="font-size:11px;color:#ef4444;">Stock: ${x.current} → ${x.after} 🔴</span>
+            </div>`).join("")}
+        </div>
+
+        <div style="font-size:12px;color:#7a8aaa;margin-bottom:14px;">Archive instead — the supplier is hidden from all lists but your history is preserved.</div>
+
+        <div style="display:flex;gap:8px;">
+          <button onclick="closeModal()" style="cursor:pointer;flex:1;padding:11px;border-radius:10px;border:1px solid #1e2a45;background:#0a0e1a;color:#7a8aaa;font-size:13px;font-weight:700;">Cancel</button>
+          <button onclick="archiveCreditor('${id}')" style="cursor:pointer;flex:1;padding:11px;border-radius:10px;border:none;background:linear-gradient(135deg,#b45309,#d97706);color:#fff;font-size:13px;font-weight:800;">📦 Archive</button>
+        </div>
+      </div>
+    `);
+  } else {
+    // Offer both Archive and Delete + Reverse
+    const hasStockToReverse = safeItems.length > 0;
+    showModal(`
+      <div style="font-family:'Nunito',sans-serif;padding:4px 0;">
+        <div style="font-size:16px;font-weight:900;color:#e8eaf0;margin-bottom:4px;">🗑 Remove Creditor</div>
+        <div style="font-size:13px;color:#7a8aaa;margin-bottom:14px;"><strong style="color:#e8eaf0;">${escHtml(cr.name)}</strong> has ${txCount} transaction${txCount!==1?"s":""} totalling <strong style="color:#f59e0b;">${formatINR(txTotal)}</strong>.</div>
+
+        ${hasStockToReverse ? `<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;margin-bottom:14px;">
+          <div style="font-size:11px;color:#60a5fa;font-weight:700;margin-bottom:8px;">STOCK THAT WOULD BE REVERSED:</div>
+          ${safeItems.map(x=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #1e2a45;">
+              <span style="font-size:12px;color:#e8eaf0;">${escHtml(x.name)}</span>
+              <span style="font-size:11px;color:#a78bfa;">${x.current} → ${x.after} units</span>
+            </div>`).join("")}
+        </div>` : `<div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px;margin-bottom:14px;font-size:12px;color:#4a5a7a;">No inventory stock linked to this creditor.</div>`}
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button onclick="archiveCreditor('${id}')" style="cursor:pointer;width:100%;padding:11px;border-radius:10px;border:1px solid #b45309;background:#1a0e00;color:#fbbf24;font-size:13px;font-weight:800;text-align:left;">
+            📦 Archive — Hide from lists, keep all history
+          </button>
+          <button onclick="confirmHardDeleteCreditor('${id}')" style="cursor:pointer;width:100%;padding:11px;border-radius:10px;border:1px solid #5a1a1a;background:#1a0808;color:#f87171;font-size:13px;font-weight:800;text-align:left;">
+            🗑 Delete${hasStockToReverse?" + Reverse Stock":""} — Permanently remove all data
+          </button>
+          <button onclick="closeModal()" style="cursor:pointer;width:100%;padding:11px;border-radius:10px;border:1px solid #1e2a45;background:transparent;color:#7a8aaa;font-size:13px;font-weight:700;">Cancel</button>
+        </div>
+      </div>
+    `);
+  }
+}
+
+function confirmHardDeleteCreditor(id){
+  const creditors = getCreditors();
+  const cr = creditors.find(c=>c.id===id);
+  if(!cr) return;
+
+  // Reverse any inventory stock linked to this creditor's purchase transactions
+  const txs = cr.transactions || [];
+  txs.filter(t=>t.type==="purchase"&&t._invItem&&t._invQty).forEach(t=>{
+    const item = inventoryItems.find(x=>x.name===t._invItem);
+    if(!item) return;
+    // Remove the matching stock entry (match by amount+date+qty heuristic or _fromInventory flag)
+    const qtyToRemove = Number(t._invQty);
+    // Remove from stock entries — find closest match
+    let remaining = qtyToRemove;
+    item.stock = (item.stock||[]).filter(e=>{
+      if(remaining > 0 && Number(e.qty) <= remaining){
+        remaining -= Number(e.qty);
+        return false; // remove this entry
+      }
+      return true;
+    });
+  });
+  saveInventory();
+
+  saveCreditors(creditors.filter(c=>c.id!==id));
+  closeModal();
+  notify("🗑 " + cr.name + " deleted and stock reversed");
+  renderTab(6);
+}
+
+// ── Debtor delete ─────────────────────────────────────────────────────────────
+function deleteDebtor(id){
+  const debtors = getDebtors();
+  const dr = debtors.find(d=>d.id===id);
+  if(!dr) return;
+
+  const txs = dr.transactions || [];
+  if(txs.length === 0){
+    if(!confirm("Delete " + dr.name + "? This cannot be undone.")) return;
+    saveDebtors(debtors.filter(d=>d.id!==id));
+    closeModal();
+    notify("🗑 " + dr.name + " deleted");
+    renderTab(7);
+    return;
+  }
+
+  // Has transactions — archive only (reversing debtor sales would inflate stock artificially)
+  const txTotal = txs.filter(t=>t.type==="sale").reduce((s,t)=>s+Number(t.amount),0);
+  const txCount = txs.length;
+  showModal(`
+    <div style="font-family:'Nunito',sans-serif;padding:4px 0;">
+      <div style="font-size:16px;font-weight:900;color:#e8eaf0;margin-bottom:4px;">📦 Archive Debtor</div>
+      <div style="font-size:13px;color:#7a8aaa;margin-bottom:14px;"><strong style="color:#e8eaf0;">${escHtml(dr.name)}</strong> has ${txCount} transaction${txCount!==1?"s":""} totalling <strong style="color:#22c55e;">${formatINR(txTotal)}</strong> in sales.</div>
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:14px;font-size:12px;color:#7a8aaa;line-height:1.6;">
+        Sales already made cannot be reversed — goods were dispatched and stock was already deducted. Archiving hides this debtor from all lists while keeping your records intact.
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="closeModal()" style="cursor:pointer;flex:1;padding:11px;border-radius:10px;border:1px solid #1e2a45;background:#0a0e1a;color:#7a8aaa;font-size:13px;font-weight:700;">Cancel</button>
+        <button onclick="archiveDebtor('${id}')" style="cursor:pointer;flex:1;padding:11px;border-radius:10px;border:none;background:linear-gradient(135deg,#b45309,#d97706);color:#fff;font-size:13px;font-weight:800;">📦 Archive</button>
+      </div>
+    </div>
+  `);
 }
 
 // ── Transaction filter/search helpers ─────────────────────────────────────────
@@ -7559,15 +7774,19 @@ function newDebtorId(){ return "DR" + Date.now() + Math.random().toString(36).sl
 // ── Main Render ───────────────────────────────────────────────────────────────
 function renderDebtorsTab(){
   const debtors = getDebtors();
-  const totalOwed   = debtors.reduce((s,d)=>s+Math.max(0,debtBalance(d)),0);
-  const totalCount  = debtors.length;
+  const totalOwed   = debtors.filter(d=>!d._archived).reduce((s,d)=>s+Math.max(0,debtBalance(d)),0);
+  const totalCount  = debtors.filter(d=>!d._archived).length;
   const searchVal   = window._debtSearch || "";
   const gstFilter   = window._debtGstFilter || "all";
 
+  const showArchived = window._debtShowArchived || false;
+  const archivedCount = debtors.filter(d=>d._archived).length;
+
   let filtered = debtors.filter(d=>
-    !searchVal ||
+    (showArchived ? d._archived : !d._archived) &&
+    (!searchVal ||
     d.name.toLowerCase().includes(searchVal.toLowerCase()) ||
-    (d.phone||"").includes(searchVal)
+    (d.phone||"").includes(searchVal))
   );
   if(gstFilter==="gst")   filtered = filtered.filter(d=>!!d.gstin);
   if(gstFilter==="nogst") filtered = filtered.filter(d=>!d.gstin);
@@ -7584,9 +7803,8 @@ function renderDebtorsTab(){
         <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${totalCount} debtor${totalCount!==1?"s":""} · Total receivable: <span style="color:#22c55e;font-weight:800;">${formatINR(totalOwed)}</span></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button onclick="openAddDebtorModal()" class="btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:10px 20px;font-size:13px;font-weight:800;">
-          + Add Manually
-        </button>
+        ${archivedCount>0 ? `<button onclick="window._debtShowArchived=!window._debtShowArchived;renderTab(7)" style="cursor:pointer;border-radius:20px;padding:8px 14px;border:1px solid ${showArchived?'#d97706':'#1e2a45'};background:${showArchived?'#1a0e00':'transparent'};color:${showArchived?'#fbbf24':'#4a5a7a'};font-size:12px;font-weight:700;">📦 Archived (${archivedCount})</button>` : ''}
+        ${!showArchived ? `<button onclick="openAddDebtorModal()" class="btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:10px 20px;font-size:13px;font-weight:800;">+ Add Manually</button>` : ''}
       </div>
     </div>
 
@@ -7657,16 +7875,19 @@ function _renderDebtorCard(dr){
   const balLabel = bal>0?"They owe you":bal<0?"You owe them":"Settled";
   const lastTx = (dr.transactions||[]).slice(-1)[0];
   const initials = dr.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+  const isArchived = !!dr._archived;
+  const borderColor = isArchived ? "#2a2a2a" : "#1e2a45";
+  const cardBg = isArchived ? "#0a0a0a" : "#0d1220";
 
-  return `<div style="background:#0d1220;border:1px solid #1e2a45;border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
-    onmouseenter="this.style.borderColor='#2a6a3a'" onmouseleave="this.style.borderColor='#1e2a45'"
+  return `<div style="background:${cardBg};border:1px solid ${borderColor};border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
+    onmouseenter="this.style.borderColor='${isArchived?'#3a3a3a':'#2a6a3a'}'" onmouseleave="this.style.borderColor='${borderColor}'"
     onclick="openDebtorDetail('${dr.id}')">
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
       <!-- Avatar -->
-      <div style="width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#166534,#22c55e);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;">${initials}</div>
+      <div style="width:46px;height:46px;border-radius:50%;background:${isArchived?'linear-gradient(135deg,#2a2a2a,#3a3a3a)':'linear-gradient(135deg,#166534,#22c55e)'};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;opacity:${isArchived?'0.6':'1'};">${initials}</div>
       <!-- Info -->
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:800;font-size:15px;color:#e8eaf0;">${escHtml(dr.name)}</div>
+        <div style="font-weight:800;font-size:15px;color:${isArchived?'#4a5a7a':'#e8eaf0'};">${escHtml(dr.name)}</div>
         <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">
           ${dr.phone?`📞 ${dr.phone}`:""}
           ${dr.gstin?` · 🔢 ${dr.gstin}`:""}
@@ -7674,11 +7895,15 @@ function _renderDebtorCard(dr){
         ${lastTx?`<div style="font-size:11px;color:#4a5a7a;margin-top:3px;">Last: ${debtTxIcon(lastTx.type)} ${escHtml(lastTx.note||lastTx.type)} · ${new Date(lastTx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>`:""}
         ${dr._fromShopConnect?`<div style="margin-top:4px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#16653444;color:#4ade80;border:1px solid #22c55e44;">🔗 Linked Shop</span></div>`:""}
       </div>
-      <!-- Balance -->
+      <!-- Balance / Archive badge -->
       <div style="text-align:right;flex-shrink:0;">
+        ${isArchived ? `<span style="font-size:10px;font-weight:800;color:#b45309;background:#1a0e00;border-radius:20px;padding:3px 8px;border:1px solid #92400e;">📦 ARCHIVED</span>
+        <div style="margin-top:6px;">
+          <button onclick="event.stopPropagation();unarchiveDebtor('${dr.id}')" style="cursor:pointer;font-size:11px;font-weight:700;color:#22c55e;background:#052a14;border:1px solid #16a34a;border-radius:8px;padding:4px 10px;">↩ Restore</button>
+        </div>` : `
         <div style="font-size:18px;font-weight:800;color:${balColor};">${formatINR(Math.abs(bal))}</div>
         <div style="font-size:11px;color:${balColor};margin-top:2px;">${balLabel}</div>
-        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${(dr.transactions||[]).length} transactions</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${(dr.transactions||[]).length} transactions</div>`}
       </div>
     </div>
   </div>`;
