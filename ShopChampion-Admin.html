@@ -1195,7 +1195,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
         <div style="display:grid;gap:5px;">
           <div style="font-size:12px;color:#e8eaf0;">🏆 Leaderboard &amp; Rankings</div>
           <div style="font-size:12px;color:#e8eaf0;">👥 Unlimited Customer Profiles</div>
-          <div style="font-size:12px;color:#e8eaf0;">💳 Purchase Tracking &amp; Points</div>
+          <div style="font-size:12px;color:#e8eaf0;">🧾 Sales Tracking &amp; Points</div>
           <div style="font-size:12px;color:#e8eaf0;">📊 Analytics &amp; Revenue Charts</div>
           <div style="font-size:12px;color:#e8eaf0;">🎉 Festivals, Spin Wheel &amp; Events</div>
           <div style="font-size:12px;color:#e8eaf0;">⚙️ Full Settings &amp; Configuration</div>
@@ -1400,7 +1400,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
     </button>
     <button class="bnav-btn" id="bnav-2" onclick="mobileTab(2)">
       <span class="bnav-icon" id="bnav-icon-2">💳</span>
-      <span class="bnav-label" id="bnav-label-2">Purchase</span>
+      <span class="bnav-label" id="bnav-label-2">Sales</span>
     </button>
     <button class="bnav-btn" id="bnav-5" onclick="mobileTab(5)">
       <span class="bnav-icon" id="bnav-icon-5">📦</span>
@@ -1445,9 +1445,9 @@ async function scHashPassword(phone, password) {
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
 const ADMIN_PASS = "1234";
-const TABS_BASE = ["leaderboard","customers","purchase","analytics","compare","inventory","creditors","debtors","messages","settings"];
-const TABS_ICON = ["🏆","👥","💳","📊","⚖️","📦","🏦","🧾","✉️","⚙️"];
-const TABS_LABEL_PRO = ["Rankings","Customers","Purchase","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings"];
+const TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings"];
+const TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️"];
+const TABS_LABEL_PRO = ["Rankings","Customers","Sales","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings"];
 let _shopRequestsUnread = 0; // badge count for messages tab
 function getTabs(){
   const isPro = currentAppStyle === "pro";
@@ -3681,7 +3681,7 @@ function renderPurchaseTab(sorted){
       </div>
       ${invMode?`<div id="pt-inv-total" style="display:none;background:#0a1a08;border:1px solid #1a4a1a;border-radius:10px;padding:12px 16px;margin-bottom:14px;text-align:right;"></div>`:""}
       ${invMode?"":`<div id="pt-pts" style="display:none;background:#0a1628;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#aaa;"></div>`}
-      <button class="btn" id="pt-sub" onclick="ptSubmit()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">Add Purchase →</button>
+      <button class="btn" id="pt-sub" onclick="ptSubmit()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">Add Sale →</button>
     </div>`;
 
   const bwInvNames = inventoryItems.map(x=>x.name);
@@ -3749,9 +3749,9 @@ function renderPurchaseTab(sorted){
 
   return `<div style="display:flex;gap:20px;align-items:flex-start;">
     <div style="flex:0 0 auto;width:min(520px,100%);">
-      <h2 style="margin:0 0 16px;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">💳 Purchase</h2>
+      <h2 style="margin:0 0 16px;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">🧾 Sales</h2>
       <div style="display:flex;gap:8px;margin-bottom:18px;">
-        ${tabBtn("purchase","🧾 Add Purchase","#FFD700")}
+        ${tabBtn("purchase","🧾 Add Sale","#FFD700")}
         ${tabBtn("borrow",`📦 Borrow${totalOwed>0?" ("+pendingBorrows.length+")":""}`,  "#f84")}
       </div>
       ${ptView==="purchase" ? purchaseForm : borrowForm}
@@ -3989,7 +3989,7 @@ async function ptSubmit(){
   ptRestoreLiveBadge();
   const btn=document.getElementById("pt-sub");
   btn.style.background="linear-gradient(135deg,#1a5a2a,#2a8a3a)";btn.style.color="#4f4";btn.textContent="✅ Added!";
-  setTimeout(()=>{btn.style.background="linear-gradient(135deg,#FFD700,#FFA500)";btn.style.color="#1a0a00";btn.textContent="Add Purchase →";},2000);
+  setTimeout(()=>{btn.style.background="linear-gradient(135deg,#FFD700,#FFA500)";btn.style.color="#1a0a00";btn.textContent="Add Sale →";},2000);
 }
 
 // ─── BULK PURCHASE TAB FUNCTIONS ─────────────────────────────────────────────
@@ -9177,7 +9177,7 @@ async function deleteSelectedCustomers(){
 function openPurchaseModal(id){
   const c=getSorted().find(x=>x.id===id);if(!c)return;
   const bill="B"+String(Date.now()).slice(-4),now=new Date().toISOString().slice(0,16);
-  showModal(`${modalHeader("Add Purchase — "+c.name)}
+  showModal(`${modalHeader("Add Sale — "+c.name)}
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Amount (₹)</label>
     <input class="input" type="number" id="m-amt" placeholder="0.00" style="margin-bottom:14px;font-size:20px;font-weight:700;" oninput="pmPts()" autofocus />
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
@@ -9187,7 +9187,7 @@ function openPurchaseModal(id){
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Notes</label>
     <input class="input" id="m-notes" placeholder="Optional..." style="margin-bottom:14px;" />
     <div id="m-pts" style="display:none;background:#0a1628;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;color:#aaa;"></div>
-    <button class="btn" onclick="savePurchaseModal('${id}')" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-weight:800;">Add Purchase →</button>`);
+    <button class="btn" onclick="savePurchaseModal('${id}')" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-weight:800;">Add Sale →</button>`);
 }
 function pmPts(){const a=parseFloat(document.getElementById("m-amt").value)||0,b=document.getElementById("m-pts");if(a){b.style.display="block";b.innerHTML=`Points: <strong style="color:#FFD700;">+${getPoints(a).toLocaleString()}</strong>`;}else b.style.display="none";}
 function savePurchaseModal(id){const a=parseFloat(document.getElementById("m-amt").value||"0");if(!a||a<=0){notify("❌ Amount must be greater than ₹0","error");return;}addPurchase(id,{amount:a,bill:document.getElementById("m-bill").value,notes:document.getElementById("m-notes").value,date:document.getElementById("m-date").value});}
@@ -9396,7 +9396,7 @@ function showProfile(id){
 
     ${hist}
     <div style="display:flex;gap:8px;margin-top:16px;">
-      <button class="btn" onclick="closeModal();openPurchaseModal('${c.id}')" style="background:#1a3a60;color:#5af;border:1px solid #1a4a80;flex:1;padding:12px;font-weight:800;">+ Add Purchase</button>
+      <button class="btn" onclick="closeModal();openPurchaseModal('${c.id}')" style="background:#1a3a60;color:#5af;border:1px solid #1a4a80;flex:1;padding:12px;font-weight:800;">+ Add Sale</button>
       <button class="btn" onclick="closeModal();showCustomerBillHistory('${c.id}')" style="background:#1a2a20;color:#4f4;border:1px solid #1a4a2a;flex:1;padding:12px;font-weight:800;">🧾 Bills</button>
       ${(()=>{const pb=(c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial"||b.status==="pending_payment");const owed=pb.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);return pb.length?`<button class="btn" onclick="closeModal();showBorrowDetails('${c.id}')" style="background:#2a1500;color:#f84;border:1px solid #5a2a00;flex:1;padding:12px;font-weight:800;">📦 Owes ${formatINR(owed)}</button>`:''})()}
       <button class="btn" onclick="closeModal();openEditModal('${c.id}')" style="background:#1a3a1a;color:#4f4;border:1px solid #1a4a1a;flex:1;padding:12px;font-weight:800;">✏️ Edit</button>
@@ -9442,7 +9442,7 @@ const BNAV_PRO_ICONS = {
   2: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
   5: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
 };
-const BNAV_PRO_LABELS = { 0: "Rankings", 1: "Customers", 2: "Purchase", 5: "Inventory" };
+const BNAV_PRO_LABELS = { 0: "Rankings", 1: "Customers", 2: "Sales", 5: "Inventory" };
 const BNAV_GAME_ICONS = { 0: "🏆", 1: "👥", 2: "💳", 5: "📦" };
 const BNAV_GAME_LABELS = { 0: "Board", 1: "Customers", 2: "Purchase", 5: "Inventory" };
 
@@ -9508,11 +9508,11 @@ const LANGUAGES = {
 const TRANSLATIONS = {
   en: {
     adminPanel:"Admin Panel", leaderboard:"Leaderboard", customers:"Customers",
-    purchase:"Purchase", analytics:"Analytics", compare:"Compare",
+    purchase:"Sales", analytics:"Analytics", compare:"Compare",
     inventory:"Inventory", creditors:"Creditors", debtors:"Debtors",
     messages:"Messages",
     festivals:"Festival Rewards", settings:"Settings", logout:"Logout",
-    addCustomer:"+ Add Customer", exportCSV:"⬇ Export CSV", addPurchase:"Add Purchase →",
+    addCustomer:"+ Add Customer", exportCSV:"⬇ Export CSV", addPurchase:"Add Sale →",
     totalSpend:"Total Spend", points:"Points", rank:"Rank", visits:"visits",
     lastVisit:"Last Visit", firstVisit:"First Visit", frequency:"Frequency",
     avgPerVisit:"Avg per Visit", totalVisits:"Total Visits", purchaseHistory:"Purchase History",
@@ -9520,7 +9520,7 @@ const TRANSLATIONS = {
     pushDisplay:"⬆ Push to Display", displaySetup:"📺 Display Setup",
     searchPlaceholder:"🔍 Search by name, phone or ID...",
     customerProfile:"Customer Profile", back:"← Back", edit:"✏️ Edit",
-    addPurchaseBtn:"+ Purchase", deleteConfirm:"Delete this customer and all their purchases?",
+    addPurchaseBtn:"+ Sale", deleteConfirm:"Delete this customer and all their purchases?",
     deletePurchaseConfirm:"Delete this purchase? The customer's total spend will decrease.",
     today:"Today", allTime:"All Time", pickDate:"📆 Pick Date",
     showFor:"📅 Show For:", yearFilter:"📆 YEAR:",
@@ -9557,9 +9557,9 @@ const TRANSLATIONS = {
   },
   hi: {
     adminPanel:"एडमिन पैनल", leaderboard:"लीडरबोर्ड", customers:"ग्राहक",
-    purchase:"खरीदारी", analytics:"विश्लेषण", compare:"तुलना",
+    purchase:"बिक्री", analytics:"विश्लेषण", compare:"तुलना",
     festivals:"उत्सव पुरस्कार", settings:"सेटिंग्स", logout:"लॉगआउट",
-    addCustomer:"+ ग्राहक जोड़ें", exportCSV:"⬇ CSV निर्यात", addPurchase:"खरीदारी जोड़ें →",
+    addCustomer:"+ ग्राहक जोड़ें", exportCSV:"⬇ CSV निर्यात", addPurchase:"बिक्री जोड़ें →",
     totalSpend:"कुल खर्च", points:"अंक", rank:"रैंक", visits:"दौरे",
     lastVisit:"अंतिम दौरा", firstVisit:"पहला दौरा", frequency:"आवृत्ति",
     avgPerVisit:"प्रति दौरा औसत", totalVisits:"कुल दौरे", purchaseHistory:"खरीद इतिहास",
@@ -9567,7 +9567,7 @@ const TRANSLATIONS = {
     pushDisplay:"⬆ डिस्प्ले पर भेजें", displaySetup:"📺 डिस्प्ले सेटअप",
     searchPlaceholder:"🔍 नाम, फ़ोन या ID से खोजें...",
     customerProfile:"ग्राहक प्रोफाइल", back:"← वापस", edit:"✏️ संपादित",
-    addPurchaseBtn:"+ खरीदारी", deleteConfirm:"इस ग्राहक और उनकी सभी खरीदारी हटाएं?",
+    addPurchaseBtn:"+ बिक्री", deleteConfirm:"इस ग्राहक और उनकी सभी खरीदारी हटाएं?",
     deletePurchaseConfirm:"यह खरीदारी हटाएं? ग्राहक का कुल खर्च कम हो जाएगा।",
     today:"आज", allTime:"सब समय", pickDate:"📆 दिनांक चुनें",
     showFor:"📅 दिखाएं:", yearFilter:"📆 वर्ष:",
@@ -9604,9 +9604,9 @@ const TRANSLATIONS = {
   },
   mr: {
     adminPanel:"प्रशासक पॅनेल", leaderboard:"लीडरबोर्ड", customers:"ग्राहक",
-    purchase:"खरेदी", analytics:"विश्लेषण", compare:"तुलना",
+    purchase:"विक्री", analytics:"विश्लेषण", compare:"तुलना",
     festivals:"सण बक्षिसे", settings:"सेटिंग्ज", logout:"बाहेर पडा",
-    addCustomer:"+ ग्राहक जोडा", exportCSV:"⬇ CSV निर्यात", addPurchase:"खरेदी जोडा →",
+    addCustomer:"+ ग्राहक जोडा", exportCSV:"⬇ CSV निर्यात", addPurchase:"विक्री जोडा →",
     totalSpend:"एकूण खर्च", points:"गुण", rank:"क्रमांक", visits:"भेटी",
     lastVisit:"शेवटची भेट", firstVisit:"पहिली भेट", frequency:"वारंवारिता",
     avgPerVisit:"प्रति भेट सरासरी", totalVisits:"एकूण भेटी", purchaseHistory:"खरेदी इतिहास",
@@ -9614,7 +9614,7 @@ const TRANSLATIONS = {
     pushDisplay:"⬆ डिस्प्लेवर पाठवा", displaySetup:"📺 डिस्प्ले सेटअप",
     searchPlaceholder:"🔍 नाव, फोन किंवा ID ने शोधा...",
     customerProfile:"ग्राहक प्रोफाइल", back:"← मागे", edit:"✏️ संपादित करा",
-    addPurchaseBtn:"+ खरेदी", deleteConfirm:"हा ग्राहक आणि त्यांच्या सर्व खरेदी हटवायच्या?",
+    addPurchaseBtn:"+ विक्री", deleteConfirm:"हा ग्राहक आणि त्यांच्या सर्व खरेदी हटवायच्या?",
     deletePurchaseConfirm:"ही खरेदी हटवायची? ग्राहकाचा एकूण खर्च कमी होईल.",
     today:"आज", allTime:"सर्व काळ", pickDate:"📆 तारीख निवडा",
     showFor:"📅 दाखवा:", yearFilter:"📆 वर्ष:",
@@ -9651,9 +9651,9 @@ const TRANSLATIONS = {
   },
   gu: {
     adminPanel:"એડ્મિન પેનલ", leaderboard:"લીડરબોર્ડ", customers:"ગ્રાહકો",
-    purchase:"ખરીદી", analytics:"વિશ્લેષણ", compare:"સરખામણી",
+    purchase:"વેચાણ", analytics:"વિશ્લેષણ", compare:"સરખામણી",
     festivals:"તહેવાર પુરસ્કાર", settings:"સેટિંગ્સ", logout:"લૉગ આઉટ",
-    addCustomer:"+ ગ્રાહક ઉમેરો", exportCSV:"⬇ CSV નિકાસ", addPurchase:"ખરીદી ઉમેરો →",
+    addCustomer:"+ ગ્રાહક ઉમેરો", exportCSV:"⬇ CSV નિકાસ", addPurchase:"વેચાણ ઉમેરો →",
     totalSpend:"કુલ ખર્ચ", points:"પોઇન્ટ", rank:"ક્રમ", visits:"મુલાકાત",
     lastVisit:"છેલ્લી મુલાકાત", firstVisit:"પ્રથમ મુલાકાત", frequency:"આવૃત્તિ",
     avgPerVisit:"દરેક મુલાકાતે સરેરાશ", totalVisits:"કુલ મુલાકાત", purchaseHistory:"ખરીદી ઇતિહાસ",
@@ -9661,7 +9661,7 @@ const TRANSLATIONS = {
     pushDisplay:"⬆ ડિસ્પ્લે પર મોકલો", displaySetup:"📺 ડિસ્પ્લે સેટઅપ",
     searchPlaceholder:"🔍 નામ, ફોન અથવા ID થી શોધો...",
     customerProfile:"ગ્રાહક પ્રોફાઇલ", back:"← પાછળ", edit:"✏️ સંપાદિત",
-    addPurchaseBtn:"+ ખરીદી", deleteConfirm:"આ ગ્રાહક અને તેમની બધી ખરીદી ડિલીટ કરો?",
+    addPurchaseBtn:"+ વેચાણ", deleteConfirm:"આ ગ્રાહક અને તેમની બધી ખરીદી ડિલીટ કરો?",
     deletePurchaseConfirm:"આ ખરીદી ડિલીટ કરો? ગ્રાહકનો કુલ ખર્ચ ઘટશે.",
     today:"આજ", allTime:"હંમેશ", pickDate:"📆 તારીખ પસંદ કરો",
     showFor:"📅 બતાવો:", yearFilter:"📆 વર્ષ:",
@@ -13169,7 +13169,7 @@ function createBillObject({ custId, soldItems, amount, billNum, notes, date }) {
     const lineAmt = amount;
     const taxableAmt = gstType !== "none" ? parseFloat((lineAmt / (1 + gstRate / 100)).toFixed(2)) : lineAmt;
     const taxAmt = gstType !== "none" ? parseFloat((lineAmt - taxableAmt).toFixed(2)) : 0;
-    items = [{ name: notes || "Purchase", qty: 1, unit: "", hsn: "", rate: amount, amount: lineAmt, gstRate: gstType !== "none" ? gstRate : 0, taxableAmt, taxAmt }];
+    items = [{ name: notes || "Sale", qty: 1, unit: "", hsn: "", rate: amount, amount: lineAmt, gstRate: gstType !== "none" ? gstRate : 0, taxableAmt, taxAmt }];
   }
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0) || amount;
@@ -14526,10 +14526,10 @@ const STEPS_EN = [
     tabIndex:1, targetId:"tab-content"
   },
   {
-    icon:"💳", title:"Purchase Entry",
+    icon:"🧾", title:"Sales Entry",
     text:"Record every sale here. Pick the customer, enter the amount or select items from inventory, and tap Save. The leaderboard updates instantly.",
-    detail:"Purchase Entry is what you will use most often — every time a customer buys something, record it here. Start typing the customer name and it will appear in the list. You can enter a simple rupee amount, or if you have inventory set up, select specific items and quantities so stock is deducted automatically. You can also attach a bill number or note. Once saved, the customer's rank updates live on the leaderboard. If you made a mistake, you can edit or delete a purchase from the customer's profile. This tab also supports quick-entry mode for busy shops.",
-    speech:"Purchase Entry is where you record every sale. Select the customer, enter the amount or pick items from your inventory, and save. The leaderboard rank updates instantly.",
+    detail:"Sales Entry is what you will use most often — every time a customer buys something, record it here. Start typing the customer name and it will appear in the list. You can enter a simple rupee amount, or if you have inventory set up, select specific items and quantities so stock is deducted automatically. You can also attach a bill number or note. Once saved, the customer's rank updates live on the leaderboard. If you made a mistake, you can edit or delete a purchase from the customer's profile. This tab also supports quick-entry mode for busy shops.",
+    speech:"Sales Entry is where you record every sale. Select the customer, enter the amount or pick items from your inventory, and save. The leaderboard rank updates instantly.",
     tabIndex:2, targetId:"tab-content"
   },
   {
@@ -14599,10 +14599,10 @@ const STEPS_HI = [
     tabIndex:1, targetId:"tab-content"
   },
   {
-    icon:"💳", title:"खरीदारी दर्ज करें (Purchase)",
+    icon:"🧾", title:"बिक्री दर्ज करें (Sales)",
     text:"हर बिक्री यहाँ दर्ज करें। ग्राहक चुनें, रकम या इन्वेंटरी से आइटम चुनें, और सेव करें। लीडरबोर्ड तुरंत अपडेट हो जाता है।",
     detail:"परचेज़ टैब वो जगह है जो आप रोज़ सबसे ज़्यादा इस्तेमाल करेंगे। ग्राहक का नाम टाइप करते ही वो सूची में आ जाएगा। आप सिर्फ़ रुपये की रकम डाल सकते हैं, या अगर इन्वेंटरी सेट है तो सामान और मात्रा चुनें — स्टॉक अपने आप कम हो जाएगा। बिल नंबर या नोट भी जोड़ सकते हैं। सेव होते ही ग्राहक की रैंक लाइव बदल जाती है। गलती हो जाए तो ग्राहक के प्रोफ़ाइल में जाकर खरीदारी एडिट या डिलीट कर सकते हैं। व्यस्त दुकानों के लिए क्विक-एंट्री मोड भी है।",
-    speech:"परचेज़ टैब में हर बिक्री दर्ज करें। ग्राहक चुनें, रकम या आइटम भरें, और सेव करें। ग्राहक की रैंक तुरंत बदल जाती है। गलती होने पर ग्राहक के प्रोफ़ाइल से एडिट भी कर सकते हैं।",
+    speech:"सेल्स टैब में हर बिक्री दर्ज करें। ग्राहक चुनें, रकम या आइटम भरें, और सेव करें। ग्राहक की रैंक तुरंत बदल जाती है। गलती होने पर ग्राहक के प्रोफ़ाइल से एडिट भी कर सकते हैं।",
     tabIndex:2, targetId:"tab-content"
   },
   {
