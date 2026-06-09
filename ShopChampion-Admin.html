@@ -4273,6 +4273,142 @@ function invUpdateGstPreview(formType){
   }
 }
 
+
+// ── HSN Lookup Table & Kirana Cheat Sheet ──────────────────────────────────
+const HSN_GST_MAP = {
+  // 0% — Fresh/unprocessed essentials
+  "0401":0,"0402":0,"0403":0,"0404":0,  // Milk & dairy (fresh/unprocessed)
+  "0701":0,"0702":0,"0703":0,"0704":0,"0705":0,"0706":0,"0707":0,"0708":0,"0709":0, // Vegetables
+  "0801":0,"0802":0,"0803":0,"0804":0,"0805":0,"0806":0,"0807":0,"0808":0,"0809":0,"0810":0, // Fruits
+  "1001":0,"1002":0,"1003":0,"1004":0,"1005":0,"1006":0,"1007":0,"1008":0, // Cereals (wheat, rice, maize)
+  "0901":0, // Coffee (unroasted)
+  "0902":0, // Tea leaves (unprocessed)
+  "1701":0, // Cane/beet sugar (unbranded)
+  "2501":0, // Salt
+  "0401":0, // Fresh milk
+
+  // 5% — Packaged/processed food & essentials
+  "0406":5,  // Cheese
+  "0405":5,  // Butter
+  "1507":5,"1508":5,"1509":5,"1510":5,"1511":5,"1512":5,"1513":5,"1514":5,"1515":5, // Edible oils
+  "1601":5,"1602":5, // Processed meat
+  "1901":5,  // Malt extract / cereal preparations
+  "2101":5,  // Coffee extracts, roasted coffee
+  "2102":5,  // Yeast
+  "2103":5,  // Sauces, condiments, mustard
+  "2106":5,  // Food preparations
+  "1904":5,  // Corn flakes, puffed rice
+  "1905":5,  // Bread, pastry, biscuits (under ₹100)
+  "2201":5,  // Waters (packed drinking water ≤20L)
+  "3006":5,  // Pharmaceutical preparations (life-saving)
+  "3004":5,  // Medicines (essential)
+
+  // 12% — Processed food & mid-range goods
+  "0409":12, // Natural honey
+  "1517":12, // Margarine
+  "2001":12,"2002":12,"2003":12,"2004":12,"2005":12, // Preserved vegetables
+  "2007":12, // Jams, jellies, fruit purees
+  "2008":12, // Fruit/nut preparations (dry fruits)
+  "2009":12, // Fruit juices
+  "2202":12, // Aerated water / soft drinks (non-carbonated)
+  "1806":12, // Chocolate
+  "1904":12, // Namkeen / snack (packed)
+  "4819":12, // Paper boxes, cartons
+
+  // 18% — Toiletries, packaged food (premium), electronics
+  "3305":18, // Hair care products (shampoo, hair oil)
+  "3306":18, // Dental care (toothpaste, toothbrush)
+  "3307":18, // Shaving preparations, deodorants
+  "3401":18, // Soap, washing bars
+  "3402":18, // Detergents
+  "3403":18, // Lubricant preparations
+  "3808":18, // Pesticides, mosquito repellents
+  "3921":18, // Plastic sheets / packaging
+  "4901":18, // Printed books (non-educational)
+  "8504":18, // Transformers, UPS
+  "8507":18, // Batteries
+  "8513":18, // Torches
+  "1905":18, // Premium biscuits (over ₹100)
+  "2106":18, // Branded food supplements
+  "2202":18, // Carbonated drinks (aerated)
+  "3004":12, // Most medicines
+
+  // 28% — Luxury / sin goods
+  "2401":28, // Tobacco leaves
+  "2402":28, // Cigars, cigarettes
+  "2403":28, // Other tobacco
+  "2203":28, // Beer
+  "2204":28, // Wine
+  "2205":28, // Vermouth
+  "2206":28, // Fermented beverages
+  "2207":28, // Ethyl alcohol
+  "2208":28, // Spirits (whisky, rum, vodka)
+  "3301":28, // Essential oils
+  "8703":28, // Motor cars
+};
+
+const KIRANA_CHEATSHEET = [
+  { rate: 0,  color: "#22c55e", label: "0% — No GST",   items: "Fresh milk, Rice, Wheat, Vegetables, Fruits, Eggs, Bread, Salt, Unbranded flour/sugar" },
+  { rate: 5,  color: "#84cc16", label: "5%",             items: "Packed tea/coffee, Edible oils (mustard, sunflower), Butter, Cheese, Sugar (branded), Packed flour (atta), Medicines" },
+  { rate: 12, color: "#facc15", label: "12%",            items: "Ghee, Dry fruits, Fruit juice, Jam & jelly, Chocolate, Frozen vegetables, Namkeen (loose packed)" },
+  { rate: 18, color: "#fb923c", label: "18%",            items: "Shampoo, Soap, Toothpaste, Detergent, Deodorant, Mosquito coil/spray, Premium biscuits, Soft drinks, Packaged snacks" },
+  { rate: 28, color: "#f87171", label: "28%",            items: "Cigarettes, Tobacco, Alcohol/beer, Aerated drinks (premium), Chewing tobacco, Pan masala" },
+];
+
+function hsnLookupRate(code) {
+  if (!code) return null;
+  const c = code.trim();
+  // Try 8-digit, 6-digit, 4-digit prefixes
+  for (let len of [8, 6, 4]) {
+    const key = c.slice(0, len);
+    if (HSN_GST_MAP[key] !== undefined) return HSN_GST_MAP[key];
+  }
+  return null;
+}
+
+function hsnOnInput(formType) {
+  const hsn = (document.getElementById("inv-hsn-" + formType)?.value || "").trim();
+  if (hsn.length >= 4) {
+    const rate = hsnLookupRate(hsn);
+    const msgEl = document.getElementById("inv-hsn-msg-" + formType);
+    const rateEl = document.getElementById("inv-gst-rate");
+    if (rate !== null) {
+      if (rateEl) { rateEl.value = rate; invUpdateGstPreview(formType); }
+      if (msgEl) { msgEl.textContent = "✅ GST rate auto-filled: " + rate + "%"; msgEl.style.color = "#22c55e"; }
+    } else {
+      if (msgEl) { msgEl.textContent = "⚠️ HSN not found — set rate manually"; msgEl.style.color = "#fb923c"; }
+    }
+  } else {
+    const msgEl = document.getElementById("inv-hsn-msg-" + formType);
+    if (msgEl) msgEl.textContent = "";
+  }
+}
+
+function hsnSaveValue(formType) {
+  // called on save — returns current HSN value
+  return (document.getElementById("inv-hsn-" + formType)?.value || "").trim();
+}
+
+function buildCheatSheet(formType) {
+  const panel = document.getElementById("inv-cheat-" + formType);
+  if (!panel) return;
+  if (panel.style.display !== "none") { panel.style.display = "none"; return; }
+  panel.innerHTML = `
+    <div style="font-size:11px;font-weight:800;color:#a78bfa;margin-bottom:8px;letter-spacing:.5px;">COMMON KIRANA GST RATES</div>
+    ${KIRANA_CHEATSHEET.map(r => `
+      <div style="margin-bottom:7px;">
+        <span style="display:inline-block;background:${r.color}22;border:1px solid ${r.color}66;color:${r.color};font-size:11px;font-weight:800;border-radius:4px;padding:1px 7px;margin-right:6px;min-width:55px;text-align:center;">${r.label}</span>
+        <span style="font-size:11px;color:#c0cce0;">${r.items}</span>
+      </div>`).join('')}
+    <div style="font-size:10px;color:#4a5a7a;margin-top:6px;">Tap a slab to apply it →</div>
+    ${KIRANA_CHEATSHEET.map(r => `
+      <button onclick="document.getElementById('inv-gst-rate').value=${r.rate};invUpdateGstPreview('${formType}');document.getElementById('inv-cheat-${formType}').style.display='none';"
+        style="background:${r.color}22;border:1px solid ${r.color}55;color:${r.color};font-size:12px;font-weight:800;border-radius:8px;padding:5px 14px;margin:3px 4px 0 0;cursor:pointer;">${r.rate}%</button>`).join('')}
+  `;
+  panel.style.display = "block";
+}
+// ── End HSN Lookup ──────────────────────────────────────────────────────────
+
 function invItemGstTotal(item, qty){
   // Returns { base, gstAmt, total, rate, included }
   const rate     = Number(item.gstRate)||0;
@@ -11183,7 +11319,7 @@ function invDeductSold(soldItems, custId){
 }
 
 // Add stock entry
-function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice, gstRate, gstIncluded){
+function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice, gstRate, gstIncluded, hsnCode){
   let item = inventoryItems.find(x=>x.name===name);
   if(!item){
     item = {id:autoId(), name, unit:unit||"unit", category:category||"General", stock:[], salesLog:[]};
@@ -11195,6 +11331,7 @@ function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellin
   // Save GST settings on item
   if(gstRate !== undefined && gstRate !== null) item.gstRate = Number(gstRate)||0;
   if(gstIncluded) item.gstIncluded = gstIncluded;
+  if(hsnCode) item.hsnCode = hsnCode;
   if(!item.stock) item.stock=[];
   item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes});
   saveInventory();
@@ -11656,6 +11793,16 @@ function renderInventoryTab(){
           </div>
         </div>
         <div id="inv-gst-preview-add" style="font-size:12px;color:#a78bfa;background:#0d0820;border-radius:8px;padding:8px 10px;display:none;"></div>
+        <!-- HSN Field Add -->
+        <div style="margin-top:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;">HSN / SAC CODE <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — auto-fills rate)</span></label>
+            <button type="button" onclick="buildCheatSheet('add')" style="font-size:10px;background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;border-radius:6px;padding:2px 8px;cursor:pointer;">🔍 What's my rate?</button>
+          </div>
+          <input class="input" type="text" id="inv-hsn-add" placeholder="e.g. 3305 (Shampoo), 0401 (Milk)" maxlength="8" oninput="hsnOnInput('add')" style="margin-bottom:4px;" />
+          <div id="inv-hsn-msg-add" style="font-size:11px;min-height:14px;"></div>
+          <div id="inv-cheat-add" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-top:6px;"></div>
+        </div>
       </div>
 
       <div style="margin-bottom:12px;">
@@ -11792,6 +11939,16 @@ function renderInventoryTab(){
             </div>
           </div>
           <div id="inv-gst-preview-restock" style="font-size:12px;color:#a78bfa;background:#0d0820;border-radius:8px;padding:8px 10px;display:none;"></div>
+          <!-- HSN Field Restock -->
+          <div style="margin-top:10px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <label style="font-size:11px;color:#7a8aaa;font-weight:700;">HSN / SAC CODE <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — auto-fills rate)</span></label>
+              <button type="button" onclick="buildCheatSheet('restock')" style="font-size:10px;background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;border-radius:6px;padding:2px 8px;cursor:pointer;">🔍 What's my rate?</button>
+            </div>
+            <input class="input" type="text" id="inv-hsn-restock" placeholder="e.g. 3305 (Shampoo), 0401 (Milk)" maxlength="8" oninput="hsnOnInput('restock')" value="${selItem&&selItem.hsnCode?selItem.hsnCode:''}" style="margin-bottom:4px;" />
+            <div id="inv-hsn-msg-restock" style="font-size:11px;min-height:14px;"></div>
+            <div id="inv-cheat-restock" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-top:6px;"></div>
+          </div>
         </div>
 
         <div style="margin-bottom:12px;">
@@ -11958,6 +12115,7 @@ function invSubmitAdd(){
   const notes=(document.getElementById("inv-notes").value||"").trim();
   const gstRate=parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
   const gstIncluded=document.getElementById("inv-gst-included")?.value||"exclusive";
+  const hsnCode=(document.getElementById("inv-hsn-add")?.value||"").trim();
   if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
   // Duplicate item name check (case-insensitive)
   const _dupItem = inventoryItems.find(x=>x.name.trim().toLowerCase()===name.toLowerCase());
@@ -11968,7 +12126,7 @@ function invSubmitAdd(){
   }
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
   const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
-  invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
+  invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded, hsnCode);
   _invLogCreditorPurchase(creditorId, name, qty, cost, date, notes);
 
   // If linked shop creditor, offer sync
@@ -11996,11 +12154,12 @@ function invSubmitRestock(){
   const notes=(document.getElementById("inv-notes").value||"").trim();
   const gstRate=parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
   const gstIncluded=document.getElementById("inv-gst-included")?.value||"exclusive";
+  const hsnCode=(document.getElementById("inv-hsn-restock")?.value||"").trim();
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
   const selItem = inventoryItems.find(x=>x.name===invRestockSelected);
   const category = selItem ? (selItem.category||"General") : "General";
   const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
-  invAddStock(invRestockSelected, unit||(selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded);
+  invAddStock(invRestockSelected, unit||(selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded, hsnCode);
   _invLogCreditorPurchase(creditorId, invRestockSelected, qty, cost, date, notes);
 
   // If creditor is a linked shop, offer payment sync request
