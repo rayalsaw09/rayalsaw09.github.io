@@ -9326,7 +9326,7 @@ function removeAppIcon(){
 }
 
 // ─── MODALS ──────────────────────────────────────────────────
-function closeModal(){document.getElementById("modal-container").innerHTML="";}
+function closeModal(){ if(window._modalCloseHook){try{window._modalCloseHook();}catch(e){} window._modalCloseHook=null;} _scStopLedgerListener(); document.getElementById("modal-container").innerHTML=""; }
 function showModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:440px;">${html}</div></div>`;}
 function showWideModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:min(960px,95vw);max-height:95vh;">${html}</div></div>`;}
 function modalHeader(t){return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><div class="modal-title">${t}</div><button onclick="closeModal()" style="background:none;border:none;color:#7a8aaa;cursor:pointer;font-size:20px;">✕</button></div>`;}
@@ -12453,13 +12453,16 @@ let _autoAcceptedListener = null; // live listener for auto_accepted docs
 // ══════════════════════════════════════════════════════════════════
 // ShopChat — Supabase-backed messaging
 // ══════════════════════════════════════════════════════════════════
-let _scConnections   = [];
-let _scPendingReqs   = [];
-let _scActiveChatPhone = null;
-let _scMessages      = {};
-let _scUnreadCounts  = {};
-let _scPollTimer     = null;
-let _scConnPollTimer = null;
+let _scConnections      = [];
+let _scPendingReqs      = [];
+let _scActiveChatPhone  = null;
+let _scMessages         = {};
+let _scUnreadCounts     = {};
+let _scPollTimer        = null;
+let _scConnPollTimer    = null;
+let _scBlockedShopIds   = []; // SC-IDs blocked by this shop (stored in localStorage)
+let _scPeerLedgerCache  = {}; // peerPhone -> { balance, balLabel, name } fetched from peer Firebase
+let _scLedgerUnsub      = null; // active Firestore onSnapshot unsub for open ledger modal
 
 function scSupa(path, opts={}) {
   return fetch(SC_SUPABASE_URL + "/rest/v1/" + path, {
@@ -12577,6 +12580,9 @@ async function scLoadConnections() {
   try {
     const res = await scSupa(`sc_connections?or=(phone_a.eq.${encodeURIComponent(authPhone)},phone_b.eq.${encodeURIComponent(authPhone)})&select=*`, {method:"GET",headers:{"Prefer":""}});
     _scConnections = await res.json() || [];
+    scLoadBlockList();
+    // Fetch peer ledger balances in background (no await — non-blocking)
+    scFetchAllPeerBalances().then(()=>{ /* balances cached, UI will show on next render */ });
   } catch(e) { _scConnections = []; }
 }
 
@@ -12585,8 +12591,9 @@ async function scLoadPendingRequests() {
   try {
     const res = await scSupa(`sc_conn_requests?to_phone=eq.${encodeURIComponent(authPhone)}&status=eq.pending&select=*&order=created_at.desc`, {method:"GET",headers:{"Prefer":""}});
     const reqs = await res.json() || [];
-    _scPendingReqs = reqs;
-    _shopRequestsUnread = reqs.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
+    // Filter out requests from blocked shops
+    _scPendingReqs = reqs.filter(r => !_scBlockedShopIds.includes(r.from_shop_id||""));
+    _shopRequestsUnread = _scPendingReqs.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
   } catch(e) { _scPendingReqs = []; }
 }
 
@@ -12622,17 +12629,122 @@ async function scDeclineRequest(reqId) {
   safeRenderTab(currentTab);
 }
 
+async function scDeclineAndBlockRequest(reqId) {
+  const req = _scPendingReqs.find(r=>r.id===reqId);
+  if (!req) return;
+  // Decline the request
+  await scSupa(`sc_conn_requests?id=eq.${encodeURIComponent(reqId)}`, {
+    method:"PATCH", body:JSON.stringify({status:"declined"})
+  });
+  // Save block in localStorage
+  const blockKey = `sc_blocked_${authPhone}`;
+  const blocked = JSON.parse(localStorage.getItem(blockKey)||"[]");
+  const shopId = req.from_shop_id || "";
+  if (shopId && !blocked.includes(shopId)) {
+    blocked.push(shopId);
+    localStorage.setItem(blockKey, JSON.stringify(blocked));
+    _scBlockedShopIds = blocked;
+  }
+  _scPendingReqs = _scPendingReqs.filter(r=>r.id!==reqId);
+  _shopRequestsUnread = _scPendingReqs.length;
+  notify(`🚫 ${escHtml(req.from_shop_name||shopId)} blocked — their future requests will be ignored`);
+  safeRenderTab(currentTab);
+}
+
+function scLoadBlockList() {
+  if (!authPhone) return;
+  const blockKey = `sc_blocked_${authPhone}`;
+  _scBlockedShopIds = JSON.parse(localStorage.getItem(blockKey)||"[]");
+}
+
+function scUnblockShop(shopId) {
+  const blockKey = `sc_blocked_${authPhone}`;
+  _scBlockedShopIds = _scBlockedShopIds.filter(id=>id!==shopId);
+  localStorage.setItem(blockKey, JSON.stringify(_scBlockedShopIds));
+  notify(`✅ ${shopId} unblocked`);
+}
+
+async function scUnlinkShop(connId) {
+  const conn = _scConnections.find(c=>c.id===connId);
+  if (!conn) return;
+  const peerName = scPeerName(conn);
+  // Confirm first
+  const confirmDiv = document.createElement("div");
+  confirmDiv.id = "sc-unlink-confirm";
+  confirmDiv.style.cssText = "position:fixed;inset:0;background:#000c;z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
+  confirmDiv.innerHTML = `
+    <div style="background:#0d1220;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:560px;padding-bottom:max(24px,env(safe-area-inset-bottom));font-family:'Nunito',sans-serif;">
+      <div style="font-size:16px;font-weight:800;color:#ef4444;margin-bottom:6px;">⚠️ Unlink ${escHtml(peerName)}?</div>
+      <div style="font-size:13px;color:#7a8aaa;margin-bottom:6px;">This will permanently remove the connection and all shared ledger access for both shops.</div>
+      <div style="font-size:12px;color:#4a5a7a;margin-bottom:20px;">Chat history will also be deleted. This cannot be undone.</div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="document.getElementById('sc-unlink-confirm').remove()"
+          style="flex:1;padding:12px;border-radius:10px;border:1px solid #1e2a45;background:transparent;color:#7a8aaa;font-weight:700;font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;">Cancel</button>
+        <button onclick="document.getElementById('sc-unlink-confirm').remove();scConfirmUnlink('${connId}')"
+          style="flex:1;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#7f1d1d,#ef4444);color:#fff;font-weight:800;font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;">🔗 Unlink</button>
+      </div>
+    </div>`;
+  document.body.appendChild(confirmDiv);
+  confirmDiv.addEventListener("click", e=>{ if(e.target===confirmDiv) confirmDiv.remove(); });
+}
+
+async function scConfirmUnlink(connId) {
+  try {
+    // Delete connection record
+    await scSupa(`sc_connections?id=eq.${encodeURIComponent(connId)}`, {method:"DELETE"});
+    // Delete all messages between these two phones
+    const conn = _scConnections.find(c=>c.id===connId);
+    if (conn) {
+      const pa = encodeURIComponent(conn.phone_a);
+      const pb = encodeURIComponent(conn.phone_b);
+      await scSupa(`sc_messages?or=(and(from_phone.eq.${pa},to_phone.eq.${pb}),and(from_phone.eq.${pb},to_phone.eq.${pa}))`, {method:"DELETE"});
+    }
+    _scConnections = _scConnections.filter(c=>c.id!==connId);
+    _scActiveChatPhone = null;
+    notify("✅ Shop unlinked successfully");
+    safeRenderTab(8);
+  } catch(e) {
+    notify("❌ Failed to unlink: " + (e.message||""), "error");
+  }
+}
+
 function scPeerPhone(conn){ return conn.phone_a===authPhone ? conn.phone_b : conn.phone_a; }
 function scPeerName(conn) { return conn.phone_a===authPhone ? (conn.shop_name_b||"Shop") : (conn.shop_name_a||"Shop"); }
 function scPeerShopId(conn){ return conn.phone_a===authPhone ? (conn.shop_id_b||"") : (conn.shop_id_a||""); }
-function scLedgerSharedToMe(conn){ return conn.phone_a===authPhone ? conn.ledger_share_a_to_b : conn.ledger_share_b_to_a; }
+// Did the PEER share their ledger TO ME?
+// If I am phone_a, peer is phone_b → peer shares via ledger_share_b_to_a
+function scLedgerSharedToMe(conn){ return conn.phone_a===authPhone ? conn.ledger_share_b_to_a : conn.ledger_share_a_to_b; }
+// Did I share MY ledger TO the peer?
+// If I am phone_a, I share via ledger_share_a_to_b
 function scIShareWithPeer(conn)  { return conn.phone_a===authPhone ? conn.ledger_share_a_to_b : conn.ledger_share_b_to_a; }
+// Name of the ledger entry I shared
+function scMySharedName(conn)    { return conn.phone_a===authPhone ? (conn.shared_name_a_to_b||"") : (conn.shared_name_b_to_a||""); }
+// Name of the ledger entry the peer shared to me
+function scPeerSharedName(conn)  { return conn.phone_a===authPhone ? (conn.shared_name_b_to_a||"") : (conn.shared_name_a_to_b||""); }
+function scPeerSharedType(conn)  { return conn.phone_a===authPhone ? (conn.shared_type_b_to_a||"") : (conn.shared_type_a_to_b||""); }
 
 // ── Share Ledger Picker Modal ─────────────────────────────────────────────────
 function scShowShareLedgerModal(connId, currentlySharing) {
-  // If already sharing, just toggle off directly
+  // If already sharing → show revoke confirmation
   if (currentlySharing) {
-    scToggleLedgerShare(connId, false);
+    const conn = _scConnections.find(c=>c.id===connId);
+    const sharedName = conn ? scMySharedName(conn) : "Ledger";
+    const confirmDiv = document.createElement("div");
+    confirmDiv.id = "sc-share-ledger-modal";
+    confirmDiv.style.cssText = "position:fixed;inset:0;background:#000c;z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
+    confirmDiv.innerHTML = `
+      <div style="background:#0d1220;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:560px;padding-bottom:max(24px,env(safe-area-inset-bottom));font-family:'Nunito',sans-serif;">
+        <div style="font-size:16px;font-weight:800;color:#e8eaf0;margin-bottom:6px;">🔒 Revoke Ledger Share?</div>
+        <div style="font-size:13px;color:#7a8aaa;margin-bottom:20px;">You are currently sharing <b style="color:#FFD700;">${escHtml(sharedName)}</b> with this shop. Revoking will immediately remove their access.</div>
+        <div style="display:flex;gap:10px;">
+          <button onclick="document.getElementById('sc-share-ledger-modal').remove()"
+            style="flex:1;padding:12px;border-radius:10px;border:1px solid #1e2a45;background:transparent;color:#7a8aaa;font-weight:700;font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;">Cancel</button>
+          <button onclick="document.getElementById('sc-share-ledger-modal').remove();scToggleLedgerShare('${connId}',false)"
+            style="flex:1;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#7f1d1d,#ef4444);color:#fff;font-weight:800;font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;">🔒 Revoke Access</button>
+        </div>
+      </div>`;
+    document.body.appendChild(confirmDiv);
+    confirmDiv.addEventListener("click", e => { if (e.target === confirmDiv) confirmDiv.remove(); });
     return;
   }
 
@@ -12880,75 +12992,61 @@ function scStopPolling() {
 function scGetSharedBalance(conn) {
   if (!scLedgerSharedToMe(conn)) return null;
   const peer = scPeerPhone(conn);
-  const sid  = scPeerShopId(conn);
-  const cr = getCreditors().find(c=>c._connectedShopId===sid||c._connectedPhone===peer);
-  if (cr) return { type:"creditor", balance:credBalance(cr) };
-  const dr = getDebtors().find(d=>d._connectedShopId===sid||d._connectedPhone===peer);
-  if (dr) return { type:"debtor", balance:debtBalance(dr) };
-  return null;
+  const cached = _scPeerLedgerCache[peer];
+  if (!cached) return null;
+  return { balance: cached.balance, label: cached.balLabel };
 }
 
-async function scRenderSharedLedger(connId) {
-  const conn = _scConnections.find(c=>c.id===connId);
-  if (!conn) return;
-  if (!scLedgerSharedToMe(conn)) { notify("⚠️ They haven't shared their ledger with you","error"); return; }
-
-  const peerPhone = scPeerPhone(conn);
-  const peerName  = scPeerName(conn);
-  // isA = am I phone_a in this connection?
-  const isA = conn.phone_a === authPhone;
-  // sharedName = name of the ledger entry the peer chose to share
-  const sharedName = isA ? (conn.shared_name_b_to_a||"") : (conn.shared_name_a_to_b||"");
-  // sharedType = creditor or debtor (from the sharer's perspective)
-  const sharedType = isA ? (conn.shared_type_b_to_a||"") : (conn.shared_type_a_to_b||"");
-
-  // Show loading state
-  showModal(`<div style="padding:40px;text-align:center;color:#7a8aaa;">
-    <div style="font-size:36px;margin-bottom:12px;">⏳</div>
-    <div style="font-size:14px;">Loading shared ledger...</div>
-  </div>`);
-
-  if (!db) { notify("❌ Firebase not connected","error"); closeModal(); return; }
-
+// Fetch peer's ledger balance from their Firebase and cache it
+async function scFetchPeerLedgerBalance(conn) {
+  if (!scLedgerSharedToMe(conn) || !db) return;
+  const peer = scPeerPhone(conn);
+  const sharedName = scPeerSharedName(conn);
+  const sharedType = scPeerSharedType(conn);
+  if (!sharedName) return;
   try {
-    // Fetch BOTH creditors and debtors from the PEER's Firebase account
     const [credDoc, debtDoc] = await Promise.all([
-      db.collection("users").doc(peerPhone).collection("app_data").doc("creditors").get(),
-      db.collection("users").doc(peerPhone).collection("app_data").doc("debtors").get()
+      db.collection("users").doc(peer).collection("app_data").doc("creditors").get(),
+      db.collection("users").doc(peer).collection("app_data").doc("debtors").get()
     ]);
-
     const allCreditors = (credDoc.exists ? credDoc.data().list : null) || [];
     const allDebtors   = (debtDoc.exists ? debtDoc.data().list : null) || [];
-
-    // Find the shared entry by name
-    let entity = null, etype = "creditor";
-    if (sharedName) {
-      const nl = sharedName.toLowerCase();
-      entity = allCreditors.find(c => (c.name||"").toLowerCase() === nl);
-      if (!entity) { entity = allDebtors.find(d => (d.name||"").toLowerCase() === nl); etype = "debtor"; }
-      // Partial match fallback
-      if (!entity) { entity = allCreditors.find(c => (c.name||"").toLowerCase().includes(nl)); }
-      if (!entity) { entity = allDebtors.find(d => (d.name||"").toLowerCase().includes(nl)); etype = "debtor"; }
+    const nl = sharedName.toLowerCase();
+    let entity = null, etype = sharedType || "creditor";
+    entity = allCreditors.find(c=>(c.name||"").toLowerCase()===nl);
+    if (!entity) { entity = allDebtors.find(d=>(d.name||"").toLowerCase()===nl); if(entity) etype="debtor"; }
+    if (!entity) { entity = allCreditors.find(c=>(c.name||"").toLowerCase().includes(nl)); }
+    if (!entity) { entity = allDebtors.find(d=>(d.name||"").toLowerCase().includes(nl)); if(entity) etype="debtor"; }
+    if (!entity) return;
+    const txns = entity.transactions || [];
+    let bal = 0;
+    if (etype === "creditor") {
+      const purchased = txns.filter(t=>t.type==="purchase").reduce((s,t)=>s+(t.amount||0),0);
+      const paid      = txns.filter(t=>t.type==="payment").reduce((s,t)=>s+(t.amount||0),0);
+      const returned  = txns.filter(t=>t.type==="return").reduce((s,t)=>s+(t.amount||0),0);
+      bal = purchased - paid - returned;
+    } else {
+      const sold     = txns.filter(t=>t.type==="sale").reduce((s,t)=>s+(t.amount||0),0);
+      const received = txns.filter(t=>t.type==="payment").reduce((s,t)=>s+(t.amount||0),0);
+      const returned = txns.filter(t=>t.type==="return").reduce((s,t)=>s+(t.amount||0),0);
+      bal = sold - received - returned;
     }
-    // Last resort: first non-archived entry
-    if (!entity && allCreditors.length > 0) { entity = allCreditors.find(c=>!c._archived); }
-    if (!entity && allDebtors.length > 0)   { entity = allDebtors.find(d=>!d._archived); etype = "debtor"; }
+    const balLabel = etype==="creditor"
+      ? (bal>0?`owes ₹${bal.toFixed(2)}`:`paid ₹${Math.abs(bal).toFixed(2)} extra`)
+      : (bal>0?`owes ₹${bal.toFixed(2)}`:`paid ₹${Math.abs(bal).toFixed(2)} extra`);
+    _scPeerLedgerCache[peer] = { balance: bal, balLabel: balLabel, name: entity.name || sharedName };
+  } catch(e) { /* silently ignore */ }
+}
 
-    if (!entity) {
-      showModal(`<div style="padding:24px;text-align:center;">
-        <div style="font-size:36px;margin-bottom:12px;">📋</div>
-        <div style="font-size:15px;font-weight:800;color:#e8eaf0;margin-bottom:8px;">Ledger Not Available</div>
-        <div style="font-size:13px;color:#7a8aaa;">
-          <b style="color:#FFD700;">${escHtml(peerName)}</b> shared their ledger
-          ${sharedName ? `for <b style="color:#60a5fa;">${escHtml(sharedName)}</b>` : ""}
-          but no matching entry was found in their account.<br><br>
-          Ask them to re-share the ledger from the Messages tab.
-        </div>
-      </div>`);
-      return;
-    }
-  // Calculate balance directly from fetched data (same formula as local helpers)
-  const txns = entity.transactions||[];
+// Fetch balances for all connections that have a shared ledger
+async function scFetchAllPeerBalances() {
+  const conns = _scConnections.filter(c => scLedgerSharedToMe(c));
+  await Promise.all(conns.map(c => scFetchPeerLedgerBalance(c)));
+}
+
+// Helper to build ledger modal HTML from entity data
+function _buildSharedLedgerHtml(entity, etype, peerName, connId) {
+  const txns = entity.transactions || [];
   let bal = 0;
   if (etype === "creditor") {
     const purchased = txns.filter(t=>t.type==="purchase").reduce((s,t)=>s+(t.amount||0),0);
@@ -12961,49 +13059,142 @@ async function scRenderSharedLedger(connId) {
     const returned = txns.filter(t=>t.type==="return").reduce((s,t)=>s+(t.amount||0),0);
     bal = sold - received - returned;
   }
-  const balColor = bal>0?"#ef4444":"#22c55e";
-  const displayName = entity.name || sharedName || peerName;
-  const balLabel = etype==="creditor"
-    ? (bal>0?`You owe ₹${bal.toFixed(2)}`:`Overpaid ₹${Math.abs(bal).toFixed(2)}`)
-    : (bal>0?`They owe ₹${bal.toFixed(2)}`:`You owe ₹${Math.abs(bal).toFixed(2)}`);
+  const balColor = bal > 0 ? "#ef4444" : "#22c55e";
+  const displayName = entity.name || peerName;
+  const balLabel = etype === "creditor"
+    ? (bal > 0 ? `You owe ₹${bal.toFixed(2)}` : `Overpaid ₹${Math.abs(bal).toFixed(2)}`)
+    : (bal > 0 ? `They owe ₹${bal.toFixed(2)}` : `You owe ₹${Math.abs(bal).toFixed(2)}`);
   const csvRows = [["Type","Amount","Date","Notes"],...txns.map(t=>[t.type,t.amount||0,t.date||"",t.notes||t.bill||""])];
   const csv = csvRows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
-  const csvUrl = "data:text/csv;charset=utf-8,"+encodeURIComponent(csv);
-  const rows = txns.slice().reverse().map(t=>{
-    const icon = t.type==="purchase"||t.type==="sale"?"📦":t.type==="payment"||t.type==="receipt"?"💸":"↩️";
-    const lbl  = {purchase:"Purchase",payment:"Payment",return:"Return",sale:"Sale",receipt:"Receipt"}[t.type]||t.type;
-    const col  = t.type==="payment"||t.type==="receipt"?"#22c55e":t.type==="return"?"#fb923c":"#e8eaf0";
+  const csvUrl = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+  const rows = txns.slice().reverse().map(t => {
+    const icon = t.type==="purchase"||t.type==="sale" ? "📦" : t.type==="payment"||t.type==="receipt" ? "💸" : "↩️";
+    const lbl  = {purchase:"Purchase",payment:"Payment",return:"Return",sale:"Sale",receipt:"Receipt"}[t.type] || t.type;
+    const col  = t.type==="payment"||t.type==="receipt" ? "#22c55e" : t.type==="return" ? "#fb923c" : "#e8eaf0";
     const dt   = t.date ? new Date(t.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "";
     return `<tr><td style="padding:9px 8px;font-size:13px;">${icon} ${lbl}</td>
       <td style="padding:9px 8px;font-size:13px;color:${col};font-weight:700;">₹${Number(t.amount||0).toFixed(2)}</td>
       <td style="padding:9px 8px;font-size:12px;color:#7a8aaa;">${dt}</td>
       <td style="padding:9px 8px;font-size:12px;color:#7a8aaa;">${escHtml(t.notes||t.bill||"")}</td></tr>`;
   }).join("");
-  showModal(`<div style="max-height:78vh;overflow-y:auto;">
+  return `<div style="max-height:78vh;overflow-y:auto;" id="sc-ledger-modal-content">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
       <div style="font-size:28px;">📋</div>
       <div style="flex:1;">
         <div style="font-size:17px;font-weight:800;color:#e8eaf0;">${escHtml(displayName)}</div>
         <div style="font-size:12px;color:#7a8aaa;">${etype==="creditor"?"Creditor (Supplier)":"Debtor (Buyer)"} · Shared by ${escHtml(peerName)}</div>
+        <div style="font-size:10px;color:#3a5a3a;margin-top:2px;">🔴 Live — updates automatically</div>
       </div>
       <a href="${csvUrl}" download="${escHtml(displayName)}-ledger.csv"
         style="background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;font-size:12px;font-weight:800;border-radius:8px;padding:7px 14px;text-decoration:none;">⬇ Export CSV</a>
     </div>
     <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
       <div style="font-size:13px;color:#7a8aaa;">Closing Balance</div>
-      <div style="font-size:18px;font-weight:800;color:${balColor};">${balLabel}</div>
+      <div id="sc-ledger-bal" style="font-size:18px;font-weight:800;color:${balColor};">${balLabel}</div>
     </div>
-    ${txns.length===0?'<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>':`
-    <table style="width:100%;border-collapse:collapse;">
-      <thead><tr style="border-bottom:1px solid #1e2a45;">
-        <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">TYPE</th>
-        <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">AMOUNT</th>
-        <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">DATE</th>
-        <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">NOTES</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`}
+    ${txns.length === 0
+      ? '<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>'
+      : `<table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="border-bottom:1px solid #1e2a45;">
+            <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">TYPE</th>
+            <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">AMOUNT</th>
+            <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">DATE</th>
+            <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">NOTES</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`}
+  </div>`;
+}
+
+function _scStopLedgerListener() {
+  if (_scLedgerUnsub) { try { _scLedgerUnsub(); } catch(e){} _scLedgerUnsub = null; }
+}
+
+async function scRenderSharedLedger(connId) {
+  const conn = _scConnections.find(c=>c.id===connId);
+  if (!conn) return;
+  if (!scLedgerSharedToMe(conn)) { notify("⚠️ They haven't shared their ledger with you","error"); return; }
+
+  const peerPhone  = scPeerPhone(conn);
+  const peerName   = scPeerName(conn);
+  const sharedName = scPeerSharedName(conn);
+  const sharedType = scPeerSharedType(conn);
+
+  // Stop any previous live listener
+  _scStopLedgerListener();
+
+  // Show loading
+  showModal(`<div style="padding:40px;text-align:center;color:#7a8aaa;">
+    <div style="font-size:36px;margin-bottom:12px;">⏳</div>
+    <div style="font-size:14px;">Loading shared ledger...</div>
   </div>`);
+
+  if (!db) { notify("❌ Firebase not connected","error"); closeModal(); return; }
+
+  // Helper to find the matching entity in both lists
+  function _findEntity(allCreditors, allDebtors) {
+    let entity = null, etype = sharedType || "creditor";
+    if (sharedName) {
+      const nl = sharedName.toLowerCase();
+      entity = allCreditors.find(c=>(c.name||"").toLowerCase()===nl);
+      if (!entity) { entity = allDebtors.find(d=>(d.name||"").toLowerCase()===nl); if(entity) etype="debtor"; }
+      if (!entity) { entity = allCreditors.find(c=>(c.name||"").toLowerCase().includes(nl)); }
+      if (!entity) { entity = allDebtors.find(d=>(d.name||"").toLowerCase().includes(nl)); if(entity) etype="debtor"; }
+    }
+    if (!entity && allCreditors.length>0) { entity = allCreditors.find(c=>!c._archived); }
+    if (!entity && allDebtors.length>0)   { entity = allDebtors.find(d=>!d._archived); etype="debtor"; }
+    return { entity, etype };
+  }
+
+  try {
+    // ── Initial load ──────────────────────────────────────────────
+    const [credDoc, debtDoc] = await Promise.all([
+      db.collection("users").doc(peerPhone).collection("app_data").doc("creditors").get(),
+      db.collection("users").doc(peerPhone).collection("app_data").doc("debtors").get()
+    ]);
+    const allCreditors = (credDoc.exists ? credDoc.data().list : null) || [];
+    const allDebtors   = (debtDoc.exists ? debtDoc.data().list : null) || [];
+    const { entity, etype } = _findEntity(allCreditors, allDebtors);
+
+    if (!entity) {
+      showModal(`<div style="padding:24px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">📋</div>
+        <div style="font-size:15px;font-weight:800;color:#e8eaf0;margin-bottom:8px;">Ledger Not Available</div>
+        <div style="font-size:13px;color:#7a8aaa;">
+          <b style="color:#FFD700;">${escHtml(peerName)}</b> shared their ledger
+          ${sharedName ? `for <b style="color:#60a5fa;">${escHtml(sharedName)}</b>` : ""}
+          but no matching entry was found.<br><br>
+          Ask them to re-share the ledger from the Messages tab.
+        </div>
+      </div>`);
+      return;
+    }
+
+    showModal(_buildSharedLedgerHtml(entity, etype, peerName, connId));
+
+    // ── Live listener on the doc that has the shared entry ────────
+    // Determine which doc to listen on
+    const listenDocId = etype === "creditor" ? "creditors" : "debtors";    _scLedgerUnsub = db.collection("users").doc(peerPhone)
+      .collection("app_data").doc(listenDocId)
+      .onSnapshot(snap => {
+        if (!snap.exists) return;
+        const list = snap.data().list || [];
+        const nl = (sharedName||"").toLowerCase();
+        let updated = list.find(c=>(c.name||"").toLowerCase()===nl);
+        if (!updated) updated = list.find(c=>(c.name||"").toLowerCase().includes(nl));
+        if (!updated) return;
+        // Re-render content in place (without closing modal)
+        const contentEl = document.getElementById("sc-ledger-modal-content");
+        if (contentEl) {
+          const wrapper = contentEl.parentElement;
+          if (wrapper) {
+            wrapper.innerHTML = _buildSharedLedgerHtml(updated, etype, peerName, connId);
+          }
+        }
+        // Also update contact list balance cache
+        scFetchPeerLedgerBalance(conn).then(()=>{ /* cache updated silently */ });
+      }, err => { console.warn("Ledger listener error:", err); });
+
   } catch(e) {
     console.error("scRenderSharedLedger error:", e);
     notify("❌ Failed to load shared ledger. Check your connection.", "error");
@@ -13598,6 +13789,7 @@ function renderMessagesTab(){
           <div style="display:flex;gap:8px;">
             <button onclick="scAcceptRequest('${req.id}')" class="btn" style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:10px;font-size:13px;font-weight:800;">✅ Accept</button>
             <button onclick="scDeclineRequest('${req.id}')" class="btn" style="flex:1;background:#1a0a0a;border:1px solid #ef4444;color:#ef4444;padding:10px;font-size:13px;font-weight:700;">✕ Decline</button>
+            <button onclick="scDeclineAndBlockRequest('${req.id}')" class="btn" title="Decline and block future requests from this shop" style="background:#1a0a0a;border:1px solid #7f1d1d;color:#7f1d1d;padding:10px 12px;font-size:13px;font-weight:700;">🚫</button>
           </div>
         </div>`;
       }).join("")}
@@ -13620,28 +13812,34 @@ function renderMessagesTab(){
         const lastMsgText = lastMsg ? (lastMsg.from_phone===authPhone?"You: ":"")+lastMsg.body : "Tap to chat";
         const lastMsgTime = lastMsg ? new Date(lastMsg.created_at).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}) : "";
         const unread = _scUnreadCounts[peer] || 0;
-        const balInfo = scGetSharedBalance(conn);
-        const balHtml = balInfo
-          ? `<span style="font-size:11px;color:${balInfo.balance>0?"#ef4444":"#22c55e"};font-weight:700;margin-left:6px;">${balInfo.balance>0?"owes":"paid"} ₹${Math.abs(balInfo.balance).toFixed(2)}</span>` : "";
+        // Balance from peer ledger cache (their data shared to me)
+        const cachedBal = _scPeerLedgerCache[peer];
+        const balHtml = (scLedgerSharedToMe(conn) && cachedBal)
+          ? `<span style="font-size:11px;color:${cachedBal.balance>0?"#ef4444":"#22c55e"};font-weight:700;margin-left:6px;">${cachedBal.balLabel}</span>` : "";
+        // My share status badge
+        const myShareHtml = scIShareWithPeer(conn)
+          ? `<span style="font-size:10px;color:#22c55e;font-weight:700;margin-left:4px;">🔓 Sharing</span>` : "";
         const ledgerBtn = scLedgerSharedToMe(conn)
           ? `<button onclick="event.stopPropagation();scRenderSharedLedger('${conn.id}')"
-              style="display:inline-block;background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;font-size:10px;font-weight:800;border-radius:6px;padding:2px 8px;cursor:pointer;margin-top:3px;">📋 View Ledger</button>` : "";
-        return `<div onclick="scOpenChat('${peer}','${conn.id}')"
-          style="display:flex;align-items:center;gap:12px;padding:14px 12px;cursor:pointer;border-bottom:1px solid #0d1220;"
-          onmouseover="this.style.background='#0d1220'" onmouseout="this.style.background='transparent'">
-          <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#fff;flex-shrink:0;position:relative;">
-            ${initials}
-            ${unread>0?`<div style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;">${unread}</div>`:""}
-          </div>
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:4px;">
-              <div style="font-size:15px;font-weight:800;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(name)}${balHtml}</div>
-              <div style="font-size:11px;color:#4a5a7a;flex-shrink:0;">${lastMsgTime}</div>
+              style="display:inline-block;background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;font-size:10px;font-weight:800;border-radius:6px;padding:2px 8px;cursor:pointer;margin-top:3px;margin-right:4px;">📋 View Ledger</button>` : "";
+        return `<div style="display:flex;align-items:center;gap:12px;padding:14px 12px;border-bottom:1px solid #0d1220;">
+          <div onclick="scOpenChat('${peer}','${conn.id}')" style="display:flex;align-items:center;gap:12px;flex:1;cursor:pointer;min-width:0;">
+            <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#fff;flex-shrink:0;position:relative;">
+              ${initials}
+              ${unread>0?`<div style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;">${unread}</div>`:""}
             </div>
-            <div style="font-size:11px;color:#4a5a7a;font-family:monospace;">${escHtml(sid)}</div>
-            <div style="font-size:12px;color:#4a5a7a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(lastMsgText.slice(0,55))}</div>
-            ${ledgerBtn}
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;gap:4px;">
+                <div style="font-size:15px;font-weight:800;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(name)}${balHtml}${myShareHtml}</div>
+                <div style="font-size:11px;color:#4a5a7a;flex-shrink:0;">${lastMsgTime}</div>
+              </div>
+              <div style="font-size:11px;color:#4a5a7a;font-family:monospace;">${escHtml(sid)}</div>
+              <div style="font-size:12px;color:#4a5a7a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(lastMsgText.slice(0,55))}</div>
+              <div style="margin-top:2px;">${ledgerBtn}</div>
+            </div>
           </div>
+          <button onclick="scUnlinkShop('${conn.id}')" title="Unlink this shop"
+            style="flex-shrink:0;background:#1a0a0a;border:1px solid #3a1a1a;color:#7f1d1d;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;font-weight:800;">🔗✕</button>
         </div>`;
       }).join("");
 
@@ -13714,6 +13912,8 @@ async function scOpenChat(peerPhone, connId) {
             style="background:${iShare?"#16653433":"#0a0e1a"};border:1px solid ${iShare?"#22c55e":"#2a3560"};color:${iShare?"#22c55e":"#4a5a7a"};font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">
             ${iShare?"🔓 Shared":"🔒 Share Ledger"}
           </button>
+          <button onclick="scUnlinkShop('${connId}')"
+            style="background:#1a0a0a;border:1px solid #3a1a1a;color:#7f1d1d;font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">🔗✕ Unlink</button>
         </div>
       </div>
       <div id="sc-chat-messages" style="flex:1;overflow-y:auto;padding:4px 2px;"></div>
