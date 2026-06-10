@@ -12626,7 +12626,7 @@ function scPeerPhone(conn){ return conn.phone_a===authPhone ? conn.phone_b : con
 function scPeerName(conn) { return conn.phone_a===authPhone ? (conn.shop_name_b||"Shop") : (conn.shop_name_a||"Shop"); }
 function scPeerShopId(conn){ return conn.phone_a===authPhone ? (conn.shop_id_b||"") : (conn.shop_id_a||""); }
 function scLedgerSharedToMe(conn){ return conn.phone_a===authPhone ? conn.ledger_share_a_to_b : conn.ledger_share_b_to_a; }
-function scIShareWithPeer(conn)  { return conn.phone_a===authPhone ? conn.ledger_share_b_to_a : conn.ledger_share_a_to_b; }
+function scIShareWithPeer(conn)  { return conn.phone_a===authPhone ? conn.ledger_share_a_to_b : conn.ledger_share_b_to_a; }
 
 // ── Share Ledger Picker Modal ─────────────────────────────────────────────────
 function scShowShareLedgerModal(connId, currentlySharing) {
@@ -12778,9 +12778,9 @@ async function scToggleLedgerShare(connId, enable, sharedItemId, sharedItemName)
   const conn = _scConnections.find(c=>c.id===connId);
   if (!conn) return;
   const isA = conn.phone_a === authPhone;
-  const shareField = isA ? "ledger_share_b_to_a" : "ledger_share_a_to_b";
-  const nameField  = isA ? "shared_name_b_to_a"  : "shared_name_a_to_b";
-  const typeField  = isA ? "shared_type_b_to_a"  : "shared_type_a_to_b";
+  const shareField = isA ? "ledger_share_a_to_b" : "ledger_share_b_to_a";
+  const nameField  = isA ? "shared_name_a_to_b"  : "shared_name_b_to_a";
+  const typeField  = isA ? "shared_type_a_to_b"  : "shared_type_b_to_a";
   const patch = { [shareField]: enable };
   if (enable && sharedItemName) patch[nameField] = sharedItemName;
   if (enable && window._slTab)  patch[typeField]  = window._slTab === "cred" ? "creditor" : "debtor";
@@ -12846,10 +12846,15 @@ async function scLoadMessages(peerPhone) {
       {method:"GET",headers:{"Prefer":""}}
     );
     const msgs = await res.json()||[];
-    const prev = (_scMessages[peerPhone]||[]).length;
+    // Use last-seen timestamp stored in localStorage to detect truly new messages
+    const seenKey = `sc_msg_seen_${authPhone}_${peerPhone}`;
+    const lastSeenTs = parseInt(localStorage.getItem(seenKey)||"0", 10);
+    const newMsgs = msgs.filter(m => m.from_phone !== authPhone && m.created_at > lastSeenTs);
     _scMessages[peerPhone] = msgs;
-    if (msgs.length > prev && _scActiveChatPhone !== peerPhone) {
-      _scUnreadCounts[peerPhone] = (_scUnreadCounts[peerPhone]||0) + (msgs.length-prev);
+    if (newMsgs.length > 0 && _scActiveChatPhone !== peerPhone) {
+      _scUnreadCounts[peerPhone] = newMsgs.length;
+    } else if (_scActiveChatPhone === peerPhone) {
+      _scUnreadCounts[peerPhone] = 0;
     }
   } catch(e){}
 }
@@ -13679,6 +13684,9 @@ function scShowAddShop() {
 async function scOpenChat(peerPhone, connId) {
   _scActiveChatPhone = peerPhone;
   _scUnreadCounts[peerPhone] = 0;
+  // Persist last-seen timestamp so unread badge doesn't re-appear on reload
+  const seenKey = `sc_msg_seen_${authPhone}_${peerPhone}`;
+  localStorage.setItem(seenKey, Date.now().toString());
   const conn = _scConnections.find(c => c.id === connId);
   const peerName    = conn ? scPeerName(conn)   : peerPhone;
   const peerShopId  = conn ? scPeerShopId(conn) : "";
