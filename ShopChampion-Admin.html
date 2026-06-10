@@ -3515,7 +3515,7 @@ function renderTab(i){
         // Re-render the open chat screen fully, then refresh messages
         el.innerHTML = renderMessagesTab();
         // scOpenChat sets up the shell; we call it but skip the "open" scroll effect
-        await scOpenChatShell(_scActiveChatPhone, peerConn.id);
+        scOpenChatShell(_scActiveChatPhone, peerConn.id);
         Promise.all([scLoadConnections(), scLoadPendingRequests()]).then(async()=>{
           await scLoadMessages(_scActiveChatPhone);
           scRenderChat(_scActiveChatPhone);
