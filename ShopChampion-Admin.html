@@ -12469,6 +12469,74 @@ function scSupa(path, opts={}) {
 function scMyShopId()  { return authPhone ? "SC-" + String(authPhone).slice(-6) : ""; }
 function scMyShopName(){ return (appSettings&&appSettings.shopName) ? appSettings.shopName : "My Shop"; }
 
+async function scLookupAndPreview(shopId) {
+  shopId = (shopId || "").trim().toUpperCase();
+  const statusEl = document.getElementById("sc-shop-preview-status");
+  const cardEl   = document.getElementById("sc-shop-preview-card");
+  if (!statusEl || !cardEl) return;
+
+  if (!shopId || !/^SC-\d{6}$/i.test(shopId)) {
+    statusEl.style.color = "#ef4444";
+    statusEl.textContent = "⚠️ Enter a valid Shop ID like SC-123456";
+    cardEl.innerHTML = "";
+    return;
+  }
+  if (shopId === scMyShopId()) {
+    statusEl.style.color = "#ef4444";
+    statusEl.textContent = "❌ That's your own Shop ID";
+    cardEl.innerHTML = "";
+    return;
+  }
+  statusEl.style.color = "#a78bfa";
+  statusEl.textContent = "⏳ Looking up shop...";
+  cardEl.innerHTML = "";
+
+  try {
+    const profile = await lookupShopById(shopId);
+    if (!profile) {
+      statusEl.style.color = "#ef4444";
+      statusEl.textContent = "❌ No shop found with that ID. Ask them to share their Shop ID from Settings.";
+      return;
+    }
+    statusEl.style.color = "#22c55e";
+    statusEl.textContent = "✅ Shop found!";
+
+    const alreadyConn = _scConnections.find(c => c.phone_a === profile.phone || c.phone_b === profile.phone);
+    const initials = (profile.shopName || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+    cardEl.innerHTML = `
+      <div style="background:#060d1a;border:2px solid #1e3a6e;border-radius:14px;padding:16px;margin-top:8px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <div style="width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">
+            ${profile.shopIcon ? `<img src="${profile.shopIcon}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">` : initials}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:17px;font-weight:800;color:#e8eaf0;">${escHtml(profile.shopName || "Unknown Shop")}</div>
+            <div style="font-size:12px;color:#60a5fa;font-family:monospace;font-weight:700;">${escHtml(profile.shopId || shopId)}</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;font-size:13px;margin-bottom:16px;padding:12px;background:#0a0e1a;border-radius:10px;">
+          ${profile.phone   ? `<div><span style="color:#4a5a7a;">📞 Phone: </span><span style="color:#e8eaf0;">${escHtml(profile.phone)}</span></div>` : ""}
+          ${profile.city    ? `<div><span style="color:#4a5a7a;">📍 City: </span><span style="color:#e8eaf0;">${escHtml(profile.city)}</span></div>` : ""}
+          ${profile.address ? `<div><span style="color:#4a5a7a;">🏠 Address: </span><span style="color:#e8eaf0;">${escHtml(profile.address)}</span></div>` : ""}
+          ${profile.gstin   ? `<div><span style="color:#4a5a7a;">🔢 GSTIN: </span><span style="color:#a78bfa;font-family:monospace;">${escHtml(profile.gstin)}</span></div>` : ""}
+          ${!profile.phone && !profile.city && !profile.address && !profile.gstin
+            ? `<div style="color:#4a5a7a;font-size:12px;">No additional profile info shared by this shop.</div>` : ""}
+        </div>
+        ${alreadyConn
+          ? `<div style="text-align:center;padding:10px;background:#0a1a0a;border:1px solid #22c55e;border-radius:10px;color:#22c55e;font-size:13px;font-weight:700;">✅ Already connected with this shop</div>`
+          : `<button onclick="scSendConnRequest('${shopId}')" class="btn"
+              style="width:100%;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:13px;font-size:14px;font-weight:800;">
+              📨 Send Link Request
+            </button>`
+        }
+      </div>`;
+  } catch(e) {
+    statusEl.style.color = "#ef4444";
+    statusEl.textContent = "❌ Error looking up shop. Check your connection.";
+  }
+}
+
 async function scSendConnRequest(toShopId) {
   toShopId = (toShopId||"").trim().toUpperCase();
   if (!authPhone) { notify("❌ Not logged in","error"); return; }
@@ -12552,7 +12620,153 @@ function scPeerShopId(conn){ return conn.phone_a===authPhone ? (conn.shop_id_b||
 function scLedgerSharedToMe(conn){ return conn.phone_a===authPhone ? conn.ledger_share_a_to_b : conn.ledger_share_b_to_a; }
 function scIShareWithPeer(conn)  { return conn.phone_a===authPhone ? conn.ledger_share_b_to_a : conn.ledger_share_a_to_b; }
 
-async function scToggleLedgerShare(connId, enable) {
+// ── Share Ledger Picker Modal ─────────────────────────────────────────────────
+function scShowShareLedgerModal(connId, currentlySharing) {
+  // If already sharing, just toggle off directly
+  if (currentlySharing) {
+    scToggleLedgerShare(connId, false);
+    return;
+  }
+
+  const creditors = getCreditors().filter(c => !c._archived && c.id !== "CR_UNRECONCILED");
+  const debtors   = getDebtors().filter(d => !d._archived);
+
+  // Build modal HTML
+  const modalDiv = document.createElement("div");
+  modalDiv.id = "sc-share-ledger-modal";
+  modalDiv.style.cssText = "position:fixed;inset:0;background:#000c;z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
+
+  modalDiv.innerHTML = `
+    <div style="background:#0d1220;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:560px;max-height:80vh;display:flex;flex-direction:column;padding-bottom:max(20px,env(safe-area-inset-bottom));">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div style="font-size:16px;font-weight:800;color:#e8eaf0;">🔓 Share a Ledger</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Pick the creditor or debtor ledger to share with this shop</div>
+        </div>
+        <button onclick="document.getElementById('sc-share-ledger-modal').remove()" style="background:#1e2a45;border:none;color:#7a8aaa;border-radius:8px;width:30px;height:30px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <button id="sl-tab-cred" onclick="slSwitchTab('cred')"
+          style="flex:1;padding:9px;border-radius:10px;border:2px solid #ef4444;background:#1a0505;color:#ef4444;font-weight:800;font-size:12px;cursor:pointer;">
+          🏦 Creditors (${creditors.length})
+        </button>
+        <button id="sl-tab-debt" onclick="slSwitchTab('debt')"
+          style="flex:1;padding:9px;border-radius:10px;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;font-weight:800;font-size:12px;cursor:pointer;">
+          🧾 Debtors (${debtors.length})
+        </button>
+      </div>
+
+      <!-- Search -->
+      <input id="sl-search" placeholder="🔍 Search by name..." oninput="slRenderList()"
+        style="width:100%;box-sizing:border-box;background:#060d1a;border:1px solid #1e2a45;border-radius:10px;padding:9px 12px;color:#e8eaf0;font-size:13px;outline:none;margin-bottom:10px;" />
+
+      <!-- List -->
+      <div id="sl-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
+    </div>`;
+
+  document.body.appendChild(modalDiv);
+
+  // Close on backdrop click
+  modalDiv.addEventListener("click", e => { if (e.target === modalDiv) modalDiv.remove(); });
+
+  // Store state
+  window._slConnId    = connId;
+  window._slTab       = "cred";
+  window._slCreditors = creditors;
+  window._slDebtors   = debtors;
+
+  slRenderList();
+}
+
+function slSwitchTab(tab) {
+  window._slTab = tab;
+  const credBtn = document.getElementById("sl-tab-cred");
+  const debtBtn = document.getElementById("sl-tab-debt");
+  if (credBtn) {
+    credBtn.style.border   = tab==="cred" ? "2px solid #ef4444" : "2px solid #1e2a45";
+    credBtn.style.background = tab==="cred" ? "#1a0505" : "transparent";
+    credBtn.style.color    = tab==="cred" ? "#ef4444" : "#4a5a7a";
+  }
+  if (debtBtn) {
+    debtBtn.style.border   = tab==="debt" ? "2px solid #22c55e" : "2px solid #1e2a45";
+    debtBtn.style.background = tab==="debt" ? "#021a0a" : "transparent";
+    debtBtn.style.color    = tab==="debt" ? "#22c55e" : "#4a5a7a";
+  }
+  slRenderList();
+}
+
+function slRenderList() {
+  const listEl  = document.getElementById("sl-list");
+  const search  = (document.getElementById("sl-search")?.value || "").toLowerCase();
+  const tab     = window._slTab;
+  const items   = tab === "cred" ? (window._slCreditors || []) : (window._slDebtors || []);
+  const color   = tab === "cred" ? "#ef4444" : "#22c55e";
+  const bgColor = tab === "cred" ? "#1a0505" : "#021a0a";
+
+  const filtered = search
+    ? items.filter(i => (i.name || "").toLowerCase().includes(search))
+    : items;
+
+  if (!listEl) return;
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = `<div style="text-align:center;padding:30px;color:#4a5a7a;font-size:13px;">No ${tab==="cred"?"creditors":"debtors"} found</div>`;
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(item => {
+    const bal = tab === "cred" ? credBalance(item) : debtBalance(item);
+    const balText = bal > 0 ? `owes ₹${bal.toFixed(2)}` : bal < 0 ? `paid ₹${Math.abs(bal).toFixed(2)} extra` : "Settled";
+    const balColor = bal > 0 ? color : "#22c55e";
+    const initials = (item.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+    return `
+      <div onclick="slSelectEntry('${escHtml(item.id)}','${escHtml(item.name || "")}')"
+        style="display:flex;align-items:center;gap:12px;padding:12px;background:#060d1a;border:1px solid #1e2a45;border-radius:12px;cursor:pointer;transition:border 0.15s;"
+        onmouseover="this.style.border='1px solid ${color}'" onmouseout="this.style.border='1px solid #1e2a45'">
+        <div style="width:40px;height:40px;border-radius:10px;background:${bgColor};border:1px solid ${color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:${color};flex-shrink:0;">${initials}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:700;color:#e8eaf0;">${escHtml(item.name || "Unknown")}</div>
+          ${item.gstin ? `<div style="font-size:11px;color:#4a5a7a;font-family:monospace;">${escHtml(item.gstin)}</div>` : ""}
+        </div>
+        <div style="font-size:12px;font-weight:700;color:${balColor};flex-shrink:0;">${balText}</div>
+      </div>`;
+  }).join("");
+}
+
+function slSelectEntry(itemId, itemName) {
+  const connId = window._slConnId;
+  const tab    = window._slTab;
+  const modal  = document.getElementById("sc-share-ledger-modal");
+
+  // Show confirmation inside the modal
+  const listEl = document.getElementById("sl-list");
+  if (listEl) {
+    const color = tab === "cred" ? "#ef4444" : "#22c55e";
+    listEl.innerHTML = `
+      <div style="background:#060d1a;border:2px solid ${color};border-radius:14px;padding:20px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:8px;">${tab==="cred"?"🏦":"🧾"}</div>
+        <div style="font-size:15px;font-weight:800;color:#e8eaf0;margin-bottom:4px;">${escHtml(itemName)}</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-bottom:18px;">Share this ${tab==="cred"?"creditor":"debtor"} ledger with the connected shop?</div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="document.getElementById('sc-share-ledger-modal').remove()"
+            style="flex:1;padding:11px;border-radius:10px;border:1px solid #1e2a45;background:transparent;color:#7a8aaa;font-weight:700;font-size:13px;cursor:pointer;">Cancel</button>
+          <button onclick="scConfirmShareLedger('${connId}','${escHtml(itemId)}','${escHtml(itemName)}')"
+            style="flex:1;padding:11px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:13px;cursor:pointer;">
+            ✅ Confirm Share
+          </button>
+        </div>
+      </div>`;
+  }
+}
+
+async function scConfirmShareLedger(connId, itemId, itemName) {
+  document.getElementById("sc-share-ledger-modal")?.remove();
+  await scToggleLedgerShare(connId, true, itemId, itemName);
+}
+
+async function scToggleLedgerShare(connId, enable, sharedItemId, sharedItemName) {
   const conn = _scConnections.find(c=>c.id===connId);
   if (!conn) return;
   const field = conn.phone_a===authPhone ? "ledger_share_b_to_a" : "ledger_share_a_to_b";
@@ -13354,14 +13568,16 @@ function renderMessagesTab(){
     </div>
     <div id="sc-add-shop-panel" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px;margin-bottom:16px;">
       <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:6px;">🔗 Connect with a Shop</div>
-      <div style="font-size:12px;color:#7a8aaa;margin-bottom:10px;">Ask the other shop their ID (shown above), then enter it here.</div>
-      <div style="display:flex;gap:8px;">
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:10px;">Enter their ShopChampion ID to preview their profile before connecting.</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
         <input class="input" id="sc-add-shop-input" placeholder="SC-123456" maxlength="9"
           style="flex:1;font-family:monospace;font-size:15px;letter-spacing:1px;text-transform:uppercase;"
-          onkeydown="if(event.key==='Enter')scSendConnRequest(this.value)" />
-        <button onclick="scSendConnRequest(document.getElementById('sc-add-shop-input').value)"
-          class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:10px 18px;font-weight:800;">Send →</button>
+          onkeydown="if(event.key==='Enter')scLookupAndPreview(this.value)" />
+        <button onclick="scLookupAndPreview(document.getElementById('sc-add-shop-input').value)"
+          class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#60a5fa;padding:10px 18px;font-weight:800;">🔍 Search</button>
       </div>
+      <div id="sc-shop-preview-status" style="font-size:12px;color:#7a8aaa;min-height:16px;"></div>
+      <div id="sc-shop-preview-card"></div>
     </div>
     ${pendingHtml}
     <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:14px;overflow:hidden;">
@@ -13402,7 +13618,7 @@ async function scOpenChat(peerPhone, connId) {
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0;">
           ${theyShared ? `<button onclick="scRenderSharedLedger('${connId}')"
             style="background:#1a1a3a;border:1px solid #3a4a6a;color:#a78bfa;font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">📋 View Ledger</button>` : ""}
-          <button onclick="scToggleLedgerShare('${connId}',${!iShare})"
+          <button onclick="scShowShareLedgerModal('${connId}',${iShare})"
             style="background:${iShare?"#16653433":"#0a0e1a"};border:1px solid ${iShare?"#22c55e":"#2a3560"};color:${iShare?"#22c55e":"#4a5a7a"};font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">
             ${iShare?"🔓 Shared":"🔒 Share Ledger"}
           </button>
