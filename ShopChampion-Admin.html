@@ -66,12 +66,17 @@ const SC_FIREBASE_CONFIG = {
 };
 const SC_SUPABASE_URL  = "https://dgmzfqwglnafghpfnqau.supabase.co";
 const SC_SUPABASE_ANON = "sb_publishable_yxPk_18wrBIPebrJkYn9FQ_91lhKmjE";
+// FCM VAPID key — get from Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
+// Replace the string below with your actual VAPID key after enabling Cloud Messaging in Firebase Console
+const SC_FCM_VAPID_KEY = "BEKJDBufmyfEAGYMrd05gtDMOAPbzvUaF6gCPFXtvGvc16HPLT7eWYBpppxnZ8Hfmr8HX76gVIRkjGXvRdal4js";
+const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
 </script>
 <!-- Firebase v9 compat (CDN) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -3121,6 +3126,7 @@ function onLoginSuccess(phone) {
       scStartPolling();
       if(currentTab===8) safeRenderTab(8);
     });
+    scInitFCM(); // request push permission and save FCM token
   }, 1200);
 
   // ── Load all per-account settings from localStorage first (fast), then cloud overwrites ──
@@ -3502,13 +3508,23 @@ function renderTab(i){
   else if(i===6)el.innerHTML=renderCreditorsTab();
   else if(i===7)el.innerHTML=renderDebtorsTab();
   else if(i===8){
-    // If a chat is open, don't blow it away - just refresh data silently
+    // If a chat is open, re-render the full chat shell first (DOM was wiped by tab switch)
     if (_scActiveChatPhone) {
-      Promise.all([scLoadConnections(), scLoadPendingRequests()]).then(async()=>{
-        await scLoadMessages(_scActiveChatPhone);
-        scRenderChat(_scActiveChatPhone);
-      });
-      return;
+      const peerConn = _scConnections.find(c=>scPeerPhone(c)===_scActiveChatPhone);
+      if (peerConn) {
+        // Re-render the open chat screen fully, then refresh messages
+        el.innerHTML = renderMessagesTab();
+        // scOpenChat sets up the shell; we call it but skip the "open" scroll effect
+        await scOpenChatShell(_scActiveChatPhone, peerConn.id);
+        Promise.all([scLoadConnections(), scLoadPendingRequests()]).then(async()=>{
+          await scLoadMessages(_scActiveChatPhone);
+          scRenderChat(_scActiveChatPhone);
+          scMarkMessagesRead(_scActiveChatPhone);
+        });
+        return;
+      }
+      // Connection not found — reset chat state
+      _scActiveChatPhone = null;
     }
     el.innerHTML = renderMessagesTab();
     Promise.all([scLoadConnections(), scLoadPendingRequests()]).then(()=>{
@@ -12463,6 +12479,60 @@ let _scConnPollTimer    = null;
 let _scBlockedShopIds   = []; // SC-IDs blocked by this shop (stored in localStorage)
 let _scPeerLedgerCache  = {}; // peerPhone -> { balance, balLabel, name } fetched from peer Firebase
 let _scLedgerUnsub      = null; // active Firestore onSnapshot unsub for open ledger modal
+let _scFcmToken         = null; // FCM push token for this browser/device
+
+// ── FCM: initialise messaging and save token to Supabase ─────────────────────
+async function scInitFCM() {
+  if (!authPhone) return;
+  if (typeof SC_FCM_VAPID_KEY === "undefined" || SC_FCM_VAPID_KEY === "YOUR_VAPID_KEY_HERE") return;
+  try {
+    if (!("Notification" in window)) return;
+    const perm = Notification.permission === "granted"
+      ? "granted"
+      : await Notification.requestPermission();
+    if (perm !== "granted") return;
+    const messaging = firebase.messaging();
+    const reg = await navigator.serviceWorker.getRegistration("/sw.js")
+      || await navigator.serviceWorker.register("/sw.js");
+    const token = await messaging.getToken({ vapidKey: SC_FCM_VAPID_KEY, serviceWorkerRegistration: reg });
+    if (!token) return;
+    _scFcmToken = token;
+    await scSupa(`sc_users?phone=eq.${encodeURIComponent(authPhone)}`, {
+      method:"PATCH", body:JSON.stringify({ fcm_token: token })
+    });
+    // Foreground message: show in-app banner
+    messaging.onMessage(payload => {
+      const { title, body } = payload.notification || {};
+      if (!title) return;
+      const banner = document.createElement("div");
+      banner.style.cssText = "position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#1e3a6e;border:1px solid #2a5aaa;border-radius:14px;padding:12px 18px;font-family:'Nunito',sans-serif;z-index:99999;max-width:340px;width:90%;box-shadow:0 4px 24px #0008;display:flex;gap:10px;align-items:flex-start;";
+      banner.innerHTML = `<div style="font-size:20px;">🔔</div><div><div style="font-weight:800;color:#e8eaf0;font-size:13px;">${escHtml(title)}</div><div style="color:#7a8aaa;font-size:12px;margin-top:2px;">${escHtml(body||"")}</div></div><button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;color:#4a5a7a;font-size:18px;cursor:pointer;flex-shrink:0;">✕</button>`;
+      document.body.appendChild(banner);
+      setTimeout(()=>banner.remove(), 5000);
+    });
+  } catch(e) { /* FCM unsupported or blocked — silently skip */ }
+}
+
+// ── FCM: send push to a target phone (best-effort, never blocks the action) ──
+// Requires SC_FCM_PUSH_URL pointing to your Cloudflare Worker / Vercel function
+// that forwards the { token, title, body } payload to FCM HTTP v1 API
+// using your Firebase service account credentials.
+async function scSendPush(toPhone, title, body) {
+  if (!toPhone || !authPhone) return;
+  if (typeof SC_FCM_PUSH_URL === "undefined" || !SC_FCM_PUSH_URL) return;
+  try {
+    const res = await scSupa(`sc_users?phone=eq.${encodeURIComponent(toPhone)}&select=fcm_token`,
+      {method:"GET",headers:{"Prefer":""}});
+    const users = await res.json();
+    const token = users && users[0] && users[0].fcm_token;
+    if (!token) return;
+    fetch(SC_FCM_PUSH_URL, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ token, title, body })
+    }).catch(()=>{});
+  } catch(e) {}
+}
 
 function scSupa(path, opts={}) {
   return fetch(SC_SUPABASE_URL + "/rest/v1/" + path, {
@@ -12571,6 +12641,7 @@ async function scSendConnRequest(toShopId) {
       status:"pending", created_at:Date.now() })
   });
   notify("✅ Request sent! Waiting for them to accept.");
+  scSendPush(targetPhone, `📨 Connection request from ${scMyShopName()}`, `${scMyShopId()} wants to connect with your shop`);
   const inp = document.getElementById("sc-add-shop-input");
   if (inp) inp.value = "";
 }
@@ -12902,6 +12973,10 @@ async function scToggleLedgerShare(connId, enable, sharedItemId, sharedItemName)
   });
   await scLoadConnections();
   notify(enable ? `✅ "${sharedItemName||"Ledger"}" shared with them` : "🔒 Ledger access revoked");
+  // Push notification to peer
+  const peerPh = scPeerPhone(conn);
+  if (enable) scSendPush(peerPh, `🔓 Ledger shared by ${scMyShopName()}`, `They've shared "${sharedItemName||"their ledger"}" with you`);
+  else         scSendPush(peerPh, `🔒 Ledger access removed by ${scMyShopName()}`, "They've revoked ledger sharing with you");
   // Refresh chat header in place without full re-render (avoids closing chat)
   if (_scActiveChatPhone) {
     const conn2 = _scConnections.find(c=>c.id===connId);
@@ -12926,9 +13001,10 @@ async function scSendMessage(toPhone, body) {
   const id = "MSG"+now+Math.random().toString(36).slice(2,6).toUpperCase();
   await scSupa("sc_messages", {
     method:"POST",
-    body: JSON.stringify({ id, from_phone:authPhone, to_phone:toPhone, body, created_at:now, expires_at:now+7*24*60*60*1000 })
+    body: JSON.stringify({ id, from_phone:authPhone, to_phone:toPhone, body, created_at:now, expires_at:now+7*24*60*60*1000, seen_at:null })
   });
   scTrimMessages(authPhone, toPhone);
+  scSendPush(toPhone, `💬 New message from ${scMyShopName()}`, body.length > 60 ? body.slice(0,57)+"…" : body);
   await scLoadMessages(toPhone);
   scRenderChat(toPhone);
   const inp = document.getElementById("sc-msg-input");
@@ -12967,6 +13043,27 @@ async function scLoadMessages(peerPhone) {
       _scUnreadCounts[peerPhone] = newMsgs.length;
     } else if (_scActiveChatPhone === peerPhone) {
       _scUnreadCounts[peerPhone] = 0;
+      // Mark unseen incoming messages as seen
+      scMarkMessagesRead(peerPhone);
+    }
+  } catch(e){}
+}
+
+async function scMarkMessagesRead(peerPhone) {
+  if (!authPhone || !peerPhone) return;
+  try {
+    const now = Date.now();
+    // PATCH all messages FROM peer TO me that have no seen_at yet
+    await scSupa(
+      `sc_messages?from_phone=eq.${encodeURIComponent(peerPhone)}&to_phone=eq.${encodeURIComponent(authPhone)}&seen_at=is.null`,
+      { method:"PATCH", body:JSON.stringify({ seen_at:now }) }
+    );
+    // Also update local cache so ticks update immediately
+    if (_scMessages[peerPhone]) {
+      _scMessages[peerPhone] = _scMessages[peerPhone].map(m =>
+        (m.from_phone===peerPhone && m.to_phone===authPhone && !m.seen_at)
+          ? {...m, seen_at:now} : m
+      );
     }
   } catch(e){}
 }
@@ -12978,6 +13075,7 @@ function scStartPolling() {
       const prev = (_scMessages[_scActiveChatPhone]||[]).length;
       await scLoadMessages(_scActiveChatPhone);
       if ((_scMessages[_scActiveChatPhone]||[]).length !== prev) scRenderChat(_scActiveChatPhone);
+      scMarkMessagesRead(_scActiveChatPhone);
     }
   }, 4000);
   _scConnPollTimer = setInterval(async()=>{
@@ -13224,7 +13322,7 @@ function scRenderChat(peerPhone) {
     return dateSep + `<div style="display:flex;justify-content:${isMe?"flex-end":"flex-start"};margin-bottom:6px;">
       <div style="max-width:78%;background:${isMe?"linear-gradient(135deg,#1e3a6e,#2a5aaa)":"#0d1220"};border:1px solid ${isMe?"#2a5aaa":"#1e2a45"};border-radius:${isMe?"14px 14px 4px 14px":"14px 14px 14px 4px"};padding:9px 13px;">
         <div style="font-size:14px;color:#e8eaf0;line-height:1.5;word-break:break-word;">${escHtml(m.body)}</div>
-        <div style="font-size:10px;color:${isMe?"#6a9ade":"#4a5a7a"};margin-top:3px;text-align:right;">${timeStr}</div>
+        <div style="font-size:10px;color:${isMe?"#6a9ade":"#4a5a7a"};margin-top:3px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px;">${timeStr}${isMe ? `<span style="font-size:12px;line-height:1;color:${m.seen_at?"#4fc3f7":"#4a5a7a"};" title="${m.seen_at?"Seen":"Sent"}">${m.seen_at?"✓✓":"✓"}</span>` : ""}</div>
       </div>
     </div>`;
   }).join("");
@@ -13879,6 +13977,50 @@ function scShowAddShop() {
   if (p) p.style.display = p.style.display==="none" ? "block" : "none";
 }
 
+// Rebuilds the chat shell UI for an already-open chat (e.g. after tab switch wipes DOM)
+// Does NOT change _scActiveChatPhone — assumes it's already set
+async function scOpenChatShell(peerPhone, connId) {
+  const conn = _scConnections.find(c => c.id === connId);
+  const peerName   = conn ? scPeerName(conn)   : peerPhone;
+  const peerShopId = conn ? scPeerShopId(conn) : "";
+  const iShare     = conn ? scIShareWithPeer(conn) : false;
+  const theyShared = conn ? scLedgerSharedToMe(conn) : false;
+  const el = document.getElementById("tab-content");
+  if (!el) return;
+  // Replace the messages-tab content with the open-chat shell
+  el.innerHTML = `
+    <div style="width:100%;display:flex;flex-direction:column;height:calc(100vh - 160px);max-height:680px;">
+      <div style="display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid #1e2a45;margin-bottom:10px;flex-shrink:0;">
+        <button onclick="scCloseChat()" style="background:transparent;border:none;color:#60a5fa;font-size:22px;cursor:pointer;padding:2px 8px 2px 0;">←</button>
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;">
+          ${peerName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:800;color:#e8eaf0;">${escHtml(peerName)}</div>
+          <div style="font-size:11px;color:#60a5fa;font-family:monospace;">${escHtml(peerShopId)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0;">
+          ${theyShared ? `<button onclick="scRenderSharedLedger('${connId}')"
+            style="background:#1a1a3a;border:1px solid #3a4a6a;color:#a78bfa;font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">📋 View Ledger</button>` : ""}
+          <button id="sc-share-ledger-btn" onclick="scShowShareLedgerModal('${connId}',${iShare})"
+            style="background:${iShare?"#16653433":"#0a0e1a"};border:1px solid ${iShare?"#22c55e":"#2a3560"};color:${iShare?"#22c55e":"#4a5a7a"};font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">
+            ${iShare?"🔓 Shared":"🔒 Share Ledger"}
+          </button>
+          <button onclick="scUnlinkShop('${connId}')"
+            style="background:#1a0a0a;border:1px solid #3a1a1a;color:#7f1d1d;font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">🔗✕ Unlink</button>
+        </div>
+      </div>
+      <div id="sc-chat-messages" style="flex:1;overflow-y:auto;padding:4px 2px;"></div>
+      <div style="display:flex;gap:8px;padding-top:10px;border-top:1px solid #1e2a45;flex-shrink:0;margin-top:6px;">
+        <input class="input" id="sc-msg-input" placeholder="Type a message..."
+          style="flex:1;font-size:14px;"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();scSendMessage('${peerPhone}',this.value);}" />
+        <button onclick="scSendMessage('${peerPhone}',document.getElementById('sc-msg-input').value)"
+          class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;padding:10px 16px;font-size:16px;border:1px solid #2a5aaa;">➤</button>
+      </div>
+    </div>`;
+}
+
 async function scOpenChat(peerPhone, connId) {
   _scActiveChatPhone = peerPhone;
   _scUnreadCounts[peerPhone] = 0;
@@ -13892,8 +14034,7 @@ async function scOpenChat(peerPhone, connId) {
   const theyShared  = conn ? scLedgerSharedToMe(conn) : false;
 
   await scLoadMessages(peerPhone);
-
-  const el = document.getElementById("tab-content");
+  scMarkMessagesRead(peerPhone);
   el.innerHTML = `
     <div style="width:100%;display:flex;flex-direction:column;height:calc(100vh - 160px);max-height:680px;">
       <div style="display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid #1e2a45;margin-bottom:10px;flex-shrink:0;">

@@ -55,3 +55,46 @@ self.addEventListener("fetch", event => {
       .catch(() => caches.match(event.request))
   );
 });
+
+// ── FCM background push messages ─────────────────────────────────────────────
+// Firebase Messaging SDK injected by importScripts when FCM is active
+try {
+  importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
+  importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js");
+
+  firebase.initializeApp({
+    apiKey:            "AIzaSyAdNjL9gCptnAbJ6ZVm9BZ61rKfBtwc1Qc",
+    authDomain:        "shop-champion.firebaseapp.com",
+    projectId:         "shop-champion",
+    storageBucket:     "shop-champion.firebasestorage.app",
+    messagingSenderId: "81324128909",
+    appId:             "1:81324128909:web:cc023f5c031c505bfe00c4"
+  });
+
+  const messaging = firebase.messaging();
+
+  messaging.onBackgroundMessage(payload => {
+    const { title = "ShopChampion", body = "" } = payload.notification || {};
+    return self.registration.showNotification(title, {
+      body,
+      icon: "/icon-192.png",
+      badge: "/icon-96.png",
+      tag: "sc-notification",
+      renotify: true,
+      data: { url: "/ShopChampion-Admin.html#tab8" }
+    });
+  });
+
+  self.addEventListener("notificationclick", event => {
+    event.notification.close();
+    const target = (event.notification.data && event.notification.data.url) || "/ShopChampion-Admin.html";
+    event.waitUntil(
+      clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
+        for (const client of list) {
+          if (client.url.includes("ShopChampion-Admin") && "focus" in client) return client.focus();
+        }
+        return clients.openWindow(target);
+      })
+    );
+  });
+} catch(e) { /* FCM scripts unavailable (file:// or offline) — skip */ }
