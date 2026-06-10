@@ -1331,10 +1331,27 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 
     <!-- STEP 2b: Create Password (new user — no OTP) -->
     <div id="auth-step-newpass" style="display:none;">
-      <div style="font-size:13px;color:#FFD700;font-weight:700;margin-bottom:4px;">🎉 Welcome! Create your password</div>
-      <div style="font-size:12px;color:#7a8aaa;margin-bottom:16px;">New account for +91 <span id="auth-newpass-phone"></span></div>
+      <div style="font-size:13px;color:#FFD700;font-weight:700;margin-bottom:4px;">🎉 Welcome! Set up your shop</div>
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:14px;">New account for +91 <span id="auth-newpass-phone"></span></div>
+      <input class="input" type="text" id="auth-shop-name" placeholder="🏪 Your Shop Name (required)" style="text-align:center;font-size:15px;margin-bottom:10px;font-weight:700;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
       <input class="input" type="password" id="auth-newpass1" placeholder="Create password (min 4 chars)" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
       <input class="input" type="password" id="auth-newpass2" placeholder="Confirm password" style="text-align:center;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
+      <!-- Security Question Section -->
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;text-align:left;">
+        <div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:8px;">🛡️ Security Question <span style="font-size:10px;color:#4a5a7a;font-weight:400;">— for password recovery</span></div>
+        <select class="input" id="auth-secq-select" style="margin-bottom:8px;font-size:13px;">
+          <option value="">-- Pick a question --</option>
+          <option value="What is your favourite actor's name?">What is your favourite actor's name?</option>
+          <option value="What is your favourite cricketer's name?">What is your favourite cricketer's name?</option>
+          <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+          <option value="What was the name of your first school?">What was the name of your first school?</option>
+          <option value="What is your childhood nickname?">What is your childhood nickname?</option>
+          <option value="What is your favourite city?">What is your favourite city?</option>
+          <option value="What is the name of your first pet?">What is the name of your first pet?</option>
+          <option value="What is your favourite teacher's name?">What is your favourite teacher's name?</option>
+        </select>
+        <input class="input" type="text" id="auth-secq-ans-reg" placeholder="Your answer (remember this!)" style="font-size:13px;" />
+      </div>
       <div id="auth-new-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
       <button class="btn" onclick="setNewPassword()" id="new-save-btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:8px;">
         <span id="new-save-txt">Create Account & Login →</span>
@@ -1342,12 +1359,40 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <button onclick="authGoBack()" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;">← Change number</button>
     </div>
 
-    <!-- STEP 3: Forgot password info -->
+    <!-- STEP 3: Forgot password — enter phone then answer security question -->
     <div id="auth-step-forgot" style="display:none;">
       <div style="font-size:36px;margin-bottom:12px;">🔑</div>
-      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:10px;">Forgot Password?</div>
-      <div style="font-size:12px;color:#7a8aaa;line-height:1.8;margin-bottom:20px;">Contact your ShopChampion admin to reset your password.<br><br>They can reset it for you from the <strong style="color:#e8eaf0;">Seller Panel → Users</strong> section.</div>
-      <button onclick="authGoBack()" style="background:linear-gradient(135deg,#1e2a45,#2a3560);border:none;color:#e8eaf0;font-size:13px;font-weight:700;cursor:pointer;border-radius:8px;padding:10px 20px;width:100%;">← Back to Login</button>
+      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:6px;">Forgot Password?</div>
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:16px;">We'll verify your identity with your security question.</div>
+      <button onclick="startForgotFlow()" style="background:linear-gradient(135deg,#FFD700,#FFA500);border:none;color:#1a0a00;font-size:14px;font-weight:800;cursor:pointer;border-radius:10px;padding:12px 20px;width:100%;margin-bottom:10px;">Answer Security Question →</button>
+      <button onclick="authGoBack()" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;">← Back to Login</button>
+    </div>
+
+    <!-- STEP 4: Security question answer -->
+    <div id="auth-step-secq" style="display:none;">
+      <div style="font-size:32px;margin-bottom:10px;">🛡️</div>
+      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:6px;">Security Question</div>
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:14px;">Answer correctly to reset your password.</div>
+      <div id="auth-secq-question" style="background:#0a0e1a;border:1px solid #2a3560;border-radius:10px;padding:12px;font-size:13px;color:#e8eaf0;font-weight:700;margin-bottom:12px;text-align:left;"></div>
+      <input class="input" type="text" id="auth-secq-answer" placeholder="Your answer" style="text-align:center;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')verifySecurityAnswer()"/>
+      <div id="auth-secq-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
+      <button class="btn" onclick="verifySecurityAnswer()" id="secq-verify-btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:8px;">
+        <span id="secq-verify-txt">Verify Answer →</span>
+      </button>
+      <button onclick="authShowStep('forgot')" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;">← Back</button>
+    </div>
+
+    <!-- STEP 5: Set new password after security question passed -->
+    <div id="auth-step-resetpass" style="display:none;">
+      <div style="font-size:32px;margin-bottom:10px;">🔓</div>
+      <div style="font-size:14px;font-weight:800;color:#4f4;margin-bottom:6px;">✅ Identity Verified!</div>
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:16px;">Create a new password for +91 <span id="auth-reset-phone"></span></div>
+      <input class="input" type="password" id="auth-resetpass1" placeholder="New password (min 4 chars)" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')submitResetPassword()"/>
+      <input class="input" type="password" id="auth-resetpass2" placeholder="Confirm new password" style="text-align:center;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')submitResetPassword()"/>
+      <div id="auth-reset-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
+      <button class="btn" onclick="submitResetPassword()" id="reset-save-btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:8px;">
+        <span id="reset-save-txt">Save New Password →</span>
+      </button>
     </div>
 
   </div>
@@ -2633,7 +2678,7 @@ function storageKey(key) {
 
 // ── Helpers ──
 function authShowStep(step) {
-  ["auth-step-phone","auth-step-password","auth-step-newpass","auth-step-otp","auth-step-setpass","auth-step-forgot"]
+  ["auth-step-phone","auth-step-password","auth-step-newpass","auth-step-otp","auth-step-setpass","auth-step-forgot","auth-step-secq","auth-step-resetpass"]
     .forEach(id => { const el=document.getElementById(id); if(el) el.style.display="none"; });
   const el = document.getElementById("auth-step-"+step);
   if(el) el.style.display = "block";
@@ -2861,6 +2906,109 @@ function showForgotPassword() {
   authShowStep("forgot");
 }
 
+// ── Security Question Reset Flow ───────────────────────────────
+function startForgotFlow() {
+  // authPhone is already set from checkPhone() step
+  if (!authPhone) { authShowStep("phone"); return; }
+  authShowStep("secq");
+  loadSecurityQuestion(authPhone);
+}
+
+async function loadSecurityQuestion(phone) {
+  const qEl = document.getElementById("auth-secq-question");
+  const errEl = document.getElementById("auth-secq-err");
+  if (qEl) qEl.textContent = "Loading...";
+  if (errEl) { errEl.style.display = "none"; }
+  try {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=security_question`, {
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    });
+    const rows = await res.json();
+    if (rows && rows[0] && rows[0].security_question) {
+      if (qEl) qEl.textContent = "❓ " + rows[0].security_question;
+    } else {
+      if (qEl) qEl.textContent = "⚠️ No security question set for this account.";
+      if (errEl) {
+        errEl.textContent = "This account was created before security questions were added. Contact admin.";
+        errEl.style.display = "block";
+      }
+    }
+  } catch(e) {
+    if (qEl) qEl.textContent = "❌ Could not load question. Check connection.";
+  }
+}
+
+async function verifySecurityAnswer() {
+  const answer = (document.getElementById("auth-secq-answer")?.value || "").trim().toLowerCase();
+  const errEl = document.getElementById("auth-secq-err");
+  const btn = document.getElementById("secq-verify-btn");
+  const txt = document.getElementById("secq-verify-txt");
+  errEl.style.display = "none";
+  if (!answer) { errEl.textContent = "❌ Please enter your answer"; errEl.style.display = "block"; return; }
+
+  if (btn) btn.disabled = true;
+  if (txt) txt.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Verifying...`;
+
+  try {
+    const hashed = await scHashPassword(authPhone, answer);
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(authPhone)}&select=security_answer_hash`, {
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    });
+    const rows = await res.json();
+    if (rows && rows[0] && rows[0].security_answer_hash === hashed) {
+      // Correct — go to reset password
+      const resetPhoneEl = document.getElementById("auth-reset-phone");
+      if (resetPhoneEl) resetPhoneEl.textContent = authPhone;
+      authShowStep("resetpass");
+    } else {
+      errEl.textContent = "❌ Wrong answer. Please try again.";
+      errEl.style.display = "block";
+      if (btn) btn.disabled = false;
+      if (txt) txt.textContent = "Verify Answer →";
+    }
+  } catch(e) {
+    errEl.textContent = "❌ Error verifying. Check your connection.";
+    errEl.style.display = "block";
+    if (btn) btn.disabled = false;
+    if (txt) txt.textContent = "Verify Answer →";
+  }
+}
+
+async function submitResetPassword() {
+  const p1 = (document.getElementById("auth-resetpass1")?.value || "").trim();
+  const p2 = (document.getElementById("auth-resetpass2")?.value || "").trim();
+  const errEl = document.getElementById("auth-reset-err");
+  const btn = document.getElementById("reset-save-btn");
+  const txt = document.getElementById("reset-save-txt");
+  errEl.style.display = "none";
+
+  if (!p1 || p1.length < 4) { errEl.textContent = "❌ Password must be at least 4 characters"; errEl.style.display = "block"; return; }
+  if (p1 !== p2) { errEl.textContent = "❌ Passwords don't match"; errEl.style.display = "block"; return; }
+
+  if (btn) btn.disabled = true;
+  if (txt) txt.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Saving...`;
+
+  const hashed = await scHashPassword(authPhone, p1);
+  try {
+    await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(authPhone)}`, {
+      method: "PATCH",
+      headers: {
+        "apikey": SC_SUPABASE_ANON,
+        "Authorization": "Bearer " + SC_SUPABASE_ANON,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+      },
+      body: JSON.stringify({ password_hash: hashed })
+    });
+  } catch(e) { /* save locally even if Supabase fails */ }
+
+  localStorage.setItem("sc_user_" + authPhone, hashed);
+  localStorage.setItem("sc_auth_phone", authPhone);
+  notify("✅ Password reset successfully!");
+  onLoginSuccess(authPhone);
+}
+// ── End Security Question Reset Flow ───────────────────────────
+
 // ── Step 3: Verify OTP — REMOVED (no OTP flow) ──
 // Kept as stub to avoid any legacy calls
 function verifyOTPAndProceed() {
@@ -2882,6 +3030,15 @@ async function setNewPassword() {
   const errEl = document.getElementById("auth-new-err");
   errEl.style.display = "none";
 
+  const shopNameReg = (document.getElementById("auth-shop-name")?.value || "").trim();
+  const secQ = (document.getElementById("auth-secq-select")?.value || "").trim();
+  const secA = (document.getElementById("auth-secq-ans-reg")?.value || "").trim().toLowerCase();
+  if (authMode === "new_user" && !shopNameReg) {
+    errEl.textContent = "❌ Please enter your shop name";
+    errEl.style.display = "block";
+    document.getElementById("auth-shop-name")?.focus();
+    return;
+  }
   if (!p1 || p1.length < 4) {
     errEl.textContent = "❌ Password must be at least 4 characters";
     errEl.style.display = "block";
@@ -2889,6 +3046,16 @@ async function setNewPassword() {
   }
   if (p1 !== p2) {
     errEl.textContent = "❌ Passwords don't match";
+    errEl.style.display = "block";
+    return;
+  }
+  if (authMode === "new_user" && !secQ) {
+    errEl.textContent = "❌ Please select a security question";
+    errEl.style.display = "block";
+    return;
+  }
+  if (authMode === "new_user" && !secA) {
+    errEl.textContent = "❌ Please enter your security answer";
     errEl.style.display = "block";
     return;
   }
@@ -2912,7 +3079,7 @@ async function setNewPassword() {
           "Content-Type": "application/json",
           "Prefer": "return=minimal"
         },
-        body: JSON.stringify({ phone: authPhone, password_hash: hashed, created_at: new Date().toISOString(), user_number: userNum })
+        body: JSON.stringify({ phone: authPhone, password_hash: hashed, created_at: new Date().toISOString(), user_number: userNum, security_question: secQ, security_answer_hash: secQ ? await scHashPassword(authPhone, secA) : "", shop_name: shopNameReg })
       });
     } else {
       // Update existing password
@@ -2932,7 +3099,14 @@ async function setNewPassword() {
   // Save locally
   localStorage.setItem("sc_user_" + authPhone, hashed);
   localStorage.setItem("sc_auth_phone", authPhone);
-  if (authMode === "new_user") localStorage.setItem("sc_usernum_" + authPhone, userNum);
+  if (authMode === "new_user") {
+    localStorage.setItem("sc_usernum_" + authPhone, userNum);
+    if (shopNameReg) {
+      appSettings.shopName = shopNameReg;
+      try { localStorage.setItem("sc_app_settings", JSON.stringify(appSettings)); } catch {}
+      try { localStorage.setItem(storageKey("app_settings"), JSON.stringify(appSettings)); } catch {}
+    }
+  }
   onLoginSuccess(authPhone);
 }
 
@@ -2941,6 +3115,13 @@ function onLoginSuccess(phone) {
   _loginSuccessFired = true;
   document.getElementById("login-screen").style.display = "none";
   document.getElementById("main-app").style.display = "block";
+  // Init ShopChat
+  setTimeout(()=>{
+    scLoadConnections().then(()=>scLoadPendingRequests()).then(()=>{
+      scStartPolling();
+      if(currentTab===8) safeRenderTab(8);
+    });
+  }, 1200);
 
   // ── Load all per-account settings from localStorage first (fast), then cloud overwrites ──
   try { const ds=localStorage.getItem(storageKey("display_settings")); if(ds) displaySettings={...displaySettings,...JSON.parse(ds)}; } catch {}
@@ -3320,7 +3501,13 @@ function renderTab(i){
   else if(i===5)el.innerHTML=renderInventoryTab();
   else if(i===6)el.innerHTML=renderCreditorsTab();
   else if(i===7)el.innerHTML=renderDebtorsTab();
-  else if(i===8)el.innerHTML=renderMessagesTab();
+  else if(i===8){
+    el.innerHTML = renderMessagesTab();
+    Promise.all([scLoadConnections(), scLoadPendingRequests()]).then(()=>{
+      const loads = _scConnections.map(c => scLoadMessages(scPeerPhone(c)));
+      return Promise.all(loads);
+    }).then(()=>{ el.innerHTML = renderMessagesTab(); });
+  }
   else if(i===9)el.innerHTML=renderSettings();
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
 }
@@ -12261,6 +12448,306 @@ function _invLogCreditorPurchase(creditorId, itemName, qty, cost, date, notes){
 let _shopRequestsCache = []; // cached list of pending requests for this shop
 let _autoAcceptedListener = null; // live listener for auto_accepted docs
 
+// ══════════════════════════════════════════════════════════════════
+// ShopChat — Supabase-backed messaging
+// ══════════════════════════════════════════════════════════════════
+let _scConnections   = [];
+let _scPendingReqs   = [];
+let _scActiveChatPhone = null;
+let _scMessages      = {};
+let _scUnreadCounts  = {};
+let _scPollTimer     = null;
+let _scConnPollTimer = null;
+
+function scSupa(path, opts={}) {
+  return fetch(SC_SUPABASE_URL + "/rest/v1/" + path, {
+    ...opts,
+    headers: {
+      "apikey": SC_SUPABASE_ANON,
+      "Authorization": "Bearer " + SC_SUPABASE_ANON,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal",
+      ...(opts.headers||{})
+    }
+  });
+}
+
+function scMyShopId()  { return authPhone ? "SC-" + String(authPhone).slice(-6) : ""; }
+function scMyShopName(){ return (appSettings&&appSettings.shopName) ? appSettings.shopName : "My Shop"; }
+
+async function scSendConnRequest(toShopId) {
+  toShopId = (toShopId||"").trim().toUpperCase();
+  if (!authPhone) { notify("❌ Not logged in","error"); return; }
+  if (!toShopId || !/^SC-\d{6}$/i.test(toShopId)) { notify("❌ Invalid Shop ID. Format: SC-123456","error"); return; }
+  if (toShopId === scMyShopId()) { notify("❌ That's your own Shop ID","error"); return; }
+  const suffix = toShopId.replace(/^SC-/i,"");
+  const searchRes = await scSupa(`sc_users?phone=like.*${suffix}&select=phone`, {method:"GET",headers:{"Prefer":""}});
+  const users = await searchRes.json();
+  if (!users || users.length === 0) { notify("❌ Shop ID not found — check the ID","error"); return; }
+  const targetPhone = users[0].phone;
+  const alreadyConn = _scConnections.find(c => c.phone_a===targetPhone||c.phone_b===targetPhone);
+  if (alreadyConn) { notify("⚠️ Already connected with this shop"); return; }
+  const existRes = await scSupa(`sc_conn_requests?from_phone=eq.${encodeURIComponent(authPhone)}&to_phone=eq.${encodeURIComponent(targetPhone)}&status=eq.pending&select=id`, {method:"GET",headers:{"Prefer":""}});
+  const existing = await existRes.json();
+  if (existing && existing.length > 0) { notify("⚠️ Request already sent"); return; }
+  const id = "REQ" + Date.now() + Math.random().toString(36).slice(2,6).toUpperCase();
+  await scSupa("sc_conn_requests", {
+    method:"POST",
+    body: JSON.stringify({ id, from_phone:authPhone, to_phone:targetPhone,
+      from_shop_name:scMyShopName(), from_shop_id:scMyShopId(),
+      status:"pending", created_at:Date.now() })
+  });
+  notify("✅ Request sent! Waiting for them to accept.");
+  const inp = document.getElementById("sc-add-shop-input");
+  if (inp) inp.value = "";
+}
+
+async function scLoadConnections() {
+  if (!authPhone) return;
+  try {
+    const res = await scSupa(`sc_connections?or=(phone_a.eq.${encodeURIComponent(authPhone)},phone_b.eq.${encodeURIComponent(authPhone)})&select=*`, {method:"GET",headers:{"Prefer":""}});
+    _scConnections = await res.json() || [];
+  } catch(e) { _scConnections = []; }
+}
+
+async function scLoadPendingRequests() {
+  if (!authPhone) return;
+  try {
+    const res = await scSupa(`sc_conn_requests?to_phone=eq.${encodeURIComponent(authPhone)}&status=eq.pending&select=*&order=created_at.desc`, {method:"GET",headers:{"Prefer":""}});
+    const reqs = await res.json() || [];
+    _scPendingReqs = reqs;
+    _shopRequestsUnread = reqs.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
+  } catch(e) { _scPendingReqs = []; }
+}
+
+async function scAcceptRequest(reqId) {
+  const req = _scPendingReqs.find(r => r.id === reqId);
+  if (!req) return;
+  const connId = "CONN" + Date.now();
+  await scSupa("sc_connections", {
+    method:"POST",
+    body: JSON.stringify({
+      id:connId, phone_a:req.from_phone, phone_b:authPhone,
+      shop_name_a:req.from_shop_name||"Unknown Shop", shop_name_b:scMyShopName(),
+      shop_id_a:req.from_shop_id||("SC-"+String(req.from_phone).slice(-6)), shop_id_b:scMyShopId(),
+      ledger_share_a_to_b:false, ledger_share_b_to_a:false, created_at:Date.now()
+    })
+  });
+  await scSupa(`sc_conn_requests?id=eq.${encodeURIComponent(reqId)}`, {
+    method:"PATCH", body:JSON.stringify({status:"accepted"})
+  });
+  _scPendingReqs = _scPendingReqs.filter(r=>r.id!==reqId);
+  _shopRequestsUnread = _scPendingReqs.length;
+  await scLoadConnections();
+  notify("✅ Connected! You can now chat.");
+  safeRenderTab(currentTab);
+}
+
+async function scDeclineRequest(reqId) {
+  await scSupa(`sc_conn_requests?id=eq.${encodeURIComponent(reqId)}`, {
+    method:"PATCH", body:JSON.stringify({status:"declined"})
+  });
+  _scPendingReqs = _scPendingReqs.filter(r=>r.id!==reqId);
+  _shopRequestsUnread = _scPendingReqs.length;
+  safeRenderTab(currentTab);
+}
+
+function scPeerPhone(conn){ return conn.phone_a===authPhone ? conn.phone_b : conn.phone_a; }
+function scPeerName(conn) { return conn.phone_a===authPhone ? (conn.shop_name_b||"Shop") : (conn.shop_name_a||"Shop"); }
+function scPeerShopId(conn){ return conn.phone_a===authPhone ? (conn.shop_id_b||"") : (conn.shop_id_a||""); }
+function scLedgerSharedToMe(conn){ return conn.phone_a===authPhone ? conn.ledger_share_a_to_b : conn.ledger_share_b_to_a; }
+function scIShareWithPeer(conn)  { return conn.phone_a===authPhone ? conn.ledger_share_b_to_a : conn.ledger_share_a_to_b; }
+
+async function scToggleLedgerShare(connId, enable) {
+  const conn = _scConnections.find(c=>c.id===connId);
+  if (!conn) return;
+  const field = conn.phone_a===authPhone ? "ledger_share_b_to_a" : "ledger_share_a_to_b";
+  await scSupa(`sc_connections?id=eq.${encodeURIComponent(connId)}`, {
+    method:"PATCH", body:JSON.stringify({[field]:enable})
+  });
+  await scLoadConnections();
+  notify(enable ? "✅ Ledger shared with them" : "🔒 Ledger access revoked");
+  if (_scActiveChatPhone) {
+    const conn2 = _scConnections.find(c=>c.id===connId);
+    if (conn2) scOpenChat(scPeerPhone(conn2), connId);
+  } else safeRenderTab(currentTab);
+}
+
+async function scSendMessage(toPhone, body) {
+  body = (body||"").trim();
+  if (!body || !authPhone) return;
+  const now = Date.now();
+  const id = "MSG"+now+Math.random().toString(36).slice(2,6).toUpperCase();
+  await scSupa("sc_messages", {
+    method:"POST",
+    body: JSON.stringify({ id, from_phone:authPhone, to_phone:toPhone, body, created_at:now, expires_at:now+7*24*60*60*1000 })
+  });
+  scTrimMessages(authPhone, toPhone);
+  await scLoadMessages(toPhone);
+  scRenderChat(toPhone);
+  const inp = document.getElementById("sc-msg-input");
+  if (inp) { inp.value=""; inp.focus(); }
+}
+
+async function scTrimMessages(p1, p2) {
+  try {
+    await scSupa(`sc_messages?expires_at=lt.${Date.now()}`, {method:"DELETE"});
+    const res = await scSupa(
+      `sc_messages?or=(and(from_phone.eq.${encodeURIComponent(p1)},to_phone.eq.${encodeURIComponent(p2)}),and(from_phone.eq.${encodeURIComponent(p2)},to_phone.eq.${encodeURIComponent(p1)}))&order=created_at.asc&select=id`,
+      {method:"GET",headers:{"Prefer":""}}
+    );
+    const all = await res.json()||[];
+    if (all.length > 50) {
+      const toDelete = all.slice(0, all.length-50);
+      for (const m of toDelete) await scSupa(`sc_messages?id=eq.${encodeURIComponent(m.id)}`, {method:"DELETE"});
+    }
+  } catch(e){}
+}
+
+async function scLoadMessages(peerPhone) {
+  if (!authPhone) return;
+  try {
+    const res = await scSupa(
+      `sc_messages?or=(and(from_phone.eq.${encodeURIComponent(authPhone)},to_phone.eq.${encodeURIComponent(peerPhone)}),and(from_phone.eq.${encodeURIComponent(peerPhone)},to_phone.eq.${encodeURIComponent(authPhone)}))&order=created_at.asc&select=*&limit=50`,
+      {method:"GET",headers:{"Prefer":""}}
+    );
+    const msgs = await res.json()||[];
+    const prev = (_scMessages[peerPhone]||[]).length;
+    _scMessages[peerPhone] = msgs;
+    if (msgs.length > prev && _scActiveChatPhone !== peerPhone) {
+      _scUnreadCounts[peerPhone] = (_scUnreadCounts[peerPhone]||0) + (msgs.length-prev);
+    }
+  } catch(e){}
+}
+
+function scStartPolling() {
+  scStopPolling();
+  _scPollTimer = setInterval(async()=>{
+    if (_scActiveChatPhone) {
+      const prev = (_scMessages[_scActiveChatPhone]||[]).length;
+      await scLoadMessages(_scActiveChatPhone);
+      if ((_scMessages[_scActiveChatPhone]||[]).length !== prev) scRenderChat(_scActiveChatPhone);
+    }
+  }, 4000);
+  _scConnPollTimer = setInterval(async()=>{
+    await scLoadPendingRequests();
+  }, 15000);
+}
+function scStopPolling() {
+  if (_scPollTimer)     { clearInterval(_scPollTimer);     _scPollTimer=null; }
+  if (_scConnPollTimer) { clearInterval(_scConnPollTimer); _scConnPollTimer=null; }
+}
+
+function scGetSharedBalance(conn) {
+  if (!scLedgerSharedToMe(conn)) return null;
+  const peer = scPeerPhone(conn);
+  const sid  = scPeerShopId(conn);
+  const cr = getCreditors().find(c=>c._connectedShopId===sid||c._connectedPhone===peer);
+  if (cr) return { type:"creditor", balance:credBalance(cr) };
+  const dr = getDebtors().find(d=>d._connectedShopId===sid||d._connectedPhone===peer);
+  if (dr) return { type:"debtor", balance:debtBalance(dr) };
+  return null;
+}
+
+function scRenderSharedLedger(connId) {
+  const conn = _scConnections.find(c=>c.id===connId);
+  if (!conn) return;
+  if (!scLedgerSharedToMe(conn)) { notify("⚠️ They haven't shared their ledger with you","error"); return; }
+  const peer = scPeerPhone(conn);
+  const sid  = scPeerShopId(conn);
+  const name = scPeerName(conn);
+  const cr = getCreditors().find(c=>c._connectedShopId===sid||c._connectedPhone===peer);
+  const dr = getDebtors().find(d=>d._connectedShopId===sid||d._connectedPhone===peer);
+  const entity = cr||dr;
+  const etype  = cr?"creditor":"debtor";
+  if (!entity) {
+    showModal(`<div style="padding:24px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:12px;">📋</div>
+      <div style="font-size:15px;font-weight:800;color:#e8eaf0;margin-bottom:8px;">No Ledger Found</div>
+      <div style="font-size:13px;color:#7a8aaa;">No creditor/debtor record linked to <b style="color:#FFD700;">${escHtml(name)}</b> found.<br>They shared access but you haven't recorded any transactions yet.</div>
+    </div>`);
+    return;
+  }
+  const txns = entity.transactions||[];
+  const bal  = etype==="creditor" ? credBalance(entity) : debtBalance(entity);
+  const balColor = bal>0?"#ef4444":"#22c55e";
+  const balLabel = etype==="creditor"
+    ? (bal>0?`You owe ₹${bal.toFixed(2)}`:`Overpaid ₹${Math.abs(bal).toFixed(2)}`)
+    : (bal>0?`They owe ₹${bal.toFixed(2)}`:`You owe ₹${Math.abs(bal).toFixed(2)}`);
+  const csvRows = [["Type","Amount","Date","Notes"],...txns.map(t=>[t.type,t.amount||0,t.date||"",t.notes||t.bill||""])];
+  const csv = csvRows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("
+");
+  const csvUrl = "data:text/csv;charset=utf-8,"+encodeURIComponent(csv);
+  const rows = txns.slice().reverse().map(t=>{
+    const icon = t.type==="purchase"||t.type==="sale"?"📦":t.type==="payment"||t.type==="receipt"?"💸":"↩️";
+    const lbl  = {purchase:"Purchase",payment:"Payment",return:"Return",sale:"Sale",receipt:"Receipt"}[t.type]||t.type;
+    const col  = t.type==="payment"||t.type==="receipt"?"#22c55e":t.type==="return"?"#fb923c":"#e8eaf0";
+    const dt   = t.date ? new Date(t.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "";
+    return `<tr><td style="padding:9px 8px;font-size:13px;">${icon} ${lbl}</td>
+      <td style="padding:9px 8px;font-size:13px;color:${col};font-weight:700;">₹${Number(t.amount||0).toFixed(2)}</td>
+      <td style="padding:9px 8px;font-size:12px;color:#7a8aaa;">${dt}</td>
+      <td style="padding:9px 8px;font-size:12px;color:#7a8aaa;">${escHtml(t.notes||t.bill||"")}</td></tr>`;
+  }).join("");
+  showModal(`<div style="max-height:78vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+      <div style="font-size:28px;">📋</div>
+      <div style="flex:1;">
+        <div style="font-size:17px;font-weight:800;color:#e8eaf0;">${escHtml(name)}</div>
+        <div style="font-size:12px;color:#7a8aaa;">${etype==="creditor"?"Creditor (Supplier)":"Debtor (Buyer)"} · ${escHtml(sid)}</div>
+      </div>
+      <a href="${csvUrl}" download="${escHtml(name)}-ledger.csv"
+        style="background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;font-size:12px;font-weight:800;border-radius:8px;padding:7px 14px;text-decoration:none;">⬇ Export CSV</a>
+    </div>
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:13px;color:#7a8aaa;">Closing Balance</div>
+      <div style="font-size:18px;font-weight:800;color:${balColor};">${balLabel}</div>
+    </div>
+    ${txns.length===0?'<div style="text-align:center;padding:30px;color:#4a5a7a;">No transactions yet</div>':`
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="border-bottom:1px solid #1e2a45;">
+        <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">TYPE</th>
+        <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">AMOUNT</th>
+        <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">DATE</th>
+        <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">NOTES</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`}
+  </div>`);
+}
+
+function scRenderChat(peerPhone) {
+  const container = document.getElementById("sc-chat-messages");
+  if (!container) return;
+  const msgs = _scMessages[peerPhone]||[];
+  if (msgs.length===0) {
+    container.innerHTML=`<div style="text-align:center;padding:40px 20px;color:#4a5a7a;"><div style="font-size:36px;margin-bottom:10px;">👋</div><div style="font-size:13px;">No messages yet — say hello!</div></div>`;
+    return;
+  }
+  let prevDate = "";
+  container.innerHTML = msgs.map(m=>{
+    const isMe = m.from_phone===authPhone;
+    const d = new Date(m.created_at);
+    const dateStr = d.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
+    const timeStr = d.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
+    let dateSep = "";
+    if (dateStr !== prevDate) {
+      prevDate = dateStr;
+      dateSep = `<div style="text-align:center;margin:12px 0 8px;"><span style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:20px;padding:3px 12px;font-size:11px;color:#4a5a7a;">${dateStr}</span></div>`;
+    }
+    return dateSep + `<div style="display:flex;justify-content:${isMe?"flex-end":"flex-start"};margin-bottom:6px;">
+      <div style="max-width:78%;background:${isMe?"linear-gradient(135deg,#1e3a6e,#2a5aaa)":"#0d1220"};border:1px solid ${isMe?"#2a5aaa":"#1e2a45"};border-radius:${isMe?"14px 14px 4px 14px":"14px 14px 14px 4px"};padding:9px 13px;">
+        <div style="font-size:14px;color:#e8eaf0;line-height:1.5;word-break:break-word;">${escHtml(m.body)}</div>
+        <div style="font-size:10px;color:${isMe?"#6a9ade":"#4a5a7a"};margin-top:3px;text-align:right;">${timeStr}</div>
+      </div>
+    </div>`;
+  }).join("");
+  container.scrollTop = container.scrollHeight;
+  _scUnreadCounts[peerPhone] = 0;
+}
+// ══════════════════════════════════════════════════════════════════
+// End ShopChat helpers
+// ══════════════════════════════════════════════════════════════════
+
 function shopRequestsCol(){
   if(!db || !authPhone) return null;
   return db.collection("shop_requests").doc(authPhone).collection("requests");
@@ -12792,121 +13279,163 @@ async function declineShopRequest(req){
 
 // ── Render Messages Tab ───────────────────────────────────────────────────────
 function renderMessagesTab(){
-  const reqs = _shopRequestsCache;
-  if(!db){
-    return `<div style="padding:40px 20px;text-align:center;">
-      <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
-      <div style="font-size:16px;font-weight:800;color:#f59e0b;margin-bottom:8px;">Firebase Not Connected</div>
-      <div style="font-size:13px;color:#7a8aaa;">Shop Connect messages require Firebase. Set it up in Settings.</div>
-    </div>`;
-  }
-  if(!authPhone){
-    return `<div style="padding:40px 20px;text-align:center;">
-      <div style="font-size:13px;color:#7a8aaa;">Log in to view messages.</div>
-    </div>`;
+  if (!authPhone) {
+    return `<div style="padding:40px 20px;text-align:center;color:#7a8aaa;font-size:13px;">Log in to use Messages.</div>`;
   }
 
-  const pendingHtml = reqs.length === 0
-    ? `<div style="text-align:center;padding:60px 20px;color:#4a5a7a;">
-        <div style="font-size:48px;margin-bottom:12px;">✉️</div>
-        <div style="font-size:15px;font-weight:700;color:#7a8aaa;margin-bottom:6px;">No pending requests</div>
-        <div style="font-size:12px;">When another shop adds you as a creditor or customer, their request will appear here.</div>
-      </div>`
-    : reqs.map(req=>{
-        const p = req.fromProfile || {};
-        const initials = (p.shopName||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
-        // req.type = what they want ME to add THEM as
-        // "creditor" → they want me to record them as my creditor (they supply to me)
-        // "debtor"   → they want me to record them as my debtor (they buy from me)
-        // "customer" → they want me to record them as my customer (they buy from me)
-        const roleLabel = req.type === "creditor"
-          ? "add you as their <b style='color:#60a5fa;'>Customer/Debtor</b> — and wants you to add them as your <b style='color:#f59e0b;'>Creditor</b>"
-          : req.type === "debtor"
-          ? "add you as their <b style='color:#f59e0b;'>Creditor</b> — and wants you to add them as your <b style='color:#22c55e;'>Debtor</b>"
-          : "add you as their <b style='color:#f59e0b;'>Creditor</b> — and wants you to add them as your <b style='color:#60a5fa;'>Customer/Debtor</b>";
-        const roleDesc = req.type === "creditor"
-          ? "✅ Accept → <b style='color:#f59e0b;'>They appear in your Creditors</b> (they supply to you) · You appear in their Customers."
-          : req.type === "debtor"
-          ? "✅ Accept → <b style='color:#22c55e;'>They appear in your Debtors</b> (they buy from you) · You appear in their Creditors."
-          : "✅ Accept → <b style='color:#60a5fa;'>They appear in your Customers</b> (they buy from you) · You appear in their Creditors.";
-        const timeStr = new Date(req.createdAt).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
-        const cardBorderColor = req.type==='creditor'?'#92400e':req.type==='debtor'?'#166534':'#1e3a6e';
-        const avatarGrad = req.type==='creditor'?'#92400e,#d97706':req.type==='debtor'?'#166534,#22c55e':'#1e3a6e,#2a5aaa';
-        const badgeBg = req.type==='creditor'?'#92400e33':req.type==='debtor'?'#16653433':'#1e3a6e33';
-        const badgeBorder = req.type==='creditor'?'#d97706':req.type==='debtor'?'#22c55e':'#3a6aee';
-        const badgeColor = req.type==='creditor'?'#fbbf24':req.type==='debtor'?'#4ade80':'#60a5fa';
-        const badgeLabel = req.type==='creditor'?'🏦 Creditor':req.type==='debtor'?'🧾 Debtor':'👤 Customer';
-        const acceptLabel = req.type==='creditor'?'My Creditors':req.type==='debtor'?'My Debtors':'My Customers';
-        return `
-          <div style="background:#0d1220;border:2px solid ${cardBorderColor};border-radius:16px;padding:18px;margin-bottom:14px;">
-            <!-- Shop info -->
-            <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">
-              <div style="width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,${avatarGrad});display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">
-                ${p.shopIcon?`<img src="${p.shopIcon}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;" onerror="this.style.display='none'">`:initials}
-              </div>
-              <div style="flex:1;min-width:0;">
-                <div style="font-size:16px;font-weight:800;color:#e8eaf0;">${escHtml(p.shopName||"Unknown Shop")}</div>
-                <div style="font-size:12px;color:#60a5fa;font-family:monospace;font-weight:700;">${escHtml(p.shopId||"")}</div>
-                <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">📅 ${timeStr}</div>
-              </div>
-              <div style="background:${badgeBg};border:1px solid ${badgeBorder};border-radius:8px;padding:4px 10px;font-size:11px;font-weight:800;color:${badgeColor};white-space:nowrap;">
-                ${badgeLabel}
-              </div>
+  // ── Pending connection requests ──────────────────────────────────
+  const pendingHtml = _scPendingReqs.length === 0 ? "" : `
+    <div style="margin-bottom:20px;">
+      <div style="font-size:13px;font-weight:800;color:#fb923c;margin-bottom:10px;">📬 Connection Requests (${_scPendingReqs.length})</div>
+      ${_scPendingReqs.map(req=>{
+        const initials = (req.from_shop_name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+        const timeStr = new Date(req.created_at).toLocaleDateString("en-IN",{day:"numeric",month:"short"});
+        return `<div style="background:#0d1220;border:2px solid #92400e;border-radius:14px;padding:16px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <div style="width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#92400e,#d97706);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0;">${initials}</div>
+            <div style="flex:1;">
+              <div style="font-size:15px;font-weight:800;color:#e8eaf0;">${escHtml(req.from_shop_name||"Unknown Shop")}</div>
+              <div style="font-size:12px;color:#60a5fa;font-family:monospace;">${escHtml(req.from_shop_id||"")}</div>
+              <div style="font-size:11px;color:#4a5a7a;">📅 ${timeStr}</div>
             </div>
-            <!-- Message -->
-            <div style="background:#080c18;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;color:#a0b0d0;line-height:1.6;">
-              <b style="color:#e8eaf0;">${escHtml(p.shopName||"This shop")}</b> wants to ${roleLabel} in their account.<br>
-              <span style="font-size:12px;color:#7a8aaa;">${roleDesc}</span>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="scAcceptRequest('${req.id}')" class="btn" style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:10px;font-size:13px;font-weight:800;">✅ Accept</button>
+            <button onclick="scDeclineRequest('${req.id}')" class="btn" style="flex:1;background:#1a0a0a;border:1px solid #ef4444;color:#ef4444;padding:10px;font-size:13px;font-weight:700;">✕ Decline</button>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
+
+  // ── Contacts list ────────────────────────────────────────────────
+  const contactsHtml = _scConnections.length === 0
+    ? `<div style="text-align:center;padding:50px 20px;color:#4a5a7a;">
+        <div style="font-size:48px;margin-bottom:12px;">💬</div>
+        <div style="font-size:15px;font-weight:700;color:#7a8aaa;margin-bottom:6px;">No connected shops yet</div>
+        <div style="font-size:12px;">Add a shop using their SC-XXXXXX ID to start chatting.</div>
+       </div>`
+    : _scConnections.map(conn=>{
+        const peer  = scPeerPhone(conn);
+        const name  = scPeerName(conn);
+        const sid   = scPeerShopId(conn);
+        const initials = name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+        const msgs  = _scMessages[peer] || [];
+        const lastMsg = msgs.length > 0 ? msgs[msgs.length-1] : null;
+        const lastMsgText = lastMsg ? (lastMsg.from_phone===authPhone?"You: ":"")+lastMsg.body : "Tap to chat";
+        const lastMsgTime = lastMsg ? new Date(lastMsg.created_at).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}) : "";
+        const unread = _scUnreadCounts[peer] || 0;
+        const balInfo = scGetSharedBalance(conn);
+        const balHtml = balInfo
+          ? `<span style="font-size:11px;color:${balInfo.balance>0?"#ef4444":"#22c55e"};font-weight:700;margin-left:6px;">${balInfo.balance>0?"owes":"paid"} ₹${Math.abs(balInfo.balance).toFixed(2)}</span>` : "";
+        const ledgerBtn = scLedgerSharedToMe(conn)
+          ? `<button onclick="event.stopPropagation();scRenderSharedLedger('${conn.id}')"
+              style="display:inline-block;background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;font-size:10px;font-weight:800;border-radius:6px;padding:2px 8px;cursor:pointer;margin-top:3px;">📋 View Ledger</button>` : "";
+        return `<div onclick="scOpenChat('${peer}','${conn.id}')"
+          style="display:flex;align-items:center;gap:12px;padding:14px 12px;cursor:pointer;border-bottom:1px solid #0d1220;"
+          onmouseover="this.style.background='#0d1220'" onmouseout="this.style.background='transparent'">
+          <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#fff;flex-shrink:0;position:relative;">
+            ${initials}
+            ${unread>0?`<div style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;">${unread}</div>`:""}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:4px;">
+              <div style="font-size:15px;font-weight:800;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(name)}${balHtml}</div>
+              <div style="font-size:11px;color:#4a5a7a;flex-shrink:0;">${lastMsgTime}</div>
             </div>
-            <!-- Details -->
-            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-size:12px;">
-              ${p.phone   ?`<span style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:6px;padding:4px 10px;color:#e8eaf0;">📞 ${escHtml(p.phone)}</span>`:""}
-              ${p.gstin   ?`<span style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:6px;padding:4px 10px;color:#a78bfa;font-family:monospace;">🔢 ${escHtml(p.gstin)}</span>`:""}
-              ${p.city    ?`<span style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:6px;padding:4px 10px;color:#e8eaf0;">📍 ${escHtml(p.city)}</span>`:""}
-              ${p.address ?`<span style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:6px;padding:4px 10px;color:#7a8aaa;">🏠 ${escHtml(p.address)}</span>`:""}
-            </div>
-            <!-- Actions -->
-            <div style="display:flex;gap:10px;">
-              <button onclick="_acceptReqById('${req.id}')" class="btn"
-                style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:12px;font-size:14px;font-weight:800;">
-                ✅ Accept — Add to ${acceptLabel}
-              </button>
-              <button onclick="_declineReqById('${req.id}')" class="btn"
-                style="flex:1;background:#1a0a0a;border:1px solid #ef4444;color:#ef4444;padding:12px;font-size:13px;font-weight:700;">
-                ✕ Decline
-              </button>
-            </div>
-          </div>`;
+            <div style="font-size:11px;color:#4a5a7a;font-family:monospace;">${escHtml(sid)}</div>
+            <div style="font-size:12px;color:#4a5a7a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(lastMsgText.slice(0,55))}</div>
+            ${ledgerBtn}
+          </div>
+        </div>`;
       }).join("");
 
   return `<div style="width:100%;">
-    <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <div>
-        <div style="font-size:20px;font-weight:800;color:#e8eaf0;">✉️ Messages</div>
-        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">Connection requests from other ShopChampion shops</div>
+        <div style="font-size:20px;font-weight:800;color:#e8eaf0;">💬 Messages</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">Your ID: <span style="color:#FFD700;font-family:monospace;font-weight:800;">${scMyShopId()}</span></div>
       </div>
-      <button onclick="loadShopRequests().then(()=>renderTab(7))" class="btn"
-        style="background:#0a1628;border:1px solid #1e3a6e;color:#60a5fa;padding:8px 14px;font-size:12px;font-weight:800;">
-        🔄 Refresh
+      <button onclick="scShowAddShop()" class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#60a5fa;padding:8px 16px;font-size:13px;font-weight:800;border:1px solid #2a5aaa;">
+        ➕ Add Shop
       </button>
     </div>
-    <!-- How it works info box -->
-    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:12px;color:#7a8aaa;line-height:1.7;">
-      <div style="font-weight:800;color:#60a5fa;margin-bottom:6px;">ℹ️ How Shop Connect works</div>
-      When another ShopChampion shop searches your <b style="color:#60a5fa;">Shop ID</b> (from Creditors or Customers tab) and sends a request, it appears here.<br>
-      <b style="color:#e8eaf0;">Accept</b> → their shop is automatically saved in your account with all details (name, phone, GSTIN, address).<br>
-      <b style="color:#e8eaf0;">Decline</b> → request is removed, nothing is saved.
+    <div id="sc-add-shop-panel" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:6px;">🔗 Connect with a Shop</div>
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:10px;">Ask the other shop their ID (shown above), then enter it here.</div>
+      <div style="display:flex;gap:8px;">
+        <input class="input" id="sc-add-shop-input" placeholder="SC-123456" maxlength="9"
+          style="flex:1;font-family:monospace;font-size:15px;letter-spacing:1px;text-transform:uppercase;"
+          onkeydown="if(event.key==='Enter')scSendConnRequest(this.value)" />
+        <button onclick="scSendConnRequest(document.getElementById('sc-add-shop-input').value)"
+          class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:10px 18px;font-weight:800;">Send →</button>
+      </div>
     </div>
-    <!-- Pending requests -->
-    <div>
-      ${reqs.length>0?`<div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:12px;">📬 Pending Requests (${reqs.length})</div>`:""}
-      ${pendingHtml}
+    ${pendingHtml}
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:14px;overflow:hidden;">
+      ${contactsHtml}
     </div>
+    <div style="font-size:11px;color:#2a3a5a;text-align:center;margin-top:12px;">Messages expire after 7 days · Max 50 per conversation</div>
   </div>`;
 }
 
+function scShowAddShop() {
+  const p = document.getElementById("sc-add-shop-panel");
+  if (p) p.style.display = p.style.display==="none" ? "block" : "none";
+}
+
+async function scOpenChat(peerPhone, connId) {
+  _scActiveChatPhone = peerPhone;
+  _scUnreadCounts[peerPhone] = 0;
+  const conn = _scConnections.find(c => c.id === connId);
+  const peerName    = conn ? scPeerName(conn)   : peerPhone;
+  const peerShopId  = conn ? scPeerShopId(conn) : "";
+  const iShare      = conn ? scIShareWithPeer(conn) : false;
+  const theyShared  = conn ? scLedgerSharedToMe(conn) : false;
+
+  await scLoadMessages(peerPhone);
+
+  const el = document.getElementById("tab-content");
+  el.innerHTML = `
+    <div style="width:100%;display:flex;flex-direction:column;height:calc(100vh - 160px);max-height:680px;">
+      <div style="display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid #1e2a45;margin-bottom:10px;flex-shrink:0;">
+        <button onclick="scCloseChat()" style="background:transparent;border:none;color:#60a5fa;font-size:22px;cursor:pointer;padding:2px 8px 2px 0;">←</button>
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;">
+          ${peerName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:800;color:#e8eaf0;">${escHtml(peerName)}</div>
+          <div style="font-size:11px;color:#60a5fa;font-family:monospace;">${escHtml(peerShopId)}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0;">
+          ${theyShared ? `<button onclick="scRenderSharedLedger('${connId}')"
+            style="background:#1a1a3a;border:1px solid #3a4a6a;color:#a78bfa;font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">📋 View Ledger</button>` : ""}
+          <button onclick="scToggleLedgerShare('${connId}',${!iShare})"
+            style="background:${iShare?"#16653433":"#0a0e1a"};border:1px solid ${iShare?"#22c55e":"#2a3560"};color:${iShare?"#22c55e":"#4a5a7a"};font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">
+            ${iShare?"🔓 Shared":"🔒 Share Ledger"}
+          </button>
+        </div>
+      </div>
+      <div id="sc-chat-messages" style="flex:1;overflow-y:auto;padding:4px 2px;"></div>
+      <div style="display:flex;gap:8px;padding-top:10px;border-top:1px solid #1e2a45;flex-shrink:0;margin-top:6px;">
+        <input class="input" id="sc-msg-input" placeholder="Type a message..."
+          style="flex:1;font-size:14px;"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();scSendMessage('${peerPhone}',this.value);}" />
+        <button onclick="scSendMessage('${peerPhone}',document.getElementById('sc-msg-input').value)"
+          class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;padding:10px 16px;font-size:16px;border:1px solid #2a5aaa;">➤</button>
+      </div>
+    </div>`;
+
+  scRenderChat(peerPhone);
+  document.getElementById("sc-msg-input")?.focus();
+}
+
+function scCloseChat() {
+  _scActiveChatPhone = null;
+  safeRenderTab(8);
+}
+
 // ── Helpers called from inline onclick ────────────────────────────────────────
+function _acceptReqById(id){// ── Helpers called from inline onclick ────────────────────────────────────────
 function _acceptReqById(id){
   const req = _shopRequestsCache.find(r=>r.id===id);
   if(req) acceptShopRequest(req);
