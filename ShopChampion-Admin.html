@@ -3502,6 +3502,14 @@ function renderTab(i){
   else if(i===6)el.innerHTML=renderCreditorsTab();
   else if(i===7)el.innerHTML=renderDebtorsTab();
   else if(i===8){
+    // If a chat is open, don't blow it away - just refresh data silently
+    if (_scActiveChatPhone) {
+      Promise.all([scLoadConnections(), scLoadPendingRequests()]).then(async()=>{
+        await scLoadMessages(_scActiveChatPhone);
+        scRenderChat(_scActiveChatPhone);
+      });
+      return;
+    }
     el.innerHTML = renderMessagesTab();
     Promise.all([scLoadConnections(), scLoadPendingRequests()]).then(()=>{
       const loads = _scConnections.map(c => scLoadMessages(scPeerPhone(c)));
@@ -12637,33 +12645,33 @@ function scShowShareLedgerModal(connId, currentlySharing) {
   modalDiv.style.cssText = "position:fixed;inset:0;background:#000c;z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
 
   modalDiv.innerHTML = `
-    <div style="background:#0d1220;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:560px;max-height:80vh;display:flex;flex-direction:column;padding-bottom:max(20px,env(safe-area-inset-bottom));">
+    <div style="background:#0d1220;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:560px;max-height:80vh;display:flex;flex-direction:column;padding-bottom:max(20px,env(safe-area-inset-bottom));font-family:'Nunito',sans-serif;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
         <div>
           <div style="font-size:16px;font-weight:800;color:#e8eaf0;">🔓 Share a Ledger</div>
-          <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Pick the creditor or debtor ledger to share with this shop</div>
+          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Pick the creditor or debtor ledger to share with this shop</div>
         </div>
-        <button onclick="document.getElementById('sc-share-ledger-modal').remove()" style="background:#1e2a45;border:none;color:#7a8aaa;border-radius:8px;width:30px;height:30px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+        <button onclick="document.getElementById('sc-share-ledger-modal').remove()" style="background:#1e2a45;border:none;color:#a0aec0;border-radius:8px;width:32px;height:32px;font-size:18px;cursor:pointer;line-height:1;font-family:'Nunito',sans-serif;">✕</button>
       </div>
 
       <!-- Tabs -->
       <div style="display:flex;gap:6px;margin-bottom:12px;">
         <button id="sl-tab-cred" onclick="slSwitchTab('cred')"
-          style="flex:1;padding:9px;border-radius:10px;border:2px solid #ef4444;background:#1a0505;color:#ef4444;font-weight:800;font-size:12px;cursor:pointer;">
+          style="flex:1;padding:9px;border-radius:10px;border:2px solid #ef4444;background:#2a0808;color:#ef4444;font-weight:800;font-size:12px;cursor:pointer;font-family:'Nunito',sans-serif;">
           🏦 Creditors (${creditors.length})
         </button>
         <button id="sl-tab-debt" onclick="slSwitchTab('debt')"
-          style="flex:1;padding:9px;border-radius:10px;border:2px solid #1e2a45;background:transparent;color:#4a5a7a;font-weight:800;font-size:12px;cursor:pointer;">
+          style="flex:1;padding:9px;border-radius:10px;border:2px solid #2a3560;background:#0d1220;color:#6a7aaa;font-weight:800;font-size:12px;cursor:pointer;font-family:'Nunito',sans-serif;">
           🧾 Debtors (${debtors.length})
         </button>
       </div>
 
       <!-- Search -->
-      <input id="sl-search" placeholder="🔍 Search by name..." oninput="slRenderList()"
-        style="width:100%;box-sizing:border-box;background:#060d1a;border:1px solid #1e2a45;border-radius:10px;padding:9px 12px;color:#e8eaf0;font-size:13px;outline:none;margin-bottom:10px;" />
+      <input id="sl-search" placeholder="Search by name..." oninput="slRenderList()"
+        style="width:100%;box-sizing:border-box;background:#060d1a;border:1px solid #2a3560;border-radius:10px;padding:9px 12px;color:#e8eaf0;font-size:13px;outline:none;margin-bottom:10px;font-family:'Nunito',sans-serif;" />
 
       <!-- List -->
-      <div id="sl-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
+      <div id="sl-list" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;min-height:80px;"></div>
     </div>`;
 
   document.body.appendChild(modalDiv);
@@ -12769,15 +12777,33 @@ async function scConfirmShareLedger(connId, itemId, itemName) {
 async function scToggleLedgerShare(connId, enable, sharedItemId, sharedItemName) {
   const conn = _scConnections.find(c=>c.id===connId);
   if (!conn) return;
-  const field = conn.phone_a===authPhone ? "ledger_share_b_to_a" : "ledger_share_a_to_b";
+  const isA = conn.phone_a === authPhone;
+  const shareField = isA ? "ledger_share_b_to_a" : "ledger_share_a_to_b";
+  const nameField  = isA ? "shared_name_b_to_a"  : "shared_name_a_to_b";
+  const typeField  = isA ? "shared_type_b_to_a"  : "shared_type_a_to_b";
+  const patch = { [shareField]: enable };
+  if (enable && sharedItemName) patch[nameField] = sharedItemName;
+  if (enable && window._slTab)  patch[typeField]  = window._slTab === "cred" ? "creditor" : "debtor";
+  if (!enable) { patch[nameField] = null; patch[typeField] = null; }
   await scSupa(`sc_connections?id=eq.${encodeURIComponent(connId)}`, {
-    method:"PATCH", body:JSON.stringify({[field]:enable})
+    method:"PATCH", body:JSON.stringify(patch)
   });
   await scLoadConnections();
-  notify(enable ? "✅ Ledger shared with them" : "🔒 Ledger access revoked");
+  notify(enable ? `✅ "${sharedItemName||"Ledger"}" shared with them` : "🔒 Ledger access revoked");
+  // Refresh chat header in place without full re-render (avoids closing chat)
   if (_scActiveChatPhone) {
     const conn2 = _scConnections.find(c=>c.id===connId);
-    if (conn2) scOpenChat(scPeerPhone(conn2), connId);
+    if (conn2) {
+      const iShare2 = scIShareWithPeer(conn2);
+      const shareBtn = document.getElementById("sc-share-ledger-btn");
+      if (shareBtn) {
+        shareBtn.textContent = iShare2 ? "🔓 Shared" : "🔒 Share Ledger";
+        shareBtn.style.background = iShare2 ? "#16653433" : "#0a0e1a";
+        shareBtn.style.borderColor = iShare2 ? "#22c55e" : "#2a3560";
+        shareBtn.style.color = iShare2 ? "#22c55e" : "#4a5a7a";
+        shareBtn.onclick = () => scShowShareLedgerModal(connId, iShare2);
+      }
+    }
   } else safeRenderTab(currentTab);
 }
 
@@ -12857,28 +12883,81 @@ function scGetSharedBalance(conn) {
   return null;
 }
 
-function scRenderSharedLedger(connId) {
+async function scRenderSharedLedger(connId) {
   const conn = _scConnections.find(c=>c.id===connId);
   if (!conn) return;
   if (!scLedgerSharedToMe(conn)) { notify("⚠️ They haven't shared their ledger with you","error"); return; }
-  const peer = scPeerPhone(conn);
-  const sid  = scPeerShopId(conn);
-  const name = scPeerName(conn);
-  const cr = getCreditors().find(c=>c._connectedShopId===sid||c._connectedPhone===peer);
-  const dr = getDebtors().find(d=>d._connectedShopId===sid||d._connectedPhone===peer);
-  const entity = cr||dr;
-  const etype  = cr?"creditor":"debtor";
-  if (!entity) {
-    showModal(`<div style="padding:24px;text-align:center;">
-      <div style="font-size:36px;margin-bottom:12px;">📋</div>
-      <div style="font-size:15px;font-weight:800;color:#e8eaf0;margin-bottom:8px;">No Ledger Found</div>
-      <div style="font-size:13px;color:#7a8aaa;">No creditor/debtor record linked to <b style="color:#FFD700;">${escHtml(name)}</b> found.<br>They shared access but you haven't recorded any transactions yet.</div>
-    </div>`);
-    return;
-  }
+
+  const peerPhone = scPeerPhone(conn);
+  const peerName  = scPeerName(conn);
+  // isA = am I phone_a in this connection?
+  const isA = conn.phone_a === authPhone;
+  // sharedName = name of the ledger entry the peer chose to share
+  const sharedName = isA ? (conn.shared_name_b_to_a||"") : (conn.shared_name_a_to_b||"");
+  // sharedType = creditor or debtor (from the sharer's perspective)
+  const sharedType = isA ? (conn.shared_type_b_to_a||"") : (conn.shared_type_a_to_b||"");
+
+  // Show loading state
+  showModal(`<div style="padding:40px;text-align:center;color:#7a8aaa;">
+    <div style="font-size:36px;margin-bottom:12px;">⏳</div>
+    <div style="font-size:14px;">Loading shared ledger...</div>
+  </div>`);
+
+  if (!db) { notify("❌ Firebase not connected","error"); closeModal(); return; }
+
+  try {
+    // Fetch BOTH creditors and debtors from the PEER's Firebase account
+    const [credDoc, debtDoc] = await Promise.all([
+      db.collection("users").doc(peerPhone).collection("app_data").doc("creditors").get(),
+      db.collection("users").doc(peerPhone).collection("app_data").doc("debtors").get()
+    ]);
+
+    const allCreditors = (credDoc.exists ? credDoc.data().list : null) || [];
+    const allDebtors   = (debtDoc.exists ? debtDoc.data().list : null) || [];
+
+    // Find the shared entry by name
+    let entity = null, etype = "creditor";
+    if (sharedName) {
+      const nl = sharedName.toLowerCase();
+      entity = allCreditors.find(c => (c.name||"").toLowerCase() === nl);
+      if (!entity) { entity = allDebtors.find(d => (d.name||"").toLowerCase() === nl); etype = "debtor"; }
+      // Partial match fallback
+      if (!entity) { entity = allCreditors.find(c => (c.name||"").toLowerCase().includes(nl)); }
+      if (!entity) { entity = allDebtors.find(d => (d.name||"").toLowerCase().includes(nl)); etype = "debtor"; }
+    }
+    // Last resort: first non-archived entry
+    if (!entity && allCreditors.length > 0) { entity = allCreditors.find(c=>!c._archived); }
+    if (!entity && allDebtors.length > 0)   { entity = allDebtors.find(d=>!d._archived); etype = "debtor"; }
+
+    if (!entity) {
+      showModal(`<div style="padding:24px;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">📋</div>
+        <div style="font-size:15px;font-weight:800;color:#e8eaf0;margin-bottom:8px;">Ledger Not Available</div>
+        <div style="font-size:13px;color:#7a8aaa;">
+          <b style="color:#FFD700;">${escHtml(peerName)}</b> shared their ledger
+          ${sharedName ? `for <b style="color:#60a5fa;">${escHtml(sharedName)}</b>` : ""}
+          but no matching entry was found in their account.<br><br>
+          Ask them to re-share the ledger from the Messages tab.
+        </div>
+      </div>`);
+      return;
+    }
+  // Calculate balance directly from fetched data (same formula as local helpers)
   const txns = entity.transactions||[];
-  const bal  = etype==="creditor" ? credBalance(entity) : debtBalance(entity);
+  let bal = 0;
+  if (etype === "creditor") {
+    const purchased = txns.filter(t=>t.type==="purchase").reduce((s,t)=>s+(t.amount||0),0);
+    const paid      = txns.filter(t=>t.type==="payment").reduce((s,t)=>s+(t.amount||0),0);
+    const returned  = txns.filter(t=>t.type==="return").reduce((s,t)=>s+(t.amount||0),0);
+    bal = purchased - paid - returned;
+  } else {
+    const sold     = txns.filter(t=>t.type==="sale").reduce((s,t)=>s+(t.amount||0),0);
+    const received = txns.filter(t=>t.type==="payment").reduce((s,t)=>s+(t.amount||0),0);
+    const returned = txns.filter(t=>t.type==="return").reduce((s,t)=>s+(t.amount||0),0);
+    bal = sold - received - returned;
+  }
   const balColor = bal>0?"#ef4444":"#22c55e";
+  const displayName = entity.name || sharedName || peerName;
   const balLabel = etype==="creditor"
     ? (bal>0?`You owe ₹${bal.toFixed(2)}`:`Overpaid ₹${Math.abs(bal).toFixed(2)}`)
     : (bal>0?`They owe ₹${bal.toFixed(2)}`:`You owe ₹${Math.abs(bal).toFixed(2)}`);
@@ -12899,10 +12978,10 @@ function scRenderSharedLedger(connId) {
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
       <div style="font-size:28px;">📋</div>
       <div style="flex:1;">
-        <div style="font-size:17px;font-weight:800;color:#e8eaf0;">${escHtml(name)}</div>
-        <div style="font-size:12px;color:#7a8aaa;">${etype==="creditor"?"Creditor (Supplier)":"Debtor (Buyer)"} · ${escHtml(sid)}</div>
+        <div style="font-size:17px;font-weight:800;color:#e8eaf0;">${escHtml(displayName)}</div>
+        <div style="font-size:12px;color:#7a8aaa;">${etype==="creditor"?"Creditor (Supplier)":"Debtor (Buyer)"} · Shared by ${escHtml(peerName)}</div>
       </div>
-      <a href="${csvUrl}" download="${escHtml(name)}-ledger.csv"
+      <a href="${csvUrl}" download="${escHtml(displayName)}-ledger.csv"
         style="background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;font-size:12px;font-weight:800;border-radius:8px;padding:7px 14px;text-decoration:none;">⬇ Export CSV</a>
     </div>
     <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
@@ -12920,6 +12999,11 @@ function scRenderSharedLedger(connId) {
       <tbody>${rows}</tbody>
     </table>`}
   </div>`);
+  } catch(e) {
+    console.error("scRenderSharedLedger error:", e);
+    notify("❌ Failed to load shared ledger. Check your connection.", "error");
+    closeModal();
+  }
 }
 
 function scRenderChat(peerPhone) {
@@ -13618,7 +13702,7 @@ async function scOpenChat(peerPhone, connId) {
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0;">
           ${theyShared ? `<button onclick="scRenderSharedLedger('${connId}')"
             style="background:#1a1a3a;border:1px solid #3a4a6a;color:#a78bfa;font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">📋 View Ledger</button>` : ""}
-          <button onclick="scShowShareLedgerModal('${connId}',${iShare})"
+          <button id="sc-share-ledger-btn" onclick="scShowShareLedgerModal('${connId}',${iShare})"
             style="background:${iShare?"#16653433":"#0a0e1a"};border:1px solid ${iShare?"#22c55e":"#2a3560"};color:${iShare?"#22c55e":"#4a5a7a"};font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">
             ${iShare?"🔓 Shared":"🔒 Share Ledger"}
           </button>
