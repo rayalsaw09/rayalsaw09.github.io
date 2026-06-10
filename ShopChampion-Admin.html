@@ -7936,6 +7936,15 @@ async function sendPaymentSyncRequest(creditorId, txId, amount, note, date, invo
 function listenPurchaseSyncResponse() {}
 function listenPaymentSyncResponse() {}
 async function sweepAcceptedPaymentSyncRequests() {}
+async function cleanupStaleSentRequests() {
+  // Stub — cleans up stale pending connection requests sent by this shop
+  if (!authPhone) return;
+  try {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000; // 7 days old
+    await scSupa(`sc_conn_requests?from_phone=eq.${encodeURIComponent(authPhone)}&status=eq.pending&created_at=lt.${cutoff}`,
+      { method: "DELETE" });
+  } catch(e) {}
+}
 let _payReqListener = null;
 function startPaymentRequestListener() {
   // Start cross-write listeners for all linked shops instead
@@ -14035,6 +14044,7 @@ async function scOpenChat(peerPhone, connId) {
 
   await scLoadMessages(peerPhone);
   scMarkMessagesRead(peerPhone);
+  const el = document.getElementById("tab-content");
   el.innerHTML = `
     <div style="width:100%;display:flex;flex-direction:column;height:calc(100vh - 160px);max-height:680px;">
       <div style="display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid #1e2a45;margin-bottom:10px;flex-shrink:0;">
