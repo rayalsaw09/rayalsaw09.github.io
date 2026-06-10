@@ -8926,6 +8926,14 @@ function renderSettings(){
       row("🚪","Logout","Sign out of your account","doLogout()","›",true)
     )}
 
+    ${section("Notifications",
+      row("🔔","Enable Push Notifications",
+        _scFcmToken ? "✅ Active on this device" : (Notification.permission==="denied" ? "❌ Blocked — enable in browser settings" : "Tap to allow notifications on this device"),
+        "scRequestPushPermission()",
+        _scFcmToken ? "✓" : "›"
+      )
+    )}
+
     ${section("Appearance",
       `<div style="padding:16px 18px;border-bottom:1px solid var(--border-main, #1a2035);">
         <div style="font-size:13px;font-weight:600;color:var(--text-main,#e8eaf0);margin-bottom:10px;">App Style</div>
@@ -12491,6 +12499,28 @@ let _scLedgerUnsub      = null; // active Firestore onSnapshot unsub for open le
 let _scFcmToken         = null; // FCM push token for this browser/device
 
 // ── FCM: initialise messaging and save token to Supabase ─────────────────────
+async function scRequestPushPermission() {
+  if (!("Notification" in window)) { notify("❌ Notifications not supported on this browser","error"); return; }
+  if (Notification.permission === "denied") {
+    notify("❌ Notifications blocked. Go to browser Settings → Site Settings → Notifications → Allow for this site","error");
+    return;
+  }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { notify("❌ Permission not granted","error"); return; }
+    notify("⏳ Registering for push notifications...");
+    await scInitFCM();
+    if (_scFcmToken) {
+      notify("✅ Push notifications enabled on this device!");
+      safeRenderTab(9); // refresh settings to show active state
+    } else {
+      notify("❌ Failed to get push token. Check console for details.","error");
+    }
+  } catch(e) {
+    notify("❌ Error: " + e.message, "error");
+  }
+}
+
 async function scInitFCM() {
   if (!authPhone) return;
   if (typeof SC_FCM_VAPID_KEY === "undefined" || SC_FCM_VAPID_KEY === "YOUR_VAPID_KEY_HERE") return;
@@ -12770,10 +12800,13 @@ async function scUnlinkShop(connId) {
 
 async function scConfirmUnlink(connId) {
   try {
+    const conn = _scConnections.find(c=>c.id===connId);
+    const peerPh = conn ? scPeerPhone(conn) : null;
+    // Send push to peer BEFORE deleting (token still in Supabase)
+    if (peerPh) scSendPush(peerPh, `🔗✕ Unlinked by ${scMyShopName()}`, "They have removed the connection with your shop");
     // Delete connection record
     await scSupa(`sc_connections?id=eq.${encodeURIComponent(connId)}`, {method:"DELETE"});
     // Delete all messages between these two phones
-    const conn = _scConnections.find(c=>c.id===connId);
     if (conn) {
       const pa = encodeURIComponent(conn.phone_a);
       const pb = encodeURIComponent(conn.phone_b);
