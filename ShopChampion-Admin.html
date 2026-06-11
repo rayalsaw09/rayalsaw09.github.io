@@ -2509,6 +2509,7 @@ function buildPayload() {
   return {
     shopName: appSettings.shopName,
     appIcon: appSettings.appIcon || "",
+    isPro: (licensePlan === "pro" && licenseStatus === "pro"),
     lastUpdated:new Date().toISOString(),
     filterMode: lbFilter.mode,
     filterLabel: filterDesc,
@@ -15831,6 +15832,14 @@ window.addEventListener('load', function() {
 });
 
 function scApplyAdPayload(payload) {
+  // Pro users get no ads
+  if (licensePlan === "pro" && licenseStatus === "pro") {
+    const s = window._scAdState;
+    s.bannerAds = [];
+    s.videoAds  = [];
+    scRenderPurchaseBanners();
+    return;
+  }
   const ads = (payload.ads || []).filter(a => a.status === 'active');
   const s = window._scAdState;
 

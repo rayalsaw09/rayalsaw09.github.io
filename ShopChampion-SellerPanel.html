@@ -1743,6 +1743,12 @@ function renderPayments(payments) {
 // If a match is found → PATCH that row to Pro Active
 // If no match → create a new license key linked to their phone/user_number
 async function _doApprove(payment) {
+  // Debug: log which key is being used
+  console.log("SB_SERVICE_KEY set:", !!SB_SERVICE_KEY, "length:", SB_SERVICE_KEY.length);
+  console.log("SB_URL:", SB_URL);
+  if (!SB_SERVICE_KEY) {
+    throw new Error("Service Role Key not loaded. Please Logout and re-enter your service role key in setup.");
+  }
   const phone      = payment.customer_phone || null;
   const userNum    = payment.user_number    || null;
   const name       = payment.customer_name  || "";
@@ -1779,6 +1785,7 @@ async function _doApprove(payment) {
 
   if (existing) {
     // PATCH existing row → activate + extend expiry
+    console.log("PATCHing license id:", existing.id, "with key prefix:", (SB_SERVICE_KEY||SB_ANON).substring(0,20));
     const patchRes = await fetch(`${SB_URL}/rest/v1/licenses?id=eq.${existing.id}`, {
       method: "PATCH",
       headers: { "apikey": SB_SERVICE_KEY||SB_ANON, "Authorization": "Bearer " + (SB_SERVICE_KEY||SB_ANON), "Content-Type": "application/json", "Prefer": "return=minimal" },
@@ -3472,7 +3479,8 @@ function scShowAdModal(ad) {
         </select>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div id="sca-video-options" style="display:${(ad?.type||'banner')==='video'?'block':'none'}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
         <div>
           <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Show Every (min)</label>
           <select class="input" id="sca-frequency">
@@ -3486,8 +3494,6 @@ function scShowAdModal(ad) {
           </select>
         </div>
       </div>
-
-      <div id="sca-video-options" style="display:${(ad?.type||'banner')==='video'?'block':'none'}">
         <div style="display:flex;align-items:center;justify-content:space-between;background:#060d1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;">
           <div>
             <div style="font-size:13px;font-weight:700;color:#e8eaf0;">⛶ Fullscreen Video</div>
@@ -3536,7 +3542,18 @@ function scaToggleTypeFields(type) {
 }
 
 function scaUpdatePositions(target) {
-  // Could filter position options based on target — keeping simple for now
+  const sel = document.getElementById('sca-position');
+  if (!sel) return;
+  const cur = sel.value;
+  const opts = {
+    admin:   [['purchase-right','🖥️ Admin — Purchase Right Area']],
+    display: [['display-top','📺 Display — Top Banner'],['display-bottom','📺 Display — Bottom Banner']],
+    both:    [['purchase-right','🖥️ Admin — Purchase Right Area'],['display-top','📺 Display — Top Banner'],['display-bottom','📺 Display — Bottom Banner']],
+  };
+  const list = opts[target] || opts.both;
+  sel.innerHTML = list.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+  // Keep current selection if still valid, else default to first
+  if (list.find(([v]) => v === cur)) sel.value = cur;
 }
 
 async function scSaveAd() {

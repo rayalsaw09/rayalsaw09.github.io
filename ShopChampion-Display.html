@@ -1212,6 +1212,14 @@ function endVideoAd() {
 
 // ── Apply ads + settings from Firebase payload ──
 function applyAdsFromPayload(payload) {
+  // Pro shops get no ads
+  if (payload && payload.isPro) {
+    _videoAds = [];
+    if (_videoAdTimer) { clearInterval(_videoAdTimer); _videoAdTimer = null; }
+    scRenderTopBanner([]);
+    scRenderBottomBanner([]);
+    return;
+  }
   // Read display settings
   if (payload && payload.adDisplaySettings) {
     _idleBannerUrl    = payload.adDisplaySettings.idleBannerUrl || "";
