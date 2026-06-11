@@ -458,7 +458,10 @@
   <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="ads-section">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div class="section-title">📡 Ad Control Center</div>
-      <button class="btn" onclick="scOpenCreateAd()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:9px 18px;font-size:13px;font-weight:800;">+ Create Ad</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="scCleanupOrphanAds()" title="Remove old/leftover ads from shop apps that no longer exist here" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:9px 14px;font-size:12px;">🧹 Cleanup Old Ads</button>
+        <button class="btn" onclick="scOpenCreateAd()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:9px 18px;font-size:13px;font-weight:800;">+ Create Ad</button>
+      </div>
     </div>
 
     <!-- ── Stats Row ── -->
@@ -3581,6 +3584,7 @@ async function scSaveAd() {
 
   if (scEditingAdId) {
     // Update existing
+    payload.id = scEditingAdId;
     const idx = scCentralAds.findIndex(a => a.id === scEditingAdId);
     if (idx >= 0) scCentralAds[idx] = { ...scCentralAds[idx], ...payload };
   } else {
@@ -3597,6 +3601,13 @@ async function scSaveAd() {
   scRenderAdsList();
   spNotify(scEditingAdId ? '✅ Ad updated!' : '✅ Ad created!');
 
+  // Push to Firebase so Admin/Display apps actually pick this up
+  if (payload.status === 'active') {
+    await scPushCentralAdToShops(payload);
+  } else {
+    await scRemoveCentralAdFromShops(payload.id);
+  }
+
   // Try Supabase in background
   try {
     if (scEditingAdId) {
@@ -3611,6 +3622,103 @@ async function scSaveAd() {
   } catch(_) { /* Supabase optional */ }
 }
 
+// ── Push a central ad to every shop's Firebase leaderboard doc ──
+// This is the doc Admin (scAdInit) and Display listen to in real time.
+async function scPushCentralAdToShops(ad) {
+  saInitFirebase();
+  if (!saDb) { spNotify('⚠️ Firebase not initialized — ad saved locally but not pushed to apps.'); return; }
+
+  if (typeof allUsers === 'undefined' || !allUsers.length) {
+    try { allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || []; } catch(_) { allUsers = []; }
+  }
+  const phones = allUsers.filter(u => u.phone).map(u => u.phone);
+  if (!phones.length) { spNotify('⚠️ No shops found to push ad to.'); return; }
+
+  const adPayload = {
+    id:          ad.id,
+    name:        ad.name || '',
+    type:        ad.type || 'banner',
+    mediaUrl:    ad.mediaUrl || '',
+    target:      ad.target || 'both',
+    position:    ad.position || 'purchase-right',
+    frequency:   ad.frequency || 5,
+    duration:    ad.duration || 15,
+    fullscreen:  !!ad.fullscreen,
+    status:      ad.status || 'active',
+    monthly_rate: ad.monthly_rate || 0,
+  };
+
+  let ok = 0, fail = 0;
+  await Promise.all(phones.map(async phone => {
+    try {
+      const docRef = saDb.collection('users').doc(phone).collection('display').doc('leaderboard');
+      const snap = await docRef.get();
+      let existingAds = snap.exists ? (snap.data().ads || []) : [];
+      const idx = existingAds.findIndex(a => a.id === adPayload.id);
+      if (idx >= 0) existingAds[idx] = adPayload;
+      else existingAds.push(adPayload);
+      await docRef.set({ ads: existingAds }, { merge: true });
+      ok++;
+    } catch(e) { fail++; }
+  }));
+
+  if (fail === 0) spNotify(`✅ Live on ${ok} shop${ok!==1?'s':''}'s apps!`);
+  else spNotify(`⚠️ Pushed to ${ok}, failed for ${fail} shop(s).`);
+}
+
+// ── Remove a central ad from every shop's Firebase leaderboard doc ──
+async function scRemoveCentralAdFromShops(adId) {
+  saInitFirebase();
+  if (!saDb) return;
+  if (typeof allUsers === 'undefined' || !allUsers.length) {
+    try { allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || []; } catch(_) { allUsers = []; }
+  }
+  const phones = allUsers.filter(u => u.phone).map(u => u.phone);
+  await Promise.all(phones.map(async phone => {
+    try {
+      const docRef = saDb.collection('users').doc(phone).collection('display').doc('leaderboard');
+      const snap = await docRef.get();
+      if (!snap.exists) return;
+      const existingAds = (snap.data().ads || []).filter(a => a.id !== adId);
+      await docRef.set({ ads: existingAds }, { merge: true });
+    } catch(_) {}
+  }));
+}
+
+// ── Cleanup: remove ads from shop Firebase docs that no longer exist
+//    in the central ads list (e.g. deleted before delete-sync existed) ──
+async function scCleanupOrphanAds() {
+  if (!confirm('This will remove any ads from all shop apps that are not in your current Ad list above. Continue?')) return;
+  saInitFirebase();
+  if (!saDb) { spNotify('❌ Firebase not initialized.'); return; }
+
+  if (typeof allUsers === 'undefined' || !allUsers.length) {
+    try { allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || []; } catch(_) { allUsers = []; }
+  }
+  const phones = allUsers.filter(u => u.phone).map(u => u.phone);
+  const validIds = new Set(scCentralAds.map(a => a.id));
+
+  let cleaned = 0, removedTotal = 0;
+  await Promise.all(phones.map(async phone => {
+    try {
+      const docRef = saDb.collection('users').doc(phone).collection('display').doc('leaderboard');
+      const snap = await docRef.get();
+      if (!snap.exists) return;
+      const existingAds = snap.data().ads || [];
+      const kept = existingAds.filter(a => validIds.has(a.id));
+      if (kept.length !== existingAds.length) {
+        await docRef.set({ ads: kept }, { merge: true });
+        cleaned++;
+        removedTotal += (existingAds.length - kept.length);
+      }
+    } catch(_) {}
+  }));
+
+  spNotify(removedTotal
+    ? `🧹 Removed ${removedTotal} stale ad(s) across ${cleaned} shop(s).`
+    : '✅ No stale ads found — everything is in sync.');
+}
+
 async function scToggleAdStatus(id, current) {
   const newStatus = current === 'active' ? 'paused' : 'active';
   const ad = scCentralAds.find(a => a.id === id);
@@ -3619,6 +3727,10 @@ async function scToggleAdStatus(id, current) {
   scRenderAdStats();
   scRenderAdsList();
   spNotify(newStatus === 'active' ? '✅ Ad activated!' : '⏸ Ad paused');
+  if (ad) {
+    if (newStatus === 'active') await scPushCentralAdToShops(ad);
+    else await scRemoveCentralAdFromShops(id); // paused ads are removed from live feed
+  }
   // Try Supabase in background
   try { await sbFetch(`/rest/v1/sc_central_ads?id=eq.${id}`, {method:'PATCH',body:JSON.stringify({status:newStatus}),prefer:'return=minimal'}); } catch(_) {}
 }
@@ -3630,6 +3742,7 @@ async function scDeleteAd(id) {
   scRenderAdStats();
   scRenderAdsList();
   spNotify('🗑️ Ad deleted');
+  await scRemoveCentralAdFromShops(id);
   try { await sbFetch(`/rest/v1/sc_central_ads?id=eq.${id}`, {method:'DELETE',prefer:'return=minimal'}); } catch(_) {}
 }
 
@@ -3732,7 +3845,9 @@ function scGetStorage() {
   if (_scStorage) return _scStorage;
   try {
     saInitFirebase(); // ensures firebase app is initialized
-    _scStorage = firebase.storage();
+    const bucket = (typeof SC_FIREBASE_CONFIG !== 'undefined' && SC_FIREBASE_CONFIG.storageBucket)
+      ? SC_FIREBASE_CONFIG.storageBucket : '';
+    _scStorage = bucket ? firebase.app().storage(`gs://${bucket}`) : firebase.storage();
   } catch(e) { _scStorage = null; }
   return _scStorage;
 }
@@ -3800,18 +3915,25 @@ async function scaUploadFile(file) {
 
   const storage = scGetStorage();
   if (!storage) {
-    // Fallback: read as data URL (works locally, large files will be slow)
-    spNotify('⚠️ Firebase Storage not ready — using local preview only. Paste a hosted URL for push to work.');
-    const reader = new FileReader();
-    reader.onload = e => {
-      const url = e.target.result;
-      const urlInput = document.getElementById('sca-media-url');
-      if (urlInput) urlInput.value = url;
-      scaPreviewUrl(url);
-      if (lbl) lbl.textContent = '✅ File loaded (local only)';
-      if (zone) zone.style.borderColor = '#4f4';
-    };
-    reader.readAsDataURL(file);
+    if (!isVideo && file.size <= 700 * 1024) {
+      // Small image: embed as data URL (works for push, fits in Firestore doc)
+      const reader = new FileReader();
+      reader.onload = e => {
+        const url = e.target.result;
+        const urlInput = document.getElementById('sca-media-url');
+        if (urlInput) urlInput.value = url;
+        scaPreviewUrl(url);
+        if (lbl) lbl.textContent = '✅ Embedded (small image)';
+        if (zone) zone.style.borderColor = '#4f4';
+        if (prog) prog.style.display = 'none';
+      };
+      reader.readAsDataURL(file);
+    } else {
+      spNotify('⚠️ Cloud storage unavailable. Please upload to imgbb.com (images) or a video host and paste the direct URL instead.');
+      if (lbl) lbl.textContent = '❌ Storage unavailable — paste a URL below';
+      if (zone) zone.style.borderColor = '#f66';
+      if (prog) prog.style.display = 'none';
+    }
     return;
   }
 
@@ -3828,8 +3950,11 @@ async function scaUploadFile(file) {
       if (bar) bar.style.width = p + '%';
     },
     err => {
-      spNotify('❌ Upload failed: ' + err.message);
-      if (lbl) lbl.textContent = '❌ Upload failed';
+      let reason = err.message || 'Unknown error';
+      if (err.code === 'storage/unauthorized') reason = 'Storage rules deny upload (set Storage rules to allow writes to /ads/**)';
+      else if (err.code === 'storage/unknown' || /CORS/i.test(reason)) reason = 'Storage bucket not reachable (check Firebase Storage is enabled + bucket name in config.js)';
+      spNotify('❌ Upload failed: ' + reason);
+      if (lbl) lbl.textContent = '❌ ' + reason;
       if (zone) zone.style.borderColor = '#f66';
       if (prog) prog.style.display = 'none';
     },
