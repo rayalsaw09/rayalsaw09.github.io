@@ -1737,7 +1737,11 @@ async function _doApprove(payment) {
   const userNum    = payment.user_number    || null;
   const name       = payment.customer_name  || "";
   const expiry     = new Date();
-  expiry.setMonth(expiry.getMonth() + 1);
+  if ((payment.plan || "monthly") === "yearly") {
+    expiry.setFullYear(expiry.getFullYear() + 1);
+  } else {
+    expiry.setMonth(expiry.getMonth() + 1);
+  }
 
   // Ensure we have fresh user + key data before matching
   if (!allUsers.length) allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || [];
@@ -1809,7 +1813,7 @@ async function _doApprove(payment) {
 async function approvePayment(paymentId) {
   const payment = allPayments.find(p => p.id === paymentId);
   if (!payment) return;
-  if (!confirm(`Approve payment from "${payment.customer_name}"?\n\nAmount: ₹${(payment.amount||0).toLocaleString("en-IN")}\nUTR: ${payment.utr_number}\n\nOK = activate/extend their Pro subscription`)) return;
+  if (!confirm(`Approve payment from "${payment.customer_name}"?\n\nPlan: ${(payment.plan||"monthly").charAt(0).toUpperCase()+(payment.plan||"monthly").slice(1)}\nAmount: ₹${(payment.amount||0).toLocaleString("en-IN")}\nUTR: ${payment.utr_number}\n\nOK = activate/extend their Pro subscription`)) return;
   try {
     const usedKey = await _doApprove(payment);
     alert(`✅ Approved!\n\nSubscription activated as Pro.\nCustomer's app updates within 15 seconds.`);
@@ -1821,7 +1825,7 @@ async function approvePayment(paymentId) {
 async function approvePaymentFromHistory(paymentId) {
   const payment = allPayments.find(p => p.id === paymentId) || allPhPayments.find(p => p.id === paymentId);
   if (!payment) return;
-  if (!confirm(`Approve payment?\n\nAmount: ₹${(payment.amount||0).toLocaleString("en-IN")}\nUTR: ${payment.utr_number}\n\nOK = activate/extend their Pro subscription`)) return;
+  if (!confirm(`Approve payment?\n\nPlan: ${(payment.plan||"monthly").charAt(0).toUpperCase()+(payment.plan||"monthly").slice(1)}\nAmount: ₹${(payment.amount||0).toLocaleString("en-IN")}\nUTR: ${payment.utr_number}\n\nOK = activate/extend their Pro subscription`)) return;
   try {
     const usedKey = await _doApprove(payment);
     alert(`✅ Approved!\n\nSubscription activated as Pro.\nCustomer's app updates within 15 seconds.`);

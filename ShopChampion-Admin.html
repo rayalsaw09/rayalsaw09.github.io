@@ -1179,18 +1179,21 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
     <div id="pm-step-1">
       <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:14px;">📋 Choose Your Plan</div>
 
-      <!-- Monthly only -->
-      <div style="border:2px solid #FFD700;border-radius:14px;padding:16px 18px;background:#0d1628;margin-bottom:18px;position:relative;">
-        <div style="position:absolute;top:-10px;left:16px;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-size:10px;font-weight:900;padding:2px 10px;border-radius:20px;">✓ SELECTED</div>
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div>
-            <div style="font-size:14px;font-weight:800;color:#e8eaf0;">Monthly Plan</div>
-            <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Full access · Renew every month</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-size:26px;font-weight:900;color:#FFD700;font-family:'Rajdhani',sans-serif;">₹4,999</div>
-            <div style="font-size:10px;color:#4a5a7a;">/month</div>
-          </div>
+      <!-- Plan selector: Monthly / Yearly -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
+        <!-- Monthly -->
+        <div id="pm-card-monthly" onclick="pmSelectPlan('monthly')" style="border:2px solid #FFD700;border-radius:14px;padding:14px;background:#0d1628;cursor:pointer;position:relative;">
+          <div style="position:absolute;top:-9px;left:12px;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-size:9px;font-weight:900;padding:2px 8px;border-radius:20px;" id="pm-sel-monthly">✓ SELECTED</div>
+          <div style="font-size:12px;font-weight:800;color:#e8eaf0;margin-bottom:4px;">Monthly</div>
+          <div style="font-size:22px;font-weight:900;color:#FFD700;font-family:'Rajdhani',sans-serif;">₹299</div>
+          <div style="font-size:10px;color:#4a5a7a;">/month</div>
+        </div>
+        <!-- Yearly -->
+        <div id="pm-card-yearly" onclick="pmSelectPlan('yearly')" style="border:2px solid #2a3560;border-radius:14px;padding:14px;background:#0d1628;cursor:pointer;position:relative;">
+          <div style="position:absolute;top:-9px;left:12px;background:#25d366;color:#000;font-size:9px;font-weight:900;padding:2px 8px;border-radius:20px;">SAVE ₹89</div>
+          <div style="font-size:12px;font-weight:800;color:#e8eaf0;margin-bottom:4px;">Yearly</div>
+          <div style="font-size:22px;font-weight:900;color:#4f4;font-family:'Rajdhani',sans-serif;">₹3,499</div>
+          <div style="font-size:10px;color:#4a5a7a;">/year · ₹292/mo</div>
         </div>
       </div>
 
@@ -1223,7 +1226,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
           <div style="font-size:12px;color:#7a8aaa;">Monthly Plan</div>
           <div style="font-size:11px;color:#4a5a7a;" id="pm-buyer-label">—</div>
         </div>
-        <div style="font-size:22px;font-weight:900;color:#FFD700;font-family:'Rajdhani',sans-serif;">₹4,999</div>
+        <div style="font-size:22px;font-weight:900;color:#FFD700;font-family:'Rajdhani',sans-serif;" id="pm-amount-display">₹299</div>
       </div>
 
       <!-- QR code -->
@@ -1267,7 +1270,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:14px;margin-bottom:16px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:7px;">
           <span style="font-size:12px;color:#7a8aaa;">Plan</span>
-          <span style="font-size:12px;font-weight:700;color:#e8eaf0;">Monthly · ₹4,999</span>
+          <span style="font-size:12px;font-weight:700;color:#e8eaf0;" id="pm-plan-summary">Monthly · ₹299</span>
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:7px;">
           <span style="font-size:12px;color:#7a8aaa;">UTR</span>
@@ -8981,7 +8984,7 @@ function renderSettings(){
         <!-- Upgrade CTA -->
         <div style="background:linear-gradient(135deg,#1a0e00,#2a1800);border:1px solid #4a3000;border-radius:12px;padding:14px;text-align:center;">
           <div style="font-size:13px;font-weight:800;color:#FFD700;margin-bottom:4px;">Upgrade to ⭐ Pro</div>
-          <div style="font-size:12px;color:#7a5a2a;margin-bottom:12px;">₹299/year · All features · Ad-free display</div>
+          <div style="font-size:12px;color:#7a5a2a;margin-bottom:12px;">₹299/month or ₹3,499/year · All features · Ad-free display</div>
           <button onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:900;cursor:pointer;width:100%;">💳 Upgrade Now →</button>
           <div style="font-size:11px;color:#4a3a1a;margin-top:8px;">Already have a key? <span onclick="showRenewPrompt()" style="color:#FFD700;cursor:pointer;font-weight:700;">Enter it here →</span></div>
         </div>
@@ -11347,8 +11350,26 @@ function pmGoStep2() {
   pmSetStep(2);
 }
 
+let pmSelectedPlan = "monthly";
+
+function pmSelectPlan(plan) {
+  pmSelectedPlan = plan;
+  const mCard = document.getElementById("pm-card-monthly");
+  const yCard = document.getElementById("pm-card-yearly");
+  const mSel  = document.getElementById("pm-sel-monthly");
+  if (mCard) mCard.style.borderColor = plan === "monthly" ? "#FFD700" : "#2a3560";
+  if (yCard) yCard.style.borderColor = plan === "yearly"  ? "#4f4"    : "#2a3560";
+  if (mSel)  mSel.style.display      = plan === "monthly" ? "" : "none";
+  // Update step-2 amount display
+  const amtEl  = document.getElementById("pm-amount-display");
+  const sumEl  = document.getElementById("pm-plan-summary");
+  if (amtEl) amtEl.textContent = plan === "yearly" ? "₹3,499" : "₹299";
+  if (sumEl) sumEl.textContent = plan === "yearly" ? "Yearly · ₹3,499" : "Monthly · ₹299";
+  pmBuildQR();
+}
+
 function pmBuildQR() {
-  const upiStr = `upi://pay?pa=rayalsaw@ybl&pn=ShopChampion&am=4999&cu=INR`;
+  const upiStr = `upi://pay?pa=rayalsaw@ybl&pn=ShopChampion&am=${pmSelectedPlan==="yearly"?3499:299}&cu=INR`;
   const wrap = document.getElementById("pm-qr-div");
   if (!wrap) return;
   wrap.innerHTML = "";
@@ -11356,7 +11377,7 @@ function pmBuildQR() {
     new QRCode(wrap, { text: upiStr, width: 160, height: 160,
       colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
   } catch(e) {
-    wrap.innerHTML = `<div style="width:160px;height:160px;display:flex;align-items:center;justify-content:center;background:#fff;color:#000;font-size:11px;text-align:center;padding:8px;">Pay ₹4,999 to<br><strong>rayalsaw@ybl</strong></div>`;
+    wrap.innerHTML = `<div style="width:160px;height:160px;display:flex;align-items:center;justify-content:center;background:#fff;color:#000;font-size:11px;text-align:center;padding:8px;">Pay ₹${pmSelectedPlan==="yearly"?3499:299} to<br><strong>rayalsaw@ybl</strong></div>`;
   }
 }
 
@@ -11389,8 +11410,8 @@ async function pmSubmit() {
     customer_name: name,
     customer_phone: authPhone || null,
     user_number: userNumRaw ? String(userNumRaw) : null,
-    plan: "monthly",
-    amount: 4999,
+    plan: pmSelectedPlan,
+    amount: pmSelectedPlan === "yearly" ? 3499 : 299,
     utr_number: utr.toUpperCase(),
     status: "pending",
     submitted_at: new Date().toISOString()
