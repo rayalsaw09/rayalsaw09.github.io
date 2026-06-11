@@ -11660,6 +11660,48 @@ function invGetStock(itemName){
   return Math.max(0, total - sold);
 }
 
+// Returns list of {itemName, unit, expiryDate, qty, daysLeft, status} for stock entries
+// that have an expiryDate and the item still has remaining stock.
+// status: "expired" | "soon" (within thresholdDays) | "ok"
+function invGetExpiringEntries(thresholdDays){
+  thresholdDays = thresholdDays===undefined ? 30 : thresholdDays;
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  const results = [];
+  inventoryItems.forEach(item=>{
+    const stock = item.stock||[];
+    const entriesWithExpiry = stock.filter(e=>e.expiryDate);
+    if(!entriesWithExpiry.length) return;
+    const currentStock = invGetStock(item.name);
+    if(currentStock<=0) return; // nothing left to expire
+    entriesWithExpiry.forEach(e=>{
+      const expDate = new Date(e.expiryDate);
+      if(isNaN(expDate.getTime())) return;
+      expDate.setHours(0,0,0,0);
+      const daysLeft = Math.round((expDate-now)/86400000);
+      let status = "ok";
+      if(daysLeft<0) status="expired";
+      else if(daysLeft<=thresholdDays) status="soon";
+      if(status==="ok") return;
+      results.push({
+        itemName: item.name,
+        unit: item.unit||"unit",
+        category: item.category||"General",
+        expiryDate: e.expiryDate,
+        qty: Number(e.qty),
+        daysLeft,
+        status
+      });
+    });
+  });
+  // Expired first, then soonest expiry first
+  results.sort((a,b)=>{
+    if(a.status!==b.status) return a.status==="expired"?-1:1;
+    return a.daysLeft-b.daysLeft;
+  });
+  return results;
+}
+
 // Called from ptSubmit — deduct sold items, log customer
 function invDeductSold(soldItems, custId){
   const now = new Date().toISOString();
@@ -11676,7 +11718,7 @@ function invDeductSold(soldItems, custId){
 }
 
 // Add stock entry
-function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice, gstRate, gstIncluded, hsnCode){
+function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice, gstRate, gstIncluded, hsnCode, expiryDate){
   let item = inventoryItems.find(x=>x.name===name);
   if(!item){
     item = {id:autoId(), name, unit:unit||"unit", category:category||"General", stock:[], salesLog:[]};
@@ -11690,7 +11732,7 @@ function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellin
   if(gstIncluded) item.gstIncluded = gstIncluded;
   if(hsnCode) item.hsnCode = hsnCode;
   if(!item.stock) item.stock=[];
-  item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes});
+  item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes, expiryDate: expiryDate||""});
   saveInventory();
   notify("✅ Stock added for "+name);
   invView="stock";
@@ -12051,6 +12093,9 @@ function renderInventoryTab(){
   const lowStock = inventoryItems.filter(x=>invGetStock(x.name)<=3&&invGetStock(x.name)>0);
   const outOfStock = inventoryItems.filter(x=>invGetStock(x.name)<=0);
   const totalValue = inventoryItems.reduce((s,x)=>s+invGetStockValue(x.name),0);
+  const expiringEntries = invGetExpiringEntries(30);
+  const expiredCount = expiringEntries.filter(e=>e.status==="expired").length;
+  const soonCount = expiringEntries.filter(e=>e.status==="soon").length;
 
   // All categories A-Z
   const allCats = [...new Set(inventoryItems.map(x=>x.category||"General"))].sort();
@@ -12087,7 +12132,29 @@ function renderInventoryTab(){
       <div style="font-size:22px;font-weight:800;color:${outOfStock.length?'#f66':'#4a5a7a'};">${outOfStock.length}</div>
       <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Out of Stock</div>
     </div>
-  </div>`;
+  </div>
+  ${(expiredCount>0||soonCount>0) ? `<div style="background:#1a0e00;border:1px solid #854d0e;border-radius:12px;padding:14px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <span style="font-size:16px;">⏳</span>
+      <span style="font-size:13px;font-weight:800;color:#ff8c42;">Expiry Alerts</span>
+      <span style="font-size:10px;color:#ff8c42;margin-left:auto;background:#0a0500;border-radius:20px;padding:2px 8px;font-weight:700;">${expiringEntries.length} ${expiringEntries.length===1?'batch':'batches'}</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      ${expiringEntries.slice(0,6).map(e=>{
+        const isExpired = e.status==="expired";
+        const color = isExpired?"#f66":(e.daysLeft<=7?"#f66":"#FFD700");
+        const label = isExpired ? `Expired ${Math.abs(e.daysLeft)}d ago` : (e.daysLeft===0?"Expires today":`Expires in ${e.daysLeft}d`);
+        return `<div style="background:#0a0500;border:1px solid ${isExpired?'#5a1010':'#3a2a10'};border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="min-width:0;">
+            <div style="font-weight:700;color:#e8eaf0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(e.itemName)}</div>
+            <div style="font-size:10px;color:#7a8aaa;margin-top:1px;">${e.qty} ${e.unit} · ${new Date(e.expiryDate).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</div>
+          </div>
+          <div style="font-size:11px;font-weight:800;color:${color};white-space:nowrap;flex-shrink:0;">${label}</div>
+        </div>`;
+      }).join("")}
+      ${expiringEntries.length>6?`<div style="text-align:center;font-size:11px;color:#7a8aaa;margin-top:2px;">+${expiringEntries.length-6} more</div>`:""}
+    </div>
+  </div>` : ``}`;
 
   let body = "";
 
@@ -12159,6 +12226,18 @@ function renderInventoryTab(){
           <input class="input" type="text" id="inv-hsn-add" placeholder="e.g. 3305 (Shampoo), 0401 (Milk)" maxlength="8" oninput="hsnOnInput('add')" style="margin-bottom:4px;" />
           <div id="inv-hsn-msg-add" style="font-size:11px;min-height:14px;"></div>
           <div id="inv-cheat-add" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-top:6px;"></div>
+        </div>
+      </div>
+
+      <!-- Expiry Section -->
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#ff8c42;cursor:pointer;">
+          <input type="checkbox" id="inv-has-expiry" onchange="document.getElementById('inv-expiry-wrap').style.display=this.checked?'block':'none'" style="width:16px;height:16px;accent-color:#ff8c42;" />
+          ⏳ This item has an Expiry Date
+        </label>
+        <div id="inv-expiry-wrap" style="display:none;margin-top:10px;">
+          <label style="display:block;font-size:11px;color:#7a8aaa;margin-bottom:5px;">Expiry Date</label>
+          <input class="input" type="date" id="inv-expiry-date" style="margin-bottom:0;" />
         </div>
       </div>
 
@@ -12305,6 +12384,18 @@ function renderInventoryTab(){
             <input class="input" type="text" id="inv-hsn-restock" placeholder="e.g. 3305 (Shampoo), 0401 (Milk)" maxlength="8" oninput="hsnOnInput('restock')" value="${selItem&&selItem.hsnCode?selItem.hsnCode:''}" style="margin-bottom:4px;" />
             <div id="inv-hsn-msg-restock" style="font-size:11px;min-height:14px;"></div>
             <div id="inv-cheat-restock" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-top:6px;"></div>
+          </div>
+        </div>
+
+        <!-- Expiry Section -->
+        <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#ff8c42;cursor:pointer;">
+            <input type="checkbox" id="inv-has-expiry" ${(()=>{const lastExp=(selItem&&(selItem.stock||[]).filter(e=>e.expiryDate).slice(-1)[0]);return lastExp?'checked':'';})()} onchange="document.getElementById('inv-expiry-wrap').style.display=this.checked?'block':'none'" style="width:16px;height:16px;accent-color:#ff8c42;" />
+            ⏳ This batch has an Expiry Date
+          </label>
+          <div id="inv-expiry-wrap" style="display:${(()=>{const lastExp=(selItem&&(selItem.stock||[]).filter(e=>e.expiryDate).slice(-1)[0]);return lastExp?'block':'none';})()};margin-top:10px;">
+            <label style="display:block;font-size:11px;color:#7a8aaa;margin-bottom:5px;">Expiry Date</label>
+            <input class="input" type="date" id="inv-expiry-date" value="${(()=>{const lastExp=(selItem&&(selItem.stock||[]).filter(e=>e.expiryDate).slice(-1)[0]);return lastExp?lastExp.expiryDate:'';})()}" style="margin-bottom:0;" />
           </div>
         </div>
 
@@ -12473,6 +12564,8 @@ function invSubmitAdd(){
   const gstRate=parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
   const gstIncluded=document.getElementById("inv-gst-included")?.value||"exclusive";
   const hsnCode=(document.getElementById("inv-hsn-add")?.value||"").trim();
+  const hasExpiry=document.getElementById("inv-has-expiry")?.checked;
+  const expiryDate=hasExpiry?(document.getElementById("inv-expiry-date")?.value||""):"";
   if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
   // Duplicate item name check (case-insensitive)
   const _dupItem = inventoryItems.find(x=>x.name.trim().toLowerCase()===name.toLowerCase());
@@ -12483,7 +12576,7 @@ function invSubmitAdd(){
   }
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
   const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
-  invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded, hsnCode);
+  invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded, hsnCode, expiryDate);
   _invLogCreditorPurchase(creditorId, name, qty, cost, date, notes);
 
   // If linked shop creditor, offer sync
@@ -12512,11 +12605,13 @@ function invSubmitRestock(){
   const gstRate=parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
   const gstIncluded=document.getElementById("inv-gst-included")?.value||"exclusive";
   const hsnCode=(document.getElementById("inv-hsn-restock")?.value||"").trim();
+  const hasExpiry=document.getElementById("inv-has-expiry")?.checked;
+  const expiryDate=hasExpiry?(document.getElementById("inv-expiry-date")?.value||""):"";
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
   const selItem = inventoryItems.find(x=>x.name===invRestockSelected);
   const category = selItem ? (selItem.category||"General") : "General";
   const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
-  invAddStock(invRestockSelected, unit||(selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded, hsnCode);
+  invAddStock(invRestockSelected, unit||(selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded, hsnCode, expiryDate);
   _invLogCreditorPurchase(creditorId, invRestockSelected, qty, cost, date, notes);
 
   // If creditor is a linked shop, offer payment sync request
