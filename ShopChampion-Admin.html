@@ -15686,7 +15686,11 @@ window.addEventListener('load', function() {
     // Fallback: poll for login state
     (function pollLogin() {
       if (authPhone && db) { scAdInit(); return; }
-      setTimeout(pollLogin, 2000);
+      // Stop polling after 5 minutes — prevents infinite battery drain
+      if (!window._scAdPollStart) window._scAdPollStart = Date.now();
+      if (Date.now() - window._scAdPollStart < 5 * 60 * 1000) {
+        setTimeout(pollLogin, 2000);
+      }
     })();
   }
 });
@@ -15758,6 +15762,8 @@ function scRenderPurchaseBanners() {
       s.bannerIndex = (s.bannerIndex + 1) % slides.length;
       slides[s.bannerIndex].style.display = 'block';
       slides[s.bannerIndex].classList.add('active');
+      // Track impression for the now-showing ad
+      if (s.bannerAds[s.bannerIndex]) scTrackImpression(s.bannerAds[s.bannerIndex]);
     }, interval);
   }
 }
@@ -15793,6 +15799,26 @@ function scStartFloatVideoEngine() {
   });
 }
 
+function scTrackImpression(ad) {
+  if (!ad || !ad.id || !authPhone || !db) return;
+  try {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const ref = db.collection('ad_impressions')
+      .doc(today)
+      .collection('shops').doc(authPhone)
+      .collection('ads').doc(String(ad.id));
+    ref.set({
+      ad_id:      ad.id,
+      ad_title:   ad.title || ad.name || '',
+      ad_type:    ad.type || 'unknown',
+      shop_phone: authPhone,
+      date:       today,
+      count:      firebase.firestore.FieldValue.increment(1),
+      last_played: Date.now()
+    }, { merge: true }).catch(() => {});
+  } catch(e) {}
+}
+
 function scPlayFloatingVideo(ad) {
   const box = document.getElementById('sc-floating-video');
   const vid = document.getElementById('sc-float-vid');
@@ -15805,6 +15831,7 @@ function scPlayFloatingVideo(ad) {
   vid.loop = false;
   vid.muted = true;
   vid.play().catch(()=>{});
+  scTrackImpression(ad);
   lbl.textContent = ad.name || ad.title || '';
   box.style.display = 'block';
 
@@ -15844,6 +15871,7 @@ function scPlayFullscreenAd(ad) {
   fsEl.style.display = 'flex';
 
   fsVid.play().catch(() => {});
+  scTrackImpression(ad);
 
   // Countdown
   let remaining = ad.duration || ad.duration_sec || 15;
@@ -15878,6 +15906,9 @@ function scEndFullscreenAd() {
   // Restore exact screen state
   if (s.savedNavState && typeof _scApplyState === 'function') {
     _scApplyState(s.savedNavState);
+  } else {
+    // Safety fallback — if nav state can't be restored, go back to current tab
+    try { safeRenderTab(currentTab || 0); } catch(e) {}
   }
 }
 </script>
