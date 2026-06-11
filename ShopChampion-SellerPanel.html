@@ -159,6 +159,9 @@
     <div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:10px;padding:12px;margin-bottom:20px;font-size:12px;color:#4f4;">
       ✅ Supabase already connected to your project
     </div>
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:4px;">Supabase Service Role Key</label>
+    <input id="setup-service-key" class="input" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." style="margin-bottom:4px;font-family:monospace;font-size:11px;"/>
+    <div style="font-size:11px;color:#4a5a7a;margin-bottom:14px;">Supabase Dashboard → Project Settings → API → service_role</div>
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:4px;">Choose a Seller Password</label>
     <input id="setup-pass" class="input" type="password" placeholder="Choose a strong password" style="margin-bottom:16px;"/>
     <div id="setup-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
@@ -807,17 +810,24 @@ function loadConfig() {
 }
 
 function saveSetup() {
-  const pass = document.getElementById("setup-pass").value;
-  const err  = document.getElementById("setup-err");
+  const pass       = document.getElementById("setup-pass").value;
+  const serviceKey = (document.getElementById("setup-service-key").value || "").trim();
+  const err        = document.getElementById("setup-err");
   err.style.display = "none";
+  if (!serviceKey || !serviceKey.startsWith("eyJ")) {
+    err.textContent = "❌ Please enter your Supabase Service Role Key (starts with eyJ...)";
+    err.style.display = "block";
+    return;
+  }
   if (!pass || pass.length < 4) {
     err.textContent = "❌ Please set a password (min 4 characters)";
     err.style.display = "block";
     return;
   }
   hashSellerPass(pass).then(hashed => {
-    SELLER_PASS = hashed;
-    localStorage.setItem("sc_seller_cfg", JSON.stringify({pass: hashed}));
+    SELLER_PASS    = hashed;
+    SB_SERVICE_KEY = serviceKey;
+    localStorage.setItem("sc_seller_cfg", JSON.stringify({pass: hashed, serviceKey}));
     document.getElementById("setup-overlay").style.display = "none";
     openMain();
   });
@@ -973,8 +983,8 @@ function refreshAll() {
 // ── Supabase helpers ──
 async function sbFetch(path, opts = {}) {
   const isWrite = opts.method && opts.method !== "GET";
-  // Always use anon key — RLS is disabled so anon key has full access
-  const authKey = SB_ANON;
+  // Use service role key for writes, anon for reads
+  const authKey = (isWrite && SB_SERVICE_KEY) ? SB_SERVICE_KEY : SB_ANON;
   const res = await fetch(SB_URL + path, {
     ...opts,
     headers: {
@@ -1771,7 +1781,7 @@ async function _doApprove(payment) {
     // PATCH existing row → activate + extend expiry
     const patchRes = await fetch(`${SB_URL}/rest/v1/licenses?id=eq.${existing.id}`, {
       method: "PATCH",
-      headers: { "apikey": SB_ANON, "Authorization": "Bearer " + SB_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+      headers: { "apikey": SB_SERVICE_KEY||SB_ANON, "Authorization": "Bearer " + (SB_SERVICE_KEY||SB_ANON), "Content-Type": "application/json", "Prefer": "return=minimal" },
       body: JSON.stringify({
         active: true, plan: "pro",
         expires_at: expiry.toISOString(),
@@ -1787,7 +1797,7 @@ async function _doApprove(payment) {
     const newKey = `SC-${seg()}-${seg()}-${seg()}`;
     const licRes = await fetch(`${SB_URL}/rest/v1/licenses`, {
       method: "POST",
-      headers: { "apikey": SB_ANON, "Authorization": "Bearer " + SB_ANON, "Content-Type": "application/json", "Prefer": "return=representation" },
+      headers: { "apikey": SB_SERVICE_KEY||SB_ANON, "Authorization": "Bearer " + (SB_SERVICE_KEY||SB_ANON), "Content-Type": "application/json", "Prefer": "return=representation" },
       body: JSON.stringify({
         key: newKey, customer_name: name, plan: "pro",
         active: true, expires_at: expiry.toISOString(),
@@ -1802,7 +1812,7 @@ async function _doApprove(payment) {
   // Mark payment as approved
   const payRes = await fetch(`${SB_URL}/rest/v1/sc_payments?id=eq.${payment.id}`, {
     method: "PATCH",
-    headers: { "apikey": SB_ANON, "Authorization": "Bearer " + SB_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+    headers: { "apikey": SB_SERVICE_KEY||SB_ANON, "Authorization": "Bearer " + (SB_SERVICE_KEY||SB_ANON), "Content-Type": "application/json", "Prefer": "return=minimal" },
     body: JSON.stringify({ status: "approved", license_key: usedKey })
   });
   if (!payRes.ok) throw new Error(await payRes.text());
@@ -1841,7 +1851,7 @@ async function rejectPayment(paymentId) {
     const authKey = SB_SERVICE_KEY || SB_ANON;
     const res = await fetch(`${SB_URL}/rest/v1/sc_payments?id=eq.${paymentId}`, {
       method: "PATCH",
-      headers: { "apikey": SB_ANON, "Authorization": "Bearer " + SB_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+      headers: { "apikey": authKey, "Authorization": "Bearer " + authKey, "Content-Type": "application/json", "Prefer": "return=minimal" },
       body: JSON.stringify({ status: "rejected" })
     });
     if (!res.ok) throw new Error(await res.text());
