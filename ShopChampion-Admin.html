@@ -1731,8 +1731,8 @@ function ptRestoreState() {
       const _dd1=_lp1?Math.floor((Date.now()-new Date(_lp1.date))/86400000):9999;
       const _vc1=_dd1<=7?"#4f4":_dd1<=30?"#FFD700":_dd1<=60?"#f84":"#f66";
       const _isPro1 = typeof isSubFeatureAllowed==="function";
-      const _showVisits1 = !_isPro1||isSubFeatureAllowed(8);
-      const _showLastVisit1 = !_isPro1||isSubFeatureAllowed(10);
+      const _showVisits1 = !_isPro1||isSubFeatureAllowed(11);
+      const _showLastVisit1 = !_isPro1||isSubFeatureAllowed(13);
       const _showRank1 = !_isPro1||isSubFeatureAllowed(0);
       pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank1?` &middot; Rank #${c.rank||"?"}`:""} ${_showVisits1?`&middot; 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit1?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc1};font-weight:700;">${_lv1}</span></div>`:""} ${c.gstin?`<div style="font-size:11px;color:#a78bfa;font-weight:700;margin-top:3px;">🔢 GST: ${c.gstin}${c.gstName?` · ${c.gstName}`:""}${c.gstAddress?`<br><span style="color:#7a8aaa;font-weight:400;">${c.gstAddress}</span>`:""}</div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
     }
@@ -3735,8 +3735,8 @@ function renderCustomers(sorted,q=""){
     const waMsg=(_isProPlan && c.phone)?`https://wa.me/91${c.phone}?text=${encodeURIComponent(`Hi ${c.name.split(" ")[0]}! 👋\nYou are ranked #${c.rank} at ${appSettings.shopName}.\nYour total spend: ${formatINR(c.totalSpend)} 🏆\nVisit us again to climb the leaderboard!`)}`:"";
     const isSel = custSelected.has(c.id);
     const isPro = typeof isSubFeatureAllowed==="function";
-    const showVisits = !isPro||isSubFeatureAllowed(8);
-    const showLastVisit = !isPro||isSubFeatureAllowed(10);
+    const showVisits = !isPro||isSubFeatureAllowed(11);
+    const showLastVisit = !isPro||isSubFeatureAllowed(13);
     const showRank = true;
 
     if(custSelectMode) return `
@@ -4131,8 +4131,8 @@ function ptSelectCustomer(id){
   const _dd2=_lp2?Math.floor((Date.now()-new Date(_lp2.date))/86400000):9999;
   const _vc2=_dd2<=7?"#4f4":_dd2<=30?"#FFD700":_dd2<=60?"#f84":"#f66";
   const _isPro2 = typeof isSubFeatureAllowed==="function";
-  const _showVisits2 = !_isPro2||isSubFeatureAllowed(8);
-  const _showLastVisit2 = !_isPro2||isSubFeatureAllowed(10);
+  const _showVisits2 = !_isPro2||isSubFeatureAllowed(11);
+  const _showLastVisit2 = !_isPro2||isSubFeatureAllowed(13);
   const _showRank2 = !_isPro2||isSubFeatureAllowed(0);
   pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank2?` · Rank #${c.rank}`:""}${_showVisits2?` · 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit2?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div>`:""} ${c.gstin?`<div style="font-size:11px;color:#a78bfa;font-weight:700;margin-top:3px;">🔢 GST: ${c.gstin}${c.gstName?` · ${c.gstName}`:""}${c.gstAddress?`<br><span style="color:#7a8aaa;font-weight:400;">${c.gstAddress}</span>`:""}</div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:20px;padding:4px 8px;">✕</button>`;
   ptPts();
@@ -4239,8 +4239,8 @@ function bptSelectCustomer(id){
   const _dd3=_lp3?Math.floor((Date.now()-new Date(_lp3.date))/86400000):9999;
   const _vc3=_dd3<=7?"#4f4":_dd3<=30?"#FFD700":_dd3<=60?"#f84":"#f66";
   const _isPro3 = typeof isSubFeatureAllowed==="function";
-  const _showVisits3 = !_isPro3||isSubFeatureAllowed(8);
-  const _showLastVisit3 = !_isPro3||isSubFeatureAllowed(10);
+  const _showVisits3 = !_isPro3||isSubFeatureAllowed(11);
+  const _showLastVisit3 = !_isPro3||isSubFeatureAllowed(13);
   const _showRank3 = !_isPro3||isSubFeatureAllowed(0);
   pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#e8eaf0;">${escHtml(c.name)}</div><div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${formatINR(c.totalSpend)}${_showRank3?` · Rank #${c.rank||"?"}`:""} ${_showVisits3?`· 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit3?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc3};font-weight:700;">${_lv3}</span></div>`:""}</div><button onclick="bptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
 }
@@ -10135,14 +10135,14 @@ function showProfile(id){
 
   const hist=visits>0?`
     <div>
-      <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:10px;">🧾 Purchase History ${isSubFeatureAllowed(8)?`(${visits} visit${visits===1?"":"s"})`:""}</div>
+      <div style="font-weight:700;font-size:14px;color:#e8eaf0;margin-bottom:10px;">🧾 Purchase History ${isSubFeatureAllowed(11)?`(${visits} visit${visits===1?"":"s"})`:""}</div>
 
       <!-- Search / Filter Bar -->
       <div id="ph-filter-box" style="background:#080c18;border:1px solid #1e2a45;border-radius:10px;padding:12px 14px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span style="font-size:12px;font-weight:700;color:#7a8aaa;white-space:nowrap;">🔍 Filter by</span>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            ${isSubFeatureAllowed(10)?`<button onclick="phSetMode('date')" id="ph-mode-date" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid #FFD700;background:#1a1500;color:#FFD700;cursor:pointer;">📅 Date</button>`:`<button style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid #2a1a00;background:#0a0800;color:#443;cursor:not-allowed;" title="Enable Last Visit toggle to use date filter">🔒 Date</button>`}
+            ${isSubFeatureAllowed(13)?`<button onclick="phSetMode('date')" id="ph-mode-date" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid #FFD700;background:#1a1500;color:#FFD700;cursor:pointer;">📅 Date</button>`:`<button style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid #2a1a00;background:#0a0800;color:#443;cursor:not-allowed;" title="Enable Last Visit toggle to use date filter">🔒 Date</button>`}
             <button onclick="phSetMode('amount')" id="ph-mode-amount" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid #1e2a45;background:#0a0e1a;color:#7a8aaa;cursor:pointer;">₹ Amount</button>
             <button onclick="phSetMode('range')" id="ph-mode-range" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid #1e2a45;background:#0a0e1a;color:#7a8aaa;cursor:pointer;">📊 Range</button>
             <button onclick="phClearFilter()" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;border:1px solid #2a3560;background:none;color:#f66;cursor:pointer;">✕ Clear</button>
@@ -10185,12 +10185,12 @@ function showProfile(id){
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-      ${[{l:"Total Spend",v:formatINR(c.totalSpend),col:"#e8eaf0"},{l:"Points",v:c.points.toLocaleString(),col:"#e8eaf0"},...(isSubFeatureAllowed(8)?[{l:"Total Visits",v:visits,col:"#5af"}]:[])].map(m=>`<div style="background:#0a0e1a;border-radius:10px;padding:12px;text-align:center;"><div style="font-weight:800;font-size:16px;color:${m.col};">${m.v}</div><div style="font-size:11px;color:#556;margin-top:2px;">${m.l}</div></div>`).join("")}
+      ${[{l:"Total Spend",v:formatINR(c.totalSpend),col:"#e8eaf0"},{l:"Points",v:c.points.toLocaleString(),col:"#e8eaf0"},...(isSubFeatureAllowed(11)?[{l:"Total Visits",v:visits,col:"#5af"}]:[])].map(m=>`<div style="background:#0a0e1a;border-radius:10px;padding:12px;text-align:center;"><div style="font-weight:800;font-size:16px;color:${m.col};">${m.v}</div><div style="font-size:11px;color:#556;margin-top:2px;">${m.l}</div></div>`).join("")}
     </div>
 
-    ${(isSubFeatureAllowed(8)||isSubFeatureAllowed(10))?`<div style="background:#0a0e1a;border-radius:10px;padding:14px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      ${isSubFeatureAllowed(10)?`<div><div style="font-size:11px;color:#4a5a7a;margin-bottom:3px;">🕐 Last Visit</div><div style="font-weight:700;font-size:13px;color:${lastVisitColor};">${lastVisitStr}</div></div><div><div style="font-size:11px;color:#4a5a7a;margin-bottom:3px;">📅 First Visit</div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${firstVisitStr}</div></div>`:""}
-      ${isSubFeatureAllowed(8)?`<div><div style="font-size:11px;color:#4a5a7a;margin-bottom:3px;">🔁 Visit Frequency</div><div style="font-weight:700;font-size:13px;color:#FFD700;">${avgDaysStr}</div></div><div><div style="font-size:11px;color:#4a5a7a;margin-bottom:3px;">💰 Avg per Visit</div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${visits>0?formatINR(Math.round(c.totalSpend/visits)):"—"}</div></div>`:""}
+    ${(isSubFeatureAllowed(11)||isSubFeatureAllowed(13))?`<div style="background:#0a0e1a;border-radius:10px;padding:14px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      ${isSubFeatureAllowed(13)?`<div><div style="font-size:11px;color:#4a5a7a;margin-bottom:3px;">🕐 Last Visit</div><div style="font-weight:700;font-size:13px;color:${lastVisitColor};">${lastVisitStr}</div></div><div><div style="font-size:11px;color:#4a5a7a;margin-bottom:3px;">📅 First Visit</div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${firstVisitStr}</div></div>`:""}
+      ${isSubFeatureAllowed(11)?`<div><div style="font-size:11px;color:#4a5a7a;margin-bottom:3px;">🔁 Visit Frequency</div><div style="font-weight:700;font-size:13px;color:#FFD700;">${avgDaysStr}</div></div><div><div style="font-size:11px;color:#4a5a7a;margin-bottom:3px;">💰 Avg per Visit</div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${visits>0?formatINR(Math.round(c.totalSpend/visits)):"—"}</div></div>`:""}
     </div>`:""}
 
     ${hist}
@@ -10659,23 +10659,23 @@ function openCustomerPage(id){
     </div>
 
     <!-- Stats Grid -->
-    <div style="display:grid;grid-template-columns:${isSubFeatureAllowed(8)?'repeat(3,1fr)':'repeat(2,1fr)'};gap:10px;margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:${isSubFeatureAllowed(11)?'repeat(3,1fr)':'repeat(2,1fr)'};gap:10px;margin-bottom:14px;">
       ${[
         {l:"Total Spend",v:formatINR(c.totalSpend),col:"#FFD700"},
         {l:"Points",v:c.points.toLocaleString()+" pts",col:"#e8eaf0"},
-        ...(isSubFeatureAllowed(8)?[{l:"Total Visits",v:visits,col:"#5af"}]:[])
+        ...(isSubFeatureAllowed(11)?[{l:"Total Visits",v:visits,col:"#5af"}]:[])
       ].map(m=>`<div style="background:#0f1628;border:1px solid #1e2a45;border-radius:12px;padding:14px;text-align:center;"><div style="font-weight:800;font-size:18px;color:${m.col};">${m.v}</div><div style="font-size:11px;color:#556;margin-top:3px;">${m.l}</div></div>`).join("")}
     </div>
-    ${(isSubFeatureAllowed(8)||isSubFeatureAllowed(10))?`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px;">
+    ${(isSubFeatureAllowed(11)||isSubFeatureAllowed(13))?`<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px;">
       ${[
-        ...(isSubFeatureAllowed(10)?[{l:"🕐 Last Visit",v:lastVisitStr,col:lastVisitColor},{l:"📅 First Visit",v:firstVisitStr,col:"#e8eaf0"}]:[]),
-        ...(isSubFeatureAllowed(8)?[{l:"🔁 Frequency",v:avgDaysStr,col:"#FFD700"},{l:"💰 Avg per Visit",v:visits>0?formatINR(Math.round(c.totalSpend/visits)):"—",col:"#e8eaf0"}]:[])
+        ...(isSubFeatureAllowed(13)?[{l:"🕐 Last Visit",v:lastVisitStr,col:lastVisitColor},{l:"📅 First Visit",v:firstVisitStr,col:"#e8eaf0"}]:[]),
+        ...(isSubFeatureAllowed(11)?[{l:"🔁 Frequency",v:avgDaysStr,col:"#FFD700"},{l:"💰 Avg per Visit",v:visits>0?formatINR(Math.round(c.totalSpend/visits)):"—",col:"#e8eaf0"}]:[])
       ].map(m=>`<div style="background:#0f1628;border:1px solid #1e2a45;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#4a5a7a;margin-bottom:3px;">${m.l}</div><div style="font-weight:700;font-size:13px;color:${m.col};">${m.v}</div></div>`).join("")}
     </div>`:""}
 
     <!-- Purchase History -->
     <div style="background:#0f1628;border:1px solid #1e2a45;border-radius:14px;padding:18px;">
-      <div style="font-weight:800;font-size:16px;color:#e8eaf0;margin-bottom:14px;">🧾 Purchase History ${isSubFeatureAllowed(8)?`<span style="font-size:13px;font-weight:600;color:#7a8aaa;">(${visits} visit${visits===1?"":"s"})</span>`:""}</div>
+      <div style="font-weight:800;font-size:16px;color:#e8eaf0;margin-bottom:14px;">🧾 Purchase History ${isSubFeatureAllowed(11)?`<span style="font-size:13px;font-weight:600;color:#7a8aaa;">(${visits} visit${visits===1?"":"s"})</span>`:""}</div>
 
       ${visits>0?`
       <!-- Search Bar -->
@@ -10684,7 +10684,7 @@ function openCustomerPage(id){
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
           <span style="font-size:12px;font-weight:700;color:#7a8aaa;white-space:nowrap;">Filter by</span>
           <button onclick="cpSetMode('all')" id="cp-mode-all" class="btn" style="padding:5px 12px;font-size:11px;font-weight:700;border:1px solid #FFD700;background:#1a1500;color:#FFD700;">All</button>
-          ${isSubFeatureAllowed(10)?`<button onclick="cpSetMode('date')" id="cp-mode-date" class="btn" style="padding:5px 12px;font-size:11px;font-weight:700;border:1px solid #1e2a45;background:#0a0e1a;color:#7a8aaa;">📅 Date Range</button>`:`<button class="btn" style="padding:5px 12px;font-size:11px;font-weight:700;border:1px solid #2a1a00;background:#0a0800;color:#443;cursor:not-allowed;" title="Enable Last Visit toggle to use date filter">🔒 Date Range</button>`}
+          ${isSubFeatureAllowed(13)?`<button onclick="cpSetMode('date')" id="cp-mode-date" class="btn" style="padding:5px 12px;font-size:11px;font-weight:700;border:1px solid #1e2a45;background:#0a0e1a;color:#7a8aaa;">📅 Date Range</button>`:`<button class="btn" style="padding:5px 12px;font-size:11px;font-weight:700;border:1px solid #2a1a00;background:#0a0800;color:#443;cursor:not-allowed;" title="Enable Last Visit toggle to use date filter">🔒 Date Range</button>`}
           <button onclick="cpSetMode('amount')" id="cp-mode-amount" class="btn" style="padding:5px 12px;font-size:11px;font-weight:700;border:1px solid #1e2a45;background:#0a0e1a;color:#7a8aaa;">₹ Exact Amount</button>
           <button onclick="cpSetMode('range')" id="cp-mode-range" class="btn" style="padding:5px 12px;font-size:11px;font-weight:700;border:1px solid #1e2a45;background:#0a0e1a;color:#7a8aaa;">📊 Amount Range</button>
           <button onclick="cpClearFilters()" class="btn" style="padding:5px 12px;font-size:11px;font-weight:700;border:1px solid #2a3560;background:none;color:#f66;">✕ Clear</button>
@@ -10791,7 +10791,7 @@ function _cpShiftMonth(dir){
 }
 
 function cpSetMode(mode){
-  if(mode==="date"&&typeof isSubFeatureAllowed==="function"&&!isSubFeatureAllowed(10)){return;}
+  if(mode==="date"&&typeof isSubFeatureAllowed==="function"&&!isSubFeatureAllowed(13)){return;}
   window._cpMode=mode;
   ["all","date","amount","range"].forEach(m=>{
     const active=m===mode;
@@ -10949,10 +10949,10 @@ function cpPurchaseCard(p,custId){
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-weight:800;font-size:16px;color:${amtColor};">${formatINR(p.amount)}</span>
         ${statusBadge}
-        ${(!isBorrow&&isSubFeatureAllowed(8))?`<span style="font-size:11px;font-weight:700;color:#5af;background:#0a1a2a;border-radius:6px;padding:2px 8px;">Visit #${p.visitNum}</span>`:""}
+        ${(!isBorrow&&isSubFeatureAllowed(11))?`<span style="font-size:11px;font-weight:700;color:#5af;background:#0a1a2a;border-radius:6px;padding:2px 8px;">Visit #${p.visitNum}</span>`:""}
         ${!isBorrow?`<span style="font-size:10px;color:#4a5a7a;margin-left:auto;">🧾 tap to view bill</span>`:""}
       </div>
-      <div style="font-size:12px;color:#556;margin-top:4px;">${isBorrow?'📦 Borrow':'Bill'}: <strong style="color:#7a8aaa;">${p.bill}</strong>${isSubFeatureAllowed(10)?` &nbsp;·&nbsp; 📅 ${new Date(p.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} <span style="font-size:11px;color:#4a5a7a;">⏱ ${new Date(p.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true})}</span>`:" "}</div>
+      <div style="font-size:12px;color:#556;margin-top:4px;">${isBorrow?'📦 Borrow':'Bill'}: <strong style="color:#7a8aaa;">${p.bill}</strong>${isSubFeatureAllowed(13)?` &nbsp;·&nbsp; 📅 ${new Date(p.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} <span style="font-size:11px;color:#4a5a7a;">⏱ ${new Date(p.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true})}</span>`:" "}</div>
       ${isBorrow&&p.due?`<div style="font-size:11px;color:${isOverdue?'#f44':'#7a8aaa'};margin-top:2px;">Due: ${new Date(p.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${isOverdue?' ⚠️':''}</div>`:''}
       ${p.notes&&!isBorrow?`<div style="font-size:12px;color:#7a8aaa;margin-top:3px;">📝 ${p.notes}</div>`:''}
       ${isBorrow&&p.notes?`<div style="font-size:12px;color:#7a8aaa;margin-top:3px;">Item: ${p.notes}</div>`:''}
@@ -10992,9 +10992,9 @@ function phPurchaseCardHTML(p,custId){
         ${statusBadge}
         ${!isBorrow?`<span style="font-size:10px;color:#4a5a7a;margin-left:auto;">🧾 tap to view</span>`:""}
       </div>
-      <div style="font-size:11px;color:#556;margin-top:2px;">${isBorrow?'📦 Borrow':'Bill'}: ${p.bill}${isSubFeatureAllowed(10)?` · ${new Date(p.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} <span style="font-size:10px;color:#4a5a7a;">⏱ ${new Date(p.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true})}</span>`:" "}</div>
+      <div style="font-size:11px;color:#556;margin-top:2px;">${isBorrow?'📦 Borrow':'Bill'}: ${p.bill}${isSubFeatureAllowed(13)?` · ${new Date(p.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} <span style="font-size:10px;color:#4a5a7a;">⏱ ${new Date(p.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true})}</span>`:" "}</div>
       ${isBorrow&&p.due?`<div style="font-size:10px;color:${isOverdue?'#f44':'#7a8aaa'};">Due: ${new Date(p.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${isOverdue?' ⚠️':''}</div>`:''}
-      ${isSubFeatureAllowed(8)?`<div style="font-size:11px;color:#5af;">Visit #${p.visitNum}</div>`:""}
+      ${isSubFeatureAllowed(11)?`<div style="font-size:11px;color:#5af;">Visit #${p.visitNum}</div>`:""}
       ${p.notes&&!isBorrow?`<div style="font-size:11px;color:#7a8aaa;">${p.notes}</div>`:''}
       ${isBorrow&&p.notes?`<div style="font-size:11px;color:#7a8aaa;">Item: ${p.notes}</div>`:''}
       ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;">${p.soldItems.map(si=>si._deleted?`<span style="background:#1a0a0a;border:1px solid #4a2020;border-radius:5px;padding:2px 7px;font-size:10px;color:#884444;text-decoration:line-through;">📦 ${si.qty} ${si.name}</span><span style="background:#2a0a0a;border:1px solid #4a1a1a;border-radius:5px;padding:2px 5px;font-size:10px;color:#f66;">🗑 deleted from inventory</span>`:`<span style="background:#0a1628;border:1px solid #2a3560;border-radius:5px;padding:2px 7px;font-size:10px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||""} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
@@ -11009,7 +11009,7 @@ function phPurchaseCardHTML(p,custId){
 }
 
 function phSetMode(mode){
-  if(mode==="date"&&typeof isSubFeatureAllowed==="function"&&!isSubFeatureAllowed(10)){return;}
+  if(mode==="date"&&typeof isSubFeatureAllowed==="function"&&!isSubFeatureAllowed(13)){return;}
   window._phMode=mode;
   ["date","amount","range"].forEach(m=>{
     const btn=document.getElementById("ph-mode-"+m);
@@ -11244,8 +11244,9 @@ function isTabAllowed(i) {
   return FREE_TABS.includes(i);
 }
 
-// Checks whether a sub-feature (index 7+) is accessible
-// Push to Display=7, Visits=8, WhatsApp=9, Last Visit=10
+// Checks whether a sub-feature is accessible
+// Sub-feature indices (separate from tab indices 0-9):
+// 10=Push to Display, 11=Visits, 12=WhatsApp, 13=Last Visit
 function isSubFeatureAllowed(i) {
   // Pro users get all sub-features
   if (licensePlan === "pro" && licenseStatus === "pro") return true;
