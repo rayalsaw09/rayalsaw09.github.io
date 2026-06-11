@@ -3727,7 +3727,8 @@ function renderCustomers(sorted,q=""){
     const lastVisit=lastP?timeSince(lastP.date):"Never";
     const daysSince=lastP?Math.floor((Date.now()-new Date(lastP.date))/86400000):9999;
     const visitColor=daysSince<=7?"#4f4":daysSince<=30?"#FFD700":daysSince<=60?"#f84":"#f66";
-    const waMsg=c.phone?`https://wa.me/91${c.phone}?text=${encodeURIComponent(`Hi ${c.name.split(" ")[0]}! 👋\nYou are ranked #${c.rank} at ${appSettings.shopName}.\nYour total spend: ${formatINR(c.totalSpend)} 🏆\nVisit us again to climb the leaderboard!`)}`:""
+    const _isProPlan = licensePlan === "pro" && licenseStatus === "pro";
+    const waMsg=(_isProPlan && c.phone)?`https://wa.me/91${c.phone}?text=${encodeURIComponent(`Hi ${c.name.split(" ")[0]}! 👋\nYou are ranked #${c.rank} at ${appSettings.shopName}.\nYour total spend: ${formatINR(c.totalSpend)} 🏆\nVisit us again to climb the leaderboard!`)}`:"";
     const isSel = custSelected.has(c.id);
     const isPro = typeof isSubFeatureAllowed==="function";
     const showVisits = !isPro||isSubFeatureAllowed(8);
@@ -8899,7 +8900,7 @@ function renderSettings(){
     ["👥", "Customers", "Up to 100"],
     ["🛒", "Add Sales & Purchases", "✅ Included"],
     ["🏆", "Rankings Leaderboard", "✅ Included"],
-    ["📱", "WhatsApp Message", "Single only"],
+    ["📱", "WhatsApp Message", "🔒 Pro only"],
     ["📦", "Inventory", "Up to 50 items"],
     ["📺", "Display Screen", "✅ With ads"],
     ["💳", "Creditors / Debtors", "Up to 10"],
@@ -8911,7 +8912,7 @@ function renderSettings(){
     ["📈", "Compare Tab", "✅ Full access"],
     ["📦", "Inventory", "Unlimited"],
     ["💳", "Creditors / Debtors", "Unlimited"],
-    ["📱", "WhatsApp Bulk Messaging", "✅ Included"],
+    ["📱", "WhatsApp Messaging", "✅ Included"],
     ["🧾", "Sales History Export & Bills", "✅ Included"],
     ["🏷️", "GST / GSTIN Auto-fill", "✅ Included"],
     ["🔔", "Push Notifications", "✅ Included"],
@@ -10635,7 +10636,7 @@ function openCustomerPage(id){
       <div style="font-size:18px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Customer Profile</div>
       <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn" onclick="closeCustomerPage();openPurchaseModal('${c.id}')" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 14px;font-size:12px;font-weight:800;">+ Purchase</button>
-        ${c.phone?`<a href="https://wa.me/91${c.phone}?text=${encodeURIComponent('Hi '+c.name.split(' ')[0]+'! 👋 You are ranked #'+c.rank+' at '+appSettings.shopName+'. Total spend: '+formatINR(c.totalSpend)+' 🏆 Visit us again!')}" target="_blank" class="btn" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px 12px;font-size:12px;font-weight:800;text-decoration:none;">💬 WA</a>`:''}
+        ${(licensePlan === "pro" && licenseStatus === "pro") && c.phone?`<a href="https://wa.me/91${c.phone}?text=${encodeURIComponent('Hi '+c.name.split(' ')[0]+'! 👋 You are ranked #'+c.rank+' at '+appSettings.shopName+'. Total spend: '+formatINR(c.totalSpend)+' 🏆 Visit us again!')}" target="_blank" class="btn" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px 12px;font-size:12px;font-weight:800;text-decoration:none;">💬 WA</a>`:''}
         <button class="btn" onclick="closeCustomerPage();openEditModal('${c.id}')" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:8px 12px;font-size:12px;">✏️</button>
       </div>
     </div>
@@ -15038,6 +15039,11 @@ function createBillObject({ custId, soldItems, amount, billNum, notes, date }) {
 
 // ─── WHATSAPP SEND ────────────────────────────────────────────
 function sendBillWhatsApp(bill) {
+  // Pro-only feature
+  if (!(licensePlan === "pro" && licenseStatus === "pro")) {
+    showProGate();
+    return;
+  }
   const shopName = appSettings.shopName || "Shop Champion";
   const gstNum   = getBillSetting("billGSTNumber");
   const showGST  = getBillSetting("billShowGST") && gstNum;
@@ -15468,8 +15474,8 @@ async function addPurchase(custId, { amount, bill, date, notes, soldItems }) {
   const billObj = createBillObject({ custId, soldItems, amount: amt, billNum: bill, notes, date: date || new Date().toISOString() });
   if (billObj) {
     saveBillToFirebase(billObj); // fire-and-forget; don't block UI
-    // Auto-send WhatsApp if enabled
-    if (getBillSetting("billAutoWhatsApp") && c.phone) {
+    // Auto-send WhatsApp if enabled (Pro only)
+    if (getBillSetting("billAutoWhatsApp") && c.phone && (licensePlan === "pro" && licenseStatus === "pro")) {
       setTimeout(() => sendBillWhatsApp(billObj), 500);
     }
     // Show bill modal (unless auto-print, in which case also print)
