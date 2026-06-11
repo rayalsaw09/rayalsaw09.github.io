@@ -1494,7 +1494,6 @@ async function scHashPassword(phone, password) {
 // ─── CONSTANTS ───────────────────────────────────────────────
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
-const ADMIN_PASS = "1234";
 const TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings"];
 const TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️"];
 const TABS_LABEL_PRO = ["Rankings","Customers","Cust. Sales","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings"];
@@ -2867,34 +2866,35 @@ async function verifyPasswordOnline(phone, pass) {
     const hashed = await scHashPassword(phone, pass);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=phone,password_hash,blocked`, {
-      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON },
+    // Use secure RPC — never fetches password_hash directly
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/check_password`, {
+      method: "POST",
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_phone: phone, p_hash: hashed }),
       signal: controller.signal
     });
     clearTimeout(timer);
-    const rows = await res.json();
-    if (rows && rows.length > 0) {
-      if (rows[0].blocked === true) {
+    const ok = await res.json();
+    if (ok === true) {
+      resetBfState(phone);
+      localStorage.setItem("sc_auth_phone", phone);
+      localStorage.setItem("sc_user_" + phone, hashed);
+      onLoginSuccess(phone);
+    } else {
+      // Check if blocked
+      const bRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=blocked`, {
+        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+      });
+      const bRows = await bRes.json();
+      if (bRows && bRows[0] && bRows[0].blocked === true) {
         errEl.innerHTML = "🚫 Your account has been blocked. Please contact the shop owner.";
         errEl.style.display = "block";
         return;
       }
-      if (rows[0].password_hash === hashed) {
-        resetBfState(phone); // clear failed attempts on success
-        localStorage.setItem("sc_auth_phone", phone);
-        localStorage.setItem("sc_user_" + phone, hashed); // cache locally
-        onLoginSuccess(phone);
-      } else {
-        const bfState = recordFailedAttempt(phone);
-        const attemptsLeft = SC_MAX_ATTEMPTS - (bfState.attempts || 0);
-        if (showLockoutMessage(phone, errEl)) return;
-        errEl.textContent = `❌ Wrong password. ${attemptsLeft > 0 ? attemptsLeft + " attempt(s) left before lockout." : "Try again or use Forgot Password."}`;
-        errEl.style.display = "block";
-      }
-    } else {
-      recordFailedAttempt(phone);
+      const bfState = recordFailedAttempt(phone);
+      const attemptsLeft = SC_MAX_ATTEMPTS - (bfState.attempts || 0);
       if (showLockoutMessage(phone, errEl)) return;
-      errEl.textContent = "❌ Wrong password. Try again or use Forgot Password.";
+      errEl.textContent = `❌ Wrong password. ${attemptsLeft > 0 ? attemptsLeft + " attempt(s) left before lockout." : "Try again or use Forgot Password."}`;
       errEl.style.display = "block";
     }
   } catch(e) {
@@ -2925,12 +2925,14 @@ async function loadSecurityQuestion(phone) {
   if (qEl) qEl.textContent = "Loading...";
   if (errEl) { errEl.style.display = "none"; }
   try {
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=security_question`, {
-      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/get_security_question`, {
+      method: "POST",
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_phone: phone })
     });
-    const rows = await res.json();
-    if (rows && rows[0] && rows[0].security_question) {
-      if (qEl) qEl.textContent = "❓ " + rows[0].security_question;
+    const question = await res.json();
+    if (question) {
+      if (qEl) qEl.textContent = "❓ " + question;
     } else {
       if (qEl) qEl.textContent = "⚠️ No security question set for this account.";
       if (errEl) {
@@ -2956,12 +2958,13 @@ async function verifySecurityAnswer() {
 
   try {
     const hashed = await scHashPassword(authPhone, answer);
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(authPhone)}&select=security_answer_hash`, {
-      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/check_security_answer`, {
+      method: "POST",
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_phone: authPhone, p_hash: hashed })
     });
-    const rows = await res.json();
-    if (rows && rows[0] && rows[0].security_answer_hash === hashed) {
-      // Correct — go to reset password
+    const ok = await res.json();
+    if (ok === true) {
       const resetPhoneEl = document.getElementById("auth-reset-phone");
       if (resetPhoneEl) resetPhoneEl.textContent = authPhone;
       authShowStep("resetpass");
@@ -15986,12 +15989,14 @@ function _scShowTallyExit(){
     'Exit ShopChampion?',
     'Any unsaved changes will be lost.<br>Are you sure you want to close the app?',
     ()=>{
-      // Try to close PWA/window
-      if(window.navigator && window.navigator.app && window.navigator.app.exitApp){
+      // On mobile browsers window.close() is blocked — just go back to login instead
+      const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+      if (isMobile) {
+        doLogout();
+      } else if(window.navigator && window.navigator.app && window.navigator.app.exitApp){
         window.navigator.app.exitApp();
       } else {
         window.close();
-        // If window.close() fails (browser blocks it), show message
         setTimeout(()=>{
           const m = document.getElementById('_sc_exit_modal');
           if(!m){
