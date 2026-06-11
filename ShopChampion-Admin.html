@@ -11316,6 +11316,9 @@ let pmPollTimer = null;
 function openPaymentModal() {
   document.getElementById("payment-modal").style.display = "flex";
   pmSetStep(1);
+  // Auto-fill shop name
+  const nameEl = document.getElementById("pm-buyer-name");
+  if (nameEl && !nameEl.value && appSettings.shopName) nameEl.value = appSettings.shopName;
   // Build QR on open
   setTimeout(() => pmBuildQR(), 100);
 }
