@@ -3884,6 +3884,13 @@ function renderPurchaseTab(sorted){
       <input type="hidden" id="pt-sel" />
       ${invMode?"":`<label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Purchase Amount (₹)</label>
       <input class="input" type="number" id="pt-amt" min="0" step="0.01" placeholder="0.00" inputmode="decimal" style="margin-bottom:14px;font-size:18px;font-weight:700;" oninput="ptPts()" />`}
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">${invMode?"🛒 Items Sold — enter qty & selling price":"Items Sold (optional — deducts from Inventory)"}</label>
+      <div id="pt-items-container" style="margin-bottom:${invMode?'6px':'14px'};">
+        <div id="pt-items-list"></div>
+        <button type="button" onclick="ptAddItemRow()" style="width:100%;padding:9px;border-radius:10px;border:1px dashed ${invMode?"#1a4a1a":"#2a3a60"};background:transparent;color:${invMode?"#4f4":"#4a8aff"};font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;">➕ Add Item</button>
+      </div>
+      ${invMode?`<div id="pt-inv-total" style="display:none;background:#0a1a08;border:1px solid #1a4a1a;border-radius:10px;padding:12px 16px;margin-bottom:14px;text-align:right;"></div>`:""}
+      ${invMode?"":`<div id="pt-pts" style="display:none;background:#0a1628;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#aaa;"></div>`}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
         <div><label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Bill Number</label><input class="input" id="pt-bill" value="B${String(Date.now()).slice(-4)}" /></div>
         <div>
@@ -3898,13 +3905,6 @@ function renderPurchaseTab(sorted){
       </div>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Notes (optional)</label>
       <input class="input" id="pt-notes" placeholder="e.g. Diwali purchase..." style="margin-bottom:14px;" />
-      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">${invMode?"🛒 Items Sold — enter qty & selling price":"Items Sold (optional — deducts from Inventory)"}</label>
-      <div id="pt-items-container" style="margin-bottom:${invMode?'6px':'14px'};">
-        <div id="pt-items-list"></div>
-        <button type="button" onclick="ptAddItemRow()" style="width:100%;padding:9px;border-radius:10px;border:1px dashed ${invMode?"#1a4a1a":"#2a3a60"};background:transparent;color:${invMode?"#4f4":"#4a8aff"};font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;">➕ Add Item</button>
-      </div>
-      ${invMode?`<div id="pt-inv-total" style="display:none;background:#0a1a08;border:1px solid #1a4a1a;border-radius:10px;padding:12px 16px;margin-bottom:14px;text-align:right;"></div>`:""}
-      ${invMode?"":`<div id="pt-pts" style="display:none;background:#0a1628;border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px;color:#aaa;"></div>`}
       <button class="btn" id="pt-sub" onclick="ptSubmit()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">Add Sale →</button>
     </div>`;
 
