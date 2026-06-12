@@ -7049,6 +7049,7 @@ function _crTxRender(creditorId){
         </div>
         ${tx.note?`<div style="color:#7a8aaa;margin-bottom:8px;">📝 ${escHtml(tx.note)}</div>`:""}
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick='printTxBill(${JSON.stringify(tx)}, ${JSON.stringify(cr.name)}, "creditor")' style="cursor:pointer;background:#0a1628;border:1px solid #1e3a6e;border-radius:6px;color:#60a5fa;font-size:11px;font-weight:700;padding:5px 10px;">🧾 View Bill</button>
           ${(tx.syncStatus==="declined"||tx.syncStatus==="local")&&cr._fromShopConnect?`<button onclick="openRequestAgainModal('${creditorId}','${tx.id||""}',${tx.amount},'${(tx.note||"").replace(/'/g,"\'")}','${tx.date||""}','${(tx.invoiceNo||"").replace(/'/g,"\'")}','${tx.syncReqId}')" style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:6px;color:#f87171;font-size:11px;font-weight:700;padding:5px 10px;">🔄 Request Again</button>`:""}
           <button onclick="deleteCrTx('${creditorId}',${origIdx});setTimeout(()=>_crTxRender('${creditorId}'),300);" style="cursor:pointer;background:#1a0808;border:1px solid #5a1a1a;border-radius:6px;color:#f66;font-size:11px;font-weight:700;padding:5px 10px;">🗑 Delete</button>
         </div>
@@ -7230,29 +7231,11 @@ function openAddTxModal(creditorId, defaultType){
       ${hasInv ? `
       <div style="background:#0a1628;border:1px solid #1e3a6e;border-radius:10px;padding:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <label style="font-size:12px;color:#60a5fa;font-weight:700;">📦 Link to Inventory Item <span style="color:#4a5a7a;font-weight:400;">(optional)</span></label>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-            <input type="checkbox" id="tx-inv-link" onchange="crTxToggleInvLink()" style="width:16px;height:16px;accent-color:#60a5fa;" />
-            <span style="font-size:11px;color:#7a8aaa;">Update inventory</span>
-          </label>
+          <label style="font-size:12px;color:#60a5fa;font-weight:700;">📦 Items <span style="color:#4a5a7a;font-weight:400;">(optional — link to inventory)</span></label>
+          <button type="button" onclick="crTxAddItemRow()" style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:6px;color:#60a5fa;font-size:11px;font-weight:700;padding:5px 10px;">+ Add Item</button>
         </div>
-        <div id="tx-inv-fields" style="display:none;display:flex;flex-direction:column;gap:8px;">
-          <select class="input" id="tx-inv-item" onchange="crTxOnItemSelect()" style="margin-bottom:0;">
-            <option value="">— Select item —</option>
-            ${invOpts}
-          </select>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div>
-              <label style="font-size:10px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:3px;">QTY RECEIVED</label>
-              <input class="input" id="tx-inv-qty" type="number" min="0.01" step="any" placeholder="0" style="margin-bottom:0;" oninput="crTxRecalcAmount()" />
-            </div>
-            <div>
-              <label style="font-size:10px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:3px;">COST PER UNIT (₹)</label>
-              <input class="input" id="tx-inv-cost" type="number" min="0" step="any" placeholder="0" style="margin-bottom:0;" oninput="crTxRecalcAmount()" />
-            </div>
-          </div>
-          <div id="tx-inv-preview" style="font-size:11px;color:#4a5a7a;"></div>
-        </div>
+        <div id="tx-items-rows" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <div id="tx-items-total" style="font-size:11px;color:#4a5a7a;margin-top:8px;"></div>
       </div>` : `<div style="font-size:11px;color:#4a5a7a;padding:4px 0;">💡 Add items to Inventory tab first to link stock updates here.</div>`}
 
       <div>
@@ -7281,40 +7264,71 @@ function openAddTxModal(creditorId, defaultType){
       </button>
     </div>
   `);
-  setTimeout(()=>document.getElementById("tx-amount")?.focus(),100);
+  setTimeout(()=>{document.getElementById("tx-amount")?.focus(); if(hasInv) crTxAddItemRow();},100);
+}
+function crTxAddItemRow(prefill){
+  const container = document.getElementById("tx-items-rows");
+  if(!container) return;
+  const rowId = "txitem-"+Date.now()+"-"+Math.floor(Math.random()*10000);
+  const invOpts = inventoryItems.map(x=>`<option value="${escHtml(x.name)}" ${prefill?.name===x.name?"selected":""}>${escHtml(x.name)}${x.unit?" ("+x.unit+")":""} · Stock: ${invGetStock(x.name)}</option>`).join("");
+  const row = document.createElement("div");
+  row.id = rowId;
+  row.style = "display:grid;grid-template-columns:1fr 70px 90px 90px 28px;gap:6px;align-items:center;";
+  row.innerHTML = `
+    <select class="input tx-item-name" onchange="crTxItemSelect('${rowId}')" style="margin-bottom:0;font-size:12px;">
+      <option value="">— Item —</option>
+      ${invOpts}
+    </select>
+    <input class="input tx-item-qty" type="number" min="0.01" step="any" placeholder="Qty" value="${prefill?.qty||""}" style="margin-bottom:0;font-size:12px;" oninput="crTxRecalcAmount()" />
+    <input class="input tx-item-rate" type="number" min="0" step="any" placeholder="Rate ₹" value="${prefill?.rate||""}" style="margin-bottom:0;font-size:12px;" oninput="crTxRecalcAmount()" />
+    <div class="tx-item-amt" style="font-size:12px;font-weight:700;color:#a0b0d0;text-align:right;">₹0</div>
+    <button type="button" onclick="document.getElementById('${rowId}').remove();crTxRecalcAmount();" style="cursor:pointer;background:none;border:none;color:#f87171;font-size:16px;">×</button>
+  `;
+  container.appendChild(row);
 }
 
-function crTxToggleInvLink(){
-  const cb = document.getElementById("tx-inv-link");
-  const fields = document.getElementById("tx-inv-fields");
-  if(fields) fields.style.display = cb?.checked ? "flex" : "none";
-  if(!cb?.checked){ document.getElementById("tx-inv-preview").textContent=""; }
-}
-
-function crTxOnItemSelect(){
-  const name = document.getElementById("tx-inv-item")?.value;
+function crTxItemSelect(rowId){
+  const row = document.getElementById(rowId);
+  if(!row) return;
+  const name = row.querySelector(".tx-item-name")?.value;
   const item = inventoryItems.find(x=>x.name===name);
-  if(!item) return;
-  // Pre-fill cost from last stock entry
-  const lastEntry = (item.stock||[]).slice(-1)[0];
-  if(lastEntry?.costPerUnit){ const el=document.getElementById("tx-inv-cost"); if(el) el.value=lastEntry.costPerUnit; }
+  if(item){
+    const lastEntry = (item.stock||[]).slice(-1)[0];
+    const rateEl = row.querySelector(".tx-item-rate");
+    if(rateEl && !rateEl.value && lastEntry?.costPerUnit) rateEl.value = lastEntry.costPerUnit;
+  }
   crTxRecalcAmount();
 }
 
+function crTxGetItems(){
+  const rows = [...document.querySelectorAll("#tx-items-rows > div")];
+  return rows.map(row=>{
+    const name = row.querySelector(".tx-item-name")?.value||"";
+    const qty  = parseFloat(row.querySelector(".tx-item-qty")?.value||"0");
+    const rate = parseFloat(row.querySelector(".tx-item-rate")?.value||"0");
+    return { name, qty, rate, amount: qty*rate };
+  }).filter(it=>it.qty>0 && it.rate>=0);
+}
+
 function crTxRecalcAmount(){
-  const qty  = parseFloat(document.getElementById("tx-inv-qty")?.value||"0");
-  const cost = parseFloat(document.getElementById("tx-inv-cost")?.value||"0");
-  const name = document.getElementById("tx-inv-item")?.value||"";
-  const prev = document.getElementById("tx-inv-preview");
-  if(qty>0 && cost>0){
-    const total = qty*cost;
+  const items = crTxGetItems();
+  // Update per-row amount display
+  [...document.querySelectorAll("#tx-items-rows > div")].forEach(row=>{
+    const qty  = parseFloat(row.querySelector(".tx-item-qty")?.value||"0");
+    const rate = parseFloat(row.querySelector(".tx-item-rate")?.value||"0");
+    const amtEl = row.querySelector(".tx-item-amt");
+    if(amtEl) amtEl.textContent = "₹"+(qty*rate).toLocaleString("en-IN",{maximumFractionDigits:2});
+  });
+  const total = items.reduce((s,it)=>s+it.amount,0);
+  const totalEl = document.getElementById("tx-items-total");
+  if(items.length>0){
     const amtEl = document.getElementById("tx-amount");
     if(amtEl) amtEl.value = total.toFixed(2);
     const noteEl = document.getElementById("tx-note");
-    if(noteEl && !noteEl.value) noteEl.value = name ? `${name} × ${qty}` : "";
-    if(prev) prev.textContent = `→ ₹${total.toLocaleString("en-IN",{maximumFractionDigits:2})} · Stock will increase by ${qty}`;
+    if(noteEl && !noteEl.value) noteEl.value = items.map(it=>it.name?`${it.name} × ${it.qty}`:"").filter(Boolean).join(", ");
+    if(totalEl) totalEl.textContent = `→ Total: ₹${total.toLocaleString("en-IN",{maximumFractionDigits:2})} · Stock will increase for ${items.filter(it=>it.name).length} item(s)`;
   } else {
-    if(prev) prev.textContent="";
+    if(totalEl) totalEl.textContent="";
   }
 }
 
@@ -7587,29 +7601,23 @@ function saveCrTransaction(){
   const idx = creditors.findIndex(c=>c.id===creditorId);
   if(idx<0){ notify("❌ Creditor not found"); return; }
 
-  // ── Inventory link (purchase only) ──
-  let invLinked = false;
-  let invItemName = "";
-  let invQtyLinked = 0;
+  // ── Multi-item link (purchase only) ──
+  let multiItems = [];
   if(type === "purchase"){
-    const invLinkCb = document.getElementById("tx-inv-link");
-    if(invLinkCb?.checked){
-      const itemName = document.getElementById("tx-inv-item")?.value?.trim();
-      const qty      = parseFloat(document.getElementById("tx-inv-qty")?.value||"0");
-      const cost     = parseFloat(document.getElementById("tx-inv-cost")?.value||"0");
-      if(!itemName){ notify("⚠️ Select an inventory item or uncheck the inventory link"); return; }
-      if(!(qty>0)){ notify("⚠️ Enter a valid quantity"); return; }
-      // Add stock to inventory
-      const item = inventoryItems.find(x=>x.name===itemName);
+    const items = crTxGetItems().filter(it=>it.name);
+    items.forEach(it=>{
+      const item = inventoryItems.find(x=>x.name===it.name);
       const unit = item?.unit||"unit";
       const cat  = item?.category||"General";
       const sp   = item?.sellingPrice||0;
-      invAddStock(itemName, unit, qty, cost>0?cost:0, date, note||invoiceNo||"", cat, sp, item?.gstRate||0, item?.gstIncluded||"");
-      invLinked = true;
-      invItemName = itemName;
-      invQtyLinked = qty;
-    }
+      invAddStock(it.name, unit, it.qty, it.rate>0?it.rate:0, date, note||invoiceNo||"", cat, sp, item?.gstRate||0, item?.gstIncluded||"");
+    });
+    multiItems = items.map(it=>({ name:it.name, qty:it.qty, rate:it.rate, amount:it.amount, unit:(inventoryItems.find(x=>x.name===it.name)?.unit)||"" }));
   }
+  let invLinked = multiItems.length > 0;
+  let invItemName = multiItems.map(it=>it.name).join(", ");
+  let invQtyLinked = 0;
+
   if(type === "return"){
     const invLinkCb = document.getElementById("tx-ret-inv-link");
     if(invLinkCb?.checked){
@@ -7632,6 +7640,7 @@ function saveCrTransaction(){
   if(!creditors[idx].transactions) creditors[idx].transactions=[];
   creditors[idx].transactions.push({
     id:txId, type, amount, note, date, invoiceNo,
+    ...(multiItems.length>0 ? { items: multiItems } : {}),
     ...(invLinked ? { _invItem: invItemName, _invQty: invQtyLinked } : {}),
     createdAt:Date.now(), syncStatus:"local"
   });
@@ -8645,7 +8654,10 @@ function _drTxRender(debtorId){
           ${tx._invItem?`<div><span style="color:#4a5a7a;">Inventory</span><br><span style="color:#60a5fa;font-weight:700;">📦 ${escHtml(tx._invItem)} × ${tx._invQty}</span></div>`:""}
         </div>
         ${tx.note?`<div style="color:#7a8aaa;margin-bottom:8px;">📝 ${escHtml(tx.note)}</div>`:""}
-        <button onclick="deleteDebtTx('${debtorId}',${origIdx});setTimeout(()=>_drTxRender('${debtorId}'),300);" style="cursor:pointer;background:#1a0808;border:1px solid #5a1a1a;border-radius:6px;color:#f66;font-size:11px;font-weight:700;padding:5px 10px;">🗑 Delete</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick='printTxBill(${JSON.stringify(tx)}, ${JSON.stringify(dr.name)}, "debtor")' style="cursor:pointer;background:#0a1628;border:1px solid #1e3a6e;border-radius:6px;color:#60a5fa;font-size:11px;font-weight:700;padding:5px 10px;">🧾 View Bill</button>
+          <button onclick="deleteDebtTx('${debtorId}',${origIdx});setTimeout(()=>_drTxRender('${debtorId}'),300);" style="cursor:pointer;background:#1a0808;border:1px solid #5a1a1a;border-radius:6px;color:#f66;font-size:11px;font-weight:700;padding:5px 10px;">🗑 Delete</button>
+        </div>
       </div>
     </div>`;
   }).join("");
@@ -13445,7 +13457,8 @@ function _buildSharedLedgerHtml(entity, etype, peerName, connId) {
     return `<tr><td style="padding:9px 8px;font-size:13px;">${icon} ${lbl}</td>
       <td style="padding:9px 8px;font-size:13px;color:${col};font-weight:700;">₹${Number(t.amount||0).toFixed(2)}</td>
       <td style="padding:9px 8px;font-size:12px;color:#7a8aaa;">${dt}</td>
-      <td style="padding:9px 8px;font-size:12px;color:#7a8aaa;">${escHtml(t.notes||t.bill||"")}</td></tr>`;
+      <td style="padding:9px 8px;font-size:12px;color:#7a8aaa;">${escHtml(t.notes||t.bill||"")}</td>
+      <td style="padding:9px 8px;font-size:12px;text-align:right;"><button onclick='printTxBill(${JSON.stringify(t)}, ${JSON.stringify(displayName)}, ${JSON.stringify(etype)})' style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:6px;color:#60a5fa;font-size:11px;font-weight:700;padding:4px 8px;">🧾 Bill</button></td></tr>`;
   }).join("");
   return `<div style="max-height:78vh;overflow-y:auto;" id="sc-ledger-modal-content">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
@@ -13455,6 +13468,8 @@ function _buildSharedLedgerHtml(entity, etype, peerName, connId) {
         <div style="font-size:12px;color:#7a8aaa;">${etype==="creditor"?"Creditor (Supplier)":"Debtor (Buyer)"} · Shared by ${escHtml(peerName)}</div>
         <div style="font-size:10px;color:#3a5a3a;margin-top:2px;">🔴 Live — updates automatically</div>
       </div>
+      <button onclick='printSharedLedgerStatement(${JSON.stringify(entity)}, ${JSON.stringify(etype)}, ${JSON.stringify(displayName)}, ${JSON.stringify(peerName)})'
+        style="cursor:pointer;background:#1e2a45;border:1px solid #3a4a6a;color:#a0b0d0;font-size:12px;font-weight:800;border-radius:8px;padding:7px 12px;">🖨 Print Statement</button>
       <a href="${csvUrl}" download="${escHtml(displayName)}-ledger.csv"
         style="background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;font-size:12px;font-weight:800;border-radius:8px;padding:7px 14px;text-decoration:none;">⬇ Export CSV</a>
     </div>
@@ -13470,10 +13485,148 @@ function _buildSharedLedgerHtml(entity, etype, peerName, connId) {
             <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">AMOUNT</th>
             <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">DATE</th>
             <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">NOTES</th>
+            <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:right;">BILL</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>`}
   </div>`;
+}
+
+// ── Print a single transaction as a professional Bill / Invoice ───────────────
+function printTxBill(tx, partyName, etype) {
+  const myShopName = (appSettings && appSettings.shopName) || "My Shop";
+  const isCreditor = etype === "creditor";
+  const dt = tx.date ? new Date(tx.date+ (tx.date.length<=10?"T00:00:00":"")).toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"}) : "-";
+  const lbl = {purchase:"Purchase Bill",payment:"Payment Receipt",return:"Return / Credit Note",sale:"Sales Bill",receipt:"Payment Receipt"}[tx.type] || "Voucher";
+  const items = Array.isArray(tx.items) ? tx.items : (tx._invItem ? [{name:tx._invItem, qty:tx._invQty||1, rate:(tx._invQty?tx.amount/tx._invQty:tx.amount), amount:tx.amount, unit:""}] : []);
+
+  let itemRows = "";
+  if (items.length > 0) {
+    itemRows = items.map((it,i)=>`<tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${i+1}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${escHtml(it.name||"-")}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;">${it.qty||0}${it.unit?" "+escHtml(it.unit):""}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;">₹${Number(it.rate||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">₹${Number(it.amount||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
+    </tr>`).join("");
+  }
+
+  const itemsTable = items.length > 0 ? `
+  <table style="width:100%;border-collapse:collapse;margin-top:20px;">
+    <thead><tr>
+      <th style="background:#f3f4f6;padding:9px 10px;text-align:left;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;width:36px;">#</th>
+      <th style="background:#f3f4f6;padding:9px 10px;text-align:left;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Item</th>
+      <th style="background:#f3f4f6;padding:9px 10px;text-align:right;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Qty</th>
+      <th style="background:#f3f4f6;padding:9px 10px;text-align:right;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Rate</th>
+      <th style="background:#f3f4f6;padding:9px 10px;text-align:right;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Amount</th>
+    </tr></thead>
+    <tbody>${itemRows}</tbody>
+    <tfoot><tr style="background:#f9fafb;">
+      <td colspan="4" style="padding:10px;font-weight:800;text-align:right;">Total:</td>
+      <td style="padding:10px;font-weight:800;text-align:right;">₹${Number(tx.amount||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
+    </tr></tfoot>
+  </table>` : `
+  <div style="margin-top:24px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:18px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:14px;color:#374151;">${escHtml(tx.note||lbl)}</div>
+      <div style="font-size:24px;font-weight:800;">₹${Number(tx.amount||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</div>
+    </div>
+  </div>`;
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(lbl)} — ${escHtml(partyName)}</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:30px;color:#111;max-width:800px;margin:0 auto;}
+    h1{margin:0;font-size:22px;}h2{margin:0;font-size:16px;color:#555;}
+    @media print{button{display:none}}
+  </style></head><body>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+    <div><h1>${escHtml(myShopName)}</h1><div style="font-size:12px;color:#6b7280;margin-top:4px;">${escHtml(lbl)}</div></div>
+    <div style="text-align:right;font-size:12px;color:#6b7280;">
+      <div>Date: ${dt}</div>
+      ${tx.invoiceNo?`<div>Ref / Invoice: <b>${escHtml(tx.invoiceNo)}</b></div>`:""}
+      <div>Printed: ${new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"})}</div>
+    </div>
+  </div>
+  <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:8px;">
+    <div style="font-size:12px;color:#6b7280;">${isCreditor?"Supplier":"Customer"}</div>
+    <div style="font-size:17px;font-weight:700;">${escHtml(partyName)}</div>
+  </div>
+  ${itemsTable}
+  <div style="margin-top:30px;text-align:center;font-size:11px;color:#9ca3af;">Generated by ShopChampion</div>
+  <div style="margin-top:16px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:#1e40af;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🖨 Print / Save PDF</button></div>
+  </body></html>`;
+
+  const w = window.open("","_blank","width=860,height=700");
+  w.document.write(html);
+  w.document.close();
+}
+
+// ── Print a professional statement for a SHARED (party-statement) ledger ──────
+function printSharedLedgerStatement(entity, etype, displayName, peerName) {
+  const txs = (entity.transactions || []).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const myShopName = (appSettings && appSettings.shopName) || "My Shop";
+  const isCreditor = etype === "creditor";
+
+  let running = 0;
+  const rows = txs.map(tx => {
+    let dr_amt = "", cr_amt = "";
+    const inAmt = (isCreditor && tx.type==="purchase") || (!isCreditor && tx.type==="sale");
+    if (inAmt) { running += (tx.amount||0); dr_amt = "₹"+Number(tx.amount||0).toLocaleString("en-IN"); }
+    else { running -= (tx.amount||0); cr_amt = "₹"+Number(tx.amount||0).toLocaleString("en-IN"); }
+    const lbl = {purchase:"Purchase",payment:"Payment",return:"Return",sale:"Sale",receipt:"Receipt"}[tx.type] || tx.type;
+    const dt = tx.date ? new Date(tx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "-";
+    return `<tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${dt}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${escHtml(tx.invoiceNo||tx.bill||"-")}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${escHtml(tx.notes||tx.note||lbl)}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#d97706;">${dr_amt||"-"}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;color:#16a34a;">${cr_amt||"-"}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;color:${running>=0?"#d97706":"#16a34a"};">₹${Math.abs(running).toLocaleString("en-IN")}</td>
+    </tr>`;
+  }).join("");
+
+  const closingBal = running;
+  const balLabel = isCreditor
+    ? (closingBal > 0 ? "Payable" : closingBal < 0 ? "Advance Paid" : "Settled")
+    : (closingBal > 0 ? "Receivable" : closingBal < 0 ? "Advance Received" : "Settled");
+  const balColor = closingBal > 0 ? "#d97706" : closingBal < 0 ? "#16a34a" : "#6b7280";
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Statement — ${escHtml(displayName)}</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:30px;color:#111;max-width:800px;margin:0 auto;}
+    h1{margin:0;font-size:22px;}h2{margin:0;font-size:16px;color:#555;}
+    table{width:100%;border-collapse:collapse;margin-top:20px;}
+    th{background:#f3f4f6;padding:9px 10px;text-align:left;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;}
+    @media print{button{display:none}}
+  </style></head><body>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+    <div><h1>${escHtml(myShopName)}</h1><div style="font-size:12px;color:#6b7280;margin-top:4px;">Party Statement (${isCreditor?"Supplier / Creditor":"Buyer / Debtor"})</div></div>
+    <div style="text-align:right;font-size:12px;color:#6b7280;">Printed: ${new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"})}</div>
+  </div>
+  <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:20px;">
+    <div style="font-size:18px;font-weight:700;margin-bottom:4px;">${escHtml(displayName)}</div>
+    <div style="font-size:12px;color:#6b7280;">Shared by ${escHtml(peerName)}</div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Date</th><th>Ref / Invoice</th><th>Description</th>
+      <th style="text-align:right">${isCreditor?"Purchase (Dr)":"Sale (Dr)"}</th>
+      <th style="text-align:right">${isCreditor?"Payment (Cr)":"Receipt (Cr)"}</th>
+      <th style="text-align:right">Balance</th>
+    </tr></thead>
+    <tbody>${rows || `<tr><td colspan="6" style="padding:16px;text-align:center;color:#9ca3af;">No transactions</td></tr>`}</tbody>
+    <tfoot><tr style="background:#f9fafb;">
+      <td colspan="5" style="padding:10px;font-weight:800;text-align:right;">Closing Balance:</td>
+      <td style="padding:10px;font-weight:800;text-align:right;color:${balColor};">₹${Math.abs(closingBal).toLocaleString("en-IN")} (${balLabel})</td>
+    </tr></tfoot>
+  </table>
+  <div style="margin-top:30px;text-align:center;font-size:11px;color:#9ca3af;">Generated by ShopChampion</div>
+  <div style="margin-top:16px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:#1e40af;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🖨 Print / Save PDF</button></div>
+  </body></html>`;
+
+  const w = window.open("","_blank","width=860,height=700");
+  w.document.write(html);
+  w.document.close();
 }
 
 function _scStopLedgerListener() {
