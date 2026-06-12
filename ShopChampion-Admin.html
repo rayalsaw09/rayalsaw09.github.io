@@ -5445,6 +5445,11 @@ function renderAnalytics(sorted){
       </div>
     </div>` : ''}
 
+    <!-- ── BALANCE SHEET ── -->
+    <div style="margin-bottom:10px;">
+      <button onclick="openBalanceSheet()" style="cursor:pointer;width:100%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);border:none;border-radius:12px;color:#fff;font-size:13px;font-weight:800;padding:12px;">📊 View Balance Sheet</button>
+    </div>
+
     <!-- ── LOW STOCK ALERT ── -->
     ${(lowStockItems.length>0||outOfStock.length>0) ? `<div style="background:#0a0a00;border:2px solid #854d0e;border-radius:16px;padding:14px;margin-bottom:10px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
@@ -5465,6 +5470,192 @@ function renderAnalytics(sorted){
     </div>` : ''}
 
   </div>`;
+}
+
+// ─── BALANCE SHEET ──────────────────────────────────────────────────────────
+function _bsGetCashInHand(){
+  return Number(localStorage.getItem("sc_cash_in_hand")||"0")||0;
+}
+function _bsSetCashInHand(val){
+  localStorage.setItem("sc_cash_in_hand", String(Number(val)||0));
+}
+
+function _bsComputeData(){
+  const creditors = getCreditors().filter(c=>c.id!=="CR_UNRECONCILED");
+  const debtors   = getDebtors();
+
+  const payables   = creditors.map(c=>({name:c.name, amount:credBalance(c)})).filter(x=>x.amount>0);
+  const receivables= debtors.map(d=>({name:d.name, amount:debtBalance(d)})).filter(x=>x.amount>0);
+
+  const totalPayables    = payables.reduce((s,x)=>s+x.amount,0);
+  const totalReceivables = receivables.reduce((s,x)=>s+x.amount,0);
+
+  const inventoryRows = inventoryItems.map(it=>({
+    name: it.name,
+    stock: invGetStock(it.name),
+    unit: it.unit||"",
+    value: invGetStockValue(it.name)
+  })).filter(x=>x.stock>0);
+  const totalInventoryValue = inventoryRows.reduce((s,x)=>s+x.value,0);
+
+  const cash = _bsGetCashInHand();
+
+  const totalAssets = cash + totalInventoryValue + totalReceivables;
+  const totalLiabilities = totalPayables;
+  const netWorth = totalAssets - totalLiabilities;
+
+  return { creditors, debtors, payables, receivables, totalPayables, totalReceivables,
+    inventoryRows, totalInventoryValue, cash, totalAssets, totalLiabilities, netWorth };
+}
+
+function openBalanceSheet(){
+  const d = _bsComputeData();
+  const shopName = (appSettings && appSettings.shopName) || "My Shop";
+
+  const row = (label, value, opts={}) => `<div style="display:flex;justify-content:space-between;padding:7px 0;${opts.border?"border-top:1px solid #1e2a45;":""}">
+    <div style="font-size:13px;color:${opts.bold?'#e8eaf0':'#a0b0d0'};font-weight:${opts.bold?800:600};${opts.indent?'padding-left:14px;':''}">${label}</div>
+    <div style="font-size:13px;color:${opts.color||'#e8eaf0'};font-weight:${opts.bold?800:600};">${formatINR(value)}</div>
+  </div>`;
+
+  showWideModal(`
+    ${modalHeader("📊 Balance Sheet")}
+    <div style="display:flex;flex-direction:column;gap:14px;">
+
+      <div style="background:#0a1628;border:1px solid #1e3a6e;border-radius:10px;padding:12px;">
+        <div style="font-size:12px;color:#60a5fa;font-weight:800;margin-bottom:6px;">💵 CASH IN HAND</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="input" id="bs-cash" type="number" min="0" step="any" value="${d.cash}" style="margin-bottom:0;font-size:16px;font-weight:800;" />
+          <button onclick="bsSaveCash()" style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:8px;color:#60a5fa;font-size:12px;font-weight:700;padding:9px 14px;white-space:nowrap;">Save</button>
+        </div>
+        <div style="font-size:10px;color:#4a5a7a;margin-top:4px;">Enter your current cash/bank balance manually</div>
+      </div>
+
+      <div style="background:#08101e;border:1px solid #1e2a45;border-radius:12px;padding:14px;">
+        <div style="font-size:13px;font-weight:800;color:#4ade80;margin-bottom:6px;">📈 ASSETS</div>
+        ${row("Cash in Hand", d.cash, {indent:true})}
+        ${row("Inventory (Stock Value)", d.totalInventoryValue, {indent:true})}
+        ${row("Receivables (Debtors owe you)", d.totalReceivables, {indent:true})}
+        ${row("TOTAL ASSETS", d.totalAssets, {bold:true, border:true, color:"#4ade80"})}
+      </div>
+
+      <div style="background:#08101e;border:1px solid #1e2a45;border-radius:12px;padding:14px;">
+        <div style="font-size:13px;font-weight:800;color:#f87171;margin-bottom:6px;">📉 LIABILITIES</div>
+        ${row("Payables (You owe creditors)", d.totalPayables, {indent:true})}
+        ${row("TOTAL LIABILITIES", d.totalLiabilities, {bold:true, border:true, color:"#f87171"})}
+      </div>
+
+      <div style="background:${d.netWorth>=0?'#081a08':'#1a0808'};border:1px solid ${d.netWorth>=0?'#1a5a1a':'#5a1a1a'};border-radius:12px;padding:14px;">
+        ${row("NET WORTH (Assets − Liabilities)", d.netWorth, {bold:true, color: d.netWorth>=0?'#22c55e':'#ef4444'})}
+      </div>
+
+      ${d.inventoryRows.length>0 ? `
+      <div style="background:#08101e;border:1px solid #1e2a45;border-radius:12px;padding:14px;">
+        <div style="font-size:12px;font-weight:800;color:#a0b0d0;margin-bottom:8px;">📦 Inventory Breakdown</div>
+        ${d.inventoryRows.map(it=>row(`${escHtml(it.name)} (${it.stock} ${escHtml(it.unit)})`, it.value, {indent:true})).join("")}
+      </div>` : ""}
+
+      ${d.payables.length>0 ? `
+      <div style="background:#08101e;border:1px solid #1e2a45;border-radius:12px;padding:14px;">
+        <div style="font-size:12px;font-weight:800;color:#fca5a5;margin-bottom:8px;">📤 Payables Breakdown</div>
+        ${d.payables.map(x=>row(escHtml(x.name), x.amount, {indent:true, color:"#f87171"})).join("")}
+      </div>` : ""}
+
+      ${d.receivables.length>0 ? `
+      <div style="background:#08101e;border:1px solid #1e2a45;border-radius:12px;padding:14px;">
+        <div style="font-size:12px;font-weight:800;color:#86efac;margin-bottom:8px;">📥 Receivables Breakdown</div>
+        ${d.receivables.map(x=>row(escHtml(x.name), x.amount, {indent:true, color:"#4ade80"})).join("")}
+      </div>` : ""}
+
+      <button onclick="printBalanceSheet()" class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-weight:800;">
+        🖨 Print / Export PDF
+      </button>
+      <button onclick="closeModal()" class="btn" style="background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;padding:12px;">
+        Close
+      </button>
+    </div>
+  `);
+}
+
+function bsSaveCash(){
+  const val = parseFloat(document.getElementById("bs-cash")?.value||"0")||0;
+  _bsSetCashInHand(val);
+  notify("✅ Cash in hand updated");
+  setTimeout(openBalanceSheet, 150);
+}
+
+function printBalanceSheet(){
+  const d = _bsComputeData();
+  const shopName = (appSettings && appSettings.shopName) || "My Shop";
+  const dateStr = new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"});
+
+  const row = (label, value, opts={}) => `<tr ${opts.border?'style="border-top:2px solid #d1d5db;"':''}>
+    <td style="padding:8px 10px;${opts.indent?'padding-left:24px;':''}font-weight:${opts.bold?800:400};">${label}</td>
+    <td style="padding:8px 10px;text-align:right;font-weight:${opts.bold?800:400};color:${opts.color||'#111'};">₹${Number(value).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
+  </tr>`;
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Balance Sheet — ${escHtml(shopName)}</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:30px;color:#111;max-width:760px;margin:0 auto;}
+    h1{margin:0;font-size:22px;}
+    table{width:100%;border-collapse:collapse;margin-top:8px;}
+    th{background:#f3f4f6;padding:9px 10px;text-align:left;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;}
+    .section{margin-top:24px;}
+    @media print{button{display:none}}
+  </style></head><body>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+    <div><h1>${escHtml(shopName)}</h1><div style="font-size:12px;color:#6b7280;margin-top:4px;">Balance Sheet</div></div>
+    <div style="text-align:right;font-size:12px;color:#6b7280;">As on: ${dateStr}</div>
+  </div>
+
+  <div class="section">
+    <table><thead><tr><th>Assets</th><th style="text-align:right;">Amount</th></tr></thead>
+    <tbody>
+      ${row("Cash in Hand", d.cash, {indent:true})}
+      ${row("Inventory (Stock Value)", d.totalInventoryValue, {indent:true})}
+      ${row("Receivables (Debtors)", d.totalReceivables, {indent:true})}
+      ${row("Total Assets", d.totalAssets, {bold:true, border:true})}
+    </tbody></table>
+  </div>
+
+  <div class="section">
+    <table><thead><tr><th>Liabilities</th><th style="text-align:right;">Amount</th></tr></thead>
+    <tbody>
+      ${row("Payables (Creditors)", d.totalPayables, {indent:true})}
+      ${row("Total Liabilities", d.totalLiabilities, {bold:true, border:true})}
+    </tbody></table>
+  </div>
+
+  <div class="section">
+    <table><tbody>
+      ${row("Net Worth (Assets − Liabilities)", d.netWorth, {bold:true, color: d.netWorth>=0?"#16a34a":"#dc2626", border:true})}
+    </tbody></table>
+  </div>
+
+  ${d.inventoryRows.length>0 ? `
+  <div class="section">
+    <table><thead><tr><th>Inventory Breakdown</th><th style="text-align:right;">Value</th></tr></thead>
+    <tbody>${d.inventoryRows.map(it=>row(`${escHtml(it.name)} (${it.stock} ${escHtml(it.unit)})`, it.value)).join("")}</tbody></table>
+  </div>` : ""}
+
+  ${d.payables.length>0 ? `
+  <div class="section">
+    <table><thead><tr><th>Payables Breakdown</th><th style="text-align:right;">Amount</th></tr></thead>
+    <tbody>${d.payables.map(x=>row(escHtml(x.name), x.amount)).join("")}</tbody></table>
+  </div>` : ""}
+
+  ${d.receivables.length>0 ? `
+  <div class="section">
+    <table><thead><tr><th>Receivables Breakdown</th><th style="text-align:right;">Amount</th></tr></thead>
+    <tbody>${d.receivables.map(x=>row(escHtml(x.name), x.amount)).join("")}</tbody></table>
+  </div>` : ""}
+
+  <div style="margin-top:30px;text-align:center;font-size:11px;color:#9ca3af;">Generated by ShopChampion</div>
+  <div style="margin-top:16px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:#1e40af;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🖨 Print / Save PDF</button></div>
+  </body></html>`;
+
+  const w = window.open("","_blank","width=860,height=700");
+  w.document.write(html);
+  w.document.close();
 }
 
 // ─── COMPARE MODE ─────────────────────────────────────────────
