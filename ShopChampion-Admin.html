@@ -175,6 +175,38 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   body.pro-theme .more-menu-btn.active { background: #eff6ff !important; border-color: #bfdbfe !important; color: #1d4ed8 !important; }
   body.pro-theme .modal-overlay { background: rgba(15,23,42,0.5) !important; }
   body.pro-theme .modal-box { background: #ffffff !important; border-color: #e2e8f0 !important; }
+
+  /* Pro theme: fix light text on dark-card backgrounds becoming invisible
+     once card backgrounds turn white (Balance Sheet, Analytics, etc.) */
+  body.pro-theme [style*="background:#08101e"],
+  body.pro-theme [style*="background: #08101e"] { background: #f4f6fb !important; border-color: #dde4f0 !important; }
+  body.pro-theme [style*="background:#0a1628"],
+  body.pro-theme [style*="background: #0a1628"] { background: #eef4ff !important; border-color: #c7ddff !important; }
+  body.pro-theme [style*="background:#081a08"],
+  body.pro-theme [style*="background: #081a08"] { background: #eafbea !important; border-color: #b6e8b6 !important; }
+  body.pro-theme [style*="background:#1a0808"],
+  body.pro-theme [style*="background: #1a0808"] { background: #fdeaea !important; border-color: #f3bcbc !important; }
+  body.pro-theme [style*="color:#e8eaf0"],
+  body.pro-theme [style*="color: #e8eaf0"] { color: #1a2030 !important; }
+  body.pro-theme [style*="color:#a0b0d0"],
+  body.pro-theme [style*="color: #a0b0d0"] { color: #475569 !important; }
+  body.pro-theme [style*="color:#4a5a7a"],
+  body.pro-theme [style*="color: #4a5a7a"] { color: #64748b !important; }
+  body.pro-theme [style*="color:#60a5fa"],
+  body.pro-theme [style*="color: #60a5fa"] { color: #2563eb !important; }
+  body.pro-theme [style*="color:#7a8aaa"],
+  body.pro-theme [style*="color: #7a8aaa"] { color: #64748b !important; }
+  body.pro-theme [style*="color:#fca5a5"],
+  body.pro-theme [style*="color: #fca5a5"] { color: #b91c1c !important; }
+  body.pro-theme [style*="color:#86efac"],
+  body.pro-theme [style*="color: #86efac"] { color: #15803d !important; }
+  body.pro-theme [style*="border:1px solid #1e2a45"],
+  body.pro-theme [style*="border: 1px solid #1e2a45"] { border-color: #dde4f0 !important; }
+  body.pro-theme [style*="border-top:1px solid #1e2a45"],
+  body.pro-theme [style*="border-top: 1px solid #1e2a45"] { border-top-color: #dde4f0 !important; }
+  body.pro-theme [style*="background:#1e2a45"],
+  body.pro-theme [style*="background: #1e2a45"] { background: #e2e8f0 !important; color: #60a5fa !important; }
+
   body.pro-theme .input { background: #ffffff !important; border-color: #cbd5e1 !important; color: #0f172a !important; border-radius: 8px !important; }
   body.pro-theme .btn { font-weight: 500 !important; }
   body.pro-theme ::-webkit-scrollbar-track { background: #f1f5f9 !important; }
@@ -1879,6 +1911,7 @@ function startFirestoreListener() {
     loadInventoryFromFirestore(null);
     loadCreditorsFromCloud();
     loadDebtorsFromCloud();
+    loadCashLedgerFromCloud();
     // Load shop connection requests (messages inbox)
     loadShopRequests();
     // Live listener: get notified when other shops accept our connect requests
@@ -5445,10 +5478,22 @@ function renderAnalytics(sorted){
       </div>
     </div>` : ''}
 
+    <!-- ── CASH IN HAND (live) ── -->
+    <div style="background:#0a0e1a;border:1px solid #1e3a6e;border-radius:16px;padding:14px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="font-size:15px;">💵</span>
+        <span style="font-size:13px;font-weight:800;color:#e8eaf0;">Cash in Hand</span>
+        <span style="font-size:10px;color:#4a5a7a;margin-left:auto;">live balance</span>
+      </div>
+      <div style="font-size:22px;font-weight:900;color:#60a5fa;margin-bottom:8px;">${fmt(_bsGetCashInHand())}</div>
+      <button onclick="openCashLedger()" style="cursor:pointer;width:100%;background:#1e2a45;border:1px solid #2a3a6a;border-radius:10px;color:#60a5fa;font-size:12px;font-weight:700;padding:9px;">📜 View Cash Flow Ledger</button>
+    </div>
+
     <!-- ── BALANCE SHEET ── -->
     <div style="margin-bottom:10px;">
       <button onclick="openBalanceSheet()" style="cursor:pointer;width:100%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);border:none;border-radius:12px;color:#fff;font-size:13px;font-weight:800;padding:12px;">📊 View Balance Sheet</button>
     </div>
+
 
     <!-- ── LOW STOCK ALERT ── -->
     ${(lowStockItems.length>0||outOfStock.length>0) ? `<div style="background:#0a0a00;border:2px solid #854d0e;border-radius:16px;padding:14px;margin-bottom:10px;">
@@ -5472,12 +5517,116 @@ function renderAnalytics(sorted){
   </div>`;
 }
 
-// ─── BALANCE SHEET ──────────────────────────────────────────────────────────
-function _bsGetCashInHand(){
-  return Number(localStorage.getItem("sc_cash_in_hand")||"0")||0;
+// ─── CASH / BANK LEDGER ───────────────────────────────────────────────────
+// "Cash in Hand" is computed, not typed: Opening Balance (set once) + every
+// auto-recorded movement (creditor payments OUT, debtor/customer payments IN).
+// The shop owner can choose, in Settings, whether Cash and Bank are tracked
+// as ONE combined balance ("mixed") or as TWO separate balances ("separate"),
+// based on the payment mode (Cash / UPI / NEFT / Cheque / Other) selected
+// when recording a payment.
+
+function cashLedgerKey(){ return storageKey("cash_ledger"); }
+function cashOpeningKey(account){ return storageKey("cash_opening"+(account&&account!=="cash"?"_"+account:"")); }
+function cashTrackingModeKey(){ return storageKey("cash_tracking_mode"); }
+
+// "mixed"    → one combined Cash+Bank balance (default, simplest)
+// "separate" → independent Cash and Bank balances based on payment mode
+function getCashTrackingMode(){
+  return localStorage.getItem(cashTrackingModeKey())||"mixed";
 }
-function _bsSetCashInHand(val){
-  localStorage.setItem("sc_cash_in_hand", String(Number(val)||0));
+function setCashTrackingMode(mode){
+  localStorage.setItem(cashTrackingModeKey(), mode==="separate"?"separate":"mixed");
+  saveSettingsToCloud();
+}
+
+// Map a payment mode (Cash/UPI/NEFT/Cheque/Other) to an account bucket.
+// In "mixed" mode everything always goes to "cash" (one combined total).
+function _cashAccountFor(mode){
+  if(getCashTrackingMode()!=="separate") return "cash";
+  return (mode && mode.toLowerCase()==="cash") ? "cash" : "bank";
+}
+
+function _bsGetCashLedger(){
+  try { return JSON.parse(localStorage.getItem(cashLedgerKey())||"[]"); } catch { return []; }
+}
+function _bsSaveCashLedger(list){
+  try { localStorage.setItem(cashLedgerKey(), JSON.stringify(list)); } catch {}
+  try { saveCashLedgerToCloud(list); } catch {}
+}
+
+function _bsGetOpeningBalance(account){
+  return Number(localStorage.getItem(cashOpeningKey(account))||"0")||0;
+}
+function _bsSetOpeningBalance(val, account){
+  localStorage.setItem(cashOpeningKey(account), String(Number(val)||0));
+}
+
+// Record a cash/bank movement.
+// direction: "in" | "out"
+// mode: "Cash" | "UPI" | "NEFT" | "Cheque" | "Other" (defaults to "Cash")
+// source: short machine tag, e.g. "creditor_payment", "debtor_payment"
+function cashRecordTx({direction, amount, date, note, source, refId, mode}){
+  amount = Number(amount)||0;
+  if(amount<=0) return;
+  mode = mode || "Cash";
+  const account = _cashAccountFor(mode);
+  const ledger = _bsGetCashLedger();
+  ledger.push({
+    id: "CL"+Date.now()+Math.random().toString(36).slice(2,5),
+    direction, amount, date: date||new Date().toISOString().slice(0,10),
+    note: note||"", source: source||"", refId: refId||"", mode, account,
+    createdAt: Date.now()
+  });
+  _bsSaveCashLedger(ledger);
+}
+
+// Remove cash-ledger entries linked to a specific transaction (used when a
+// creditor/debtor transaction is deleted, so cash balance stays correct).
+function cashRemoveByRef(refId){
+  if(!refId) return;
+  const ledger = _bsGetCashLedger().filter(e=>e.refId!==refId);
+  _bsSaveCashLedger(ledger);
+}
+
+// Sync helpers (best-effort, mirror existing cloud-save pattern)
+function saveCashLedgerToCloud(list){
+  if(!db || !authPhone) return;
+  db.collection("users").doc(authPhone).collection("app_data").doc("cash_ledger")
+    .set({
+      list,
+      opening: _bsGetOpeningBalance("cash"),
+      openingBank: _bsGetOpeningBalance("bank"),
+      trackingMode: getCashTrackingMode(),
+      updatedAt: Date.now()
+    }, {merge:true}).catch(()=>{});
+}
+function loadCashLedgerFromCloud(){
+  if(!db || !authPhone) return;
+  db.collection("users").doc(authPhone).collection("app_data").doc("cash_ledger")
+    .get().then(doc=>{
+      if(doc && doc.exists){
+        const data = doc.data();
+        if(data.list) try { localStorage.setItem(cashLedgerKey(), JSON.stringify(data.list)); } catch {}
+        if(data.opening!==undefined) try { localStorage.setItem(cashOpeningKey("cash"), String(Number(data.opening)||0)); } catch {}
+        if(data.openingBank!==undefined) try { localStorage.setItem(cashOpeningKey("bank"), String(Number(data.openingBank)||0)); } catch {}
+        if(data.trackingMode) try { localStorage.setItem(cashTrackingModeKey(), data.trackingMode); } catch {}
+      }
+    }).catch(()=>{});
+}
+
+// Balance for one account = opening balance + sum(in) − sum(out) for that account
+function _bsGetAccountBalance(account){
+  const ledger = _bsGetCashLedger().filter(e=>(e.account||"cash")===account);
+  const net = ledger.reduce((s,e)=> s + (e.direction==="in" ? e.amount : -e.amount), 0);
+  return _bsGetOpeningBalance(account) + net;
+}
+
+// Total cash in hand (= cash account balance, or cash+bank combined when mixed)
+function _bsGetCashInHand(){
+  if(getCashTrackingMode()==="separate"){
+    return _bsGetAccountBalance("cash") + _bsGetAccountBalance("bank");
+  }
+  return _bsGetAccountBalance("cash");
 }
 
 function _bsComputeData(){
@@ -5511,28 +5660,94 @@ function _bsComputeData(){
 function openBalanceSheet(){
   const d = _bsComputeData();
   const shopName = (appSettings && appSettings.shopName) || "My Shop";
+  const trackingMode = getCashTrackingMode();
+  const ledger = _bsGetCashLedger();
 
   const row = (label, value, opts={}) => `<div style="display:flex;justify-content:space-between;padding:7px 0;${opts.border?"border-top:1px solid #1e2a45;":""}">
     <div style="font-size:13px;color:${opts.bold?'#e8eaf0':'#a0b0d0'};font-weight:${opts.bold?800:600};${opts.indent?'padding-left:14px;':''}">${label}</div>
     <div style="font-size:13px;color:${opts.color||'#e8eaf0'};font-weight:${opts.bold?800:600};">${formatINR(value)}</div>
   </div>`;
 
+  // ── Cash card content (varies by tracking mode) ──
+  let cashCard;
+  if(trackingMode==="separate"){
+    const cashOpening = _bsGetOpeningBalance("cash");
+    const bankOpening = _bsGetOpeningBalance("bank");
+    const cashLedger  = ledger.filter(e=>(e.account||"cash")==="cash");
+    const bankLedger  = ledger.filter(e=>e.account==="bank");
+    const cashIn  = cashLedger.filter(e=>e.direction==="in").reduce((s,e)=>s+e.amount,0);
+    const cashOut = cashLedger.filter(e=>e.direction==="out").reduce((s,e)=>s+e.amount,0);
+    const bankIn  = bankLedger.filter(e=>e.direction==="in").reduce((s,e)=>s+e.amount,0);
+    const bankOut = bankLedger.filter(e=>e.direction==="out").reduce((s,e)=>s+e.amount,0);
+    const cashBal = _bsGetAccountBalance("cash");
+    const bankBal = _bsGetAccountBalance("bank");
+
+    cashCard = `
+      <div style="background:#0a1628;border:1px solid #1e3a6e;border-radius:10px;padding:12px;">
+        <div style="font-size:12px;color:#60a5fa;font-weight:800;margin-bottom:6px;">💵 CASH IN HAND (live)</div>
+        <div style="font-size:22px;font-weight:900;color:#e8eaf0;margin-bottom:8px;">${formatINR(cashBal)}</div>
+        <div style="font-size:11px;color:#a0b0d0;line-height:1.6;margin-bottom:10px;">
+          Opening Balance: ${formatINR(cashOpening)}<br/>
+          + Received (Cash payments): ${formatINR(cashIn)}<br/>
+          − Paid out (Cash payments): ${formatINR(cashOut)}
+        </div>
+        <div style="font-size:11px;color:#60a5fa;font-weight:700;margin-bottom:6px;">Edit Cash Opening Balance</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="input" id="bs-cash" type="number" step="any" value="${cashOpening}" style="margin-bottom:0;font-size:16px;font-weight:800;" />
+          <button onclick="bsSaveCash()" style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:8px;color:#60a5fa;font-size:12px;font-weight:700;padding:9px 14px;white-space:nowrap;">Save</button>
+        </div>
+      </div>
+
+      <div style="background:#0a1a2a;border:1px solid #1e4a6e;border-radius:10px;padding:12px;">
+        <div style="font-size:12px;color:#38bdf8;font-weight:800;margin-bottom:6px;">🏦 BANK BALANCE (live)</div>
+        <div style="font-size:22px;font-weight:900;color:#e8eaf0;margin-bottom:8px;">${formatINR(bankBal)}</div>
+        <div style="font-size:11px;color:#a0b0d0;line-height:1.6;margin-bottom:10px;">
+          Opening Balance: ${formatINR(bankOpening)}<br/>
+          + Received (UPI/NEFT/Cheque/Other): ${formatINR(bankIn)}<br/>
+          − Paid out (UPI/NEFT/Cheque/Other): ${formatINR(bankOut)}
+        </div>
+        <div style="font-size:11px;color:#38bdf8;font-weight:700;margin-bottom:6px;">Edit Bank Opening Balance</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="input" id="bs-bank" type="number" step="any" value="${bankOpening}" style="margin-bottom:0;font-size:16px;font-weight:800;" />
+          <button onclick="bsSaveBank()" style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:8px;color:#38bdf8;font-size:12px;font-weight:700;padding:9px 14px;white-space:nowrap;">Save</button>
+        </div>
+        <div style="font-size:10px;color:#4a5a7a;margin-top:8px;">Set both opening balances once, to your actual balances on the day you started using ShopChampion. After that, they update automatically based on the payment mode chosen for each transaction.</div>
+        <button onclick="closeModal();setTimeout(openCashLedger,150)" style="cursor:pointer;width:100%;margin-top:10px;background:#1e2a45;border:1px solid #2a3a6a;border-radius:8px;color:#60a5fa;font-size:12px;font-weight:700;padding:8px;">📜 View Cash Flow Ledger</button>
+      </div>`;
+  } else {
+    const opening = _bsGetOpeningBalance("cash");
+    const ledgerNet = ledger.reduce((s,e)=> s + (e.direction==="in" ? e.amount : -e.amount), 0);
+    cashCard = `
+      <div style="background:#0a1628;border:1px solid #1e3a6e;border-radius:10px;padding:12px;">
+        <div style="font-size:12px;color:#60a5fa;font-weight:800;margin-bottom:6px;">💵 CASH IN HAND (live)</div>
+        <div style="font-size:22px;font-weight:900;color:#e8eaf0;margin-bottom:8px;">${formatINR(d.cash)}</div>
+        <div style="font-size:11px;color:#a0b0d0;line-height:1.6;margin-bottom:10px;">
+          Opening Balance: ${formatINR(opening)}<br/>
+          + Received (debtor/customer payments): ${formatINR(ledger.filter(e=>e.direction==="in").reduce((s,e)=>s+e.amount,0))}<br/>
+          − Paid out (creditor payments): ${formatINR(ledger.filter(e=>e.direction==="out").reduce((s,e)=>s+e.amount,0))}<br/>
+          = Net movement: ${formatINR(ledgerNet)}
+        </div>
+        <div style="font-size:11px;color:#60a5fa;font-weight:700;margin-bottom:6px;">Edit Opening Balance</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="input" id="bs-cash" type="number" step="any" value="${opening}" style="margin-bottom:0;font-size:16px;font-weight:800;" />
+          <button onclick="bsSaveCash()" style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:8px;color:#60a5fa;font-size:12px;font-weight:700;padding:9px 14px;white-space:nowrap;">Save</button>
+        </div>
+        <div style="font-size:10px;color:#4a5a7a;margin-top:4px;">Set this once to your actual cash/bank balance on the day you started using ShopChampion. After that, it updates automatically from creditor/debtor payments. Want to track Cash and Bank separately? Go to Settings → Cash & Bank Tracking.</div>
+        <button onclick="closeModal();setTimeout(openCashLedger,150)" style="cursor:pointer;width:100%;margin-top:10px;background:#1e2a45;border:1px solid #2a3a6a;border-radius:8px;color:#60a5fa;font-size:12px;font-weight:700;padding:8px;">📜 View Cash Flow Ledger</button>
+      </div>`;
+  }
+
   showWideModal(`
     ${modalHeader("📊 Balance Sheet")}
     <div style="display:flex;flex-direction:column;gap:14px;">
 
-      <div style="background:#0a1628;border:1px solid #1e3a6e;border-radius:10px;padding:12px;">
-        <div style="font-size:12px;color:#60a5fa;font-weight:800;margin-bottom:6px;">💵 CASH IN HAND</div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <input class="input" id="bs-cash" type="number" min="0" step="any" value="${d.cash}" style="margin-bottom:0;font-size:16px;font-weight:800;" />
-          <button onclick="bsSaveCash()" style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:8px;color:#60a5fa;font-size:12px;font-weight:700;padding:9px 14px;white-space:nowrap;">Save</button>
-        </div>
-        <div style="font-size:10px;color:#4a5a7a;margin-top:4px;">Enter your current cash/bank balance manually</div>
-      </div>
+      ${cashCard}
 
       <div style="background:#08101e;border:1px solid #1e2a45;border-radius:12px;padding:14px;">
         <div style="font-size:13px;font-weight:800;color:#4ade80;margin-bottom:6px;">📈 ASSETS</div>
-        ${row("Cash in Hand", d.cash, {indent:true})}
+        ${trackingMode==="separate"
+          ? row("Cash in Hand", _bsGetAccountBalance("cash"), {indent:true}) + row("Bank Balance", _bsGetAccountBalance("bank"), {indent:true})
+          : row("Cash in Hand", d.cash, {indent:true})}
         ${row("Inventory (Stock Value)", d.totalInventoryValue, {indent:true})}
         ${row("Receivables (Debtors owe you)", d.totalReceivables, {indent:true})}
         ${row("TOTAL ASSETS", d.totalAssets, {bold:true, border:true, color:"#4ade80"})}
@@ -5578,9 +5793,98 @@ function openBalanceSheet(){
 
 function bsSaveCash(){
   const val = parseFloat(document.getElementById("bs-cash")?.value||"0")||0;
-  _bsSetCashInHand(val);
-  notify("✅ Cash in hand updated");
+  _bsSetOpeningBalance(val, "cash");
+  saveCashLedgerToCloud(_bsGetCashLedger());
+  notify("✅ Cash opening balance updated");
   setTimeout(openBalanceSheet, 150);
+}
+
+function bsSaveBank(){
+  const val = parseFloat(document.getElementById("bs-bank")?.value||"0")||0;
+  _bsSetOpeningBalance(val, "bank");
+  saveCashLedgerToCloud(_bsGetCashLedger());
+  notify("✅ Bank opening balance updated");
+  setTimeout(openBalanceSheet, 150);
+}
+
+// ─── CASH FLOW LEDGER MODAL ───────────────────────────────────────────────────
+function openCashLedger(account){
+  const trackingMode = getCashTrackingMode();
+  // account: "cash" | "bank" | undefined (undefined => "cash" in mixed mode, or "all" in separate mode)
+  if(trackingMode!=="separate") account = "cash";
+  if(!account) account = "all";
+
+  const fullLedger = _bsGetCashLedger();
+  const opening = account==="bank" ? _bsGetOpeningBalance("bank")
+                : account==="cash" ? _bsGetOpeningBalance("cash")
+                : _bsGetOpeningBalance("cash") + _bsGetOpeningBalance("bank");
+
+  const filtered = account==="all" ? fullLedger : fullLedger.filter(e=>(e.account||"cash")===account);
+  const ledger = [...filtered].sort((a,b)=>{
+    const da = new Date(a.date), db_ = new Date(b.date);
+    if(da-db_!==0) return da-db_;
+    return (a.createdAt||0)-(b.createdAt||0);
+  });
+
+  let running = opening;
+  const rows = ledger.map(e=>{
+    const openBal = running;
+    running += (e.direction==="in" ? e.amount : -e.amount);
+    const closeBal = running;
+    const sign = e.direction==="in" ? "+" : "−";
+    const color = e.direction==="in" ? "#4ade80" : "#f87171";
+    const icon = e.direction==="in" ? "📥" : "📤";
+    const modeTag = e.mode ? `<span style="font-size:9px;color:#60a5fa;background:#0a1628;border:1px solid #1e3a6e;border-radius:6px;padding:1px 6px;margin-left:6px;font-weight:700;">${escHtml(e.mode)}</span>` : "";
+    return `<div style="background:#08101e;border:1px solid #1e2a45;border-radius:10px;padding:10px 12px;margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:800;color:#e8eaf0;">${icon} ${escHtml(e.note||e.source||"Transaction")}${modeTag}</div>
+          <div style="font-size:10px;color:#4a5a7a;margin-top:2px;">${escHtml(e.date)}</div>
+        </div>
+        <div style="font-size:14px;font-weight:900;color:${color};white-space:nowrap;">${sign}${formatINR(e.amount)}</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#a0b0d0;margin-top:6px;border-top:1px solid #1e2a45;padding-top:6px;">
+        <span>Opening: ${formatINR(openBal)}</span>
+        <span>Closing: ${formatINR(closeBal)}</span>
+      </div>
+    </div>`;
+  }).reverse().join("");
+
+  const finalBalance = running;
+
+  // Tabs (only shown in separate tracking mode)
+  const tabBtn = (acc, label) => `<button onclick="openCashLedger('${acc}')" style="cursor:pointer;flex:1;padding:8px;border-radius:8px;border:1px solid ${account===acc?'#60a5fa':'#1e2a45'};background:${account===acc?'#001a2a':'#0a0e1a'};color:${account===acc?'#60a5fa':'#4a5a7a'};font-size:12px;font-weight:700;">${label}</button>`;
+  const tabs = trackingMode==="separate" ? `<div style="display:flex;gap:6px;">${tabBtn("cash","💵 Cash")}${tabBtn("bank","🏦 Bank")}${tabBtn("all","📊 All")}</div>` : "";
+
+  const title = account==="cash" ? "📜 Cash Ledger" : account==="bank" ? "📜 Bank Ledger" : "📜 Cash Flow Ledger";
+
+  showWideModal(`
+    ${modalHeader(title)}
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      ${tabs}
+      <div style="background:#0a1628;border:1px solid #1e3a6e;border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:11px;color:#60a5fa;font-weight:800;">OPENING BALANCE</div>
+          <div style="font-size:16px;font-weight:900;color:#e8eaf0;">${formatINR(opening)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px;color:#60a5fa;font-weight:800;">CURRENT BALANCE</div>
+          <div style="font-size:16px;font-weight:900;color:#e8eaf0;">${formatINR(finalBalance)}</div>
+        </div>
+      </div>
+
+      ${ledger.length===0 ? `<div style="text-align:center;padding:30px;color:#4a5a7a;font-size:13px;">No transactions yet.<br/>Creditor payments and debtor receipts will appear here automatically.</div>` : `
+      <div style="font-size:11px;color:#4a5a7a;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px;">Transactions (most recent first)</div>
+      ${rows}`}
+
+      <button onclick="closeModal();setTimeout(openBalanceSheet,150)" class="btn" style="background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;padding:12px;">
+        ← Back to Balance Sheet
+      </button>
+      <button onclick="closeModal()" class="btn" style="background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;padding:12px;">
+        Close
+      </button>
+    </div>
+  `);
 }
 
 function printBalanceSheet(){
@@ -5610,7 +5914,9 @@ function printBalanceSheet(){
   <div class="section">
     <table><thead><tr><th>Assets</th><th style="text-align:right;">Amount</th></tr></thead>
     <tbody>
-      ${row("Cash in Hand", d.cash, {indent:true})}
+      ${getCashTrackingMode()==="separate"
+        ? row("Cash in Hand", _bsGetAccountBalance("cash"), {indent:true}) + row("Bank Balance", _bsGetAccountBalance("bank"), {indent:true})
+        : row("Cash in Hand", d.cash, {indent:true})}
       ${row("Inventory (Stock Value)", d.totalInventoryValue, {indent:true})}
       ${row("Receivables (Debtors)", d.totalReceivables, {indent:true})}
       ${row("Total Assets", d.totalAssets, {bold:true, border:true})}
@@ -7697,6 +8003,7 @@ async function saveSmartPayment(){
   if(!cr.transactions) cr.transactions=[];
   cr.transactions.push(tx);
   saveCreditors(creditors);
+  cashRecordTx({direction:"out", amount, date, note:`Paid to ${cr.name||"creditor"}${ref?(" · "+ref):""}`, source:"creditor_payment", refId:txId, mode});
   closeModal();
   notify(`✅ Payment of ${formatINR(amount)} recorded`,"success");
 
@@ -7836,6 +8143,10 @@ function saveCrTransaction(){
     createdAt:Date.now(), syncStatus:"local"
   });
   saveCreditors(creditors);
+  if(type==="payment"){
+    const crTxMode = document.getElementById("tx-pay-mode")?.value||"Cash";
+    cashRecordTx({direction:"out", amount, date, note:`Paid to ${creditors[idx].name||"creditor"}${note?(" · "+note):""}`, source:"creditor_payment", refId:txId, mode:crTxMode});
+  }
   closeModal();
   notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return"} of ${formatINR(amount)} recorded${invLinked?" · "+invItemName+(type==="return"?" stock deducted":" stock updated"):""}`);
   setTimeout(()=>openCreditorDetail(creditorId),200);
@@ -8172,8 +8483,10 @@ function deleteCrTx(creditorId, origIdx){
   const creditors = getCreditors();
   const idx = creditors.findIndex(c => c.id === creditorId);
   if(idx < 0) return;
+  const removedTx = (creditors[idx].transactions||[])[origIdx];
   creditors[idx].transactions = (creditors[idx].transactions || []).filter((_,i) => i !== origIdx);
   saveCreditors(creditors);
+  if(removedTx && removedTx.id) cashRemoveByRef(removedTx.id);
   notify("🗑 Transaction deleted");
   setTimeout(() => openCreditorDetail(creditorId), 200);
 }
@@ -8185,6 +8498,7 @@ async function deleteCrTransaction(creditorId, txId) {
   const cr = creditors[idx];
   creditors[idx].transactions = (cr.transactions || []).filter(t => t.id !== txId);
   saveCreditors(creditors);
+  cashRemoveByRef(txId);
   // Cross-delete from their side if linked
   if (cr._fromShopConnect && cr.phone) {
     await crossDeleteTransaction(cr.phone, txId);
@@ -8928,6 +9242,19 @@ function openAddDebtTxModal(debtorId, defaultType){
       </div>
     </div>` : "";
 
+  // Payment mode selector — only relevant for receipts (cash/bank movement)
+  const modeSection = (defaultType === "payment") ? `
+    <div>
+      <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">RECEIVED VIA</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${["Cash","UPI","NEFT","Cheque","Other"].map((m,i)=>`
+          <button type="button" onclick="document.querySelectorAll('.drtx-mode-btn').forEach(b=>{b.style.background='#0a0e1a';b.style.borderColor='#1e2a45';b.style.color='#4a5a7a';});this.style.background='#001a2a';this.style.borderColor='#60a5fa';this.style.color='#60a5fa';document.getElementById('drtx-mode').value='${m}'"
+            class="drtx-mode-btn" style="cursor:pointer;padding:6px 12px;border-radius:8px;border:1px solid ${i===0?'#60a5fa':'#1e2a45'};background:${i===0?'#001a2a':'#0a0e1a'};color:${i===0?'#60a5fa':'#4a5a7a'};font-size:12px;font-weight:700;">${m}</button>
+        `).join("")}
+      </div>
+      <input type="hidden" id="drtx-mode" value="Cash" />
+    </div>` : "";
+
   showWideModal(`
     ${modalHeader(typeLabels[defaultType]+" "+escHtml(dr.name))}
     <div style="display:flex;flex-direction:column;gap:12px;">
@@ -8939,6 +9266,7 @@ function openAddDebtTxModal(debtorId, defaultType){
       </div>
 
       ${invSection}
+      ${modeSection}
 
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">AMOUNT (₹) *</label>
@@ -8969,6 +9297,7 @@ function saveDebtTransaction(){
   const amtRaw   = parseFloat(document.getElementById("drtx-amount")?.value||"0");
   const note     = document.getElementById("drtx-note")?.value.trim()||"";
   const date     = document.getElementById("drtx-date")?.value||new Date().toISOString().slice(0,10);
+  const mode     = document.getElementById("drtx-mode")?.value||"Cash";
 
   if(!debtorId||!type){ notify("⚠️ Error: missing debtor info","error"); return; }
   if(isNaN(amtRaw)||amtRaw<=0){ notify("⚠️ Enter a valid amount"); return; }
@@ -9009,16 +9338,21 @@ function saveDebtTransaction(){
   }
 
   if(!debtors[idx].transactions) debtors[idx].transactions=[];
+  const drTxId = "DT"+Date.now()+Math.random().toString(36).slice(2,5);
   debtors[idx].transactions.push({
-    id:     "DT"+Date.now()+Math.random().toString(36).slice(2,5),
+    id:     drTxId,
     type,
     amount: amtRaw,
     note,
     date,
+    ...(type==="payment" ? { mode } : {}),
     ...(invLinked ? { _invItem: invItemName, _invQty: invQty } : {}),
     createdAt: Date.now(),
   });
   saveDebtors(debtors);
+  if(type==="payment"){
+    cashRecordTx({direction:"in", amount: amtRaw, date, note:`Received from ${debtors[idx].name||"customer"}${note?(" · "+note):""}`, source:"debtor_payment", refId:drTxId, mode});
+  }
   closeModal();
   const typeLabel = type==="payment"?"Receipt":type.charAt(0).toUpperCase()+type.slice(1);
   const invMsg = invLinked ? ` · ${invItemName} stock ${type==="return"?"added back":"deducted"}` : "";
@@ -9031,8 +9365,10 @@ function deleteDebtTx(debtorId, origIdx){
   const debtors = getDebtors();
   const idx = debtors.findIndex(d=>d.id===debtorId);
   if(idx<0) return;
+  const removedTx = (debtors[idx].transactions||[])[origIdx];
   debtors[idx].transactions = (debtors[idx].transactions||[]).filter((_,i)=>i!==origIdx);
   saveDebtors(debtors);
+  if(removedTx && removedTx.id) cashRemoveByRef(removedTx.id);
   notify("🗑 Transaction deleted");
   setTimeout(()=>openDebtorDetail(debtorId), 200);
 }
@@ -9275,7 +9611,8 @@ function renderSettings(){
       row("🏪","Shop Name & Icon",appSettings.shopName||"Not set","openShopNameModal()") +
       row("🔊","Voice Announcement",voiceOn?"Enabled":"Disabled","openVoiceModal()") +
       row("📦","Purchase Mode",getPurchaseMode()==="inventory"?"📦 Inventory Mode — items × price":"🛒 Standard Mode — manual amount","openPurchaseModeModal()") +
-      row("💰","Item Price Fill",getAutoPriceMode()==="auto"?"🔒 Auto — fills & locks from inventory price":"✏️ Manual — pre-fills but user can edit","openAutoPriceModeModal()")
+      row("💰","Item Price Fill",getAutoPriceMode()==="auto"?"🔒 Auto — fills & locks from inventory price":"✏️ Manual — pre-fills but user can edit","openAutoPriceModeModal()") +
+      row("🏦","Cash & Bank Tracking",getCashTrackingMode()==="separate"?"🏦 Separate — Cash vs Bank balances":"💵 Combined — one total balance","openCashTrackingModal()")
     )}
 
     ${section("Data",
@@ -14704,6 +15041,45 @@ function _declineReqById(id){
 }
 
 // ─── PURCHASE MODE MODAL ──────────────────────────────────────
+// ─── CASH & BANK TRACKING MODE MODAL ──────────────────────────
+function openCashTrackingModal(){
+  const cur = getCashTrackingMode();
+  const modal = document.createElement("div");
+  modal.id="ctm-modal-overlay";
+  modal.style.cssText="position:fixed;inset:0;background:#000a;z-index:9999;display:flex;align-items:flex-end;justify-content:center;";
+  modal.innerHTML=`
+    <div style="background:#0d1220;border:1px solid #1e2a45;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:560px;padding-bottom:max(24px,env(safe-area-inset-bottom));">
+      <div style="font-size:17px;font-weight:800;color:#e8eaf0;margin-bottom:6px;">🏦 Cash & Bank Tracking</div>
+      <div style="font-size:12px;color:#4a5a7a;margin-bottom:20px;">Choose how creditor payments and customer receipts affect your balances. Based on the payment mode (Cash / UPI / NEFT / Cheque / Other) selected when recording each transaction.</div>
+      <div onclick="setCashTrackingMode('mixed');document.getElementById('ctm-modal-overlay').remove();safeRenderTab(currentTab);"
+           style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:2px solid ${cur==='mixed'?'#4a8aff':'#1e2a45'};background:${cur==='mixed'?'#0a1628':'#080c18'};cursor:pointer;margin-bottom:12px;">
+        <span style="font-size:28px;">💵</span>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:15px;color:${cur==='mixed'?'#7ab3ff':'#e8eaf0'};">Combined (Mixed)</div>
+          <div style="font-size:12px;color:#4a5a7a;margin-top:3px;">One single "Cash in Hand" total. All payments — by cash, UPI, bank transfer, etc — add to or subtract from the same balance. Simplest option.</div>
+        </div>
+        ${cur==='mixed'?'<span style="font-size:20px;color:#4a8aff;">✓</span>':""}
+      </div>
+      <div onclick="setCashTrackingMode('separate');document.getElementById('ctm-modal-overlay').remove();safeRenderTab(currentTab);"
+           style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:2px solid ${cur==='separate'?'#4f4':'#1e2a45'};background:${cur==='separate'?'#081a08':'#080c18'};cursor:pointer;margin-bottom:20px;">
+        <span style="font-size:28px;">🏦</span>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:15px;color:${cur==='separate'?'#4f4':'#e8eaf0'};">Separate Cash & Bank</div>
+          <div style="font-size:12px;color:#4a5a7a;margin-top:3px;">Two independent balances. Payments made in "Cash" mode affect Cash in Hand; UPI/NEFT/Cheque/Other payments affect your Bank Balance. Both shown on the Balance Sheet.</div>
+        </div>
+        ${cur==='separate'?'<span style="font-size:20px;color:#4f4;">✓</span>':""}
+      </div>
+      <div style="font-size:11px;color:#4a5a7a;background:#070f07;border-radius:8px;padding:10px;margin-bottom:14px;">
+        💡 You can switch this anytime. Past transactions keep the mode they were recorded with — switching just changes how new entries and balances are grouped going forward.
+      </div>
+      <button onclick="document.getElementById('ctm-modal-overlay').remove()" style="width:100%;padding:13px;background:#1a2540;border:none;border-radius:12px;color:#7a8aaa;font-size:14px;font-weight:700;cursor:pointer;">Close</button>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener("click",e=>{if(e.target===modal)modal.remove();});
+}
+
+
+// ─── PURCHASE MODE MODAL ───────────────────────────────────────
 function openPurchaseModeModal(){
   const cur = getPurchaseMode();
   const modal = document.createElement("div");
