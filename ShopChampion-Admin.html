@@ -1486,7 +1486,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
     </button>
     <button class="bnav-btn" id="bnav-2" onclick="mobileTab(2)">
       <span class="bnav-icon" id="bnav-icon-2">💳</span>
-      <span class="bnav-label" id="bnav-label-2">Cust. Sales</span>
+      <span class="bnav-label" id="bnav-label-2">Add Sale</span>
     </button>
     <button class="bnav-btn" id="bnav-5" onclick="mobileTab(5)">
       <span class="bnav-icon" id="bnav-icon-5">📦</span>
@@ -1532,7 +1532,7 @@ const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratr
 const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
 const TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings","alerts"];
 const TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️","⚠️"];
-const TABS_LABEL_PRO = ["Rankings","Customers","Cust. Sales","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings","Alerts"];
+const TABS_LABEL_PRO = ["Rankings","Customers","Add Sale","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings","Alerts"];
 let _shopRequestsUnread = 0; // badge count for messages tab
 function getTabs(){
   const isPro = currentAppStyle === "pro";
@@ -11051,7 +11051,7 @@ const BNAV_PRO_ICONS = {
   2: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
   5: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
 };
-const BNAV_PRO_LABELS = { 0: "Rankings", 1: "Customers", 2: "Cust. Sales", 5: "Inventory" };
+const BNAV_PRO_LABELS = { 0: "Rankings", 1: "Customers", 2: "Add Sale", 5: "Inventory" };
 const BNAV_GAME_ICONS = { 0: "🏆", 1: "👥", 2: "💳", 5: "📦" };
 const BNAV_GAME_LABELS = { 0: "Board", 1: "Customers", 2: "Purchase", 5: "Inventory" };
 
@@ -11117,7 +11117,7 @@ const LANGUAGES = {
 const TRANSLATIONS = {
   en: {
     adminPanel:"Admin Panel", leaderboard:"Leaderboard", customers:"Customers",
-    purchase:"Cust. Sales", analytics:"Analytics", compare:"Compare",
+    purchase:"Add Sale", analytics:"Analytics", compare:"Compare",
     inventory:"Inventory", creditors:"Creditors", debtors:"Debtors", alerts:"Alerts",
     messages:"Messages",
     festivals:"Festival Rewards", settings:"Settings", logout:"Logout",
@@ -17692,6 +17692,7 @@ window.scGuideStartLang = function(lang){
   _guideStepIdx = 0;
   _guideActive = true;
   localStorage.setItem('sc_guide_shown','1');
+  if(typeof setLanguage === 'function') setLanguage(lang);
   _showBackdrop();
   _showStep(_guideStepIdx);
 };
