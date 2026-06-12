@@ -1530,9 +1530,9 @@ async function scHashPassword(phone, password) {
 // ─── CONSTANTS ───────────────────────────────────────────────
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
-const TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings"];
-const TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️"];
-const TABS_LABEL_PRO = ["Rankings","Customers","Cust. Sales","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings"];
+const TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings","alerts"];
+const TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️","⚠️"];
+const TABS_LABEL_PRO = ["Rankings","Customers","Cust. Sales","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings","Alerts"];
 let _shopRequestsUnread = 0; // badge count for messages tab
 function getTabs(){
   const isPro = currentAppStyle === "pro";
@@ -1548,6 +1548,11 @@ function getTabs(){
     // Unread badge on messages tab (index 8)
     if(i===8 && _shopRequestsUnread>0){
       label += ` <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle;">${_shopRequestsUnread}</span>`;
+    }
+    // Alert count badge on alerts tab (index 10)
+    if(i===10){
+      const alertCount = (typeof getAlertCount === "function") ? getAlertCount() : 0;
+      if(alertCount>0) label += ` <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle;">${alertCount}</span>`;
     }
     return label;
   });
@@ -2028,7 +2033,7 @@ window.addEventListener('appinstalled', () => {
 
 // ── Mobile Bottom Nav ──────────────────────────────────────────
 const MOBILE_MAIN_TABS = [0, 1, 2, 5]; // leaderboard, customers, purchase, inventory
-const MOBILE_MORE_TABS = [3, 4, 6, 7, 8, 9];    // analytics, compare, creditors, debtors, messages, settings
+const MOBILE_MORE_TABS = [3, 4, 6, 7, 8, 9, 10];    // analytics, compare, creditors, debtors, messages, settings, alerts
 
 function mobileTab(i) {
   closeMoreMenu();
@@ -3453,7 +3458,7 @@ function _safeRenderTabImmediate(i) {
                   <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
                   <div style="flex:1;min-width:0;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-                      <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${item.name}</div>
+                      <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${item.name}${stk <= (item.minStock||5) ? ' <span title="Low stock" style="font-size:12px;">⚠️</span>' : ''}</div>
                       <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk <= 0 ? 'OUT' : stk} ${item.unit || 'unit'}</div>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
@@ -3574,6 +3579,7 @@ function renderTab(i){
     }).then(()=>{ el.innerHTML = renderMessagesTab(); });
   }
   else if(i===9)el.innerHTML=renderSettings();
+  else if(i===10)el.innerHTML=renderAlertsTab();
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
 }
 
@@ -4503,7 +4509,7 @@ function invUpdateGstPreview(formType){
   if(!rateEl || !previewEl) return;
 
   const rate     = parseFloat(rateEl.value)||0;
-  const included = inclEl?.value || "exclusive";
+  const included = inclEl?.value || "inclusive";
   const sellBase = parseFloat(sellEl?.value||"0")||0;
 
   if(rate === 0){ previewEl.style.display="none"; return; }
@@ -4665,7 +4671,7 @@ function buildCheatSheet(formType) {
 function invItemGstTotal(item, qty){
   // Returns { base, gstAmt, total, rate, included }
   const rate     = Number(item.gstRate)||0;
-  const included = item.gstIncluded || "exclusive";
+  const included = item.gstIncluded || "inclusive";
   const sellPrice = Number(item.sellingPrice)||0;
   const basePerUnit = included === "inclusive"
     ? +(sellPrice * 100 / (100 + rate)).toFixed(4)
@@ -4690,7 +4696,7 @@ function bwShowItemStock(input){
   if(item){
     const stk = invGetStock(name);
     const gstInfo = (item.gstRate && item.gstRate > 0 && item.sellingPrice > 0)
-      ? ` · 🔢 GST ${item.gstRate}% ${item.gstIncluded==='inclusive'?'(incl.)':'(+extra)'}`
+      ? ` · 🔢 GST ${item.gstRate}% ${(item.gstIncluded||"inclusive")==='inclusive'?'(incl.)':'(+extra)'}`
       : "";
     hint.textContent = '📦 Stock: '+stk+' '+(item.unit||'unit')+gstInfo;
     hint.style.color = stk<=0?'#f66':stk<=5?'#FFD700':'#4f4';
@@ -7316,7 +7322,7 @@ function openCreditorDetail(id){
         ${!isUnrec ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
           <button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
-          <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>
+          <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return / Dr Note</button>
         </div>` : `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
           <div style="font-size:11px;color:#d97706;font-weight:700;">⚠️ Unassigned entries</div>
           <button onclick="openMoveUnrecModal()" class="btn" style="background:#92400e;border:1px solid #d97706;color:#fbbf24;font-size:12px;font-weight:800;padding:7px 14px;border-radius:8px;">🔀 Move to Creditor</button>
@@ -7377,7 +7383,7 @@ function openCreditorDetail(id){
         <!-- Filter type tabs -->
         <div style="display:flex;gap:6px;margin-bottom:10px;">
           ${["all","purchase","payment","return"].map(f=>{
-            const labels={all:"📋 All",purchase:"📦 Purchase",payment:"💰 Payment",return:"↩️ Return"};
+            const labels={all:"📋 All",purchase:"📦 Purchase",payment:"💰 Payment",return:"↩️ Return / Dr Note"};
             const cnt={all:txs.length,purchase:txs.filter(t=>t.type==="purchase").length,payment:txs.filter(t=>t.type==="payment").length,return:txs.filter(t=>t.type==="return").length};
             return `<button id="cr-tf-${f}" onclick="_crTxSetFilter('${id}','${f}')"
               style="flex:1;cursor:pointer;border-radius:8px;padding:7px 6px;font-size:11px;font-weight:800;
@@ -7502,7 +7508,7 @@ function _crTxRender(creditorId){
   const typeCfg={
     purchase:{label:"Purchase", debit:true,  bg:"#92400e22",col:"#fbbf24",icon:"📦"},
     payment: {label:"Payment",  debit:false, bg:"#14532d22",col:"#4ade80",icon:"💰"},
-    return:  {label:"Return",   debit:false, bg:"#2e106522",col:"#c4b5fd",icon:"↩️"},
+    return:  {label:"Return / Dr Note",   debit:false, bg:"#2e106522",col:"#c4b5fd",icon:"↩️"},
   };
 
   // Tally-style compact ledger table
@@ -8022,7 +8028,7 @@ function openReturnModal(creditorId){
   const invOpts = inventoryItems.map(x=>`<option value="${escHtml(x.name)}">${escHtml(x.name)}${x.unit?" ("+x.unit+")":""} · Stock: ${invGetStock(x.name)}</option>`).join("");
   const hasInv = inventoryItems.length > 0;
   showWideModal(`
-    ${modalHeader("↩️ Record Return / Debit Note")}
+    ${modalHeader("↩️ Record Return / Dr Note")}
     <div style="display:flex;flex-direction:column;gap:12px;">
       <input type="hidden" id="tx-creditor-id" value="${creditorId}" />
       <input type="hidden" id="tx-type" value="return" />
@@ -8075,7 +8081,7 @@ function openReturnModal(creditorId){
         </div>
       </div>
       <button onclick="saveCrTransaction()" class="btn" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);color:#fff;font-weight:800;margin-top:4px;">
-        ↩️ Save Return
+        ↩️ Save Return / Dr Note
       </button>
       <button onclick="closeModal()" class="btn" style="background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;padding:12px;">
         ← Cancel
@@ -8148,7 +8154,7 @@ function saveCrTransaction(){
     cashRecordTx({direction:"out", amount, date, note:`Paid to ${creditors[idx].name||"creditor"}${note?(" · "+note):""}`, source:"creditor_payment", refId:txId, mode:crTxMode});
   }
   closeModal();
-  notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return"} of ${formatINR(amount)} recorded${invLinked?" · "+invItemName+(type==="return"?" stock deducted":" stock updated"):""}`);
+  notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return / Dr Note"} of ${formatINR(amount)} recorded${invLinked?" · "+invItemName+(type==="return"?" stock deducted":" stock updated"):""}`);
   setTimeout(()=>openCreditorDetail(creditorId),200);
 }
 
@@ -8953,7 +8959,7 @@ function openDebtorDetail(id){
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="openAddDebtTxModal('${id}','sale')"    class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">🛒 Sale</button>
           <button onclick="openAddDebtTxModal('${id}','payment')" class="btn" style="background:#0a1628;border:1px solid #60a5fa;color:#60a5fa;font-size:12px;padding:8px 12px;">💰 Receipt</button>
-          <button onclick="openAddDebtTxModal('${id}','return')"  class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return</button>
+          <button onclick="openAddDebtTxModal('${id}','return')"  class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Returned / Cr Note</button>
         </div>
       </div>
 
@@ -9009,7 +9015,7 @@ function openDebtorDetail(id){
         <!-- Filter type tabs -->
         <div style="display:flex;gap:6px;margin-bottom:10px;">
           ${["all","sale","payment","return"].map(f=>{
-            const labels={all:"📋 All",sale:"🛒 Sale",payment:"💰 Receipt",return:"↩️ Return"};
+            const labels={all:"📋 All",sale:"🛒 Sale",payment:"💰 Receipt",return:"↩️ Returned / Cr Note"};
             const cnt={all:txs.length,sale:txs.filter(t=>t.type==="sale").length,payment:txs.filter(t=>t.type==="payment").length,return:txs.filter(t=>t.type==="return").length};
             return `<button id="dr-tf-${f}" onclick="_drTxSetFilter('${id}','${f}')"
               style="flex:1;cursor:pointer;border-radius:8px;padding:7px 6px;font-size:11px;font-weight:800;
@@ -9122,7 +9128,7 @@ function _drTxRender(debtorId){
   const typeCfg={
     sale:    {label:"Sale",    debit:true,  bg:"#14532d22",col:"#4ade80",icon:"🛒"},
     payment: {label:"Receipt", debit:false, bg:"#1e3a6e22",col:"#60a5fa",icon:"💰"},
-    return:  {label:"Return",  debit:false, bg:"#2e106522",col:"#c4b5fd",icon:"↩️"},
+    return:  {label:"Returned / Cr Note",  debit:false, bg:"#2e106522",col:"#c4b5fd",icon:"↩️"},
   };
 
   const rows=filtered.map(tx=>{
@@ -9197,7 +9203,7 @@ function openAddDebtTxModal(debtorId, defaultType){
   const dr = getDebtors().find(d=>d.id===debtorId);
   if(!dr){ notify("❌ Debtor not found","error"); return; }
 
-  const typeLabels = {sale:"🛒 Record Sale to", payment:"💰 Record Receipt from", return:"↩️ Record Return from"};
+  const typeLabels = {sale:"🛒 Record Sale to", payment:"💰 Record Receipt from", return:"↩️ Record Returned / Cr Note from"};
   const typeDescs  = {
     sale:    "Recording a sale increases the amount they owe you.",
     payment: "Recording a receipt decreases the amount they owe you.",
@@ -9354,7 +9360,7 @@ function saveDebtTransaction(){
     cashRecordTx({direction:"in", amount: amtRaw, date, note:`Received from ${debtors[idx].name||"customer"}${note?(" · "+note):""}`, source:"debtor_payment", refId:drTxId, mode});
   }
   closeModal();
-  const typeLabel = type==="payment"?"Receipt":type.charAt(0).toUpperCase()+type.slice(1);
+  const typeLabel = type==="payment"?"Receipt":type==="return"?"Returned / Cr Note":type.charAt(0).toUpperCase()+type.slice(1);
   const invMsg = invLinked ? ` · ${invItemName} stock ${type==="return"?"added back":"deducted"}` : "";
   notify("✅ "+typeLabel+" of "+formatINR(amtRaw)+" saved"+invMsg);
   setTimeout(()=>openDebtorDetail(debtorId), 200);
@@ -9422,6 +9428,203 @@ function printDebtorStatement(id){
 }
 
 // ─── END DEBTORS MODULE ──────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ─── ALERTS / WARNINGS TAB ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Days since a given YYYY-MM-DD date string
+function _daysSince(dateStr){
+  if(!dateStr) return 0;
+  const d = new Date(dateStr+(String(dateStr).length<=10?"T00:00:00":""));
+  if(isNaN(d.getTime())) return 0;
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  d.setHours(0,0,0,0);
+  return Math.round((now-d)/86400000);
+}
+
+// Oldest unpaid "purchase" (creditor) / "sale" (debtor) transaction date, or null
+function _oldestUnpaidTxDate(entity, txType){
+  const txs = (entity.transactions||[]).filter(t=>t.type===txType && t.date);
+  if(!txs.length) return null;
+  const sorted = txs.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  return sorted[0].date;
+}
+
+// Returns a summary count of all active alerts (for the tab badge)
+function getAlertCount(){
+  let count = 0;
+  try {
+    count += inventoryItems.filter(x=>invGetStock(x.name)>0 && invGetStock(x.name)<=(x.minStock||5)).length;
+    count += inventoryItems.filter(x=>invGetStock(x.name)<=0).length;
+    count += invGetExpiringEntries(30).length;
+    (getCreditors()||[]).filter(c=>!c._archived && c.id!=="CR_UNRECONCILED").forEach(c=>{
+      const bal = credBalance(c);
+      if(bal>0){
+        const oldest = _oldestUnpaidTxDate(c,"purchase");
+        if(oldest && _daysSince(oldest)>30) count++;
+      }
+    });
+    (getDebtors()||[]).filter(d=>!d._archived).forEach(d=>{
+      const bal = debtBalance(d);
+      if(bal>0){
+        const oldest = _oldestUnpaidTxDate(d,"sale");
+        if(oldest && _daysSince(oldest)>30) count++;
+      }
+    });
+  } catch(e){ /* ignore */ }
+  return count;
+}
+
+function renderAlertsTab(){
+  // ── Section 1: Low Stock ──
+  const lowStockItems = inventoryItems.filter(x=>{
+    const stk = invGetStock(x.name);
+    return stk>0 && stk<=(x.minStock||5);
+  });
+
+  // ── Section 2: Out of Stock ──
+  const outOfStockItems = inventoryItems.filter(x=>invGetStock(x.name)<=0);
+
+  // ── Section 3: Expiry Warnings ──
+  const expiring = invGetExpiringEntries(30);
+  const expired      = expiring.filter(e=>e.status==="expired");
+  const expiring7    = expiring.filter(e=>e.status==="soon" && e.daysLeft<=7);
+  const expiring30   = expiring.filter(e=>e.status==="soon" && e.daysLeft>7 && e.daysLeft<=30);
+
+  // ── Section 4: Creditor Overdue ──
+  const creditorOverdue = (getCreditors()||[]).filter(c=>!c._archived && c.id!=="CR_UNRECONCILED").map(c=>{
+    const bal = credBalance(c);
+    if(bal<=0) return null;
+    const oldest = _oldestUnpaidTxDate(c,"purchase");
+    if(!oldest) return null;
+    const days = _daysSince(oldest);
+    if(days<=30) return null;
+    return {name:c.name||"Creditor", id:c.id, amount:bal, days};
+  }).filter(Boolean).sort((a,b)=>b.days-a.days);
+
+  // ── Section 5: Debtor Overdue ──
+  const debtorOverdue = (getDebtors()||[]).filter(d=>!d._archived).map(d=>{
+    const bal = debtBalance(d);
+    if(bal<=0) return null;
+    const oldest = _oldestUnpaidTxDate(d,"sale");
+    if(!oldest) return null;
+    const days = _daysSince(oldest);
+    if(days<=30) return null;
+    return {name:d.name||"Debtor", id:d.id, amount:bal, days};
+  }).filter(Boolean).sort((a,b)=>b.days-a.days);
+
+  const hasAnything = lowStockItems.length || outOfStockItems.length || expired.length || expiring7.length || expiring30.length || creditorOverdue.length || debtorOverdue.length;
+
+  if(!hasAnything){
+    return `<div style="padding:60px 20px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:14px;">✅</div>
+      <div style="font-size:18px;font-weight:800;color:#4ade80;margin-bottom:6px;">All clear — nothing needs attention</div>
+      <div style="font-size:13px;color:#7a8aaa;">Your stock, expiries and dues all look healthy right now.</div>
+    </div>`;
+  }
+
+  const sectionHeader = (icon,title,color)=>`<div style="font-size:14px;font-weight:800;color:${color};margin:18px 0 10px;display:flex;align-items:center;gap:8px;">${icon} ${title}</div>`;
+
+  let html = `<div style="padding:16px 14px 80px;max-width:760px;margin:0 auto;">
+    <div style="font-size:18px;font-weight:800;color:#FFD700;margin-bottom:4px;">⚠️ Alerts</div>
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:6px;">Everything that needs your attention, in one place.</div>`;
+
+  // Section 1 — Low Stock
+  if(lowStockItems.length){
+    html += sectionHeader("📉","Low Stock","#FFD700");
+    html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+    lowStockItems.forEach(item=>{
+      const stk = invGetStock(item.name);
+      const min = item.minStock || 5;
+      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(item.name)}</div>
+          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Current: <span style="color:#FFD700;font-weight:700;">${stk} ${escHtml(item.unit||"unit")}</span> · Min: ${min} ${escHtml(item.unit||"unit")}</div>
+        </div>
+        <button onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}');switchTab(5)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">📦 Inventory →</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Section 2 — Out of Stock
+  if(outOfStockItems.length){
+    html += sectionHeader("❌","Out of Stock","#f66");
+    html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+    outOfStockItems.forEach(item=>{
+      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(item.name)}</div>
+          <div style="font-size:11px;color:#f66;margin-top:2px;font-weight:700;">OUT OF STOCK · 0 ${escHtml(item.unit||"unit")}</div>
+        </div>
+        <button onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}');switchTab(5)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">📦 Inventory →</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Section 3 — Expiry Warnings
+  if(expired.length || expiring7.length || expiring30.length){
+    html += sectionHeader("⏳","Expiry Warnings","#ff8c42");
+    const expiryGroup = (title,color,items)=>{
+      if(!items.length) return "";
+      let out = `<div style="font-size:12px;font-weight:800;color:${color};margin:8px 0 6px;">${title} (${items.length})</div>`;
+      out += `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px;">`;
+      items.forEach(e=>{
+        const dt = new Date(e.expiryDate+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
+        out += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(e.itemName)}</div>
+            <div style="font-size:11px;color:${color};margin-top:2px;">Expiry: ${dt} · Stock: ${e.qty} ${escHtml(e.unit||"unit")}</div>
+          </div>
+          <button onclick="invShowItemDetail('${e.itemName.replace(/'/g,"\\'")}');switchTab(5)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">📦 Inventory →</button>
+        </div>`;
+      });
+      out += `</div>`;
+      return out;
+    };
+    html += expiryGroup("Expired","#f66",expired);
+    html += expiryGroup("Expiring within 7 days","#ff8c42",expiring7);
+    html += expiryGroup("Expiring within 30 days","#FFD700",expiring30);
+  }
+
+  // Section 4 — Creditor Overdue
+  if(creditorOverdue.length){
+    html += sectionHeader("🏦","Creditor Overdue (You Owe)","#fbbf24");
+    html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+    creditorOverdue.forEach(c=>{
+      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="switchTab(6);setTimeout(()=>openCreditorDetail('${c.id}'),50)">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(c.name)}</div>
+          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Oldest unpaid bill: <span style="color:#f59e0b;font-weight:700;">${c.days} days ago</span></div>
+        </div>
+        <div style="font-size:14px;font-weight:800;color:#fbbf24;flex-shrink:0;">${formatINR(c.amount)}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Section 5 — Debtor Overdue
+  if(debtorOverdue.length){
+    html += sectionHeader("🧾","Debtor Overdue (They Owe You)","#4ade80");
+    html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+    debtorOverdue.forEach(d=>{
+      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="switchTab(7);setTimeout(()=>openDebtorDetail('${d.id}'),50)">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(d.name)}</div>
+          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Oldest unpaid sale: <span style="color:#4ade80;font-weight:700;">${d.days} days ago</span></div>
+        </div>
+        <div style="font-size:14px;font-weight:800;color:#4ade80;flex-shrink:0;">${formatINR(d.amount)}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
 
 function renderSettings(){
   const savedPhone = localStorage.getItem("sc_auth_phone") || "";
@@ -10848,7 +11051,7 @@ const TRANSLATIONS = {
   en: {
     adminPanel:"Admin Panel", leaderboard:"Leaderboard", customers:"Customers",
     purchase:"Cust. Sales", analytics:"Analytics", compare:"Compare",
-    inventory:"Inventory", creditors:"Creditors", debtors:"Debtors",
+    inventory:"Inventory", creditors:"Creditors", debtors:"Debtors", alerts:"Alerts",
     messages:"Messages",
     festivals:"Festival Rewards", settings:"Settings", logout:"Logout",
     addCustomer:"+ Add Customer", exportCSV:"⬇ Export CSV", addPurchase:"Add Sale →",
@@ -11778,6 +11981,8 @@ function updateLicenseUI() {
 
 // Checks whether a main tab (0-6) is accessible in current plan
 function isTabAllowed(i) {
+  // Alerts tab (index 10) is always available — avoids collision with sub-feature index 10 (Push to Display)
+  if (i === 10) return true;
   // Pro user — all tabs unlocked
   if (licensePlan === "pro" && licenseStatus === "pro") return true;
   // Free/expired — only explicitly allowed free tabs
@@ -12258,7 +12463,7 @@ function invDeductSold(soldItems, custId){
 }
 
 // Add stock entry
-function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice, gstRate, gstIncluded, hsnCode, expiryDate){
+function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice, gstRate, gstIncluded, hsnCode, expiryDate, minStock){
   let item = inventoryItems.find(x=>x.name===name);
   if(!item){
     item = {id:autoId(), name, unit:unit||"unit", category:category||"General", stock:[], salesLog:[]};
@@ -12271,6 +12476,7 @@ function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellin
   if(gstRate !== undefined && gstRate !== null) item.gstRate = Number(gstRate)||0;
   if(gstIncluded) item.gstIncluded = gstIncluded;
   if(hsnCode) item.hsnCode = hsnCode;
+  if(minStock !== undefined && minStock !== null && minStock !== "") item.minStock = Number(minStock)||0;
   if(!item.stock) item.stock=[];
   item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes, expiryDate: expiryDate||""});
   saveInventory();
@@ -12730,11 +12936,14 @@ function renderInventoryTab(){
           <input class="input" type="number" id="inv-cost" min="0" step="0.01" placeholder="0.00" value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);if(!ex)return '';var costs=(ex.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);return costs.length?Number(costs[costs.length-1].costPerUnit).toFixed(2):'';})()}" />
         </div>
         <div>
-          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Selling Price / Unit (₹) <span style="color:#4f4;font-size:10px;">★ auto-fill</span></label>
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Final Selling Price (₹) <span style="color:#4f4;font-size:10px;">★ auto-fill</span><br><span style="font-size:10px;color:#4a5a7a;font-weight:400;">Enter the price you charge the customer</span></label>
           <input class="input" type="number" id="inv-sell-price" min="0" step="0.01" placeholder="0.00" value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex&&ex.sellingPrice>0?Number(ex.sellingPrice).toFixed(2):'';})()}" style="color:#FFD700;" />
         </div>
       </div>
-      <!-- GST Section -->
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Min Stock Warning <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — defaults to 5)</span></label>
+        <input class="input" type="number" id="inv-min-stock" min="0" step="1" placeholder="5" value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex&&ex.minStock>0?ex.minStock:'';})()}" style="text-align:center;" />
+      </div>
       <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;">
         <div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:10px;">🔢 GST on this item <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional)</span></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
@@ -12752,7 +12961,7 @@ function renderInventoryTab(){
             <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">PRICE IS</label>
             <select class="input" id="inv-gst-included" style="margin-bottom:0;" onchange="invUpdateGstPreview('add')">
               <option value="exclusive">Exclusive (+ GST on sale)</option>
-              <option value="inclusive">Inclusive (GST inside price)</option>
+              <option value="inclusive" selected>Inclusive (GST inside price)</option>
             </select>
           </div>
         </div>
@@ -12888,9 +13097,13 @@ function renderInventoryTab(){
             <input class="input" type="number" id="inv-cost" min="0" step="0.01" placeholder="0.00" value="${lastCost}" />
           </div>
           <div>
-            <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Selling Price / Unit (₹) <span style="color:#4f4;font-size:10px;">★ auto-fill</span></label>
+            <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Final Selling Price (₹) <span style="color:#4f4;font-size:10px;">★ auto-fill</span><br><span style="font-size:10px;color:#4a5a7a;font-weight:400;">Enter the price you charge the customer</span></label>
             <input class="input" type="number" id="inv-sell-price" min="0" step="0.01" placeholder="0.00" value="${lastSell}" style="color:#FFD700;" />
           </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Min Stock Warning <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — defaults to 5)</span></label>
+          <input class="input" type="number" id="inv-min-stock" min="0" step="1" placeholder="5" value="${selItem&&selItem.minStock>0?selItem.minStock:''}" style="text-align:center;" />
         </div>
         <!-- GST Section -->
         <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;">
@@ -12909,8 +13122,8 @@ function renderInventoryTab(){
             <div>
               <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">PRICE IS</label>
               <select class="input" id="inv-gst-included" style="margin-bottom:0;" onchange="invUpdateGstPreview('restock')">
-                <option value="exclusive" ${!selItem||selItem.gstIncluded!=='inclusive'?'selected':''}>Exclusive (+ GST on sale)</option>
-                <option value="inclusive" ${selItem&&selItem.gstIncluded==='inclusive'?'selected':''}>Inclusive (GST inside price)</option>
+                <option value="exclusive" ${selItem&&selItem.gstIncluded==='exclusive'?'selected':''}>Exclusive (+ GST on sale)</option>
+                <option value="inclusive" ${!selItem||selItem.gstIncluded!=='exclusive'?'selected':''}>Inclusive (GST inside price)</option>
               </select>
             </div>
           </div>
@@ -13102,10 +13315,11 @@ function invSubmitAdd(){
   const date=document.getElementById("inv-date").value||new Date().toISOString().slice(0,10);
   const notes=(document.getElementById("inv-notes").value||"").trim();
   const gstRate=parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
-  const gstIncluded=document.getElementById("inv-gst-included")?.value||"exclusive";
+  const gstIncluded=document.getElementById("inv-gst-included")?.value||"inclusive";
   const hsnCode=(document.getElementById("inv-hsn-add")?.value||"").trim();
   const hasExpiry=document.getElementById("inv-has-expiry")?.checked;
   const expiryDate=hasExpiry?(document.getElementById("inv-expiry-date")?.value||""):"";
+  const minStock=(document.getElementById("inv-min-stock")?.value||"").trim();
   if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
   // Duplicate item name check (case-insensitive)
   const _dupItem = inventoryItems.find(x=>x.name.trim().toLowerCase()===name.toLowerCase());
@@ -13116,7 +13330,7 @@ function invSubmitAdd(){
   }
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
   const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
-  invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded, hsnCode, expiryDate);
+  invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded, hsnCode, expiryDate, minStock);
   _invLogCreditorPurchase(creditorId, name, qty, cost, date, notes);
 
   // If linked shop creditor, offer sync
@@ -13143,15 +13357,16 @@ function invSubmitRestock(){
   const date=document.getElementById("inv-date").value||new Date().toISOString().slice(0,10);
   const notes=(document.getElementById("inv-notes").value||"").trim();
   const gstRate=parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
-  const gstIncluded=document.getElementById("inv-gst-included")?.value||"exclusive";
+  const gstIncluded=document.getElementById("inv-gst-included")?.value||"inclusive";
   const hsnCode=(document.getElementById("inv-hsn-restock")?.value||"").trim();
   const hasExpiry=document.getElementById("inv-has-expiry")?.checked;
   const expiryDate=hasExpiry?(document.getElementById("inv-expiry-date")?.value||""):"";
+  const minStock=(document.getElementById("inv-min-stock")?.value||"").trim();
   if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
   const selItem = inventoryItems.find(x=>x.name===invRestockSelected);
   const category = selItem ? (selItem.category||"General") : "General";
   const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
-  invAddStock(invRestockSelected, unit||(selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded, hsnCode, expiryDate);
+  invAddStock(invRestockSelected, unit||(selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded, hsnCode, expiryDate, minStock);
   _invLogCreditorPurchase(creditorId, invRestockSelected, qty, cost, date, notes);
 
   // If creditor is a linked shop, offer payment sync request
@@ -13979,7 +14194,7 @@ function _buildSharedLedgerHtml(entity, etype, peerName, connId) {
   const csvUrl = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
   const rows = txns.slice().reverse().map(t => {
     const icon = t.type==="purchase"||t.type==="sale" ? "📦" : t.type==="payment"||t.type==="receipt" ? "💸" : "↩️";
-    const lbl  = {purchase:"Purchase",payment:"Payment",return:"Return",sale:"Sale",receipt:"Receipt"}[t.type] || t.type;
+    const lbl  = {purchase:"Purchase",payment:"Payment",return:(etype==="creditor"?"Return / Dr Note":"Returned / Cr Note"),sale:"Sale",receipt:"Receipt"}[t.type] || t.type;
     const col  = t.type==="payment"||t.type==="receipt" ? "#22c55e" : t.type==="return" ? "#fb923c" : "#e8eaf0";
     const dt   = t.date ? new Date(t.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "";
     return `<tr><td style="padding:9px 8px;font-size:13px;">${icon} ${lbl}</td>
@@ -14025,7 +14240,7 @@ function printTxBill(tx, partyName, etype) {
   const myShopName = (appSettings && appSettings.shopName) || "My Shop";
   const isCreditor = etype === "creditor";
   const dt = tx.date ? new Date(tx.date+ (tx.date.length<=10?"T00:00:00":"")).toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"}) : "-";
-  const lbl = {purchase:"Purchase Bill",payment:"Payment Receipt",return:"Return / Credit Note",sale:"Sales Bill",receipt:"Payment Receipt"}[tx.type] || "Voucher";
+  const lbl = {purchase:"Purchase Bill",payment:"Payment Receipt",return:(isCreditor?"Return / Dr Note":"Returned / Cr Note"),sale:"Sales Bill",receipt:"Payment Receipt"}[tx.type] || "Voucher";
   const items = Array.isArray(tx.items) ? tx.items : (tx._invItem ? [{name:tx._invItem, qty:tx._invQty||1, rate:(tx._invQty?tx.amount/tx._invQty:tx.amount), amount:tx.amount, unit:""}] : []);
 
   let itemRows = "";
@@ -14101,7 +14316,7 @@ function printSharedLedgerStatement(entity, etype, displayName, peerName) {
     const inAmt = (isCreditor && tx.type==="purchase") || (!isCreditor && tx.type==="sale");
     if (inAmt) { running += (tx.amount||0); dr_amt = "₹"+Number(tx.amount||0).toLocaleString("en-IN"); }
     else { running -= (tx.amount||0); cr_amt = "₹"+Number(tx.amount||0).toLocaleString("en-IN"); }
-    const lbl = {purchase:"Purchase",payment:"Payment",return:"Return",sale:"Sale",receipt:"Receipt"}[tx.type] || tx.type;
+    const lbl = {purchase:"Purchase",payment:"Payment",return:(isCreditor?"Return / Dr Note":"Returned / Cr Note"),sale:"Sale",receipt:"Receipt"}[tx.type] || tx.type;
     const dt = tx.date ? new Date(tx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "-";
     return `<tr>
       <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${dt}</td>
@@ -15175,7 +15390,7 @@ function renderInventoryCategoryPage(catName){
             <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
             <div style="flex:1;min-width:0;">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-                <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${item.name}</div>
+                <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${item.name}${stk<=(item.minStock||5)?' <span title="Low stock" style="font-size:12px;">⚠️</span>':''}</div>
                 <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk<=0?"OUT":stk} ${item.unit||"unit"}</div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
