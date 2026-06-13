@@ -10221,6 +10221,8 @@ async function forceLogoutMember(memberId) {
     await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/force_logout_member`, {
       method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
       body: JSON.stringify({ p_shop_phone:authPhone, p_member_id:memberId })
+    });
+    notify("⏏ Member force-logged out"); renderTab(12);
   } catch(e) { notify("Network error","error"); }
 }
 
@@ -10230,6 +10232,8 @@ async function deleteMember(memberId, displayName) {
     await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/delete_shop_member`, {
       method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
       body: JSON.stringify({ p_shop_phone:authPhone, p_member_id:memberId })
+    });
+    notify("🗑 Member deleted"); renderTab(12);
   } catch(e) { notify("Network error","error"); }
 }
 
