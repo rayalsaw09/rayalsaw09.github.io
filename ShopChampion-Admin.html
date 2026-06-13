@@ -9976,10 +9976,27 @@ async function fetchTeamMembers() {
       headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
       body: JSON.stringify({ p_shop_phone: authPhone })
     });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[Team] list_shop_members RPC failed:", res.status, errText);
+      // Fallback: query sc_shop_members table directly via REST
+      const res2 = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?shop_phone=eq.${encodeURIComponent(authPhone)}&select=*`, {
+        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+      });
+      if (!res2.ok) {
+        const errText2 = await res2.text();
+        console.error("[Team] sc_shop_members fallback failed:", res2.status, errText2);
+        notify("Failed to load members","error");
+        return [];
+      }
+      const data2 = await res2.json();
+      _teamMembers = Array.isArray(data2) ? data2 : [];
+      return _teamMembers;
+    }
     const data = await res.json();
     _teamMembers = Array.isArray(data) ? data : [];
     return _teamMembers;
-  } catch(e) { notify("Failed to load members","error"); return []; }
+  } catch(e) { console.error("[Team] fetchTeamMembers exception:", e); notify("Failed to load members","error"); return []; }
 }
 
 function renderPermMatrix(permissions, prefix) {
@@ -10072,6 +10089,10 @@ async function renderTeamTab(el) {
 
 function openAddMemberModal() {
   const body = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:16px;font-weight:800;color:#e8eaf0;">Add Team Member</div>
+      <button onclick="closeModal()" class="btn" style="background:#1a2238;border:1px solid #2a3a5a;color:#aab;font-size:13px;padding:5px 12px;">✕</button>
+    </div>
     <div style="margin-bottom:12px;">
       <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Username</label>
       <input class="input" type="text" id="nm_username" placeholder="e.g. ravi123" style="font-size:14px;"/>
@@ -10093,7 +10114,7 @@ function openAddMemberModal() {
     <div id="nm_err" style="color:#f66;font-size:12px;margin-top:10px;display:none;"></div>
     <button onclick="saveNewMember()" class="btn" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:14px;font-weight:800;padding:12px;">Create Member →</button>
   `;
-  showModal("Add Team Member", body);
+  showWideModal(body);
 }
 
 async function saveNewMember() {
@@ -10130,6 +10151,10 @@ async function openEditMemberModal(memberId) {
   const m = _teamMembers.find(x=>x.id===memberId);
   if(!m) return;
   const body = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:16px;font-weight:800;color:#e8eaf0;">Edit: ${escHtml(m.display_name)}</div>
+      <button onclick="closeModal()" class="btn" style="background:#1a2238;border:1px solid #2a3a5a;color:#aab;font-size:13px;padding:5px 12px;">✕</button>
+    </div>
     <div style="margin-bottom:12px;">
       <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Username (read-only)</label>
       <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px 14px;font-size:14px;color:#7a8aaa;">@${escHtml(m.username)}</div>
@@ -10147,7 +10172,7 @@ async function openEditMemberModal(memberId) {
     <div id="em_err" style="color:#f66;font-size:12px;margin-top:10px;display:none;"></div>
     <button onclick="saveEditMember('${memberId}')" class="btn" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#1a4a8a,#1a2a6a);color:#fff;font-size:14px;font-weight:800;padding:12px;">Save Changes →</button>
   `;
-  showModal("Edit: " + m.display_name, body);
+  showWideModal(body);
 }
 
 async function saveEditMember(memberId) {
