@@ -3442,7 +3442,7 @@ function doLogout() {
   // Reset in-memory state so next account starts clean
   customers = [];
   inventoryItems = [];
-  invView = "stock"; invSelectedCat = ""; invSearchQuery = ""; invCatPageName = ""; invCatPageSearch = ""; invRestockSearch = ""; invRestockSelected = null;
+  invView = "stock"; invSelectedCat = ""; invSearchQuery = ""; invCatPageName = ""; invCatPageSearch = "";
   syncBinId = ""; syncApiKey = "";
   displaySettings = { showCount:10 }; // reset to safe default with correct key
   appSettings = { shopName:"ShopChampion", currency:"₹", pointsPerRupee:1, redeemRate:100, welcomeBonus:0 };
@@ -8003,6 +8003,8 @@ function crTxAddItemRow(prefill){
     </div>
   `;
   container.appendChild(row);
+  // If a prefill item name is set, trigger auto-fill of rate/GST/HSN immediately
+  if(prefill?.name) crTxItemSelect(rowId);
 }
 
 function crTxItemSelect(rowId){
@@ -8388,7 +8390,12 @@ function saveCrTransaction(){
       const hsnCode = it.hsn || item?.hsnCode || "";
       invAddStock(it.name, unit, it.qty, it.rate>0?it.rate:0, date, note||invoiceNo||"", cat, sp, gstRate, gstIncluded, hsnCode);
     });
-    multiItems = items.map(it=>({ name:it.name, qty:it.qty, rate:it.rate, amount:it.amount, unit:(inventoryItems.find(x=>x.name===it.name)?.unit)||"" }));
+    multiItems = items.map(it=>{
+      const invItem = inventoryItems.find(x=>x.name===it.name);
+      const gstRate = (it.gstRate!==undefined && it.gstRate!==null) ? it.gstRate : (invItem?.gstRate||0);
+      const hsnCode = it.hsn || invItem?.hsnCode || "";
+      return { name:it.name, qty:it.qty, rate:it.rate, amount:it.amount, unit:invItem?.unit||"", gstRate, hsn:hsnCode };
+    });
   }
   let invLinked = multiItems.length > 0;
   let invItemName = multiItems.map(it=>it.name).join(", ");
@@ -13674,13 +13681,12 @@ function renderInventoryTab(){
 
   const tabBtn=(v,label,color)=>{
     const a=invView===v;
-    return `<button onclick="if('${v}'!=='add'&&'${v}'!=='restock')invPrefillName='';if('${v}'!=='restock'){invRestockSearch='';invRestockSelected=null;}invView='${v}';invSelectedCat='';safeRenderTab(currentTab)" style="cursor:pointer;flex:1;padding:8px 2px;border-radius:10px;border:2px solid ${a?color:'#1e2a45'};background:${a?'#0a0e1a':'transparent'};color:${a?color:'#4a5a7a'};font-size:11px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;">${label}</button>`;
+    return `<button onclick="if('${v}'!=='add')invPrefillName='';invView='${v}';invSelectedCat='';safeRenderTab(currentTab)" style="cursor:pointer;flex:1;padding:8px 2px;border-radius:10px;border:2px solid ${a?color:'#1e2a45'};background:${a?'#0a0e1a':'transparent'};color:${a?color:'#4a5a7a'};font-size:11px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;">${label}</button>`;
   };
 
   const nav = `<div style="display:flex;gap:6px;margin-bottom:16px;">
     ${tabBtn("stock","📦 Stock","#4f4")}
-    ${tabBtn("add","➕ Add New","#FFD700")}
-    ${tabBtn("restock","🔄 Restock","#4a8aff")}
+    ${tabBtn("add","➕ Add Item","#FFD700")}
     ${tabBtn("log","📋 Sales Log","#b47aff")}
   </div>`;
 
@@ -13732,270 +13738,95 @@ function renderInventoryTab(){
 
   if(invView==="add"){
     const existingCats = [...new Set(inventoryItems.map(x=>x.category||"General"))].sort();
+    const prefillItem = invPrefillName ? inventoryItems.find(x=>x.name===invPrefillName) : null;
     body = `<div class="card" style="padding:22px;">
-      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:16px;">➕ Add New Item</div>
-      <div style="font-size:12px;color:#4a5a7a;margin-bottom:14px;padding:10px 12px;background:#0d1220;border-radius:8px;border:1px solid #1e2a45;">Use this tab to add a <b style="color:#FFD700;">brand new product</b> to inventory. To add stock to an existing item, use the <b style="color:#4a8aff;">🔄 Restock</b> tab.</div>
+      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:6px;">➕ Add / Edit Item</div>
+      <div style="font-size:12px;color:#4a5a7a;margin-bottom:14px;padding:10px 12px;background:#0d1220;border-radius:8px;border:1px solid #1e2a45;">Define a product — its name, unit, selling price and GST. To add stock quantities, use the <b style="color:#4a8aff;">Creditor tab → Purchase</b>.</div>
+
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Item / Product Name *</label>
       <input class="input" id="inv-name" placeholder="e.g. Basmati Rice 5kg..."
-        oninput="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var costEl=document.getElementById('inv-cost');var sellEl=document.getElementById('inv-sell-price');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(costEl){var costs=(ex.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);if(costs.length)costEl.value=Number(costs[costs.length-1].costPerUnit).toFixed(2);}if(sellEl&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);}})(this)"
-        onchange="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var costEl=document.getElementById('inv-cost');var sellEl=document.getElementById('inv-sell-price');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(costEl){var costs=(ex.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);if(costs.length)costEl.value=Number(costs[costs.length-1].costPerUnit).toFixed(2);}if(sellEl&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);}})(this)"
+        oninput="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var sellEl=document.getElementById('inv-sell-price');var minEl=document.getElementById('inv-min-stock');var gstEl=document.getElementById('inv-gst-rate');var hsnEl=document.getElementById('inv-hsn-add');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(sellEl&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);if(minEl&&ex.minStock>0)minEl.value=ex.minStock;if(gstEl)gstEl.value=String(ex.gstRate||0);if(hsnEl&&ex.hsnCode)hsnEl.value=ex.hsnCode;}})(this)"
         value="${invPrefillName ? invPrefillName : ''}"
         style="margin-bottom:12px;" />
-      
+
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Category</label>
-      <input class="input" id="inv-category" list="inv-category-list" placeholder="e.g. Grocery, Dairy, Snacks..." value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex?ex.category||'General':'';})()}" style="margin-bottom:12px;" />
+      <input class="input" id="inv-category" list="inv-category-list" placeholder="e.g. Grocery, Dairy, Snacks..."
+        value="${prefillItem ? prefillItem.category||'General' : ''}" style="margin-bottom:12px;" />
       <datalist id="inv-category-list">${existingCats.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">`).join("")}</datalist>
+
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-        <div>
-          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Quantity *</label>
-          <input class="input" type="number" id="inv-qty" min="0.01" step="0.01" placeholder="0" style="text-align:center;font-size:18px;font-weight:700;" />
-        </div>
         <div>
           <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Unit</label>
-          <input class="input" id="inv-unit" list="inv-units" placeholder="kg / pcs / litre..." value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex?ex.unit||'':'';})()}" />
+          <input class="input" id="inv-unit" list="inv-units" placeholder="kg / pcs / litre..."
+            value="${prefillItem ? prefillItem.unit||'' : ''}" />
           <datalist id="inv-units"><option value="kg"><option value="pcs"><option value="litre"><option value="box"><option value="dozen"><option value="packet"><option value="bottle"><option value="bag"></datalist>
         </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div>
-          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Cost per Unit (₹)</label>
-          <input class="input" type="number" id="inv-cost" min="0" step="0.01" placeholder="0.00" value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);if(!ex)return '';var costs=(ex.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);return costs.length?Number(costs[costs.length-1].costPerUnit).toFixed(2):'';})()}" />
-        </div>
-        <div>
-          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Final Selling Price (₹) <span style="color:#4f4;font-size:10px;">★ auto-fill</span><br><span style="font-size:10px;color:#4a5a7a;font-weight:400;">Enter the price you charge the customer</span></label>
-          <input class="input" type="number" id="inv-sell-price" min="0" step="0.01" placeholder="0.00" value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex&&ex.sellingPrice>0?Number(ex.sellingPrice).toFixed(2):'';})()}" style="color:#FFD700;" />
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Selling Price (₹) <span style="color:#4f4;font-size:10px;">★</span></label>
+          <input class="input" type="number" id="inv-sell-price" min="0" step="0.01" placeholder="0.00"
+            value="${prefillItem&&prefillItem.sellingPrice>0 ? Number(prefillItem.sellingPrice).toFixed(2) : ''}" style="color:#FFD700;" />
         </div>
       </div>
+
       <div style="margin-bottom:12px;">
-        <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Min Stock Warning <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — defaults to 5)</span></label>
-        <input class="input" type="number" id="inv-min-stock" min="0" step="1" placeholder="Default: 5" value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex&&ex.minStock>0?ex.minStock:'';})()}" style="text-align:center;" />
+        <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Min Stock Warning <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(alert when stock falls below this)</span></label>
+        <input class="input" type="number" id="inv-min-stock" min="0" step="1" placeholder="Default: 5"
+          value="${prefillItem&&prefillItem.minStock>0 ? prefillItem.minStock : ''}" style="text-align:center;" />
       </div>
-      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;">
-        <div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:10px;">🔢 GST on this item <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional)</span></div>
+
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:18px;">
+        <div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:10px;">🔢 GST Settings <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional)</span></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
           <div>
             <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST RATE (%)</label>
             <select class="input" id="inv-gst-rate" style="margin-bottom:0;" onchange="invUpdateGstPreview('add')">
-              <option value="0" selected>0% — No GST</option>
-              <option value="5">5%</option>
-              <option value="12">12%</option>
-              <option value="18">18%</option>
-              <option value="28">28%</option>
+              <option value="0" ${!prefillItem||!prefillItem.gstRate?'selected':''}>0% — No GST</option>
+              <option value="5" ${prefillItem&&prefillItem.gstRate===5?'selected':''}>5%</option>
+              <option value="12" ${prefillItem&&prefillItem.gstRate===12?'selected':''}>12%</option>
+              <option value="18" ${prefillItem&&prefillItem.gstRate===18?'selected':''}>18%</option>
+              <option value="28" ${prefillItem&&prefillItem.gstRate===28?'selected':''}>28%</option>
             </select>
           </div>
           <div>
             <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">PRICE IS</label>
             <select class="input" id="inv-gst-included" style="margin-bottom:0;" onchange="invUpdateGstPreview('add')">
-              <option value="exclusive">Exclusive (+ GST on sale)</option>
-              <option value="inclusive" selected>Inclusive (GST inside price)</option>
+              <option value="exclusive" ${prefillItem&&prefillItem.gstIncluded==='exclusive'?'selected':''}>Exclusive (+ GST on sale)</option>
+              <option value="inclusive" ${!prefillItem||prefillItem.gstIncluded!=='exclusive'?'selected':''}>Inclusive (GST inside price)</option>
             </select>
           </div>
         </div>
         <div id="inv-gst-preview-add" style="font-size:12px;color:#a78bfa;background:#0d0820;border-radius:8px;padding:8px 10px;display:none;"></div>
-        <!-- HSN Field Add -->
         <div style="margin-top:10px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-            <label style="font-size:11px;color:#7a8aaa;font-weight:700;">HSN / SAC CODE <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — auto-fills rate)</span></label>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;">HSN / SAC CODE <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional)</span></label>
             <button type="button" onclick="buildCheatSheet('add')" style="font-size:10px;background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;border-radius:6px;padding:2px 8px;cursor:pointer;">🔍 What's my rate?</button>
           </div>
-          <input class="input" type="text" id="inv-hsn-add" placeholder="e.g. 3305 (Shampoo), 0401 (Milk)" maxlength="8" oninput="hsnOnInput('add')" style="margin-bottom:4px;" />
+          <input class="input" type="text" id="inv-hsn-add" placeholder="e.g. 3305 (Shampoo), 0401 (Milk)" maxlength="8"
+            oninput="hsnOnInput('add')"
+            value="${prefillItem&&prefillItem.hsnCode ? prefillItem.hsnCode : ''}"
+            style="margin-bottom:4px;" />
           <div id="inv-hsn-msg-add" style="font-size:11px;min-height:14px;"></div>
           <div id="inv-cheat-add" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-top:6px;"></div>
         </div>
       </div>
 
-      <!-- Expiry Section -->
-      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;">
-        <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#ff8c42;cursor:pointer;">
-          <input type="checkbox" id="inv-has-expiry" onchange="document.getElementById('inv-expiry-wrap').style.display=this.checked?'block':'none'" style="width:16px;height:16px;accent-color:#ff8c42;" />
-          ⏳ This item has an Expiry Date
-        </label>
-        <div id="inv-expiry-wrap" style="display:none;margin-top:10px;">
-          <label style="display:block;font-size:11px;color:#7a8aaa;margin-bottom:5px;">Expiry Date</label>
-          <input class="input" type="date" id="inv-expiry-date" style="margin-bottom:0;" />
+      <div style="background:#0a1628;border:1px solid #1a3a5a;border-radius:10px;padding:14px;margin-bottom:18px;" ${prefillItem ? 'style="display:none;"' : ''}>
+        <div style="font-size:12px;font-weight:800;color:#4f4;margin-bottom:4px;">📦 Opening Stock <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — skip if adding stock via Creditor tab)</span></div>
+        <div style="font-size:11px;color:#4a6a4a;margin-bottom:10px;">Enter qty if you already have this item in stock. Gets added directly to inventory.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">QTY</label>
+            <input class="input" type="number" id="inv-opening-qty" min="0" step="any" placeholder="0" style="margin-bottom:0;color:#4f4;font-weight:700;" />
+          </div>
+          <div>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">COST / UNIT (₹)</label>
+            <input class="input" type="number" id="inv-opening-cost" min="0" step="any" placeholder="0.00" style="margin-bottom:0;" />
+          </div>
         </div>
       </div>
 
-      <div style="margin-bottom:12px;">
-        <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Date</label>
-        <input class="input" type="date" id="inv-date" value="${new Date().toISOString().slice(0,10)}" />
-      </div>
-      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Notes (optional)</label>
-      <input class="input" id="inv-notes" placeholder="Supplier, batch info..." style="margin-bottom:12px;" />
-      <!-- Creditor linkage -->
-      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:18px;">
-        <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:8px;">🏷️ Purchased From (Creditor) <span style="font-size:10px;color:#4a5a7a;font-weight:400;">— links stock to creditor account</span></div>
-        <select class="input" id="inv-creditor-id" style="margin-bottom:0;">
-          <option value="">⚠️ Skip — add to Unreconciled</option>
-          ${getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").map(c=>`<option value="${c.id}">${c._fromShopConnect?'🔗 ':' '}${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
-        </select>
-        <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">If skipped, a purchase entry will be added under <b style="color:#f59e0b;">Unreconciled Purchases</b> in the Creditors tab.</div>
-      </div>
-      <button class="btn" onclick="invSubmitAdd()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">Add to Inventory →</button>
+      <button class="btn" onclick="invSubmitAdd()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">💾 Save Item →</button>
     </div>`;
-  }
-  else if(invView==="restock"){
-    // ── Restock view: search existing items, see stock, fill qty/cost ──
-    if(!inventoryItems.length){
-      body = `<div class="card" style="padding:32px;text-align:center;">
-        <div style="font-size:40px;margin-bottom:12px;">📦</div>
-        <div style="font-size:15px;font-weight:700;color:#e8eaf0;margin-bottom:8px;">No items to restock</div>
-        <div style="font-size:13px;color:#7a8aaa;margin-bottom:20px;">Add your first product using the ➕ Add New tab</div>
-      </div>`;
-    } else if(!invRestockSelected){
-      // Step 1: Search & select item
-      const q2 = (invRestockSearch||"").trim().toLowerCase();
-      const matches = q2
-        ? inventoryItems.filter(x=>x.name.toLowerCase().includes(q2)||(x.category||"").toLowerCase().includes(q2))
-        : inventoryItems;
-      const itemRows = matches.map(item=>{
-        const stk = invGetStock(item.name);
-        const stColor = stk<=0?"#e03030":stk<=3?"#cc8800":"#1a8a3a";
-        const stLabel = stk<=0?"Out of stock":stk<=3?"Low stock":"In stock";
-        return `<div onclick="invRestockSelected='${item.name.replace(/'/g,"\\'").replace(/"/g,"&quot;")}';invRestockSearch='';safeRenderTab(currentTab)"
-          style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid #0f1628;cursor:pointer;transition:background 0.15s;"
-          onmouseover="this.style.background='#0a1628'" onmouseout="this.style.background='transparent'">
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:700;color:#e8eaf0;font-size:14px;">${item.name}</div>
-            <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${item.category||"General"}${item.unit?" · "+item.unit:""}</div>
-          </div>
-          <div style="text-align:right;flex-shrink:0;">
-            <div style="font-weight:800;font-size:14px;color:${stColor};">${stk} ${item.unit||"unit"}</div>
-            <div style="font-size:10px;color:${stColor};margin-top:1px;">${stLabel}</div>
-          </div>
-          <span style="color:#4a8aff;font-size:20px;font-weight:300;flex-shrink:0;">›</span>
-        </div>`;
-      }).join("");
-
-      body = `<div class="card" style="padding:0;overflow:hidden;">
-        <div style="padding:14px 16px;border-bottom:1px solid #1e2a45;">
-          <div style="font-size:13px;font-weight:800;color:#4a8aff;margin-bottom:10px;">🔄 Select item to restock</div>
-          <div style="position:relative;">
-            <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;">🔍</span>
-            <input class="input" id="inv-restock-search" placeholder="Search items..."
-              value="${(invRestockSearch||'').replace(/"/g,'&quot;')}"
-              oninput="invRestockSearch=this.value;if(window._invRSTimer)clearTimeout(window._invRSTimer);window._invRSTimer=setTimeout(()=>safeRenderTab(currentTab),180);"
-              style="padding-left:34px;margin-bottom:0;" />
-            ${invRestockSearch?`<button onclick="invRestockSearch='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:20px;cursor:pointer;line-height:1;">×</button>`:""}
-          </div>
-        </div>
-        ${matches.length===0
-          ? `<div style="padding:32px;text-align:center;color:#4a5a7a;font-size:13px;">No items match "<b style="color:#e8eaf0;">${invRestockSearch}</b>"</div>`
-          : itemRows
-        }
-      </div>`;
-    } else {
-      // Step 2: Restock form for selected item
-      const selItem = inventoryItems.find(x=>x.name===invRestockSelected);
-      const curStock = selItem ? invGetStock(selItem.name) : 0;
-      const stColor = curStock<=0?"#e03030":curStock<=3?"#cc8800":"#1a8a3a";
-      const lastCosts = selItem ? (selItem.stock||[]).filter(e=>Number(e.costPerUnit||0)>0) : [];
-      const lastCost = lastCosts.length ? Number(lastCosts[lastCosts.length-1].costPerUnit).toFixed(2) : "";
-      const lastSell = selItem&&selItem.sellingPrice>0 ? Number(selItem.sellingPrice).toFixed(2) : "";
-
-      body = `<div class="card" style="padding:22px;">
-        <button onclick="invRestockSelected=null;safeRenderTab(currentTab)" style="background:#1a2540;border:none;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;margin-bottom:16px;">← Back to items</button>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding:14px;background:#0a1628;border-radius:12px;border:1px solid #1e3a5a;">
-          <div>
-            <div style="font-size:15px;font-weight:800;color:#e8eaf0;">${invRestockSelected}</div>
-            <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${selItem?selItem.category||"General":""}${selItem&&selItem.unit?" · "+selItem.unit:""}</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-size:16px;font-weight:800;color:${stColor};">${curStock} ${selItem?selItem.unit||"unit":""}</div>
-            <div style="font-size:10px;color:${stColor};margin-top:1px;">Current stock</div>
-          </div>
-        </div>
-        <div style="font-size:14px;font-weight:800;color:#4a8aff;margin-bottom:14px;">🔄 Add Stock for this item</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Quantity to Add *</label>
-            <input class="input" type="number" id="inv-qty" min="0.01" step="0.01" placeholder="0" style="text-align:center;font-size:18px;font-weight:700;" />
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Unit</label>
-            <input class="input" id="inv-unit" list="inv-units" placeholder="kg / pcs / litre..." value="${selItem?selItem.unit||"":""}"/>
-            <datalist id="inv-units"><option value="kg"><option value="pcs"><option value="litre"><option value="box"><option value="dozen"><option value="packet"><option value="bottle"><option value="bag"></datalist>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-          <div>
-            <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Cost per Unit (₹)</label>
-            <input class="input" type="number" id="inv-cost" min="0" step="0.01" placeholder="0.00" value="${lastCost}" />
-          </div>
-          <div>
-            <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Final Selling Price (₹) <span style="color:#4f4;font-size:10px;">★ auto-fill</span><br><span style="font-size:10px;color:#4a5a7a;font-weight:400;">Enter the price you charge the customer</span></label>
-            <input class="input" type="number" id="inv-sell-price" min="0" step="0.01" placeholder="0.00" value="${lastSell}" style="color:#FFD700;" />
-          </div>
-        </div>
-        <div style="margin-bottom:12px;">
-          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Min Stock Warning <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — defaults to 5)</span></label>
-          <input class="input" type="number" id="inv-min-stock" min="0" step="1" placeholder="Default: 5" value="${selItem&&selItem.minStock>0?selItem.minStock:''}" style="text-align:center;" />
-        </div>
-        <!-- GST Section -->
-        <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;">
-          <div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:10px;">🔢 GST on this item <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — updates existing setting)</span></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
-            <div>
-              <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST RATE (%)</label>
-              <select class="input" id="inv-gst-rate" style="margin-bottom:0;" onchange="invUpdateGstPreview('restock')">
-                <option value="0" ${!selItem||selItem.gstRate===0||selItem.gstRate===undefined?'selected':''}>0% — No GST</option>
-                <option value="5" ${selItem&&selItem.gstRate===5?'selected':''}>5%</option>
-                <option value="12" ${selItem&&selItem.gstRate===12?'selected':''}>12%</option>
-                <option value="18" ${selItem&&selItem.gstRate===18?'selected':''}>18%</option>
-                <option value="28" ${selItem&&selItem.gstRate===28?'selected':''}>28%</option>
-              </select>
-            </div>
-            <div>
-              <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">PRICE IS</label>
-              <select class="input" id="inv-gst-included" style="margin-bottom:0;" onchange="invUpdateGstPreview('restock')">
-                <option value="exclusive" ${selItem&&selItem.gstIncluded==='exclusive'?'selected':''}>Exclusive (+ GST on sale)</option>
-                <option value="inclusive" ${!selItem||selItem.gstIncluded!=='exclusive'?'selected':''}>Inclusive (GST inside price)</option>
-              </select>
-            </div>
-          </div>
-          <div id="inv-gst-preview-restock" style="font-size:12px;color:#a78bfa;background:#0d0820;border-radius:8px;padding:8px 10px;display:none;"></div>
-          <!-- HSN Field Restock -->
-          <div style="margin-top:10px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-              <label style="font-size:11px;color:#7a8aaa;font-weight:700;">HSN / SAC CODE <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — auto-fills rate)</span></label>
-              <button type="button" onclick="buildCheatSheet('restock')" style="font-size:10px;background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;border-radius:6px;padding:2px 8px;cursor:pointer;">🔍 What's my rate?</button>
-            </div>
-            <input class="input" type="text" id="inv-hsn-restock" placeholder="e.g. 3305 (Shampoo), 0401 (Milk)" maxlength="8" oninput="hsnOnInput('restock')" value="${selItem&&selItem.hsnCode?selItem.hsnCode:''}" style="margin-bottom:4px;" />
-            <div id="inv-hsn-msg-restock" style="font-size:11px;min-height:14px;"></div>
-            <div id="inv-cheat-restock" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-top:6px;"></div>
-          </div>
-        </div>
-
-        <!-- Expiry Section -->
-        <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#ff8c42;cursor:pointer;">
-            <input type="checkbox" id="inv-has-expiry" ${(()=>{const lastExp=(selItem&&(selItem.stock||[]).filter(e=>e.expiryDate).slice(-1)[0]);return lastExp?'checked':'';})()} onchange="document.getElementById('inv-expiry-wrap').style.display=this.checked?'block':'none'" style="width:16px;height:16px;accent-color:#ff8c42;" />
-            ⏳ This batch has an Expiry Date
-          </label>
-          <div id="inv-expiry-wrap" style="display:${(()=>{const lastExp=(selItem&&(selItem.stock||[]).filter(e=>e.expiryDate).slice(-1)[0]);return lastExp?'block':'none';})()};margin-top:10px;">
-            <label style="display:block;font-size:11px;color:#7a8aaa;margin-bottom:5px;">Expiry Date</label>
-            <input class="input" type="date" id="inv-expiry-date" value="${(()=>{const lastExp=(selItem&&(selItem.stock||[]).filter(e=>e.expiryDate).slice(-1)[0]);return lastExp?lastExp.expiryDate:'';})()}" style="margin-bottom:0;" />
-          </div>
-        </div>
-
-        <div style="margin-bottom:12px;">
-          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Date</label>
-          <input class="input" type="date" id="inv-date" value="${new Date().toISOString().slice(0,10)}" />
-        </div>
-        <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Notes (optional)</label>
-        <input class="input" id="inv-notes" placeholder="Supplier, batch info..." style="margin-bottom:12px;" />
-        <!-- Creditor linkage -->
-        <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:18px;">
-          <div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:8px;">🏷️ Purchased From (Creditor) <span style="font-size:10px;color:#4a5a7a;font-weight:400;">— links stock to creditor account</span></div>
-          <select class="input" id="inv-creditor-id" style="margin-bottom:0;">
-            <option value="">⚠️ Skip — add to Unreconciled</option>
-            ${getCreditors().filter(c=>c.id!=="CR_UNRECONCILED").map(c=>`<option value="${c.id}">${c._fromShopConnect?'🔗 ':' '}${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('')}
-          </select>
-          <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">If skipped, a purchase entry will be added under <b style="color:#f59e0b;">Unreconciled Purchases</b> in the Creditors tab.</div>
-        </div>
-        <button class="btn" onclick="invSubmitRestock()" style="background:linear-gradient(135deg,#4a8aff,#2255cc);color:#fff;width:100%;padding:14px;font-size:15px;font-weight:800;">🔄 Restock Item →</button>
-      </div>`;
-    }
   }
   else if(invView==="log"){
     const allSales = [];
@@ -14137,90 +13968,54 @@ function renderInventoryTab(){
 
 function invSubmitAdd(){
   if(requireOnline()) return;
+  const name = (document.getElementById("inv-name").value||"").trim();
+  if(!name){ notify("❌ Item name required","error"); document.getElementById("inv-name").focus(); return; }
+  const category = ((document.getElementById("inv-category").value||"").trim()||"General").replace(/\b\w/g,c=>c.toUpperCase());
+  const unit = (document.getElementById("inv-unit").value||"").trim();
+  const sellPrice = parseFloat(document.getElementById("inv-sell-price").value||"0")||0;
+  const minStock = (document.getElementById("inv-min-stock").value||"").trim();
+  const gstRate = parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
+  const gstIncluded = document.getElementById("inv-gst-included")?.value||"inclusive";
+  const hsnCode = (document.getElementById("inv-hsn-add")?.value||"").trim();
   if(!hasPermission('inventory_add')) return notify("🚫 No permission to add inventory items","error");
-  const category=((document.getElementById("inv-category").value||"").trim()||"General").replace(/\b\w/g,c=>c.toUpperCase());
-  const qty=parseFloat(document.getElementById("inv-qty").value||"0");
-  const unit=(document.getElementById("inv-unit").value||"").trim();
-  const cost=parseFloat(document.getElementById("inv-cost").value||"0");
-  const sellPrice=parseFloat(document.getElementById("inv-sell-price").value||"0");
-  const date=document.getElementById("inv-date").value||new Date().toISOString().slice(0,10);
-  const notes=(document.getElementById("inv-notes").value||"").trim();
-  const gstRate=parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
-  const gstIncluded=document.getElementById("inv-gst-included")?.value||"inclusive";
-  const hsnCode=(document.getElementById("inv-hsn-add")?.value||"").trim();
-  const hasExpiry=document.getElementById("inv-has-expiry")?.checked;
-  const expiryDate=hasExpiry?(document.getElementById("inv-expiry-date")?.value||""):"";
-  const minStock=(document.getElementById("inv-min-stock")?.value||"").trim();
-  if(!name){notify("❌ Item name required","error");document.getElementById("inv-name").focus();return;}
-  // Duplicate item name check (case-insensitive)
-  const _dupItem = inventoryItems.find(x=>x.name.trim().toLowerCase()===name.toLowerCase());
-  if(_dupItem){
-    notify("⚠️ Item \"" + name + "\" already exists — use 🔄 Restock to add stock");
-    document.getElementById("inv-name").focus();
-    return;
+
+  // Find existing item or create new
+  let item = inventoryItems.find(x=>x.name.trim().toLowerCase()===name.toLowerCase());
+  if(item){
+    // Update existing item definition
+    if(unit) item.unit = unit;
+    if(category) item.category = category;
+    if(sellPrice > 0) item.sellingPrice = sellPrice;
+    if(gstRate !== undefined) item.gstRate = gstRate;
+    if(gstIncluded) item.gstIncluded = gstIncluded;
+    if(hsnCode) item.hsnCode = hsnCode;
+    if(minStock !== "") item.minStock = Number(minStock)||0;
+    notify("✅ Item updated: " + name);
+  } else {
+    // Create new item with zero stock
+    item = { id:autoId(), name, unit:unit||"unit", category, stock:[], salesLog:[], sellingPrice:sellPrice };
+    if(gstRate > 0) item.gstRate = gstRate;
+    if(gstIncluded) item.gstIncluded = gstIncluded;
+    if(hsnCode) item.hsnCode = hsnCode;
+    if(minStock !== "") item.minStock = Number(minStock)||0;
+    inventoryItems.push(item);
+    notify("✅ Item added: " + name + " — use Creditor tab to add stock");
   }
-  if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
-  const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
-  invAddStock(name, unit, qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded, hsnCode, expiryDate, minStock);
-  _invLogCreditorPurchase(creditorId, name, qty, cost, date, notes);
-
-  // If linked shop creditor, offer sync
-  if(creditorId && cost > 0){
-    const creditors = getCreditors();
-    const cr = creditors.find(c=>c.id===creditorId);
-    if(cr && cr._fromShopConnect && cr.phone && db && authPhone){
-      const totalAmt = Math.round(qty * cost * 100) / 100;
-      const txNote = notes ? `${name} ×${qty} — ${notes}` : `${name} ×${qty} (new inventory)`;
-      const latestTx = (cr.transactions||[]).slice(-1)[0];
-      const txId = latestTx?.id || ("TX"+Date.now());
-      setTimeout(()=>openPurchaseSyncModal(creditorId, txId, totalAmt, txNote, date, ""), 400);
-      return;
-    }
+  // ── Opening stock: add qty directly to inventory if provided ──
+  const openingQty  = parseFloat(document.getElementById("inv-opening-qty")?.value||"0")||0;
+  const openingCost = parseFloat(document.getElementById("inv-opening-cost")?.value||"0")||0;
+  if(openingQty > 0){
+    const today = new Date().toISOString().slice(0,10);
+    if(!item.stock) item.stock = [];
+    item.stock.push({ qty: openingQty, costPerUnit: openingCost, date: today, notes: "Opening Stock", expiryDate: "" });
+    saveInventory();
+    notify("✅ " + name + " saved with " + openingQty + " " + (unit||"unit") + " opening stock");
+  } else {
+    saveInventory();
   }
-}
-
-function invSubmitRestock(){
-  if(requireOnline()) return;
-  if(!hasPermission('inventory_restock')) return notify("🚫 No permission to restock inventory","error");
-  if(!invRestockSelected){notify("❌ No item selected","error");return;}
-  const qty=parseFloat(document.getElementById("inv-qty").value||"0");
-  const unit=(document.getElementById("inv-unit").value||"").trim();
-  const cost=parseFloat(document.getElementById("inv-cost").value||"0");
-  const sellPrice=parseFloat(document.getElementById("inv-sell-price").value||"0");
-  const date=document.getElementById("inv-date").value||new Date().toISOString().slice(0,10);
-  const notes=(document.getElementById("inv-notes").value||"").trim();
-  const gstRate=parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
-  const gstIncluded=document.getElementById("inv-gst-included")?.value||"inclusive";
-  const hsnCode=(document.getElementById("inv-hsn-restock")?.value||"").trim();
-  const hasExpiry=document.getElementById("inv-has-expiry")?.checked;
-  const expiryDate=hasExpiry?(document.getElementById("inv-expiry-date")?.value||""):"";
-  const minStock=(document.getElementById("inv-min-stock")?.value||"").trim();
-  if(!qty||qty<=0){notify("❌ Quantity must be greater than 0","error");document.getElementById("inv-qty").focus();return;}
-  const selItem = inventoryItems.find(x=>x.name===invRestockSelected);
-  const category = selItem ? (selItem.category||"General") : "General";
-  const creditorId=(document.getElementById("inv-creditor-id")?.value||"").trim();
-  invAddStock(invRestockSelected, unit||(selItem?selItem.unit||"":""), qty, cost, date, notes, category, sellPrice, gstRate, gstIncluded, hsnCode, expiryDate, minStock);
-  _invLogCreditorPurchase(creditorId, invRestockSelected, qty, cost, date, notes);
-
-  // If creditor is a linked shop, offer payment sync request
-  if(creditorId && cost > 0){
-    const creditors = getCreditors();
-    const cr = creditors.find(c=>c.id===creditorId);
-    if(cr && cr._fromShopConnect && cr.phone && db && authPhone){
-      const totalAmt = Math.round(qty * cost * 100) / 100;
-      const txNote = notes ? `${invRestockSelected} ×${qty} — ${notes}` : `${invRestockSelected} ×${qty} (inventory purchase)`;
-      // Find the tx we just added to get its id
-      const latestTx = (cr.transactions||[]).slice(-1)[0];
-      const txId = latestTx?.id || ("TX"+Date.now());
-      setTimeout(()=>openPurchaseSyncModal(creditorId, txId, totalAmt, txNote, date, ""), 400);
-      invRestockSelected = null;
-      invRestockSearch = "";
-      return;
-    }
-  }
-
-  invRestockSelected = null;
-  invRestockSearch = "";
+  invPrefillName = "";
+  invView = "stock";
+  safeRenderTab(currentTab);
 }
 
 // ─── INV → CREDITOR PURCHASE LOGGER ──────────────────────────────────────────
@@ -15090,31 +14885,69 @@ function printTxBill(tx, partyName, etype) {
   const lbl = {purchase:"Purchase Bill",payment:"Payment Receipt",return:(isCreditor?"Return / Dr Note":"Returned / Cr Note"),sale:"Sales Bill",receipt:"Payment Receipt"}[tx.type] || "Voucher";
   const items = Array.isArray(tx.items) ? tx.items : (tx._invItem ? [{name:tx._invItem, qty:tx._invQty||1, rate:(tx._invQty?tx.amount/tx._invQty:tx.amount), amount:tx.amount, unit:""}] : []);
 
+  // Enrich each item with GST/HSN from live inventory data as fallback.
+  // This fixes bills where gstRate was saved as 0 but the inventory item has GST set.
+  const enrichedItems = items.map(it => {
+    const invItem = (typeof inventoryItems !== 'undefined') ? inventoryItems.find(x => x.name === it.name) : null;
+    const gstRate = (it.gstRate != null && Number(it.gstRate) > 0) ? Number(it.gstRate) : (invItem?.gstRate || 0);
+    const hsn = (it.hsn && it.hsn.trim()) ? it.hsn.trim() : (invItem?.hsnCode || "");
+    const unit = it.unit || invItem?.unit || "";
+    return { ...it, gstRate, hsn, unit };
+  });
+
+  const hasGSTItems = enrichedItems.some(it => Number(it.gstRate) > 0);
+  const hasHSN = enrichedItems.some(it => it.hsn && it.hsn.trim());
   let itemRows = "";
   if (items.length > 0) {
-    itemRows = items.map((it,i)=>`<tr>
-      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${i+1}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${escHtml(it.name||"-")}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;">${it.qty||0}${it.unit?" "+escHtml(it.unit):""}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;">₹${Number(it.rate||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
-      <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">₹${Number(it.amount||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
-    </tr>`).join("");
+    itemRows = enrichedItems.map((it,i) => {
+      const gst = Number(it.gstRate||0);
+      const taxableAmt = gst > 0 ? Number(it.amount||0) / (1 + gst/100) : Number(it.amount||0);
+      const taxAmt = Number(it.amount||0) - taxableAmt;
+      return `<tr>
+        <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${i+1}</td>
+        ${hasHSN ? `<td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">${escHtml(it.hsn||"")||"&mdash;"}</td>` : ""}
+        <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${escHtml(it.name||"-")}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;">${it.qty||0}${it.unit?" "+escHtml(it.unit):""}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;">₹${Number(it.rate||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
+        ${hasGSTItems ? `<td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:12px;">${gst > 0 ? gst+"%" : "&mdash;"}</td>
+        <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:12px;color:#555;">${gst > 0 ? "₹"+taxAmt.toLocaleString("en-IN",{maximumFractionDigits:2}) : "&mdash;"}</td>` : ""}
+        <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">₹${Number(it.amount||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
+      </tr>`;
+    }).join("");
   }
 
+  const colSpanTotal = 3 + (hasHSN?1:0) + (hasGSTItems?2:0);
   const itemsTable = items.length > 0 ? `
   <table style="width:100%;border-collapse:collapse;margin-top:20px;">
     <thead><tr>
       <th style="background:#f3f4f6;padding:9px 10px;text-align:left;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;width:36px;">#</th>
+      ${hasHSN ? `<th style="background:#f3f4f6;padding:9px 10px;text-align:left;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">HSN/SAC</th>` : ""}
       <th style="background:#f3f4f6;padding:9px 10px;text-align:left;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Item</th>
       <th style="background:#f3f4f6;padding:9px 10px;text-align:right;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Qty</th>
       <th style="background:#f3f4f6;padding:9px 10px;text-align:right;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Rate</th>
+      ${hasGSTItems ? `<th style="background:#f3f4f6;padding:9px 10px;text-align:center;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">GST%</th>
+      <th style="background:#f3f4f6;padding:9px 10px;text-align:right;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Tax Amt</th>` : ""}
       <th style="background:#f3f4f6;padding:9px 10px;text-align:right;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Amount</th>
     </tr></thead>
     <tbody>${itemRows}</tbody>
-    <tfoot><tr style="background:#f9fafb;">
-      <td colspan="4" style="padding:10px;font-weight:800;text-align:right;">Total:</td>
-      <td style="padding:10px;font-weight:800;text-align:right;">₹${Number(tx.amount||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
-    </tr></tfoot>
+    <tfoot>
+      ${hasGSTItems ? (() => {
+        const subtotal = enrichedItems.reduce((s,it)=>{ const g=Number(it.gstRate||0); return s+(g>0?Number(it.amount||0)/(1+g/100):Number(it.amount||0)); },0);
+        const totaltax = Number(tx.amount||0) - subtotal;
+        return `<tr style="background:#f9fafb;">
+          <td colspan="${colSpanTotal-2}" style="padding:8px 10px;text-align:right;font-size:12px;color:#555;">Taxable Amount:</td>
+          <td colspan="2" style="padding:8px 10px;text-align:right;font-size:12px;color:#555;">₹${subtotal.toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
+        </tr>
+        <tr style="background:#f9fafb;">
+          <td colspan="${colSpanTotal-2}" style="padding:8px 10px;text-align:right;font-size:12px;color:#555;">Total GST:</td>
+          <td colspan="2" style="padding:8px 10px;text-align:right;font-size:12px;color:#555;">₹${totaltax.toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
+        </tr>`;
+      })() : ""}
+      <tr style="background:#f0f4ff;">
+        <td colspan="${colSpanTotal}" style="padding:10px;font-weight:800;text-align:right;">Total:</td>
+        <td style="padding:10px;font-weight:800;text-align:right;">₹${Number(tx.amount||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
+      </tr>
+    </tfoot>
   </table>` : `
   <div style="margin-top:24px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:18px;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -16265,7 +16098,7 @@ function renderInventoryCategoryPage(catName){
               <div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px;flex-wrap:wrap;gap:6px;">
                 <div style="font-size:11px;color:#4a5a7a;">Restocked: ${lastAdded} · <span style="color:#4a8aff;">Tap for buyers →</span></div>
                 <div style="display:flex;gap:5px;" onclick="event.stopPropagation()">
-                  <button onclick="invRestockSelected='${item.name.replace(/'/g,"\\'").replace(/"/g,"&quot;")}';invRestockSearch='';invView='restock';safeRenderTab(currentTab)" style="background:#1a2a4a;border:none;border-radius:7px;color:#7ab3ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">➕ Restock</button>
+                  
                   <button onclick="invEditSellPrice('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a08;border:none;border-radius:7px;color:#FFD700;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">₹ Sell Price</button>
                   <button onclick="invEditCategory('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a0a2a;border:none;border-radius:7px;color:#b080ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🏷 Cat</button>
                   <button onclick="invEditUnit('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a3a;border:none;border-radius:7px;color:#aaa;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">✏️ Unit</button>
