@@ -2121,8 +2121,10 @@ window.addEventListener("load", () => {
   // If a team member was active last time and didn't log out properly,
   // never auto-login as the owner — force the login screen so the
   // member must re-authenticate (or the owner can choose Owner Login).
-  if (localStorage.getItem("sc_member_active") === "1") {
-    localStorage.removeItem("sc_member_active");
+  // Use _memberWasActiveOnLoad (read at script parse time) to avoid a race where
+  // DOMContentLoaded already cleared sc_member_active from localStorage before we get here.
+  localStorage.removeItem("sc_member_active"); // always clean up regardless
+  if (_memberWasActiveOnLoad) {
     authShowStep("phone");
   } else if (savedPhone && localStorage.getItem("sc_user_" + savedPhone)) {
     authPhone = savedPhone;
@@ -2765,6 +2767,10 @@ function isTabVisible(tabKey) {
   return !!tabs[tabKey];
 }
 let _loginSuccessFired = false; // guard: prevent double auto-login from DOMContentLoaded + window.load
+// Read sc_member_active NOW (before any event listener clears it from localStorage).
+// This prevents a race condition where DOMContentLoaded removes the flag before
+// window.load checks it, causing the admin to be auto-logged in after a member session.
+const _memberWasActiveOnLoad = localStorage.getItem("sc_member_active") === "1";
 // ─── PER-ACCOUNT STORAGE KEY ─────────────────────────────────
 // All localStorage keys are prefixed with the logged-in phone number
 // so two accounts on the same browser never share data.
@@ -12133,50 +12139,11 @@ document.addEventListener("click", e => {
 // Initialize on DOM load
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("lang-label").textContent = currentLang.toUpperCase();
-
-  // If a team member was active last time and didn't log out properly,
-  // never auto-login as the owner — force the login screen so the
-  // member must re-authenticate (or the owner can choose Owner Login).
-  if (localStorage.getItem("sc_member_active") === "1") {
-    localStorage.removeItem("sc_member_active");
-    authShowStep("phone");
-    return;
-  }
-
-  // Check if already logged in — always verify block status online first
-  const savedPhone = localStorage.getItem("sc_auth_phone");
-  if (savedPhone) {
-    const hashed = localStorage.getItem("sc_user_" + savedPhone);
-    if (hashed) {
-      authPhone = savedPhone;
-      (async () => {
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 6000);
-          const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(savedPhone)}&select=blocked`, {
-            headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON },
-            signal: controller.signal
-          });
-          clearTimeout(timer);
-          if (res.ok) {
-            const rows = await res.json();
-            if (rows && rows.length > 0 && rows[0].blocked === true) {
-              localStorage.removeItem("sc_auth_phone");
-              document.getElementById("auth-phone").value = savedPhone;
-              const errEl = document.getElementById("auth-phone-err");
-              if (errEl) { errEl.innerHTML = "🚫 Your account has been blocked. Contact the shop owner."; errEl.style.display = "block"; }
-              authShowStep("phone");
-              return;
-            }
-          }
-        } catch(e) { /* network error or timeout — allow cached login */ }
-        await _tryRestoreMemberSession(savedPhone);
-        onLoginSuccess(savedPhone);
-      })();
-      return;
-    }
-  }
-  // Not logged in — show login screen (already visible by default)
+  // Auto-login is handled entirely by the window.load listener above.
+  // Do NOT duplicate auto-login logic here — it causes a race condition
+  // where this DOMContentLoaded clears sc_member_active from localStorage
+  // before window.load can read it, causing the admin to auto-login even
+  // when a member session was last active.
 });
 
 
