@@ -12134,6 +12134,15 @@ document.addEventListener("click", e => {
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("lang-label").textContent = currentLang.toUpperCase();
 
+  // If a team member was active last time and didn't log out properly,
+  // never auto-login as the owner — force the login screen so the
+  // member must re-authenticate (or the owner can choose Owner Login).
+  if (localStorage.getItem("sc_member_active") === "1") {
+    localStorage.removeItem("sc_member_active");
+    authShowStep("phone");
+    return;
+  }
+
   // Check if already logged in — always verify block status online first
   const savedPhone = localStorage.getItem("sc_auth_phone");
   if (savedPhone) {
