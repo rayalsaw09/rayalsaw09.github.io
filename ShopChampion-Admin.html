@@ -13276,7 +13276,8 @@ function invDeductSold(soldItems, custId){
 // Add stock entry
 function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice, gstRate, gstIncluded, hsnCode, expiryDate, minStock){
   if(requireOnline()) return;
-  const isNew = !inventoryItems.find(x=>x.name===name);
+  let item = inventoryItems.find(x=>x.name===name);
+  const isNew = !item;
   if(isNew && !hasPermission('inventory_add')) return notify("🚫 No permission to add inventory items","error");
   if(!isNew && !hasPermission('inventory_restock')) return notify("🚫 No permission to restock inventory","error");
   if(!item){
