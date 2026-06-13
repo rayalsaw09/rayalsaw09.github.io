@@ -6739,6 +6739,12 @@ function credTxColor(type){
   return "#7a8aaa";
 }
 
+function _credWAContact(cr){
+  const shop = appSettings.shopName || "our shop";
+  const msg = `Hi ${cr.name.split(" ")[0]}, this is ${shop}. We'd like to get in touch regarding our account.`;
+  return `https://wa.me/91${cr.phone}?text=${encodeURIComponent(msg)}`;
+}
+
 function newCreditorId(){ return "CR" + Date.now() + Math.random().toString(36).slice(2,6).toUpperCase(); }
 
 // ── Main Render ───────────────────────────────────────────────────────────────
@@ -6884,6 +6890,7 @@ function _renderCreditorCard(cr){
           ${cr.gstin?` · 🔢 ${cr.gstin}`:""}
         </div>
         ${lastTx?`<div style="font-size:11px;color:#4a5a7a;margin-top:3px;">Last: ${credTxIcon(lastTx.type)} ${escHtml(lastTx.note||lastTx.type)} · ${new Date(lastTx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>`:""}
+        ${(!isArchived&&!isUnrec&&cr.phone)?`<div style="margin-top:6px;"><a href="${_credWAContact(cr)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:#4ade80;background:#052a14;border:1px solid #16a34a;border-radius:8px;padding:4px 10px;text-decoration:none;">💬 WhatsApp</a></div>`:""}
         ${cr._fromShopConnect?`<div style="margin-top:4px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#1e3a6e44;color:#60a5fa;border:1px solid #2a5aaa44;">🔗 Linked Shop</span></div>`:""
         }
       </div>
@@ -7052,6 +7059,15 @@ function unarchiveDebtor(id){
   renderTab(7);
 }
 
+function _doSimpleDeleteCreditor(id){
+  const creditors = getCreditors();
+  const cr = creditors.find(c=>c.id===id);
+  saveCreditors(creditors.filter(c=>c.id!==id));
+  closeModal();
+  notify("🗑 " + (cr?cr.name:"Supplier") + " deleted");
+  renderTab(6);
+}
+
 // ── Smart delete: analyse impact, show appropriate modal ──────────────────────
 function deleteCreditor(id){
   const creditors = getCreditors();
@@ -7060,18 +7076,14 @@ function deleteCreditor(id){
 
   // Skip smart flow for unreconciled entry — just archive it
   if(id === "CR_UNRECONCILED"){
-    if(!confirm("Archive unreconciled purchases?")) return;
-    archiveCreditor(id); return;
+    showConfirmModal("Archive Unreconciled", "Archive all unreconciled purchases? You can restore them later.", `archiveCreditor('${id}')`, "Archive", false);
+    return;
   }
 
   const txs = cr.transactions || [];
   if(txs.length === 0){
     // No transactions — safe simple delete
-    if(!confirm("Delete " + cr.name + "? This cannot be undone.")) return;
-    saveCreditors(creditors.filter(c=>c.id!==id));
-    closeModal();
-    notify("🗑 " + cr.name + " deleted");
-    renderTab(6);
+    showConfirmModal("Delete Supplier", `Delete <b>${escHtml(cr.name)}</b>? This cannot be undone.`, `_doSimpleDeleteCreditor('${id}')`, "Delete", true);
     return;
   }
 
@@ -7328,6 +7340,7 @@ function openCreditorDetail(id){
           <button onclick="openAddTxModal('${id}','purchase')" class="btn" style="background:#1a0e00;border:1px solid #f59e0b;color:#f59e0b;font-size:12px;padding:8px 12px;">📦 Purchase</button>
           <button onclick="openAddTxModal('${id}','payment')"  class="btn" style="background:#001a0e;border:1px solid #22c55e;color:#22c55e;font-size:12px;padding:8px 12px;">💰 Payment</button>
           <button onclick="openAddTxModal('${id}','return')"   class="btn" style="background:#0d0020;border:1px solid #a78bfa;color:#a78bfa;font-size:12px;padding:8px 12px;">↩️ Return / Dr Note</button>
+          ${cr.phone?`<a href="${_credWAContact(cr)}" target="_blank" class="btn" style="background:#052a14;border:1px solid #16a34a;color:#4ade80;font-size:12px;padding:8px 12px;text-decoration:none;">💬 WhatsApp</a>`:""}
         </div>` : `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
           <div style="font-size:11px;color:#d97706;font-weight:700;">⚠️ Unassigned entries</div>
           <button onclick="openMoveUnrecModal()" class="btn" style="background:#92400e;border:1px solid #d97706;color:#fbbf24;font-size:12px;font-weight:800;padding:7px 14px;border-radius:8px;">🔀 Move to Creditor</button>
@@ -7754,7 +7767,7 @@ function openAddTxModal(creditorId, defaultType){
 
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">AMOUNT (₹) *</label>
-        <input class="input" id="tx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
+        <input class="input" id="tx-amount" type="number" inputmode="decimal" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
       </div>
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">ITEM / DESCRIPTION</label>
@@ -8137,7 +8150,7 @@ function openReturnModal(creditorId){
 
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">RETURN AMOUNT (₹) *</label>
-        <input class="input" id="tx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
+        <input class="input" id="tx-amount" type="number" inputmode="decimal" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
       </div>
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">ITEM / REASON</label>
@@ -8701,6 +8714,13 @@ function debtBalance(dr){
   return sold - received - returned; // positive = they owe you
 }
 
+function _debtWAReminder(dr){
+  const bal = debtBalance(dr);
+  const shop = appSettings.shopName || "our shop";
+  const msg = `Hi ${dr.name.split(" ")[0]}, this is a gentle reminder that you have an outstanding balance of ${formatINR(bal)} at ${shop}. Kindly clear it at your earliest convenience. Thank you! 🙏`;
+  return `https://wa.me/91${dr.phone}?text=${encodeURIComponent(msg)}`;
+}
+
 function debtTxIcon(type){
   if(type==="sale")    return "🛒";
   if(type==="payment") return "💰";
@@ -8768,15 +8788,15 @@ function renderDebtorsTab(){
         oninput="window._debtSearch=this.value;renderTab(7)" style="font-size:13px;" />
     </div>
 
-    <!-- GST filter pills -->
-    <div style="margin-bottom:16px;">
+    <!-- GST filter pills — only show if at least one debtor has GSTIN -->
+    ${debtors.some(d=>!d._archived&&d.gstin) ? `<div style="margin-bottom:16px;">
       <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔢 GST Status:</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${[['all','🏢 All'],['gst','✅ GST Registered'],['nogst','❌ Not Registered']].map(([k,l])=>`
           <button onclick="window._debtGstFilter='${k}';renderTab(7)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${gstFilter===k?'#22c55e':'#1e2a45'};background:${gstFilter===k?'#022c1a':'transparent'};color:${gstFilter===k?'#22c55e':'#4a5a7a'};font-size:12px;font-weight:${gstFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
         `).join('')}
       </div>
-    </div>
+    </div>` : ''}
 
     <!-- Debtor list -->
     ${filtered.length===0 ? `
@@ -8840,6 +8860,8 @@ function _renderDebtorCard(dr){
         </div>
         ${lastTx?`<div style="font-size:11px;color:#4a5a7a;margin-top:3px;">Last: ${debtTxIcon(lastTx.type)} ${escHtml(lastTx.note||lastTx.type)} · ${new Date(lastTx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>`:""}
         ${dr._fromShopConnect?`<div style="margin-top:4px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#16653444;color:#4ade80;border:1px solid #22c55e44;">🔗 Linked Shop</span></div>`:""}
+        ${(!isArchived&&dr.phone&&bal>0)?`<div style="margin-top:6px;"><a href="${_debtWAReminder(dr)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:#4ade80;background:#052a14;border:1px solid #16a34a;border-radius:8px;padding:4px 10px;text-decoration:none;">💬 WhatsApp Reminder</a></div>`:""}
+      
       </div>
       <!-- Balance / Archive badge -->
       <div style="text-align:right;flex-shrink:0;">
@@ -9044,6 +9066,7 @@ function openDebtorDetail(id){
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
           <div style="font-size:13px;font-weight:800;color:#e8eaf0;">Transaction History</div>
           <div style="display:flex;gap:8px;">
+            ${dr.phone&&bal>0?`<a href="${_debtWAReminder(dr)}" target="_blank" style="cursor:pointer;background:#052a14;border:1px solid #16a34a;border-radius:8px;color:#4ade80;font-size:11px;font-weight:800;padding:6px 12px;text-decoration:none;">💬 Remind</a>`:''}
             <button onclick="printDebtorStatement('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">🖨 Print</button>
             <button onclick="openAddDebtorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>
           </div>
@@ -9343,7 +9366,7 @@ function openAddDebtTxModal(debtorId, defaultType){
 
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">AMOUNT (₹) *</label>
-        <input class="input" id="drtx-amount" type="number" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
+        <input class="input" id="drtx-amount" type="number" inputmode="decimal" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
       </div>
       <div>
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">DESCRIPTION</label>
@@ -9434,16 +9457,29 @@ function saveDebtTransaction(){
 }
 
 function deleteDebtTx(debtorId, origIdx){
-  if(!confirm("Delete this transaction?")) return;
   const debtors = getDebtors();
   const idx = debtors.findIndex(d=>d.id===debtorId);
   if(idx<0) return;
-  const removedTx = (debtors[idx].transactions||[])[origIdx];
-  debtors[idx].transactions = (debtors[idx].transactions||[]).filter((_,i)=>i!==origIdx);
-  saveDebtors(debtors);
-  if(removedTx && removedTx.id) cashRemoveByRef(removedTx.id);
-  notify("🗑 Transaction deleted");
-  setTimeout(()=>openDebtorDetail(debtorId), 200);
+  const tx = (debtors[idx].transactions||[])[origIdx];
+  if(!tx) return;
+  const cfg = {sale:{label:"Sale",col:"#4ade80"},payment:{label:"Receipt",col:"#60a5fa"},return:{label:"Returned / Cr Note",col:"#c4b5fd"}};
+  const c = cfg[tx.type]||{label:tx.type,col:"#7a8aaa"};
+  showModal(`
+    <div style="text-align:center;padding:8px 0 4px;">
+      <div style="font-size:40px;margin-bottom:8px;">🗑️</div>
+      <div style="font-size:17px;font-weight:800;color:#f44;margin-bottom:6px;">Delete Transaction?</div>
+      <div style="font-size:13px;color:#b0bcd0;margin-bottom:10px;">This cannot be undone.</div>
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:16px;text-align:left;">
+        <div style="font-size:12px;color:#7a8aaa;margin-bottom:4px;">Transaction</div>
+        <div style="font-size:14px;font-weight:800;color:${c.col};">${c.label} · ${formatINR(tx.amount)}</div>
+        <div style="font-size:12px;color:#7a8aaa;margin-top:4px;">${tx.note||""} · ${new Date(tx.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="closeModal()" class="btn" style="flex:1;background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;">Cancel</button>
+        <button onclick="(function(){closeModal();const debtors=getDebtors();const idx=debtors.findIndex(d=>d.id==='${debtorId}');if(idx<0)return;const removedTx=(debtors[idx].transactions||[])[${origIdx}];debtors[idx].transactions=(debtors[idx].transactions||[]).filter((_,i)=>i!==${origIdx});saveDebtors(debtors);if(removedTx&&removedTx.id)cashRemoveByRef(removedTx.id);notify('🗑 Transaction deleted');setTimeout(()=>openDebtorDetail('${debtorId}'),200);})()" class="btn" style="flex:1;background:#3a0808;border:1px solid #5a1a1a;color:#f66;font-weight:800;">🗑 Delete</button>
+      </div>
+    </div>
+  `);
 }
 
 function printDebtorStatement(id){
@@ -9897,7 +9933,65 @@ function renderSettings(){
       row("🧾","Billing Settings",`Auto WhatsApp: ${getBillSetting('billAutoWhatsApp')?'On':'Off'} · Auto Print: ${getBillSetting('billAutoPrint')?'On':'Off'} · Paper: ${getBillSetting('billPaperSize')||'80mm'} · GST: ${{none:'Off',cgst_sgst:'CGST+SGST',igst:'IGST'}[getBillSetting('billGSTType')||'none']}`,"openBillingSettingsModal()")
     )}
 
-    <div style="text-align:center;padding:20px 0;font-size:12px;color:#2a3a5a;">ShopChampion Pro · Your data is secure</div>
+    ${(()=>{
+      const SC_CHANGELOG = [
+        {
+          version: "v5.2",
+          date: "June 2026",
+          badge: "Latest",
+          badgeColor: "#22c55e",
+          items: [
+            "🌐 Language picker now sets app language on first registration",
+            "🏷️ Renamed 'Cust. Sales' to 'Add Sale' for clarity",
+            "🔒 Pro upgrade screen now shows ₹299/month pricing",
+            "📋 What's New section added to Settings"
+          ]
+        },
+        {
+          version: "v5.1",
+          date: "May 2026",
+          badge: "",
+          badgeColor: "",
+          items: [
+            "💬 WhatsApp-style inter-shop messaging system",
+            "🔑 Security question based password reset",
+            "🏪 Mandatory shop name field at registration",
+            "⚡ Real-time message polling"
+          ]
+        },
+        {
+          version: "v5.0",
+          date: "April 2026",
+          badge: "",
+          badgeColor: "",
+          items: [
+            "🧾 Full GST billing with CGST/SGST/IGST",
+            "🏷️ HSN codes & GSTIN auto-validator",
+            "🖨️ A4 and thermal invoice layouts",
+            "📦 Inventory category filters & search"
+          ]
+        }
+      ];
+      return `
+    <div style="margin:16px 0 0;">
+      <div style="font-size:11px;font-weight:800;color:#4a5a7a;text-transform:uppercase;letter-spacing:1.5px;padding:0 18px 10px;">📋 What's New</div>
+      ${SC_CHANGELOG.map((release, ri) => `
+        <div style="margin:0 12px ${ri < SC_CHANGELOG.length-1 ? '10' : '0'}px;background:${ri===0?'linear-gradient(135deg,#0a120a,#0d1a0d)':'var(--card-bg,#0d1220)'};border:1px solid ${ri===0?'#1a3a1a':'#1a2035'};border-radius:14px;overflow:hidden;">
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid ${ri===0?'#1a3a1a':'#1a2035'};">
+            <div style="font-size:16px;font-weight:900;color:${ri===0?'#4ade80':'#60a5fa'};font-family:'Rajdhani',sans-serif;">${release.version}</div>
+            ${release.badge ? `<span style="font-size:10px;font-weight:800;background:${release.badgeColor};color:#fff;border-radius:20px;padding:2px 8px;">${release.badge}</span>` : ''}
+            <div style="flex:1;"></div>
+            <div style="font-size:11px;color:#4a5a7a;">${release.date}</div>
+          </div>
+          <div style="padding:10px 16px 12px;">
+            ${release.items.map(item => `<div style="font-size:12px;color:${ri===0?'#86efac':'#7a8aaa'};padding:4px 0;line-height:1.5;">${item}</div>`).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+    })()}
+
+    <div style="text-align:center;padding:20px 0 8px;font-size:12px;color:#2a3a5a;">ShopChampion Pro · Your data is secure</div>
   </div>`;
 }
 
@@ -10277,6 +10371,16 @@ function closeModal(){ if(window._modalCloseHook){try{window._modalCloseHook();}
 function showModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:440px;">${html}</div></div>`;}
 function showWideModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:min(960px,95vw);max-height:95vh;">${html}</div></div>`;}
 function modalHeader(t){return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><div class="modal-title">${t}</div><button onclick="closeModal()" style="background:none;border:none;color:#7a8aaa;cursor:pointer;font-size:20px;">✕</button></div>`;}
+function showConfirmModal(title, message, onConfirmJs, confirmLabel, danger){
+  showModal(`
+    ${modalHeader(title)}
+    <div style="font-size:14px;color:#c8d0e0;line-height:1.5;margin-bottom:20px;">${message}</div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="closeModal()" class="btn" style="flex:1;background:#0a0e1a;border:1px solid #1e2a45;color:#c8d0e0;padding:12px;font-weight:700;">Cancel</button>
+      <button onclick="${onConfirmJs}" class="btn" style="flex:1;background:${danger?'#3a1a1a':'#1e3a6e'};border:1px solid ${danger?'#4a1515':'#2a5aaa'};color:${danger?'#f66':'#cfe0ff'};padding:12px;font-weight:800;">${confirmLabel||'Confirm'}</button>
+    </div>
+  `);
+}
 
 // ─── ADD / EDIT CUSTOMER ──────────────────────────────────────
 function openAddModal(){
@@ -12340,14 +12444,17 @@ function applyLicenseOverlay(i) {
   overlay.className = "license-overlay";
   overlay.style.cssText = "position:absolute;inset:0;background:rgba(10,14,26,0.92);z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:40px;backdrop-filter:blur(4px);";
   overlay.innerHTML = `
-    <div style="font-size:52px;">🔒</div>
-    <div style="font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">Pro Feature</div>
-    <div style="font-size:14px;color:#7a8aaa;max-width:320px;line-height:1.7;">This feature requires an active subscription.<br>Contact your seller to activate or renew your plan.</div>
-    <button class="btn" onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:12px 28px;font-size:14px;font-weight:800;">
-      💳 ${licenseStatus === "expired" ? "Renew Subscription →" : "Buy Subscription →"}
+    <div style="font-size:48px;margin-bottom:4px;">🔒</div>
+    <div style="font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">Pro Feature</div>
+    <div style="font-size:13px;color:#7a8aaa;max-width:300px;line-height:1.7;">Unlock this feature with a ShopChampion Pro subscription.</div>
+    <div style="background:linear-gradient(135deg,#1a1200,#2a1e00);border:1px solid #4a3800;border-radius:14px;padding:14px 24px;text-align:center;">
+      <div style="font-size:26px;font-weight:900;color:#FFD700;font-family:'Rajdhani',sans-serif;">₹299<span style="font-size:13px;font-weight:600;color:#a07830;">/month</span></div>
+      <div style="font-size:11px;color:#8a6830;margin-top:2px;">Unlimited customers · All features · Ad-free display</div>
+    </div>
+    <button class="btn" onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:12px 32px;font-size:14px;font-weight:800;border-radius:12px;width:100%;max-width:260px;">
+      💳 ${licenseStatus === "expired" ? "Renew — ₹299/month →" : "Upgrade — ₹299/month →"}
     </button>
-    <button class="btn" onclick="showRenewPrompt()" style="background:transparent;color:#4a5a7a;border:1px solid #1e2a45;padding:8px 18px;font-size:12px;margin-top:4px;">Already have a key? Enter it →</button>
-    <div style="font-size:11px;color:#4a5a7a;">Free plan access depends on your seller's settings</div>`;
+    <button class="btn" onclick="showRenewPrompt()" style="background:transparent;color:#4a5a7a;border:1px solid #1e2a45;padding:8px 18px;font-size:12px;margin-top:2px;border-radius:10px;">Already have a key? Enter it →</button>`;
   el.appendChild(overlay);
 }
 
@@ -13017,7 +13124,7 @@ function renderInventoryTab(){
       </div>
       <div style="margin-bottom:12px;">
         <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Min Stock Warning <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — defaults to 5)</span></label>
-        <input class="input" type="number" id="inv-min-stock" min="0" step="1" placeholder="5" value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex&&ex.minStock>0?ex.minStock:'';})()}" style="text-align:center;" />
+        <input class="input" type="number" id="inv-min-stock" min="0" step="1" placeholder="Default: 5" value="${(function(){var ex=inventoryItems.find(x=>x.name===invPrefillName);return ex&&ex.minStock>0?ex.minStock:'';})()}" style="text-align:center;" />
       </div>
       <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;">
         <div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:10px;">🔢 GST on this item <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional)</span></div>
@@ -13025,10 +13132,10 @@ function renderInventoryTab(){
           <div>
             <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST RATE (%)</label>
             <select class="input" id="inv-gst-rate" style="margin-bottom:0;" onchange="invUpdateGstPreview('add')">
-              <option value="0">0% — No GST</option>
+              <option value="0" selected>0% — No GST</option>
               <option value="5">5%</option>
               <option value="12">12%</option>
-              <option value="18" selected>18%</option>
+              <option value="18">18%</option>
               <option value="28">28%</option>
             </select>
           </div>
@@ -13178,7 +13285,7 @@ function renderInventoryTab(){
         </div>
         <div style="margin-bottom:12px;">
           <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Min Stock Warning <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — defaults to 5)</span></label>
-          <input class="input" type="number" id="inv-min-stock" min="0" step="1" placeholder="5" value="${selItem&&selItem.minStock>0?selItem.minStock:''}" style="text-align:center;" />
+          <input class="input" type="number" id="inv-min-stock" min="0" step="1" placeholder="Default: 5" value="${selItem&&selItem.minStock>0?selItem.minStock:''}" style="text-align:center;" />
         </div>
         <!-- GST Section -->
         <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;">
@@ -13187,10 +13294,10 @@ function renderInventoryTab(){
             <div>
               <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST RATE (%)</label>
               <select class="input" id="inv-gst-rate" style="margin-bottom:0;" onchange="invUpdateGstPreview('restock')">
-                <option value="0" ${selItem&&selItem.gstRate===0?'selected':''}>0% — No GST</option>
+                <option value="0" ${!selItem||selItem.gstRate===0||selItem.gstRate===undefined?'selected':''}>0% — No GST</option>
                 <option value="5" ${selItem&&selItem.gstRate===5?'selected':''}>5%</option>
                 <option value="12" ${selItem&&selItem.gstRate===12?'selected':''}>12%</option>
-                <option value="18" ${!selItem||selItem.gstRate===18||selItem.gstRate===undefined?'selected':''}>18%</option>
+                <option value="18" ${selItem&&selItem.gstRate===18?'selected':''}>18%</option>
                 <option value="28" ${selItem&&selItem.gstRate===28?'selected':''}>28%</option>
               </select>
             </div>
@@ -13289,7 +13396,7 @@ function renderInventoryTab(){
       // ── Category Search bar (always shown) ──
       const searchBarHtml = `<div style="position:relative;margin-bottom:14px;">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none;">🔍</span>
-        <input id="inv-search-box" class="input" placeholder="Search categories..." value="${(invSearchQuery||'').replace(/"/g,'&quot;')}"
+        <input id="inv-search-box" class="input" placeholder="Search categories or items..." value="${(invSearchQuery||'').replace(/"/g,'&quot;')}"
           oninput="invSearchQuery=this.value;if(window._invSrchTimer)clearTimeout(window._invSrchTimer);window._invSrchTimer=setTimeout(()=>safeRenderTab(currentTab),200);"
           style="padding-left:36px;margin-bottom:0;" />
         ${invSearchQuery ? `<button onclick="invSearchQuery='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:20px;cursor:pointer;line-height:1;">×</button>` : ""}
@@ -13298,13 +13405,17 @@ function renderInventoryTab(){
       const q = (invSearchQuery||"").trim().toLowerCase();
 
       if(q){
-        // ── SEARCH MODE: show only matching category cards ──
-        const matchedCats = allCats.filter(cat => tallyMatch(cat, q));
+        // ── SEARCH MODE: match category names AND item names inside categories ──
+        const matchedCats = allCats.filter(cat => {
+          if(tallyMatch(cat, q)) return true;
+          // also include category if any item inside matches
+          return inventoryItems.some(x=>(x.category||"General")===cat && tallyMatch(x.name, q));
+        });
         let catResultsHtml;
         if(matchedCats.length === 0){
           catResultsHtml = `<div class="card" style="padding:32px;text-align:center;color:#4a5a7a;font-size:14px;">
             <div style="font-size:32px;margin-bottom:10px;">🔍</div>
-            No categories match "<b style="color:#e8eaf0;">${invSearchQuery}</b>"
+            No categories or items match "<b style="color:#e8eaf0;">${invSearchQuery}</b>"
           </div>`;
         } else {
           catResultsHtml = matchedCats.map(cat => {
@@ -13370,7 +13481,7 @@ function renderInventoryTab(){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
       <div style="font-size:18px;font-weight:800;color:#FFD700;">📦 Inventory</div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button onclick="if(db&&authPhone){if(invUnsubscribe){try{invUnsubscribe();}catch(e){}}invUnsubscribe=null;loadInventoryFromFirestore(()=>{safeRenderTab(currentTab);});}" title="Sync from cloud" style="background:#0a1628;border:1px solid #1e3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 10px;font-size:14px;">🔄</button>
+        <button onclick="if(db&&authPhone){if(invUnsubscribe){try{invUnsubscribe();}catch(e){}}invUnsubscribe=null;notify('🔄 Syncing from cloud...');loadInventoryFromFirestore(()=>{safeRenderTab(currentTab);notify('✅ Inventory synced');});}else{notify('☁️ Cloud sync not set up — data saved locally','info');}" title="Sync from cloud" style="background:#0a1628;border:1px solid #1e3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 10px;font-size:14px;">🔄</button>
         ${invView==="stock"?`<button onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;">➕ Add New</button>`:""}
       </div>
     </div>
@@ -14099,18 +14210,30 @@ async function scToggleLedgerShare(connId, enable, sharedItemId, sharedItemName)
 async function scSendMessage(toPhone, body) {
   body = (body||"").trim();
   if (!body || !authPhone) return;
-  const now = Date.now();
-  const id = "MSG"+now+Math.random().toString(36).slice(2,6).toUpperCase();
-  await scSupa("sc_messages", {
-    method:"POST",
-    body: JSON.stringify({ id, from_phone:authPhone, to_phone:toPhone, body, created_at:now, expires_at:now+7*24*60*60*1000, seen_at:null })
-  });
-  scTrimMessages(authPhone, toPhone);
-  scSendPush(toPhone, `💬 New message from ${scMyShopName()}`, body.length > 60 ? body.slice(0,57)+"…" : body);
-  await scLoadMessages(toPhone);
-  scRenderChat(toPhone);
+  if (window._scSending) return;
+  window._scSending = true;
   const inp = document.getElementById("sc-msg-input");
-  if (inp) { inp.value=""; inp.focus(); }
+  const btn = document.getElementById("sc-send-btn");
+  if (inp) inp.disabled = true;
+  if (btn) btn.disabled = true;
+  try {
+    const now = Date.now();
+    const id = "MSG"+now+Math.random().toString(36).slice(2,6).toUpperCase();
+    await scSupa("sc_messages", {
+      method:"POST",
+      body: JSON.stringify({ id, from_phone:authPhone, to_phone:toPhone, body, created_at:now, expires_at:now+7*24*60*60*1000, seen_at:null })
+    });
+    scTrimMessages(authPhone, toPhone);
+    scSendPush(toPhone, `💬 New message from ${scMyShopName()}`, body.length > 60 ? body.slice(0,57)+"…" : body);
+    await scLoadMessages(toPhone);
+    scRenderChat(toPhone);
+    if (inp) inp.value="";
+  } finally {
+    window._scSending = false;
+    if (inp) inp.disabled = false;
+    if (btn) btn.disabled = false;
+    if (inp) inp.focus();
+  }
 }
 
 async function scTrimMessages(p1, p2) {
@@ -15259,7 +15382,7 @@ async function scOpenChatShell(peerPhone, connId) {
           style="flex:1;font-size:14px;"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();scSendMessage('${peerPhone}',this.value);}" />
         <button onclick="scSendMessage('${peerPhone}',document.getElementById('sc-msg-input').value)"
-          class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;padding:10px 16px;font-size:16px;border:1px solid #2a5aaa;">➤</button>
+          id="sc-send-btn" class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;padding:10px 16px;font-size:16px;border:1px solid #2a5aaa;">➤</button>
       </div>
     </div>`;
 }
@@ -15307,7 +15430,7 @@ async function scOpenChat(peerPhone, connId) {
           style="flex:1;font-size:14px;"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();scSendMessage('${peerPhone}',this.value);}" />
         <button onclick="scSendMessage('${peerPhone}',document.getElementById('sc-msg-input').value)"
-          class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;padding:10px 16px;font-size:16px;border:1px solid #2a5aaa;">➤</button>
+          id="sc-send-btn" class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;padding:10px 16px;font-size:16px;border:1px solid #2a5aaa;">➤</button>
       </div>
     </div>`;
 
