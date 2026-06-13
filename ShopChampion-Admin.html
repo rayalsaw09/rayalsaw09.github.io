@@ -1530,9 +1530,9 @@ async function scHashPassword(phone, password) {
 // ─── CONSTANTS ───────────────────────────────────────────────
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
-const TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings","alerts"];
-const TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️","⚠️"];
-const TABS_LABEL_PRO = ["Rankings","Customers","Add Sale","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings","Alerts"];
+const TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings","alerts","history"];
+const TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️","⚠️","🕘"];
+const TABS_LABEL_PRO = ["Rankings","Customers","Add Sale","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings","Alerts","History"];
 let _shopRequestsUnread = 0; // badge count for messages tab
 function getTabs(){
   const isPro = currentAppStyle === "pro";
@@ -2033,7 +2033,7 @@ window.addEventListener('appinstalled', () => {
 
 // ── Mobile Bottom Nav ──────────────────────────────────────────
 const MOBILE_MAIN_TABS = [0, 1, 2, 5]; // leaderboard, customers, purchase, inventory
-const MOBILE_MORE_TABS = [3, 4, 6, 7, 8, 9, 10];    // analytics, compare, creditors, debtors, messages, settings, alerts
+const MOBILE_MORE_TABS = [3, 4, 6, 7, 8, 9, 10, 11];    // analytics, compare, creditors, debtors, messages, settings, alerts, history
 
 function mobileTab(i) {
   closeMoreMenu();
@@ -2721,6 +2721,65 @@ let _loginSuccessFired = false; // guard: prevent double auto-login from DOMCont
 function storageKey(key) {
   const p = authPhone || localStorage.getItem("sc_auth_phone") || "guest";
   return "sc_u_" + p + "_" + key;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ── HISTORY LOG ──────────────────────────────────────────────
+// Activity feed: every sale, purchase, inventory change, delete, etc.
+// Stored locally per-day-bucket (capped) and synced to Firestore.
+// ═══════════════════════════════════════════════════════════════
+function historyLogKey(dayKey){ return storageKey("history_" + dayKey); }
+function _histDayKey(ts){
+  const d = new Date(ts);
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+// type: 'sale'|'purchase'|'inventory'|'creditor'|'debtor'|'customer'|'other'
+// action: short verb phrase e.g. "Sale recorded", "Item deleted"
+// details: free text description
+function addHistoryLog(type, action, details, extra){
+  try{
+    const now = Date.now();
+    const dayKey = _histDayKey(now);
+    const key = historyLogKey(dayKey);
+    const list = JSON.parse(localStorage.getItem(key)||"[]");
+    const entry = {
+      id: "H"+now+Math.random().toString(36).slice(2,6),
+      ts: now,
+      type: type||"other",
+      action: action||"",
+      details: details||"",
+      extra: extra||null
+    };
+    list.push(entry);
+    // Cap at 500 entries per day to avoid bloat
+    if(list.length>500) list.splice(0, list.length-500);
+    localStorage.setItem(key, JSON.stringify(list));
+    // Sync to Firestore (fire-and-forget)
+    if(db && authPhone){
+      db.collection("users").doc(authPhone).collection("history_log").doc(dayKey)
+        .set({ list, updatedAt: now }, {merge:true}).catch(()=>{});
+    }
+    // Live-refresh history tab if currently open
+    if(currentTab===11) safeRenderTab(11);
+  } catch(e){ /* never break the app over logging */ }
+}
+// Load history for a given day (YYYY-MM-DD). Tries local first, syncs from cloud if empty.
+function getHistoryForDay(dayKey){
+  try{ return JSON.parse(localStorage.getItem(historyLogKey(dayKey))||"[]"); }
+  catch{ return []; }
+}
+function loadHistoryFromCloud(dayKey){
+  if(!db || !authPhone) return;
+  db.collection("users").doc(authPhone).collection("history_log").doc(dayKey)
+    .get().then(doc=>{
+      if(doc && doc.exists){
+        const data = doc.data();
+        if(data.list){
+          try{ localStorage.setItem(historyLogKey(dayKey), JSON.stringify(data.list)); }catch{}
+          if(currentTab===11) safeRenderTab(11);
+        }
+      }
+    }).catch(()=>{});
 }
 
 // ── Helpers ──
@@ -3416,7 +3475,7 @@ function _safeRenderTabImmediate(i) {
               const catOOS = catItems.filter(x => invGetStock(x.name) <= 0).length;
               const catLow = catItems.filter(x => invGetStock(x.name) > 0 && invGetStock(x.name) <= 3).length;
               return `<div class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #FFD70030;"
-                onclick="invCatPageName='${cat.replace(/'/g, "\\'")}';invCatPageSearch='';invView='category';invSearchQuery='';safeRenderTab(currentTab)">
+                onclick="invCatPageName='${cat.replace(/'/g, "\\'")}';invCatPageSearch=${tallyMatch(cat,q)?"''":`'${q.replace(/'/g,"\\'")}'`};invView='category';invSearchQuery='';safeRenderTab(currentTab)">
                 <div><div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
                 <div style="font-size:12px;color:#7a8aaa;margin-top:4px;">${catItems.length} item${catItems.length !== 1 ? 's' : ''}${catLow > 0 ? ` &nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} low</span>` : ''}${catOOS > 0 ? ` &nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} out</span>` : ''}</div></div>
                 <div style="display:flex;align-items:center;gap:12px;">${catVal > 0 ? `<div style="text-align:right;"><div style="font-size:15px;font-weight:800;color:#4f4;">₹${catVal >= 100000 ? (catVal / 100000).toFixed(1) + 'L' : catVal >= 1000 ? (catVal / 1000).toFixed(1) + 'k' : catVal.toFixed(0)}</div><div style="font-size:10px;color:#4a5a7a;">Value</div></div>` : ''}<span style="color:#7ab3ff;font-size:22px;font-weight:300;">›</span></div>
@@ -3583,6 +3642,7 @@ function renderTab(i){
   }
   else if(i===9)el.innerHTML=renderSettings();
   else if(i===10)el.innerHTML=renderAlertsTab();
+  else if(i===11)el.innerHTML=renderHistoryTab();
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
 }
 
@@ -5061,10 +5121,12 @@ async function deletePurchase(custId,bill,dateEnc){
   const date=decodeURIComponent(dateEnc);
   const idx=c.purchases.findIndex(p=>p.bill===bill&&p.date===date);
   if(idx>-1){
-    c.totalSpend=Math.max(0,c.totalSpend-Number(c.purchases[idx].amount));
+    const _delAmt=Number(c.purchases[idx].amount);
+    c.totalSpend=Math.max(0,c.totalSpend-_delAmt);
     c.purchases.splice(idx,1);
     notify("✅ Purchase deleted");
     try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
+    addHistoryLog('sale','Sale deleted',`${c.name} · ${formatINR(_delAmt)}${bill?` · Bill ${bill}`:''}`);
     if(useLocalOnly)safeRenderTab(currentTab);
   }
 }
@@ -7014,6 +7076,7 @@ function saveCreditorModal(editId){
   const idx = creditors.findIndex(c=>c.id===editId);
   if(idx>=0) creditors[idx]=cr; else creditors.push(cr);
   saveCreditors(creditors);
+  addHistoryLog('creditor', editId?'Creditor updated':'Creditor added', name);
   closeModal();
   notify(editId?"✅ Creditor updated":"✅ Creditor added");
   renderTab(6);
@@ -7026,6 +7089,7 @@ function archiveCreditor(id){
   if(!cr) return;
   cr._archived = true;
   saveCreditors(creditors);
+  addHistoryLog('creditor','Creditor archived',cr.name);
   closeModal();
   notify("📦 " + cr.name + " archived");
   renderTab(6);
@@ -7037,6 +7101,7 @@ function archiveDebtor(id){
   if(!dr) return;
   dr._archived = true;
   saveDebtors(debtors);
+  addHistoryLog('debtor','Debtor archived',dr.name);
   closeModal();
   notify("📦 " + dr.name + " archived");
   renderTab(7);
@@ -7048,6 +7113,7 @@ function unarchiveCreditor(id){
   if(!cr) return;
   delete cr._archived;
   saveCreditors(creditors);
+  addHistoryLog('creditor','Creditor restored',cr.name);
   notify("✅ " + cr.name + " restored");
   renderTab(6);
 }
@@ -7058,6 +7124,7 @@ function unarchiveDebtor(id){
   if(!dr) return;
   delete dr._archived;
   saveDebtors(debtors);
+  addHistoryLog('debtor','Debtor restored',dr.name);
   notify("✅ " + dr.name + " restored");
   renderTab(7);
 }
@@ -7066,6 +7133,7 @@ function _doSimpleDeleteCreditor(id){
   const creditors = getCreditors();
   const cr = creditors.find(c=>c.id===id);
   saveCreditors(creditors.filter(c=>c.id!==id));
+  addHistoryLog('creditor','Creditor deleted', cr?cr.name:"Supplier");
   closeModal();
   notify("🗑 " + (cr?cr.name:"Supplier") + " deleted");
   renderTab(6);
@@ -7201,6 +7269,7 @@ function confirmHardDeleteCreditor(id){
   saveInventory();
 
   saveCreditors(creditors.filter(c=>c.id!==id));
+  addHistoryLog('creditor','Creditor deleted (with stock reversal)', cr.name);
   closeModal();
   notify("🗑 " + cr.name + " deleted and stock reversed");
   renderTab(6);
@@ -7216,6 +7285,7 @@ function deleteDebtor(id){
   if(txs.length === 0){
     if(!confirm("Delete " + dr.name + "? This cannot be undone.")) return;
     saveDebtors(debtors.filter(d=>d.id!==id));
+    addHistoryLog('debtor','Debtor deleted', dr.name);
     closeModal();
     notify("🗑 " + dr.name + " deleted");
     renderTab(7);
@@ -8098,6 +8168,7 @@ async function saveSmartPayment(){
   if(!cr.transactions) cr.transactions=[];
   cr.transactions.push(tx);
   saveCreditors(creditors);
+  addHistoryLog('creditor','Payment to creditor',`${cr.name||'Creditor'} · ${formatINR(amount)}${ref?` · ${ref}`:''}`);
   cashRecordTx({direction:"out", amount, date, note:`Paid to ${cr.name||"creditor"}${ref?(" · "+ref):""}`, source:"creditor_payment", refId:txId, mode});
   closeModal();
   notify(`✅ Payment of ${formatINR(amount)} recorded`,"success");
@@ -8241,6 +8312,7 @@ function saveCrTransaction(){
     createdAt:Date.now(), syncStatus:"local"
   });
   saveCreditors(creditors);
+  addHistoryLog('creditor',`Creditor ${type==="purchase"?"purchase":type==="payment"?"payment":"return"} recorded`,`${creditors[idx].name||'Creditor'} · ${formatINR(amount)}${invoiceNo?` · ${invoiceNo}`:''}`);
   if(type==="payment"){
     const crTxMode = document.getElementById("tx-pay-mode")?.value||"Cash";
     cashRecordTx({direction:"out", amount, date, note:`Paid to ${creditors[idx].name||"creditor"}${note?(" · "+note):""}`, source:"creditor_payment", refId:txId, mode:crTxMode});
@@ -8594,8 +8666,10 @@ async function deleteCrTransaction(creditorId, txId) {
   const idx = creditors.findIndex(c => c.id === creditorId);
   if (idx < 0) return;
   const cr = creditors[idx];
+  const _delTx = (cr.transactions||[]).find(t=>t.id===txId);
   creditors[idx].transactions = (cr.transactions || []).filter(t => t.id !== txId);
   saveCreditors(creditors);
+  addHistoryLog('creditor','Creditor transaction deleted',`${cr.name||'Creditor'}${_delTx?` · ${formatINR(_delTx.amount)}`:''}`);
   cashRemoveByRef(txId);
   // Cross-delete from their side if linked
   if (cr._fromShopConnect && cr.phone) {
@@ -8958,6 +9032,7 @@ function saveDebtorModal(editId){
   const idx = debtors.findIndex(d=>d.id===editId);
   if(idx>=0) debtors[idx]=dr; else debtors.push(dr);
   saveDebtors(debtors);
+  addHistoryLog('debtor', editId?'Debtor updated':'Debtor added', name);
   closeModal();
   notify(editId?"✅ Debtor updated":"✅ Debtor added");
   renderTab(7);
@@ -9449,6 +9524,7 @@ function saveDebtTransaction(){
     createdAt: Date.now(),
   });
   saveDebtors(debtors);
+  addHistoryLog('debtor',`Debtor ${type==="payment"?"receipt":type==="return"?"return":"sale"} recorded`,`${debtors[idx].name||'Debtor'} · ${formatINR(amtRaw)}`);
   if(type==="payment"){
     cashRecordTx({direction:"in", amount: amtRaw, date, note:`Received from ${debtors[idx].name||"customer"}${note?(" · "+note):""}`, source:"debtor_payment", refId:drTxId, mode});
   }
@@ -9479,7 +9555,7 @@ function deleteDebtTx(debtorId, origIdx){
       </div>
       <div style="display:flex;gap:10px;">
         <button onclick="closeModal()" class="btn" style="flex:1;background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;">Cancel</button>
-        <button onclick="(function(){closeModal();const debtors=getDebtors();const idx=debtors.findIndex(d=>d.id==='${debtorId}');if(idx<0)return;const removedTx=(debtors[idx].transactions||[])[${origIdx}];debtors[idx].transactions=(debtors[idx].transactions||[]).filter((_,i)=>i!==${origIdx});saveDebtors(debtors);if(removedTx&&removedTx.id)cashRemoveByRef(removedTx.id);notify('🗑 Transaction deleted');setTimeout(()=>openDebtorDetail('${debtorId}'),200);})()" class="btn" style="flex:1;background:#3a0808;border:1px solid #5a1a1a;color:#f66;font-weight:800;">🗑 Delete</button>
+        <button onclick="(function(){closeModal();const debtors=getDebtors();const idx=debtors.findIndex(d=>d.id==='${debtorId}');if(idx<0)return;const removedTx=(debtors[idx].transactions||[])[${origIdx}];debtors[idx].transactions=(debtors[idx].transactions||[]).filter((_,i)=>i!==${origIdx});saveDebtors(debtors);if(removedTx&&removedTx.id)cashRemoveByRef(removedTx.id);addHistoryLog('debtor','Debtor transaction deleted',(debtors[idx].name||'Debtor')+(removedTx?(' · '+formatINR(removedTx.amount)):''));notify('🗑 Transaction deleted');setTimeout(()=>openDebtorDetail('${debtorId}'),200);})()" class="btn" style="flex:1;background:#3a0808;border:1px solid #5a1a1a;color:#f66;font-weight:800;">🗑 Delete</button>
       </div>
     </div>
   `);
@@ -9730,6 +9806,98 @@ function renderAlertsTab(){
 
   html += `</div>`;
   return html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ── HISTORY TAB ──────────────────────────────────────────────
+// Shows a chronological activity feed for a selectable date
+// (defaults to today). Logs are written by addHistoryLog().
+// ═══════════════════════════════════════════════════════════════
+let historySelectedDate = ""; // "" = today; else "YYYY-MM-DD"
+
+const HIST_TYPE_META = {
+  sale:      {icon:"💰", color:"#4ade80", label:"Sale"},
+  purchase:  {icon:"📦", color:"#f59e0b", label:"Purchase"},
+  inventory: {icon:"📦", color:"#7ab3ff", label:"Inventory"},
+  customer:  {icon:"👤", color:"#a78bfa", label:"Customer"},
+  creditor:  {icon:"🏦", color:"#fbbf24", label:"Creditor"},
+  debtor:    {icon:"🧾", color:"#4ade80", label:"Debtor"},
+  other:     {icon:"📋", color:"#7a8aaa", label:"Other"}
+};
+
+function renderHistoryTab(){
+  const todayKey = _histDayKey(Date.now());
+  const dayKey = historySelectedDate || todayKey;
+  const isToday = dayKey === todayKey;
+
+  // Try loading from cloud if local is empty (helps after re-login / new device)
+  let entries = getHistoryForDay(dayKey);
+  if(entries.length===0 && db && authPhone) loadHistoryFromCloud(dayKey);
+
+  // Sort newest first
+  entries = entries.slice().sort((a,b)=>b.ts-a.ts);
+
+  const dateObj = new Date(dayKey+"T00:00:00");
+  const dateLabel = dateObj.toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric"});
+
+  // Type filter
+  const activeFilter = window._histTypeFilter || "all";
+  const filtered = activeFilter==="all" ? entries : entries.filter(e=>e.type===activeFilter);
+
+  // Summary counts by type (for filter pills)
+  const counts = {};
+  entries.forEach(e=>{ counts[e.type] = (counts[e.type]||0)+1; });
+
+  const filterPills = ["all",...Object.keys(HIST_TYPE_META)].map(k=>{
+    const cnt = k==="all" ? entries.length : (counts[k]||0);
+    if(k!=="all" && cnt===0) return "";
+    const meta = k==="all" ? {icon:"🕘",color:"#60a5fa",label:"All"} : HIST_TYPE_META[k];
+    const active = activeFilter===k;
+    return `<button onclick="window._histTypeFilter='${k}';renderTab(11)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${active?meta.color:'#1e2a45'};background:${active?meta.color+'22':'transparent'};color:${active?meta.color:'#4a5a7a'};font-size:12px;font-weight:${active?'800':'600'};white-space:nowrap;flex-shrink:0;">${meta.icon} ${meta.label}${cnt?` (${cnt})`:''}</button>`;
+  }).join("");
+
+  const entryCards = filtered.length===0
+    ? `<div style="text-align:center;padding:50px 20px;color:#4a5a7a;">
+        <div style="font-size:48px;margin-bottom:12px;">🕘</div>
+        <div style="font-size:15px;font-weight:700;color:#7a8aaa;margin-bottom:6px;">No activity ${isToday?"yet today":"on this day"}</div>
+        <div style="font-size:12px;">${isToday?"Sales, purchases, and other actions will appear here as you use the app.":"Try a different date, or this may be before History tracking started."}</div>
+       </div>`
+    : filtered.map(e=>{
+        const meta = HIST_TYPE_META[e.type] || HIST_TYPE_META.other;
+        const timeStr = new Date(e.ts).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
+        return `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:1px solid #0d1220;">
+          <div style="width:38px;height:38px;border-radius:10px;background:${meta.color}22;border:1px solid ${meta.color}55;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">${meta.icon}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:800;color:#e8eaf0;">${escHtml(e.action)}</div>
+            ${e.details?`<div style="font-size:12px;color:#7a8aaa;margin-top:2px;line-height:1.4;">${escHtml(e.details)}</div>`:""}
+          </div>
+          <div style="font-size:11px;color:#4a5a7a;flex-shrink:0;white-space:nowrap;">${timeStr}</div>
+        </div>`;
+      }).join("");
+
+  return `<div style="padding:16px 14px 80px;max-width:760px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:18px;font-weight:800;color:#60a5fa;">🕘 History</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <input type="date" id="hist-date-picker" value="${dayKey}" max="${todayKey}"
+          onchange="historySelectedDate=this.value===('${todayKey}')?'':this.value;window._histTypeFilter='all';renderTab(11)"
+          style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:8px 12px;color:#e8eaf0;font-size:13px;" />
+        ${!isToday?`<button onclick="historySelectedDate='';window._histTypeFilter='all';renderTab(11)" class="btn" style="background:#1e3a6e;border:1px solid #2a5aaa;color:#60a5fa;font-size:12px;font-weight:800;padding:8px 12px;">Today</button>`:""}
+      </div>
+    </div>
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:14px;">${dateLabel}${isToday?" (Today)":""} · ${entries.length} event${entries.length!==1?"s":""}</div>
+
+    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">${filterPills}</div>
+
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:14px;overflow:hidden;">
+      ${entryCards}
+    </div>
+
+    <div style="font-size:11px;color:#2a3a5a;text-align:center;margin-top:14px;">History tracking started ${(()=>{
+      // best-effort: show nothing extra; logging begins from this version onward
+      return "from this version onward.";
+    })()}</div>
+  </div>`;
 }
 
 function renderSettings(){
@@ -10494,6 +10662,7 @@ async function saveNewCustomer(){
   customers.push(newC);
   closeModal();tempPhoto="";
   notify(`✅ ${name} added! ID: ${id}`);
+  addHistoryLog('customer','Customer added',`${name} · ID ${id}`);
   try { await saveOneCustomer(newC); } catch(e){notify("⚠️ Saved locally, Firebase error: "+e.message);}
   if(useLocalOnly) safeRenderTab(currentTab);
 }
@@ -10850,8 +11019,11 @@ async function savePhoto(id,photo){
 
 async function deleteCustomer(id){
   if(!confirm("Delete this customer and all their purchases?"))return;
+  const _c=customers.find(x=>x.id===id);
+  const _cName=_c?_c.name:id;
   try{await deleteOneCustomer(id);notify("🗑 Customer deleted");}
   catch(e){notify("⚠️ Delete error: "+e.message);}
+  addHistoryLog('customer','Customer deleted',_cName);
   if(useLocalOnly)safeRenderTab(currentTab);
 }
 
@@ -10878,6 +11050,7 @@ async function deleteSelectedCustomers(){
   if(custSelected.size===0)return;
   if(!confirm(`Delete ${custSelected.size} selected customer${custSelected.size>1?"s":""} and all their purchases? This cannot be undone.`))return;
   const ids=[...custSelected];
+  const _names=ids.map(id=>{const c=customers.find(x=>x.id===id);return c?c.name:id;});
   let errors=0;
   for(const id of ids){
     try{await deleteOneCustomer(id);}
@@ -10886,6 +11059,7 @@ async function deleteSelectedCustomers(){
   custSelected.clear();
   custSelectMode=false;
   notify(errors===0?`🗑 ${ids.length} customer${ids.length>1?"s":""} deleted`:`⚠️ Deleted ${ids.length-errors}, ${errors} error(s)`);
+  addHistoryLog('customer','Customers deleted',`${ids.length} customer${ids.length>1?"s":""}: ${_names.join(", ")}`);
   safeRenderTab(currentTab);
 }
 
@@ -11225,7 +11399,7 @@ const TRANSLATIONS = {
   en: {
     adminPanel:"Admin Panel", leaderboard:"Leaderboard", customers:"Customers",
     purchase:"Add Sale", analytics:"Analytics", compare:"Compare",
-    inventory:"Inventory", creditors:"Creditors", debtors:"Debtors", alerts:"Alerts",
+    inventory:"Inventory", creditors:"Creditors", debtors:"Debtors", alerts:"Alerts", history:"History",
     messages:"Messages",
     festivals:"Festival Rewards", settings:"Settings", logout:"Logout",
     addCustomer:"+ Add Customer", exportCSV:"⬇ Export CSV", addPurchase:"Add Sale →",
@@ -12658,6 +12832,7 @@ function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellin
   item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes, expiryDate: expiryDate||""});
   saveInventory();
   notify("✅ Stock added for "+name);
+  addHistoryLog('inventory','Stock added',`${name} · +${qty} ${unit||'unit'}${costPerUnit?` @ ₹${costPerUnit}`:''}`);
   invView="stock";
   invSelectedCat="";
   invSearchQuery="";
@@ -12720,6 +12895,7 @@ function _confirmInvDelete(name){
     });
   });
   if(customersTouched) saveCustomers();
+  addHistoryLog('inventory','Item deleted',`"${name}" removed from inventory`+(customersTouched?" · customer history updated":""));
   // Reset view back to stock list
   invView="stock"; invDetailItem=null;
   safeRenderTab(currentTab);
@@ -13077,8 +13253,8 @@ function renderInventoryTab(){
         const label = isExpired ? `Expired ${Math.abs(e.daysLeft)}d ago` : (e.daysLeft===0?"Expires today":`Expires in ${e.daysLeft}d`);
         return `<div style="background:#0a0500;border:1px solid ${isExpired?'#5a1010':'#3a2a10'};border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <div style="min-width:0;">
-            <div style="font-weight:700;color:#e8eaf0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(e.itemName)}</div>
-            <div style="font-size:10px;color:#7a8aaa;margin-top:1px;">${e.qty} ${e.unit} · ${new Date(e.expiryDate+"T00:00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</div>
+            <div style="font-weight:700;color:#fbbf24;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(e.itemName)}</div>
+            <div style="font-size:10px;color:#d4a574;margin-top:1px;">${e.qty} ${e.unit} · ${new Date(e.expiryDate+"T00:00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</div>
           </div>
           <div style="font-size:11px;font-weight:800;color:${color};white-space:nowrap;flex-shrink:0;">${label}</div>
         </div>`;
@@ -13427,7 +13603,7 @@ function renderInventoryTab(){
             const catOOS   = catItems.filter(x=>invGetStock(x.name)<=0).length;
             const catLow   = catItems.filter(x=>invGetStock(x.name)>0&&invGetStock(x.name)<=3).length;
             return `<div class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #FFD70030;"
-              onclick="invCatPageName='${cat.replace(/'/g,"\\'")}';invCatPageSearch='';invView='category';invSearchQuery='';safeRenderTab(currentTab)">
+              onclick="invCatPageName='${cat.replace(/'/g,"\\'")}';invCatPageSearch=${tallyMatch(cat,q)?"''":`'${q.replace(/'/g,"\\'")}'`};invView='category';invSearchQuery='';safeRenderTab(currentTab)">
               <div>
                 <div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
                 <div style="font-size:12px;color:#7a8aaa;margin-top:4px;">
@@ -13606,6 +13782,7 @@ function _invLogCreditorPurchase(creditorId, itemName, qty, cost, date, notes){
       _fromInventory: true
     });
     saveCreditors(creditors);
+    addHistoryLog('creditor','Creditor purchase recorded (inventory)',`${creditors[idx].name} · ${formatINR(amount)} · ${itemName} ×${qty}`);
     notify("✅ Purchase of " + formatINR(amount) + " logged to " + creditors[idx].name);
   } else {
     // ── No creditor selected: add to "Unreconciled Purchases" auto-creditor ──
@@ -13640,6 +13817,7 @@ function _invLogCreditorPurchase(creditorId, itemName, qty, cost, date, notes){
       _unreconciled: true
     });
     saveCreditors(creditors);
+    addHistoryLog('creditor','Unreconciled purchase recorded',`${formatINR(amount)} · ${itemName} ×${qty}`);
     notify("⚠️ No creditor selected — added to Unreconciled Purchases (" + formatINR(amount) + ")","warn");
   }
 }
@@ -16726,6 +16904,7 @@ async function addPurchase(custId, { amount, bill, date, notes, soldItems }) {
   const _rankedV = _sortedV.find(x => x.id === custId);
   speakPurchaseAnnouncement(c.name, formatINR(amt), _rankedV ? _rankedV.rank : "?");
   try { await saveOneCustomer(c); } catch (e) { notify("⚠️ Firebase error: " + e.message); }
+  addHistoryLog('sale', 'Sale recorded', `${c.name} · ${formatINR(amt)}${bill?` · Bill ${bill}`:''}`);
 
   // ── NEW: Generate & save bill, then show modal ───────────────
   const billObj = createBillObject({ custId, soldItems, amount: amt, billNum: bill, notes, date: date || new Date().toISOString() });
