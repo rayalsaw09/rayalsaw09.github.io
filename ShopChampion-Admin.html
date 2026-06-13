@@ -3398,7 +3398,7 @@ function doLogout() {
     fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/force_logout_member`, {
       method:"POST",
       headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
-      body: JSON.stringify({ p_member_id: currentMember.id })
+      body: JSON.stringify({ p_shop_phone: authPhone, p_member_id: currentMember.id })
     }).catch(()=>{});
   }
   if(_memberSessionTimer) { clearInterval(_memberSessionTimer); _memberSessionTimer = null; }
@@ -10136,7 +10136,7 @@ async function saveNewMember() {
     const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/create_shop_member`, {
       method:"POST",
       headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
-      body: JSON.stringify({ p_shop_phone:authPhone, p_username:username.toLowerCase(), p_password_hash:hash, p_display_name:display, p_permissions:permissions })
+      body: JSON.stringify({ p_shop_phone:authPhone, p_username:username.toLowerCase(), p_hash:hash, p_display_name:display, p_permissions:permissions })
     });
     const data = await res.json();
     if(data && data.error) { errEl.textContent = data.error; errEl.style.display="block"; return; }
@@ -10194,11 +10194,11 @@ async function saveEditMember(memberId) {
     const [r1, r2] = await Promise.all([
       fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/update_member_permissions`, {
         method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
-        body: JSON.stringify({ p_member_id:memberId, p_permissions:permissions })
+        body: JSON.stringify({ p_shop_phone:authPhone, p_member_id:memberId, p_permissions:permissions })
       }),
       fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/update_member_details`, {
         method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
-        body: JSON.stringify({ p_member_id:memberId, p_display_name:display, p_password_hash:passwordHash })
+        body: JSON.stringify({ p_shop_phone:authPhone, p_member_id:memberId, p_display_name:display, p_hash:passwordHash })
       })
     ]);
     closeModal(); notify("✅ Member updated"); renderTab(12);
@@ -10210,7 +10210,7 @@ async function toggleMemberBlock(memberId, block) {
   try {
     await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/update_member_details`, {
       method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
-      body: JSON.stringify({ p_member_id:memberId, p_display_name:null, p_password_hash:null, p_blocked:block })
+      body: JSON.stringify({ p_shop_phone:authPhone, p_member_id:memberId, p_display_name:null, p_hash:null, p_blocked:block })
     });
     notify(block?"🚫 Member blocked":"✅ Member unblocked"); renderTab(12);
   } catch(e) { notify("Network error","error"); }
@@ -10220,9 +10220,7 @@ async function forceLogoutMember(memberId) {
   try {
     await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/force_logout_member`, {
       method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
-      body: JSON.stringify({ p_member_id:memberId })
-    });
-    notify("⏏ Member force-logged out"); renderTab(12);
+      body: JSON.stringify({ p_shop_phone:authPhone, p_member_id:memberId })
   } catch(e) { notify("Network error","error"); }
 }
 
@@ -10231,9 +10229,7 @@ async function deleteMember(memberId, displayName) {
   try {
     await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/delete_shop_member`, {
       method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
-      body: JSON.stringify({ p_member_id:memberId })
-    });
-    notify("🗑 Member deleted"); renderTab(12);
+      body: JSON.stringify({ p_shop_phone:authPhone, p_member_id:memberId })
   } catch(e) { notify("Network error","error"); }
 }
 
@@ -10271,7 +10267,7 @@ async function memberLogin() {
     const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/check_member_password`, {
       method:"POST",
       headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
-      body: JSON.stringify({ p_username:username, p_password_hash:hash })
+      body: JSON.stringify({ p_username:username, p_hash:hash })
     });
     const data = await res.json();
     if(!data || !data.shop_phone) {
