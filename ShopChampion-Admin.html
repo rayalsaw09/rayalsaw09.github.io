@@ -2142,7 +2142,10 @@ window.addEventListener("load", () => {
           }
         }
       } catch(e) { /* network error — allow cached login */ }
-      try { onLoginSuccess(savedPhone); } catch(e) {
+      try {
+        await _tryRestoreMemberSession(savedPhone);
+        onLoginSuccess(savedPhone);
+      } catch(e) {
         console.error("Auto-login failed:", e);
         // If onLoginSuccess throws, fall back to login screen gracefully
         localStorage.removeItem("sc_auth_phone");
@@ -10334,6 +10337,51 @@ function _startMemberHeartbeat() {
   }, 60000);
 }
 
+// Restore member session on page refresh (if a member, not the owner, was logged in).
+// Without this, currentMember stays null after a reload and the page falls back to
+// full owner access for whoever's session token is in localStorage.
+async function _tryRestoreMemberSession(phone) {
+  const memberId = sessionStorage.getItem("sc_member_id");
+  const token = sessionStorage.getItem("sc_member_token");
+  if(!memberId || !token || !phone) return;
+  try {
+    const verifyRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/verify_member_session`, {
+      method:"POST",
+      headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+      body: JSON.stringify({ p_member_id: memberId, p_token: token })
+    });
+    const valid = await verifyRes.json();
+    if(!valid) {
+      sessionStorage.removeItem("sc_member_token");
+      sessionStorage.removeItem("sc_member_id");
+      return;
+    }
+
+    const listRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/list_shop_members`, {
+      method:"POST",
+      headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+      body: JSON.stringify({ p_shop_phone: phone })
+    });
+    const members = await listRes.json();
+    const m = Array.isArray(members) ? members.find(x=>x.id===memberId) : null;
+    if(!m || m.blocked) {
+      sessionStorage.removeItem("sc_member_token");
+      sessionStorage.removeItem("sc_member_id");
+      return;
+    }
+
+    currentMember = { id: m.id, username: m.username, display_name: m.display_name, permissions: m.permissions };
+    _memberSessionToken = token;
+
+    const pill = document.getElementById("header-member-pill");
+    const pillName = document.getElementById("header-member-name");
+    if(pill) pill.style.display = "inline-flex";
+    if(pillName) pillName.textContent = m.display_name;
+
+    _startMemberHeartbeat();
+  } catch(e) { /* network error — leave unresolved, will retry on next reload */ }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 
 function renderHistoryTab(){
@@ -12204,6 +12252,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           }
         } catch(e) { /* network error or timeout — allow cached login */ }
+        await _tryRestoreMemberSession(savedPhone);
         onLoginSuccess(savedPhone);
       })();
       return;
