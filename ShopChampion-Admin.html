@@ -3403,9 +3403,12 @@ function _safeRenderTabImmediate(i) {
       const resultsEl = document.getElementById('inv-search-results');
       if (resultsEl) {
         if (q) {
-          const matchedCats = allCats.filter(cat => tallyMatch(cat, q));
+          const matchedCats = allCats.filter(cat => {
+            if (tallyMatch(cat, q)) return true;
+            return inventoryItems.some(x => (x.category || 'General') === cat && tallyMatch(x.name, q));
+          });
           if (matchedCats.length === 0) {
-            resultsEl.innerHTML = `<div class="card" style="padding:32px;text-align:center;color:#4a5a7a;font-size:14px;"><div style="font-size:32px;margin-bottom:10px;">🔍</div>No categories match "<b style="color:#e8eaf0;">${invSearchQuery}</b>"</div>`;
+            resultsEl.innerHTML = `<div class="card" style="padding:32px;text-align:center;color:#4a5a7a;font-size:14px;"><div style="font-size:32px;margin-bottom:10px;">🔍</div>No categories or items match "<b style="color:#e8eaf0;">${invSearchQuery}</b>"</div>`;
           } else {
             resultsEl.innerHTML = matchedCats.map(cat => {
               const catItems = inventoryItems.filter(x => (x.category || 'General') === cat);
@@ -12594,7 +12597,7 @@ function invGetExpiringEntries(thresholdDays){
     const currentStock = invGetStock(item.name);
     if(currentStock<=0) return; // nothing left to expire
     entriesWithExpiry.forEach(e=>{
-      const expDate = new Date(e.expiryDate);
+      const expDate = new Date(e.expiryDate+"T00:00:00");
       if(isNaN(expDate.getTime())) return;
       expDate.setHours(0,0,0,0);
       const daysLeft = Math.round((expDate-now)/86400000);
@@ -13075,7 +13078,7 @@ function renderInventoryTab(){
         return `<div style="background:#0a0500;border:1px solid ${isExpired?'#5a1010':'#3a2a10'};border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <div style="min-width:0;">
             <div style="font-weight:700;color:#e8eaf0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(e.itemName)}</div>
-            <div style="font-size:10px;color:#7a8aaa;margin-top:1px;">${e.qty} ${e.unit} · ${new Date(e.expiryDate).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</div>
+            <div style="font-size:10px;color:#7a8aaa;margin-top:1px;">${e.qty} ${e.unit} · ${new Date(e.expiryDate+"T00:00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</div>
           </div>
           <div style="font-size:11px;font-weight:800;color:${color};white-space:nowrap;flex-shrink:0;">${label}</div>
         </div>`;
