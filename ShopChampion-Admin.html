@@ -10343,7 +10343,8 @@ function _startMemberHeartbeat() {
 async function _tryRestoreMemberSession(phone) {
   const memberId = sessionStorage.getItem("sc_member_id");
   const token = sessionStorage.getItem("sc_member_token");
-  if(!memberId || !token || !phone) return;
+  console.log("[MemberRestore] memberId:", memberId, "token:", token ? "(present)" : "(none)", "phone:", phone);
+  if(!memberId || !token || !phone) { console.log("[MemberRestore] skipping — missing memberId/token/phone"); return; }
   try {
     const verifyRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/verify_member_session`, {
       method:"POST",
@@ -10351,6 +10352,7 @@ async function _tryRestoreMemberSession(phone) {
       body: JSON.stringify({ p_member_id: memberId, p_token: token })
     });
     const valid = await verifyRes.json();
+    console.log("[MemberRestore] verify_member_session result:", verifyRes.status, valid);
     if(!valid) {
       sessionStorage.removeItem("sc_member_token");
       sessionStorage.removeItem("sc_member_id");
@@ -10363,8 +10365,10 @@ async function _tryRestoreMemberSession(phone) {
       body: JSON.stringify({ p_shop_phone: phone })
     });
     const members = await listRes.json();
+    console.log("[MemberRestore] list_shop_members result:", listRes.status, members);
     const m = Array.isArray(members) ? members.find(x=>x.id===memberId) : null;
     if(!m || m.blocked) {
+      console.log("[MemberRestore] member not found or blocked:", m);
       sessionStorage.removeItem("sc_member_token");
       sessionStorage.removeItem("sc_member_id");
       return;
@@ -10372,6 +10376,7 @@ async function _tryRestoreMemberSession(phone) {
 
     currentMember = { id: m.id, username: m.username, display_name: m.display_name, permissions: m.permissions };
     _memberSessionToken = token;
+    console.log("[MemberRestore] restored currentMember:", currentMember);
 
     const pill = document.getElementById("header-member-pill");
     const pillName = document.getElementById("header-member-name");
@@ -10379,7 +10384,7 @@ async function _tryRestoreMemberSession(phone) {
     if(pillName) pillName.textContent = m.display_name;
 
     _startMemberHeartbeat();
-  } catch(e) { /* network error — leave unresolved, will retry on next reload */ }
+  } catch(e) { console.error("[MemberRestore] error:", e); }
 }
 
 // ═══════════════════════════════════════════════════════════════════
