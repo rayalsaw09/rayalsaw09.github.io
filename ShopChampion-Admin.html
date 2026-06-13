@@ -2118,15 +2118,19 @@ window.addEventListener("load", () => {
   loadLicense();
 // Check if already logged in — always verify block status online first
   const savedPhone = localStorage.getItem("sc_auth_phone");
-  // If a team member was active last time and didn't log out properly,
-  // never auto-login as the owner — force the login screen so the
-  // member must re-authenticate (or the owner can choose Owner Login).
+  // If a team member was active last time:
+  //   - sessionStorage tokens present  → page REFRESH → restore member session normally
+  //   - sessionStorage tokens missing  → tab was CLOSED and reopened → force login screen
+  //     (don't auto-login as admin just because sc_auth_phone is still stored)
   // Use _memberWasActiveOnLoad (read at script parse time) to avoid a race where
   // DOMContentLoaded already cleared sc_member_active from localStorage before we get here.
-  localStorage.removeItem("sc_member_active"); // always clean up regardless
-  if (_memberWasActiveOnLoad) {
+  const _memberTokenPresent = !!(sessionStorage.getItem("sc_member_token") && sessionStorage.getItem("sc_member_id"));
+  if (_memberWasActiveOnLoad && !_memberTokenPresent) {
+    // Fresh open after tab close — member must re-login, don't auto-login as admin
+    localStorage.removeItem("sc_member_active");
     authShowStep("phone");
   } else if (savedPhone && localStorage.getItem("sc_user_" + savedPhone)) {
+    // Either: normal admin auto-login, OR member refresh (tokens in sessionStorage will be restored via _tryRestoreMemberSession)
     authPhone = savedPhone;
     // Check block status before allowing auto-login
     (async () => {
