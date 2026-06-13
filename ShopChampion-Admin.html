@@ -10297,7 +10297,8 @@ async function memberLogin() {
       body: JSON.stringify({ p_member_id: data.id })
     });
     const tokenData = await tokenRes.json();
-    _memberSessionToken = tokenData && tokenData.token ? tokenData.token : null;
+    _memberSessionToken = (typeof tokenData === "string" && tokenData) ? tokenData
+      : (tokenData && tokenData.token ? tokenData.token : null);
     if(_memberSessionToken) sessionStorage.setItem("sc_member_token", _memberSessionToken);
     sessionStorage.setItem("sc_member_id", data.id);
 
