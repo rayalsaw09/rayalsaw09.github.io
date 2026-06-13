@@ -4666,7 +4666,10 @@ function invUpdateGstPreview(formType){
   const previewEl = document.getElementById("inv-gst-preview-"+formType);
   if(!rateEl || !previewEl) return;
 
-  const rate     = parseFloat(rateEl.value)||0;
+  const customEl = document.getElementById("inv-gst-custom");
+  const rate     = rateEl.value === "custom"
+    ? (parseFloat(customEl?.value)||0)
+    : (parseFloat(rateEl.value)||0);
   const included = inclEl?.value || "inclusive";
   const sellBase = parseFloat(sellEl?.value||"0")||0;
 
@@ -4702,34 +4705,32 @@ const HSN_GST_MAP = {
   "0902":0, // Tea leaves (unprocessed)
   "1701":0, // Cane/beet sugar (unbranded)
   "2501":0, // Salt
-  "0401":0, // Fresh milk
 
   // 5% — Packaged/processed food & essentials
-  "0406":5,  // Cheese
   "0405":5,  // Butter
+  "0406":5,  // Cheese
   "1507":5,"1508":5,"1509":5,"1510":5,"1511":5,"1512":5,"1513":5,"1514":5,"1515":5, // Edible oils
   "1601":5,"1602":5, // Processed meat
   "1901":5,  // Malt extract / cereal preparations
+  "1904":5,  // Corn flakes, puffed rice, namkeen (5% base rate)
+  "1905":5,  // Bread, pastry, biscuits (under ₹100; premium biscuits >₹100 are 18% — set manually)
   "2101":5,  // Coffee extracts, roasted coffee
   "2102":5,  // Yeast
   "2103":5,  // Sauces, condiments, mustard
-  "2106":5,  // Food preparations
-  "1904":5,  // Corn flakes, puffed rice
-  "1905":5,  // Bread, pastry, biscuits (under ₹100)
+  "2106":5,  // Food preparations (branded supplements >₹500 are 18% — set manually)
   "2201":5,  // Waters (packed drinking water ≤20L)
+  "3004":5,  // Medicines (essential / life-saving)
   "3006":5,  // Pharmaceutical preparations (life-saving)
-  "3004":5,  // Medicines (essential)
 
   // 12% — Processed food & mid-range goods
   "0409":12, // Natural honey
   "1517":12, // Margarine
+  "1806":12, // Chocolate
   "2001":12,"2002":12,"2003":12,"2004":12,"2005":12, // Preserved vegetables
   "2007":12, // Jams, jellies, fruit purees
   "2008":12, // Fruit/nut preparations (dry fruits)
   "2009":12, // Fruit juices
-  "2202":12, // Aerated water / soft drinks (non-carbonated)
-  "1806":12, // Chocolate
-  "1904":12, // Namkeen / snack (packed)
+  "2202":12, // Aerated/non-aerated water & soft drinks (non-alcoholic)
   "4819":12, // Paper boxes, cartons
 
   // 18% — Toiletries, packaged food (premium), electronics
@@ -4745,21 +4746,17 @@ const HSN_GST_MAP = {
   "8504":18, // Transformers, UPS
   "8507":18, // Batteries
   "8513":18, // Torches
-  "1905":18, // Premium biscuits (over ₹100)
-  "2106":18, // Branded food supplements
-  "2202":18, // Carbonated drinks (aerated)
-  "3004":12, // Most medicines
 
   // 28% — Luxury / sin goods
-  "2401":28, // Tobacco leaves
-  "2402":28, // Cigars, cigarettes
-  "2403":28, // Other tobacco
   "2203":28, // Beer
   "2204":28, // Wine
   "2205":28, // Vermouth
   "2206":28, // Fermented beverages
   "2207":28, // Ethyl alcohol
   "2208":28, // Spirits (whisky, rum, vodka)
+  "2401":28, // Tobacco leaves
+  "2402":28, // Cigars, cigarettes
+  "2403":28, // Other tobacco
   "3301":28, // Essential oils
   "8703":28, // Motor cars
 };
@@ -4799,11 +4796,6 @@ function hsnOnInput(formType) {
     const msgEl = document.getElementById("inv-hsn-msg-" + formType);
     if (msgEl) msgEl.textContent = "";
   }
-}
-
-function hsnSaveValue(formType) {
-  // called on save — returns current HSN value
-  return (document.getElementById("inv-hsn-" + formType)?.value || "").trim();
 }
 
 function buildCheatSheet(formType) {
@@ -13400,6 +13392,159 @@ function invEditCategory(name){
   if(nc!==null){ item.category=(nc.trim()||"General").replace(/\b\w/g,c=>c.toUpperCase()); saveInventory(); safeRenderTab(currentTab); }
 }
 
+
+function openInvEditModal(name){
+  const item = inventoryItems.find(x=>x.name===name);
+  if(!item) return;
+  const gstRate = item.gstRate !== undefined ? item.gstRate : 0;
+  const gstIncluded = item.gstIncluded || "inclusive";
+  const hsnCode = item.hsnCode || "";
+  showWideModal(`
+    ${modalHeader("\u270f\ufe0f Edit Item \u2014 " + escHtml(name))}
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">SELLING PRICE (\u20b9)</label>
+          <input class="input" id="iei-sell" type="number" min="0" step="0.01"
+            value="${item.sellingPrice > 0 ? Number(item.sellingPrice).toFixed(2) : ""}"
+            placeholder="0.00" style="margin-bottom:0;" oninput="invEditGstPreview()" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">UNIT</label>
+          <input class="input" id="iei-unit" type="text" placeholder="kg, pcs, litre"
+            value="${escHtml(item.unit||"unit")}" style="margin-bottom:0;" />
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">CATEGORY</label>
+        <input class="input" id="iei-category" type="text" placeholder="General"
+          value="${escHtml(item.category||"General")}" style="margin-bottom:0;" />
+      </div>
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;">
+        <div style="font-size:12px;color:#a78bfa;font-weight:800;margin-bottom:10px;">\ud83e\uddfe GST Settings</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST RATE</label>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <select class="input" id="iei-gst-rate" style="margin-bottom:0;flex:1;" onchange="(function(){if(this.value==='custom'){document.getElementById('iei-gst-custom').style.display='block';document.getElementById('iei-gst-custom').focus();}else{document.getElementById('iei-gst-custom').style.display='none';}invEditGstPreview();}).call(this)">
+                ${[0,5,12,18,28].map(r=>`<option value="${r}" ${Number(gstRate)===r?"selected":""}>${r}% GST</option>`).join("")}
+                <option value="custom" ${![0,5,12,18,28].includes(Number(gstRate))&&Number(gstRate)>0?"selected":""}>Custom %</option>
+              </select>
+              <input type="number" id="iei-gst-custom" min="0" max="100" step="0.5" placeholder="e.g. 3"
+                value="${![0,5,12,18,28].includes(Number(gstRate))&&Number(gstRate)>0?gstRate:""}"
+                style="display:${![0,5,12,18,28].includes(Number(gstRate))&&Number(gstRate)>0?'block':'none'};width:70px;padding:9px 8px;border-radius:8px;border:1px solid #2a3a5a;background:#0d1220;color:#fff;font-size:13px;"
+                oninput="invEditGstPreview()" />
+            </div>
+          </div>
+          <div>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST TYPE</label>
+            <select class="input" id="iei-gst-included" style="margin-bottom:0;" onchange="invEditGstPreview()">
+              <option value="inclusive" ${gstIncluded==="inclusive"?"selected":""}>Inclusive (GST inside price)</option>
+              <option value="exclusive" ${gstIncluded==="exclusive"?"selected":""}>Exclusive (+ GST on sale)</option>
+            </select>
+          </div>
+        </div>
+        <div id="iei-gst-preview" style="font-size:12px;color:#a78bfa;background:#0d0820;border-radius:8px;padding:8px 10px;display:none;margin-bottom:10px;"></div>
+        <div>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">HSN / SAC CODE</label>
+          <input class="input" id="iei-hsn" type="text" maxlength="8"
+            placeholder="e.g. 3305 (Shampoo), 0401 (Milk)"
+            value="${escHtml(hsnCode)}"
+            style="margin-bottom:0;" oninput="invEditHsnLookup()" />
+          <div id="iei-hsn-msg" style="font-size:11px;min-height:14px;margin-top:3px;"></div>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">MIN STOCK ALERT</label>
+        <input class="input" id="iei-min-stock" type="number" min="0" step="1"
+          placeholder="0 = no alert"
+          value="${item.minStock !== undefined ? item.minStock : ""}"
+          style="margin-bottom:0;" />
+      </div>
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button onclick="invEditModalSave(this.dataset.name)" data-name="${escHtml(name)}"
+          style="flex:1;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-size:14px;font-weight:800;cursor:pointer;">
+          \u2705 Save Changes
+        </button>
+        <button onclick="closeModal()"
+          style="padding:12px 18px;border-radius:10px;border:1px solid #1e2a45;background:transparent;color:#7a8aaa;font-size:14px;cursor:pointer;">
+          Cancel
+        </button>
+      </div>
+    </div>
+  `);
+  invEditGstPreview();
+  invEditHsnLookup();
+}
+
+function invEditGstPreview(){
+  const _r = document.getElementById("iei-gst-rate");
+  const rate = _r?.value === "custom"
+    ? (parseFloat(document.getElementById("iei-gst-custom")?.value)||0)
+    : (parseFloat(_r?.value||"0")||0);
+  const included = document.getElementById("iei-gst-included")?.value||"inclusive";
+  const sell = parseFloat(document.getElementById("iei-sell")?.value||"0")||0;
+  const el = document.getElementById("iei-gst-preview");
+  if(!el) return;
+  if(rate === 0){ el.style.display="none"; return; }
+  el.style.display = "block";
+  if(sell > 0){
+    if(included === "exclusive"){
+      const gstAmt = +(sell * rate / 100).toFixed(2);
+      el.innerHTML = `Base: \u20b9${sell.toFixed(2)} + GST ${rate}% (\u20b9${gstAmt}) = <strong>Customer pays \u20b9${(sell+gstAmt).toFixed(2)}</strong>`;
+    } else {
+      const base = +(sell * 100 / (100 + rate)).toFixed(2);
+      const gstAmt = +(sell - base).toFixed(2);
+      el.innerHTML = `Price \u20b9${sell.toFixed(2)} includes GST \u2014 Base: \u20b9${base.toFixed(2)} + GST ${rate}% (\u20b9${gstAmt})`;
+    }
+  } else {
+    el.innerHTML = included==="exclusive"
+      ? `GST ${rate}% will be added on top of selling price`
+      : `GST ${rate}% is already inside the selling price`;
+  }
+}
+
+function invEditHsnLookup(){
+  const hsn = (document.getElementById("iei-hsn")?.value||"").trim();
+  const msgEl = document.getElementById("iei-hsn-msg");
+  if(!msgEl) return;
+  if(!hsn){ msgEl.innerHTML=""; return; }
+  const rate = hsnLookupRate(hsn);
+  if(rate !== null){
+    msgEl.innerHTML = `<span style="color:#22c55e;">\u2713 HSN ${hsn} \u2192 ${rate}% GST</span>
+      <button onclick="document.getElementById('iei-gst-rate').value=${rate};invEditGstPreview()"
+        style="margin-left:8px;background:#22c55e22;border:1px solid #22c55e55;color:#22c55e;font-size:10px;font-weight:800;border-radius:5px;padding:2px 8px;cursor:pointer;">Apply ${rate}%</button>`;
+  } else {
+    msgEl.innerHTML = `<span style="color:#7a8aaa;">HSN not found \u2014 check code or set rate manually</span>`;
+  }
+}
+
+function invEditModalSave(name){
+  const item = inventoryItems.find(x=>x.name===name);
+  if(!item){ notify("\u274c Item not found","error"); return; }
+  const sell = parseFloat(document.getElementById("iei-sell")?.value||"0");
+  const unit = (document.getElementById("iei-unit")?.value||"").trim();
+  const category = (document.getElementById("iei-category")?.value||"General").trim().replace(/\b\w/g,c=>c.toUpperCase());
+  const _gstEl = document.getElementById("iei-gst-rate");
+  const gstRate = _gstEl?.value === "custom"
+    ? (parseFloat(document.getElementById("iei-gst-custom")?.value)||0)
+    : (parseFloat(_gstEl?.value||"0")||0);
+  const gstIncluded = document.getElementById("iei-gst-included")?.value||"inclusive";
+  const hsnCode = (document.getElementById("iei-hsn")?.value||"").trim();
+  const minStockVal = document.getElementById("iei-min-stock")?.value;
+  if(!isNaN(sell) && sell >= 0) item.sellingPrice = sell;
+  if(unit) item.unit = unit;
+  if(category) item.category = category;
+  item.gstRate = gstRate;
+  item.gstIncluded = gstIncluded;
+  if(hsnCode) item.hsnCode = hsnCode; else delete item.hsnCode;
+  if(minStockVal !== "" && minStockVal !== null && minStockVal !== undefined) item.minStock = Number(minStockVal)||0;
+  saveInventory();
+  closeModal();
+  notify("\u2705 " + name + " updated");
+  safeRenderTab(currentTab);
+}
+
 // Cost value of current stock for an item: stock_qty * avg_cost_per_unit
 function invGetStockValue(itemName){
   const item = inventoryItems.find(x=>x.name===itemName);
@@ -13779,13 +13924,19 @@ function renderInventoryTab(){
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
           <div>
             <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST RATE (%)</label>
-            <select class="input" id="inv-gst-rate" style="margin-bottom:0;" onchange="invUpdateGstPreview('add')">
-              <option value="0" ${!prefillItem||!prefillItem.gstRate?'selected':''}>0% — No GST</option>
-              <option value="5" ${prefillItem&&prefillItem.gstRate===5?'selected':''}>5%</option>
-              <option value="12" ${prefillItem&&prefillItem.gstRate===12?'selected':''}>12%</option>
-              <option value="18" ${prefillItem&&prefillItem.gstRate===18?'selected':''}>18%</option>
-              <option value="28" ${prefillItem&&prefillItem.gstRate===28?'selected':''}>28%</option>
-            </select>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <select class="input" id="inv-gst-rate" style="margin-bottom:0;flex:1;" onchange="(function(){var v=this.value;if(v==='custom'){document.getElementById('inv-gst-custom').style.display='block';document.getElementById('inv-gst-custom').focus();}else{document.getElementById('inv-gst-custom').style.display='none';}invUpdateGstPreview('add');}).call(this)">
+                <option value="0" ${!prefillItem||![5,12,18,28].includes(Number(prefillItem.gstRate))?'selected':''}>0% — No GST</option>
+                <option value="5" ${prefillItem&&prefillItem.gstRate===5?'selected':''}>5%</option>
+                <option value="12" ${prefillItem&&prefillItem.gstRate===12?'selected':''}>12%</option>
+                <option value="18" ${prefillItem&&prefillItem.gstRate===18?'selected':''}>18%</option>
+                <option value="28" ${prefillItem&&prefillItem.gstRate===28?'selected':''}>28%</option>
+                <option value="custom">Custom %</option>
+              </select>
+              <input type="number" id="inv-gst-custom" min="0" max="100" step="0.5" placeholder="e.g. 3"
+                style="display:none;width:70px;padding:9px 8px;border-radius:8px;border:1px solid #2a3a5a;background:#0d1220;color:#fff;font-size:13px;"
+                oninput="invUpdateGstPreview('add')" />
+            </div>
           </div>
           <div>
             <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">PRICE IS</label>
@@ -13974,7 +14125,10 @@ function invSubmitAdd(){
   const unit = (document.getElementById("inv-unit").value||"").trim();
   const sellPrice = parseFloat(document.getElementById("inv-sell-price").value||"0")||0;
   const minStock = (document.getElementById("inv-min-stock").value||"").trim();
-  const gstRate = parseFloat(document.getElementById("inv-gst-rate")?.value||"0")||0;
+  const _gstRateEl = document.getElementById("inv-gst-rate");
+  const gstRate = _gstRateEl?.value === "custom"
+    ? (parseFloat(document.getElementById("inv-gst-custom")?.value)||0)
+    : (parseFloat(_gstRateEl?.value||"0")||0);
   const gstIncluded = document.getElementById("inv-gst-included")?.value||"inclusive";
   const hsnCode = (document.getElementById("inv-hsn-add")?.value||"").trim();
   if(!hasPermission('inventory_add')) return notify("🚫 No permission to add inventory items","error");
@@ -16099,9 +16253,7 @@ function renderInventoryCategoryPage(catName){
                 <div style="font-size:11px;color:#4a5a7a;">Restocked: ${lastAdded} · <span style="color:#4a8aff;">Tap for buyers →</span></div>
                 <div style="display:flex;gap:5px;" onclick="event.stopPropagation()">
                   
-                  <button onclick="invEditSellPrice('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a08;border:none;border-radius:7px;color:#FFD700;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">₹ Sell Price</button>
-                  <button onclick="invEditCategory('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a0a2a;border:none;border-radius:7px;color:#b080ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🏷 Cat</button>
-                  <button onclick="invEditUnit('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1a3a;border:none;border-radius:7px;color:#aaa;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">✏️ Unit</button>
+                  <button onclick="openInvEditModal('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#0a1a3a;border:none;border-radius:7px;color:#4a8aff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">✏️ Edit</button>
                   <button onclick="invDeleteItem('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#2a0808;border:none;border-radius:7px;color:#f66;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🗑</button>
                 </div>
               </div>
@@ -16716,33 +16868,51 @@ function createBillObject({ custId, soldItems, amount, billNum, notes, date }) {
       const invItem = inventoryItems.find(x => x.name === si.name) || {};
       const lineAmt = (si.qty || 0) * (si.pricePerUnit || 0);
       const gstRate = (si.gstRate !== undefined && si.gstRate !== null && si.gstRate !== "") ? parseFloat(si.gstRate) : defaultGSTRate;
-      const taxableAmt = gstType !== "none" ? parseFloat((lineAmt / (1 + gstRate / 100)).toFixed(2)) : lineAmt;
-      const taxAmt = gstType !== "none" ? parseFloat((lineAmt - taxableAmt).toFixed(2)) : 0;
+      const gstIncluded = si.gstIncluded || invItem.gstIncluded || "inclusive";
+      // For exclusive items the selling price is the taxable base; for inclusive, divide it out
+      const taxableAmt = gstType !== "none"
+        ? (gstIncluded === "exclusive"
+            ? parseFloat(lineAmt.toFixed(2))
+            : parseFloat((lineAmt / (1 + gstRate / 100)).toFixed(2)))
+        : lineAmt;
+      const taxAmt = gstType !== "none"
+        ? (gstIncluded === "exclusive"
+            ? parseFloat((lineAmt * gstRate / 100).toFixed(2))
+            : parseFloat((lineAmt - taxableAmt).toFixed(2)))
+        : 0;
+      // lineTotal = what customer actually pays for this line
+      const lineTotal = (gstType !== "none" && gstIncluded === "exclusive")
+        ? parseFloat((lineAmt + taxAmt).toFixed(2))
+        : lineAmt;
       return {
         name: si.name,
         qty: si.qty,
         unit: invItem.unit || "unit",
-        hsn: invItem.hsn || si.hsn || "",
+        hsn: invItem.hsnCode || si.hsn || "",
         rate: si.pricePerUnit || 0,
-        amount: lineAmt,
+        amount: lineTotal,       // customer-facing total for this line
+        baseAmount: lineAmt,     // pre-tax base
         gstRate: gstType !== "none" ? gstRate : 0,
+        gstIncluded,
         taxableAmt,
         taxAmt,
       };
     });
   } else {
-    // Standard mode: single line
+    // Standard mode: single line — entered amount is always the final total (inclusive)
     const gstRate = defaultGSTRate;
     const lineAmt = amount;
     const taxableAmt = gstType !== "none" ? parseFloat((lineAmt / (1 + gstRate / 100)).toFixed(2)) : lineAmt;
     const taxAmt = gstType !== "none" ? parseFloat((lineAmt - taxableAmt).toFixed(2)) : 0;
-    items = [{ name: notes || "Sale", qty: 1, unit: "", hsn: "", rate: amount, amount: lineAmt, gstRate: gstType !== "none" ? gstRate : 0, taxableAmt, taxAmt }];
+    items = [{ name: notes || "Sale", qty: 1, unit: "", hsn: "", rate: amount, amount: lineAmt, baseAmount: lineAmt, gstRate: gstType !== "none" ? gstRate : 0, gstIncluded: "inclusive", taxableAmt, taxAmt }];
   }
 
   const subtotal = items.reduce((s, i) => s + i.amount, 0) || amount;
   const taxTotal = items.reduce((s, i) => s + (i.taxAmt || 0), 0);
   const taxableTotal = items.reduce((s, i) => s + (i.taxableAmt || 0), 0);
-  const total = subtotal;
+  // For exclusive GST items, customer pays base + tax; for inclusive, total = subtotal (tax already inside)
+  const hasExclusive = items.some(i => (i.gstIncluded || "inclusive") === "exclusive" && (i.taxAmt || 0) > 0);
+  const total = parseFloat((subtotal + (hasExclusive ? taxTotal : 0)).toFixed(2));
 
   // Build GST summary by rate
   const gstSummary = {};
@@ -16946,7 +17116,7 @@ function renderBillHTML(bill) {
           <td style="padding:4px 6px;font-size:12px;color:#333;">${item.name}</td>
           <td style="padding:4px 6px;font-size:12px;color:#333;text-align:center;">${item.qty} ${item.unit||""}</td>
           <td style="padding:4px 6px;font-size:12px;color:#333;text-align:right;">₹${(item.rate||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
-          <td style="padding:4px 6px;font-size:12px;color:#333;text-align:right;">₹${(item.taxableAmt||item.amount).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
+          <td style="padding:4px 6px;font-size:12px;color:#333;text-align:right;">₹${(item.taxableAmt||item.baseAmount||item.amount).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
           ${isIGST
             ? `<td style="padding:4px 6px;font-size:12px;color:#333;text-align:center;">${item.gstRate||0}%<br><span style="font-size:10px;">₹${(item.taxAmt||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</span></td>`
             : `<td style="padding:4px 6px;font-size:12px;color:#333;text-align:center;">${half}%<br><span style="font-size:10px;">₹${((item.taxAmt||0)/2).toLocaleString("en-IN",{minimumFractionDigits:2})}</span></td>
@@ -16957,7 +17127,7 @@ function renderBillHTML(bill) {
     // Thermal: compact
     return `
       <tr>
-        <td style="padding:3px 0;font-size:13px;color:#111;vertical-align:top;">${item.name}${hasRate ? `<br><span style="font-size:10px;color:#666;">${item.qty} ${item.unit} × ₹${item.rate}</span>` : ""}${hasGST&&item.gstRate ? `<br><span style="font-size:10px;color:#888;">GST ${item.gstRate}%: ₹${(item.taxAmt||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</span>` : ""}</td>
+        <td style="padding:3px 0;font-size:13px;color:#111;vertical-align:top;">${item.name}${hasRate ? `<br><span style="font-size:10px;color:#666;">${item.qty} ${item.unit} × ₹${item.rate}</span>` : ""}${hasGST&&item.gstRate&&item.gstIncluded==="exclusive" ? `<br><span style="font-size:10px;color:#888;">Base: ₹${(item.baseAmount||0).toLocaleString("en-IN",{minimumFractionDigits:2})} + GST ${item.gstRate}%: ₹${(item.taxAmt||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</span>` : hasGST&&item.gstRate ? `<br><span style="font-size:10px;color:#888;">GST ${item.gstRate}% (incl.): ₹${(item.taxAmt||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</span>` : ""}</td>
         <td style="padding:3px 0;font-size:13px;color:#111;text-align:right;vertical-align:top;white-space:nowrap;">₹${item.amount.toLocaleString("en-IN")}</td>
       </tr>`;
   }).join("");
