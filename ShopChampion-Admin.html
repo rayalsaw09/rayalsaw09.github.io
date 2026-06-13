@@ -8349,6 +8349,7 @@ function saveCrTransaction(){
 
   if(!amount || amount<=0){ notify("⚠️ Enter a valid amount"); return; }
 
+  const creditorId = document.getElementById("tx-creditor-id")?.value;
   const creditors = getCreditors();
   const idx = creditors.findIndex(c=>c.id===creditorId);
   if(idx<0){ notify("❌ Creditor not found"); return; }
