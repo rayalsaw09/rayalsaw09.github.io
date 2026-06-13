@@ -1435,6 +1435,21 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       </button>
     </div>
 
+    <!-- MEMBER LOGIN SECTION -->
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid #1e2a45;">
+      <div id="member-login-toggle" onclick="toggleMemberLogin()" style="cursor:pointer;font-size:12px;color:#4a5a7a;text-align:center;text-decoration:underline;">👤 Team Member? Login here</div>
+      <div id="member-login-form" style="display:none;margin-top:14px;">
+        <div style="font-size:13px;color:#a78bfa;font-weight:700;margin-bottom:12px;">Team Member Login</div>
+        <input class="input" type="text" id="member-username" placeholder="Username" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')document.getElementById('member-password').focus()"/>
+        <input class="input" type="password" id="member-password" placeholder="Password" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')memberLogin()"/>
+        <div id="member-login-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
+        <button class="btn" onclick="memberLogin()" id="member-login-btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:8px;">
+          <span id="member-login-txt">Login as Member →</span>
+        </button>
+        <button onclick="toggleMemberLogin()" style="background:transparent;border:none;color:#4a5a7a;font-size:12px;cursor:pointer;text-decoration:underline;">← Back to Owner Login</button>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1452,6 +1467,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <div id="lang-menu" style="display:none;position:fixed;right:14px;top:60px;background:var(--bg-card);border:1px solid var(--border-main);border-radius:12px;padding:8px;z-index:9999;min-width:160px;box-shadow:0 8px 32px #0008;"></div>
       <span id="lang-label" style="display:none;">EN</span>
       <span id="header-plan-pill" onclick="renderTab(9)" title="View plan details" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;background:#0a1a3a;color:#88aaff;border:1px solid #1a2a5a;">🆓 Free</span>
+      <span id="header-member-pill" style="display:none;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;background:#1a0a3a;color:#a78bfa;border:1px solid #3a1a7a;cursor:pointer;" onclick="if(confirm('Log out as team member?'))doLogout();">👤 <span id="header-member-name"></span></span>
       <button class="btn" id="push-btn" onclick="this.textContent='⏳';pushSync().finally(()=>this.textContent='⬆ Push');" title="Push to Display" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:7px 14px;font-size:13px;font-weight:800;">⬆ Push</button>
     </div>
   </div>
@@ -1530,13 +1546,18 @@ async function scHashPassword(phone, password) {
 // ─── CONSTANTS ───────────────────────────────────────────────
 const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
-const TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings","alerts","history"];
-const TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️","⚠️","🕘"];
-const TABS_LABEL_PRO = ["Rankings","Customers","Add Sale","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings","Alerts","History"];
+const TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings","alerts","history","team"];
+const TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️","⚠️","🕘","👤"];
+const TABS_LABEL_PRO = ["Rankings","Customers","Add Sale","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings","Alerts","History","Team"];
 let _shopRequestsUnread = 0; // badge count for messages tab
 function getTabs(){
   const isPro = currentAppStyle === "pro";
-  return TABS_BASE.map((k,i)=>{
+  const result = [];
+  TABS_BASE.forEach((k,i)=>{
+    // Team tab: only show when logged in as owner
+    if(k === "team" && currentMember) return;
+    // Member tab visibility filter
+    if(currentMember && !isTabVisible(k)) return;
     let label = isPro ? TABS_LABEL_PRO[i] : (TABS_ICON[i]+" "+t(k));
     // Low stock badge on inventory tab (index 5)
     if(i===5 && inventoryItems && inventoryItems.length>0){
@@ -1554,8 +1575,9 @@ function getTabs(){
       const alertCount = (typeof getAlertCount === "function") ? getAlertCount() : 0;
       if(alertCount>0) label += ` <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle;">${alertCount}</span>`;
     }
-    return label;
+    result.push({index: i, label});
   });
+  return result;
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -2033,7 +2055,7 @@ window.addEventListener('appinstalled', () => {
 
 // ── Mobile Bottom Nav ──────────────────────────────────────────
 const MOBILE_MAIN_TABS = [0, 1, 2, 5]; // leaderboard, customers, purchase, inventory
-const MOBILE_MORE_TABS = [3, 4, 6, 7, 8, 9, 10, 11];    // analytics, compare, creditors, debtors, messages, settings, alerts, history
+const MOBILE_MORE_TABS = [3, 4, 6, 7, 8, 9, 10, 11, 12];    // analytics, compare, creditors, debtors, messages, settings, alerts, history, team
 
 function mobileTab(i) {
   closeMoreMenu();
@@ -2057,9 +2079,9 @@ function toggleMoreMenu() {
   if (isOpen) {
     closeMoreMenu();
   } else {
-    // Build more menu items
-    const TABS = getTabs();
-    menu.innerHTML = MOBILE_MORE_TABS.map(i => `
+    // Build more menu items — filter by member permissions
+    const visibleTabs = getTabs().map(t => t.index);
+    menu.innerHTML = MOBILE_MORE_TABS.filter(i => visibleTabs.includes(i)).map(i => `
       <button class="more-menu-btn${currentTab === i ? ' active' : ''}" onclick="mobileTab(${i});closeMoreMenu()">
         <span class="mm-icon">${TABS_ICON[i]}</span>
         <span class="mm-label">${TABS_BASE[i].charAt(0).toUpperCase() + TABS_BASE[i].slice(1)}</span>
@@ -2714,6 +2736,25 @@ let authConfirmResult = null;
 let recaptchaVerifier  = null;
 let authMode = ""; // "new_user" | "forgot"
 let authPhone = "";
+// ── Team Member state ──────────────────────────────────────────
+let currentMember = null; // null = shop owner logged in; object = team member
+// { id, username, display_name, permissions: { tabs:{...}, actions:{...} } }
+let _memberSessionToken = null; // session token stored locally for heartbeat
+let _memberSessionTimer = null; // interval handle for heartbeat
+
+function hasPermission(actionKey) {
+  if (!currentMember) return true; // owner always has full permission
+  return !!(currentMember.permissions && currentMember.permissions.actions && currentMember.permissions.actions[actionKey]);
+}
+
+function isTabVisible(tabKey) {
+  if (!currentMember) return true; // owner sees all tabs
+  // Team tab always hidden from members
+  if (tabKey === "team") return false;
+  const tabs = currentMember.permissions && currentMember.permissions.tabs;
+  if (!tabs) return false;
+  return !!tabs[tabKey];
+}
 let _loginSuccessFired = false; // guard: prevent double auto-login from DOMContentLoaded + window.load
 // ─── PER-ACCOUNT STORAGE KEY ─────────────────────────────────
 // All localStorage keys are prefixed with the logged-in phone number
@@ -2753,12 +2794,14 @@ function addHistoryLog(type, action, details, extra){
     const dayKey = _histDayKey(now);
     const key = historyLogKey(dayKey);
     const list = JSON.parse(localStorage.getItem(key)||"[]");
+    const actorName = currentMember ? currentMember.display_name : "Owner";
     const entry = {
       id: "H"+now+Math.random().toString(36).slice(2,6),
       ts: now,
       type: type||"other",
       action: action||"",
       details: details||"",
+      actor: actorName,
       extra: extra||null
     };
     list.push(entry);
@@ -3350,6 +3393,21 @@ function doLogin() {
 }
 
 function doLogout() {
+  // Clear member session token if logged in as member
+  if(currentMember && _memberSessionToken) {
+    fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/force_logout_member`, {
+      method:"POST",
+      headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+      body: JSON.stringify({ p_member_id: currentMember.id })
+    }).catch(()=>{});
+  }
+  if(_memberSessionTimer) { clearInterval(_memberSessionTimer); _memberSessionTimer = null; }
+  currentMember = null; _memberSessionToken = null;
+  sessionStorage.removeItem("sc_member_token"); sessionStorage.removeItem("sc_member_id");
+  // Hide member pill
+  const pill = document.getElementById("header-member-pill");
+  if(pill) pill.style.display = "none";
+
   try { firebase.auth().signOut(); } catch{}
   localStorage.removeItem("sc_auth_phone");
   localStorage.removeItem("sc_auth_uid");
@@ -3375,6 +3433,11 @@ function doLogout() {
   authShowStep("phone");
   document.getElementById("auth-phone").value = "";
   document.getElementById("auth-phone-err").style.display = "none";
+  // Reset member login form
+  const mf = document.getElementById("member-login-form");
+  const mt = document.getElementById("member-login-toggle");
+  if(mf) { mf.style.display="none"; document.getElementById("member-username").value=""; document.getElementById("member-password").value=""; document.getElementById("member-login-err").style.display="none"; }
+  if(mt) mt.style.display="block";
 }
 
 function updateSyncStatus(){
@@ -3584,7 +3647,7 @@ function _safeRenderTabImmediate(i) {
   }
 }
 // ─── TABS ─────────────────────────────────────────────────────
-function renderTabs(){const TABS=getTabs();document.getElementById("tab-bar").innerHTML=TABS.map((tab,i)=>`<button class="tab-btn${currentTab===i?" active":""}" onclick="switchTab(${i})">${tab}</button>`).join("");}
+function renderTabs(){const TABS=getTabs();document.getElementById("tab-bar").innerHTML=TABS.map((tab)=>`<button class="tab-btn${currentTab===tab.index?" active":""}" onclick="switchTab(${tab.index})">${tab.label}</button>`).join("");}
 function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}if(i!==6&&i!==7)invPrefillName="";window._pageStack=[];window._scDetailPage=null;currentTab=i;renderTabs();renderTab(i);}
 
 // ─── PAGE HISTORY ENGINE ──────────────────────────────────────────────────────
@@ -3654,6 +3717,7 @@ function renderTab(i){
   else if(i===9)el.innerHTML=renderSettings();
   else if(i===10)el.innerHTML=renderAlertsTab();
   else if(i===11)el.innerHTML=renderHistoryTab();
+  else if(i===12)renderTeamTab(el);
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
 }
 
@@ -5128,6 +5192,7 @@ function openPartialPaymentModal(custId, borrowId){
 // ─── DELETE PURCHASE (used in profile modal) ─────────────────
 async function deletePurchase(custId,bill,dateEnc){
   if(requireOnline()) return;
+  if(!hasPermission('sale_delete')) return notify("🚫 No permission to delete sales","error");
   if(!confirm("Delete this purchase? The customer's total spend will decrease."))return;
   const c=customers.find(x=>x.id===custId);if(!c)return;
   const date=decodeURIComponent(dateEnc);
@@ -7050,7 +7115,7 @@ function openAddCreditorModal(editId){
 
 function saveCreditorModal(editId){
   if(requireOnline()) return;
-  const name = document.getElementById("cr-name")?.value.trim();
+  if(!hasPermission('creditor_create')) return notify("🚫 No permission to manage creditors","error");
   if(!name){ notify("⚠️ Name is required"); return; }
 
   const gstinRaw = document.getElementById("cr-gstin")?.value.trim().toUpperCase()||"";
@@ -7098,7 +7163,7 @@ function saveCreditorModal(editId){
 // ── Archive helper ────────────────────────────────────────────────────────────
 function archiveCreditor(id){
   if(requireOnline()) return;
-  const creditors = getCreditors();
+  if(!hasPermission('creditor_archive')) return notify("🚫 No permission to archive creditors","error");
   const cr = creditors.find(c=>c.id===id);
   if(!cr) return;
   cr._archived = true;
@@ -7111,7 +7176,7 @@ function archiveCreditor(id){
 
 function archiveDebtor(id){
   if(requireOnline()) return;
-  const debtors = getDebtors();
+  if(!hasPermission('debtor_archive')) return notify("🚫 No permission to archive debtors","error");
   const dr = debtors.find(d=>d.id===id);
   if(!dr) return;
   dr._archived = true;
@@ -7159,6 +7224,7 @@ function _doSimpleDeleteCreditor(id){
 
 // ── Smart delete: analyse impact, show appropriate modal ──────────────────────
 function deleteCreditor(id){
+  if(!hasPermission('creditor_delete')) return notify("🚫 No permission to delete creditors","error");
   const creditors = getCreditors();
   const cr = creditors.find(c=>c.id===id);
   if(!cr) return;
@@ -7297,7 +7363,7 @@ function confirmHardDeleteCreditor(id){
 // ── Debtor delete ─────────────────────────────────────────────────────────────
 function deleteDebtor(id){
   if(requireOnline()) return;
-  const debtors = getDebtors();
+  if(!hasPermission('debtor_delete')) return notify("🚫 No permission to delete debtors","error");
   const dr = debtors.find(d=>d.id===id);
   if(!dr) return;
 
@@ -8128,7 +8194,7 @@ function crSelectBill(billId, remaining){
 
 async function saveSmartPayment(){
   if(requireOnline()) return;
-  const creditorId  = document.getElementById("spm-creditor-id")?.value;
+  if(!hasPermission('creditor_tx')) return notify("🚫 No permission to record creditor payments","error");
   const selectedBillsRaw = document.getElementById("spm-selected-bills")?.value||"";
   const selectedBillIds = selectedBillsRaw.split(",").filter(Boolean);
   const amount      = parseFloat(document.getElementById("spm-amount")?.value)||0;
@@ -8274,7 +8340,7 @@ function openReturnModal(creditorId){
 
 function saveCrTransaction(){
   if(requireOnline()) return;
-  const creditorId = document.getElementById("tx-creditor-id")?.value;
+  if(!hasPermission('creditor_tx')) return notify("🚫 No permission to record creditor transactions","error");
   const type    = document.getElementById("tx-type")?.value;
   const amount  = parseFloat(document.getElementById("tx-amount")?.value)||0;
   const note    = document.getElementById("tx-note")?.value.trim();
@@ -8671,6 +8737,7 @@ function openPendingPaymentRequests() {
 
 // ─── DELETE A CREDITOR TRANSACTION (also removes from their side) ─────────────
 function deleteCrTx(creditorId, origIdx){
+  if(!hasPermission('creditor_tx')) return notify("🚫 No permission to delete creditor transactions","error");
   if(!confirm("Delete this transaction?")) return;
   const creditors = getCreditors();
   const idx = creditors.findIndex(c => c.id === creditorId);
@@ -9030,7 +9097,7 @@ function openAddDebtorModal(editId){
 
 function saveDebtorModal(editId){
   if(requireOnline()) return;
-  const name = document.getElementById("dr-name")?.value.trim();
+  if(!hasPermission('debtor_create')) return notify("🚫 No permission to manage debtors","error");
   if(!name){ notify("⚠️ Name is required"); return; }
 
   const debtors = getDebtors();
@@ -9491,6 +9558,7 @@ function openAddDebtTxModal(debtorId, defaultType){
 
 function saveDebtTransaction(){
   if(requireOnline()) return;
+  if(!hasPermission('debtor_tx')) return notify("🚫 No permission to record debtor transactions","error");
   const debtorId = document.getElementById("drtx-debtor-id")?.value;
   const type     = document.getElementById("drtx-type")?.value;
   const amtRaw   = parseFloat(document.getElementById("drtx-amount")?.value||"0");
@@ -9851,9 +9919,402 @@ const HIST_TYPE_META = {
   other:     {icon:"📋", color:"#7a8aaa", label:"Other"}
 };
 
+// ═══════════════════════════════════════════════════════════════════
+// ─── PHASE 2: TEAM MEMBERS TAB ─────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+
+// Default permissions for new members (safe defaults: read-only-ish)
+const DEFAULT_MEMBER_PERMISSIONS = {
+  tabs: { leaderboard:true, customers:true, sales:true, analytics:false, compare:false, inventory:true, creditors:false, debtors:false, messages:true, settings:false, alerts:true, history:true },
+  actions: {
+    sale_create:true, sale_delete:false,
+    customer_create:true, customer_edit:true, customer_delete:false, customer_bulk_delete:false,
+    inventory_add:false, inventory_restock:true, inventory_delete:false,
+    creditor_create:false, creditor_tx:false, creditor_delete:false, creditor_archive:false,
+    debtor_create:false, debtor_tx:false, debtor_delete:false, debtor_archive:false,
+    history_date_filter:false
+  }
+};
+
+const PERM_ACTIONS_META = [
+  { key:"sale_create",          label:"Create Sale",              group:"Sales" },
+  { key:"sale_delete",          label:"Delete Sale",              group:"Sales" },
+  { key:"customer_create",      label:"Add Customer",             group:"Customers" },
+  { key:"customer_edit",        label:"Edit Customer",            group:"Customers" },
+  { key:"customer_delete",      label:"Delete Customer",          group:"Customers" },
+  { key:"customer_bulk_delete", label:"Bulk Delete Customers",    group:"Customers" },
+  { key:"inventory_add",        label:"Add Inventory Item",       group:"Inventory" },
+  { key:"inventory_restock",    label:"Restock / Adjust",         group:"Inventory" },
+  { key:"inventory_delete",     label:"Delete Inventory Item",    group:"Inventory" },
+  { key:"creditor_create",      label:"Add Creditor",             group:"Creditors" },
+  { key:"creditor_tx",          label:"Record Creditor Tx",       group:"Creditors" },
+  { key:"creditor_delete",      label:"Delete Creditor",          group:"Creditors" },
+  { key:"creditor_archive",     label:"Archive Creditor",         group:"Creditors" },
+  { key:"debtor_create",        label:"Add Debtor",               group:"Debtors" },
+  { key:"debtor_tx",            label:"Record Debtor Tx",         group:"Debtors" },
+  { key:"debtor_delete",        label:"Delete Debtor",            group:"Debtors" },
+  { key:"debtor_archive",       label:"Archive Debtor",           group:"Debtors" },
+  { key:"history_date_filter",  label:"View Past History Dates",  group:"History" }
+];
+
+const PERM_TABS_META = [
+  {key:"leaderboard",label:"Leaderboard"},{key:"customers",label:"Customers"},
+  {key:"sales",label:"Sales"},{key:"analytics",label:"Analytics"},
+  {key:"compare",label:"Compare"},{key:"inventory",label:"Inventory"},
+  {key:"creditors",label:"Creditors"},{key:"debtors",label:"Debtors"},
+  {key:"messages",label:"Messages"},{key:"settings",label:"Settings"},
+  {key:"alerts",label:"Alerts"},{key:"history",label:"History"}
+];
+
+let _teamMembers = [];
+
+async function fetchTeamMembers() {
+  if (requireOnline()) return [];
+  try {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/list_shop_members`, {
+      method: "POST",
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_shop_phone: authPhone })
+    });
+    const data = await res.json();
+    _teamMembers = Array.isArray(data) ? data : [];
+    return _teamMembers;
+  } catch(e) { notify("Failed to load members","error"); return []; }
+}
+
+function renderPermMatrix(permissions, prefix) {
+  const p = permissions || DEFAULT_MEMBER_PERMISSIONS;
+  const tabs = p.tabs || DEFAULT_MEMBER_PERMISSIONS.tabs;
+  const actions = p.actions || DEFAULT_MEMBER_PERMISSIONS.actions;
+
+  // Tabs section
+  const tabsHtml = `<div style="margin-bottom:14px;">
+    <div style="font-size:12px;font-weight:800;color:#60a5fa;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">📑 Visible Tabs</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+      ${PERM_TABS_META.map(t=>`<label style="display:flex;align-items:center;gap:8px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:7px 10px;cursor:pointer;font-size:13px;color:#c8d0e0;">
+        <input type="checkbox" id="${prefix}_tab_${t.key}" ${tabs[t.key]?"checked":""} style="accent-color:#60a5fa;width:15px;height:15px;"/>
+        ${t.label}
+      </label>`).join("")}
+    </div>
+  </div>`;
+
+  // Actions sections grouped
+  const groups = [...new Set(PERM_ACTIONS_META.map(a=>a.group))];
+  const actionsHtml = groups.map(grp=>{
+    const items = PERM_ACTIONS_META.filter(a=>a.group===grp);
+    return `<div style="margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:800;color:#fbbf24;margin-bottom:6px;">${grp}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+        ${items.map(a=>`<label style="display:flex;align-items:center;gap:8px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;color:#c8d0e0;">
+          <input type="checkbox" id="${prefix}_act_${a.key}" ${actions[a.key]?"checked":""} style="accent-color:#fbbf24;width:14px;height:14px;"/>
+          ${a.label}
+        </label>`).join("")}
+      </div>
+    </div>`;
+  }).join("");
+
+  return `<div style="background:#060b17;border:1px solid #1e2a45;border-radius:12px;padding:14px;max-height:360px;overflow-y:auto;">${tabsHtml}<div style="font-size:12px;font-weight:800;color:#fbbf24;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;">🔐 Action Permissions</div>${actionsHtml}</div>`;
+}
+
+function collectPermissions(prefix) {
+  const tabs = {};
+  PERM_TABS_META.forEach(t => {
+    const el = document.getElementById(`${prefix}_tab_${t.key}`);
+    tabs[t.key] = el ? el.checked : false;
+  });
+  const actions = {};
+  PERM_ACTIONS_META.forEach(a => {
+    const el = document.getElementById(`${prefix}_act_${a.key}`);
+    actions[a.key] = el ? el.checked : false;
+  });
+  return { tabs, actions };
+}
+
+async function renderTeamTab(el) {
+  el.innerHTML = `<div style="padding:20px;text-align:center;color:#4a5a7a;">⏳ Loading members...</div>`;
+  const members = await fetchTeamMembers();
+
+  const memberCards = members.length === 0
+    ? `<div style="text-align:center;padding:40px;color:#4a5a7a;font-size:14px;">No team members yet. Add your first member below.</div>`
+    : members.map(m => {
+        const lastLogin = m.last_login_at ? new Date(m.last_login_at).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "Never";
+        const hasSession = !!m.active_session_token;
+        return `<div style="background:#0a0e1a;border:1px solid ${m.blocked?"#5a1a1a":"#1e2a45"};border-radius:12px;padding:14px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div style="width:38px;height:38px;border-radius:10px;background:#1a0a3a;border:1px solid #3a1a7a;display:flex;align-items:center;justify-content:center;font-size:18px;">👤</div>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:800;color:#e8eaf0;">${escHtml(m.display_name)}</div>
+              <div style="font-size:12px;color:#7a8aaa;">@${escHtml(m.username)}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+              ${m.blocked ? `<span style="background:#3a0808;color:#f66;border:1px solid #5a1a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🔴 Blocked</span>` : `<span style="background:#0a1a0a;color:#4f4;border:1px solid #1a3a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🟢 Active</span>`}
+              <span style="font-size:10px;color:${hasSession?"#4ade80":"#4a5a7a"};">${hasSession?"● Online":"○ Offline"}</span>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#4a5a7a;margin-bottom:10px;">Last login: ${lastLogin}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button onclick="openEditMemberModal('${m.id}')" class="btn" style="flex:1;background:#1a2a4a;border:1px solid #2a3a6a;color:#88aaff;font-size:12px;padding:7px 10px;font-weight:700;">✏️ Edit</button>
+            <button onclick="toggleMemberBlock('${m.id}',${!m.blocked})" class="btn" style="flex:1;background:${m.blocked?"#0a1a0a":"#1a0a0a"};border:1px solid ${m.blocked?"#1a3a1a":"#3a1a1a"};color:${m.blocked?"#4f4":"#f66"};font-size:12px;padding:7px 10px;font-weight:700;">${m.blocked?"✅ Unblock":"🚫 Block"}</button>
+            <button onclick="forceLogoutMember('${m.id}')" class="btn" style="background:#1a1a0a;border:1px solid #3a3a1a;color:#fbbf24;font-size:12px;padding:7px 10px;font-weight:700;" title="Force Logout">⏏</button>
+            <button onclick="deleteMember('${m.id}','${escHtml(m.display_name)}')" class="btn" style="background:#1a0808;border:1px solid #3a1a1a;color:#f66;font-size:12px;padding:7px 10px;font-weight:700;">🗑</button>
+          </div>
+        </div>`;
+      }).join("");
+
+  el.innerHTML = `<div style="padding:16px 14px 80px;max-width:760px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-size:18px;font-weight:800;color:#a78bfa;">👤 Team Members</div>
+      <button onclick="openAddMemberModal()" class="btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:13px;font-weight:800;padding:9px 16px;">+ Add Member</button>
+    </div>
+    ${memberCards}
+  </div>`;
+}
+
+function openAddMemberModal() {
+  const body = `
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Username</label>
+      <input class="input" type="text" id="nm_username" placeholder="e.g. ravi123" style="font-size:14px;"/>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Display Name</label>
+      <input class="input" type="text" id="nm_display" placeholder="e.g. Ravi Kumar" style="font-size:14px;"/>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Password</label>
+      <input class="input" type="password" id="nm_pass" placeholder="Min 4 chars" style="font-size:14px;"/>
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Confirm Password</label>
+      <input class="input" type="password" id="nm_pass2" placeholder="Confirm password" style="font-size:14px;"/>
+    </div>
+    <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:8px;">Permissions</div>
+    ${renderPermMatrix(null, "nm")}
+    <div id="nm_err" style="color:#f66;font-size:12px;margin-top:10px;display:none;"></div>
+    <button onclick="saveNewMember()" class="btn" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:14px;font-weight:800;padding:12px;">Create Member →</button>
+  `;
+  showModal("Add Team Member", body);
+}
+
+async function saveNewMember() {
+  const username = (document.getElementById("nm_username").value||"").trim();
+  const display = (document.getElementById("nm_display").value||"").trim();
+  const pass = document.getElementById("nm_pass").value;
+  const pass2 = document.getElementById("nm_pass2").value;
+  const errEl = document.getElementById("nm_err");
+  errEl.style.display = "none";
+
+  if(!username || !display || !pass) { errEl.textContent="Fill all fields."; errEl.style.display="block"; return; }
+  if(pass.length < 4) { errEl.textContent="Password min 4 chars."; errEl.style.display="block"; return; }
+  if(pass !== pass2) { errEl.textContent="Passwords don't match."; errEl.style.display="block"; return; }
+
+  const permissions = collectPermissions("nm");
+  const hash = await scHashPassword(username.toLowerCase(), pass);
+
+  try {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/create_shop_member`, {
+      method:"POST",
+      headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+      body: JSON.stringify({ p_shop_phone:authPhone, p_username:username.toLowerCase(), p_password_hash:hash, p_display_name:display, p_permissions:permissions })
+    });
+    const data = await res.json();
+    if(data && data.error) { errEl.textContent = data.error; errEl.style.display="block"; return; }
+    if(data === false) { errEl.textContent = "Username already exists."; errEl.style.display="block"; return; }
+    closeModal();
+    notify("✅ Member created");
+    renderTab(12);
+  } catch(e) { errEl.textContent = "Network error."; errEl.style.display="block"; }
+}
+
+async function openEditMemberModal(memberId) {
+  const m = _teamMembers.find(x=>x.id===memberId);
+  if(!m) return;
+  const body = `
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Username (read-only)</label>
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:10px 14px;font-size:14px;color:#7a8aaa;">@${escHtml(m.username)}</div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">Display Name</label>
+      <input class="input" type="text" id="em_display" value="${escHtml(m.display_name)}" style="font-size:14px;"/>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#7a8aaa;display:block;margin-bottom:4px;">New Password (leave blank to keep current)</label>
+      <input class="input" type="password" id="em_pass" placeholder="New password" style="font-size:14px;"/>
+    </div>
+    <div style="font-size:13px;font-weight:800;color:#e8eaf0;margin-bottom:8px;">Permissions</div>
+    ${renderPermMatrix(m.permissions, "em")}
+    <div id="em_err" style="color:#f66;font-size:12px;margin-top:10px;display:none;"></div>
+    <button onclick="saveEditMember('${memberId}')" class="btn" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#1a4a8a,#1a2a6a);color:#fff;font-size:14px;font-weight:800;padding:12px;">Save Changes →</button>
+  `;
+  showModal("Edit: " + m.display_name, body);
+}
+
+async function saveEditMember(memberId) {
+  const display = (document.getElementById("em_display").value||"").trim();
+  const pass = document.getElementById("em_pass").value;
+  const errEl = document.getElementById("em_err");
+  errEl.style.display = "none";
+  if(!display) { errEl.textContent="Display name required."; errEl.style.display="block"; return; }
+
+  const permissions = collectPermissions("em");
+  let passwordHash = null;
+  if(pass) {
+    if(pass.length < 4) { errEl.textContent="Password min 4 chars."; errEl.style.display="block"; return; }
+    const m = _teamMembers.find(x=>x.id===memberId);
+    passwordHash = await scHashPassword((m?m.username:""), pass);
+  }
+
+  try {
+    const [r1, r2] = await Promise.all([
+      fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/update_member_permissions`, {
+        method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+        body: JSON.stringify({ p_member_id:memberId, p_permissions:permissions })
+      }),
+      fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/update_member_details`, {
+        method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+        body: JSON.stringify({ p_member_id:memberId, p_display_name:display, p_password_hash:passwordHash })
+      })
+    ]);
+    closeModal(); notify("✅ Member updated"); renderTab(12);
+  } catch(e) { errEl.textContent="Network error."; errEl.style.display="block"; }
+}
+
+async function toggleMemberBlock(memberId, block) {
+  if(!await scConfirm(block?"Block this member? They won't be able to log in.":"Unblock this member?")) return;
+  try {
+    await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/update_member_details`, {
+      method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+      body: JSON.stringify({ p_member_id:memberId, p_display_name:null, p_password_hash:null, p_blocked:block })
+    });
+    notify(block?"🚫 Member blocked":"✅ Member unblocked"); renderTab(12);
+  } catch(e) { notify("Network error","error"); }
+}
+
+async function forceLogoutMember(memberId) {
+  try {
+    await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/force_logout_member`, {
+      method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+      body: JSON.stringify({ p_member_id:memberId })
+    });
+    notify("⏏ Member force-logged out"); renderTab(12);
+  } catch(e) { notify("Network error","error"); }
+}
+
+async function deleteMember(memberId, displayName) {
+  if(!await scConfirm(`Delete member "${displayName}"? This cannot be undone.`)) return;
+  try {
+    await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/delete_shop_member`, {
+      method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+      body: JSON.stringify({ p_member_id:memberId })
+    });
+    notify("🗑 Member deleted"); renderTab(12);
+  } catch(e) { notify("Network error","error"); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ─── PHASE 3: MEMBER LOGIN FLOW ────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+
+function toggleMemberLogin() {
+  const form = document.getElementById("member-login-form");
+  const toggle = document.getElementById("member-login-toggle");
+  const ownerSteps = ["auth-step-phone","auth-step-password","auth-step-newpass","auth-step-forgot","auth-step-secq","auth-step-resetpass"];
+  if(form.style.display === "none") {
+    form.style.display = "block";
+    toggle.style.display = "none";
+    ownerSteps.forEach(id => { const el = document.getElementById(id); if(el) el.style.display="none"; });
+  } else {
+    form.style.display = "none";
+    toggle.style.display = "block";
+    authShowStep("phone");
+  }
+}
+
+async function memberLogin() {
+  const username = (document.getElementById("member-username").value||"").trim().toLowerCase();
+  const pass = document.getElementById("member-password").value;
+  const errEl = document.getElementById("member-login-err");
+  const btn = document.getElementById("member-login-btn");
+  const btnTxt = document.getElementById("member-login-txt");
+  errEl.style.display = "none";
+  if(!username || !pass) { errEl.textContent="Enter username and password."; errEl.style.display="block"; return; }
+
+  btn.disabled = true; btnTxt.textContent = "Logging in...";
+  try {
+    const hash = await scHashPassword(username, pass);
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/check_member_password`, {
+      method:"POST",
+      headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+      body: JSON.stringify({ p_username:username, p_password_hash:hash })
+    });
+    const data = await res.json();
+    if(!data || !data.shop_phone) {
+      errEl.textContent = data && data.blocked ? "🚫 Your account is blocked. Contact the shop owner." : "❌ Invalid username or password.";
+      errEl.style.display = "block";
+      btn.disabled = false; btnTxt.textContent = "Login as Member →";
+      return;
+    }
+
+    // Set up member session
+    currentMember = { id: data.id, username: data.username, display_name: data.display_name, permissions: data.permissions };
+    authPhone = data.shop_phone;
+    localStorage.setItem("sc_auth_phone", data.shop_phone);
+
+    // Issue session token
+    const tokenRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/issue_member_session`, {
+      method:"POST",
+      headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+      body: JSON.stringify({ p_member_id: data.id })
+    });
+    const tokenData = await tokenRes.json();
+    _memberSessionToken = tokenData && tokenData.token ? tokenData.token : null;
+    if(_memberSessionToken) sessionStorage.setItem("sc_member_token", _memberSessionToken);
+    sessionStorage.setItem("sc_member_id", data.id);
+
+    // Show member pill in header
+    const pill = document.getElementById("header-member-pill");
+    const pillName = document.getElementById("header-member-name");
+    if(pill) { pill.style.display = "inline-flex"; }
+    if(pillName) { pillName.textContent = data.display_name; }
+
+    // Start heartbeat
+    _startMemberHeartbeat();
+
+    btn.disabled = false; btnTxt.textContent = "Login as Member →";
+    onLoginSuccess(data.shop_phone);
+  } catch(e) {
+    errEl.textContent = "Network error. Try again."; errEl.style.display = "block";
+    btn.disabled = false; btnTxt.textContent = "Login as Member →";
+  }
+}
+
+function _startMemberHeartbeat() {
+  if(_memberSessionTimer) clearInterval(_memberSessionTimer);
+  _memberSessionTimer = setInterval(async () => {
+    if(!currentMember || !_memberSessionToken) { clearInterval(_memberSessionTimer); return; }
+    try {
+      const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/verify_member_session`, {
+        method:"POST",
+        headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+        body: JSON.stringify({ p_member_id: currentMember.id, p_token: _memberSessionToken })
+      });
+      const valid = await res.json();
+      if(!valid) {
+        notify("⚠️ You've been logged out — this account was signed in elsewhere.", "error");
+        setTimeout(()=>doLogout(), 2000);
+      }
+    } catch(e) { /* ignore network blips */ }
+  }, 60000);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+
 function renderHistoryTab(){
   const todayKey = _histDayKey(Date.now());
-  const dayKey = historySelectedDate || todayKey;
+  // Members without date filter permission are locked to today
+  const effectiveDateKey = (currentMember && !hasPermission('history_date_filter')) ? "" : historySelectedDate;
+  const dayKey = effectiveDateKey || todayKey;
   const isToday = dayKey === todayKey;
 
   // Try loading from cloud if local is empty (helps after re-login / new device)
@@ -9891,11 +10352,14 @@ function renderHistoryTab(){
     : filtered.map(e=>{
         const meta = HIST_TYPE_META[e.type] || HIST_TYPE_META.other;
         const timeStr = new Date(e.ts).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
+        const actor = e.actor || "Owner";
+        const actorColor = actor === "Owner" ? "#FFD700" : "#a78bfa";
         return `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:1px solid #0d1220;">
           <div style="width:38px;height:38px;border-radius:10px;background:${meta.color}22;border:1px solid ${meta.color}55;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">${meta.icon}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:800;color:#e8eaf0;">${escHtml(e.action)}</div>
             ${e.details?`<div style="font-size:12px;color:#7a8aaa;margin-top:2px;line-height:1.4;">${escHtml(e.details)}</div>`:""}
+            <div style="margin-top:4px;"><span style="font-size:10px;background:${actorColor}22;color:${actorColor};border:1px solid ${actorColor}44;border-radius:8px;padding:1px 7px;font-weight:700;">👤 ${escHtml(actor)}</span></div>
           </div>
           <div style="font-size:11px;color:#4a5a7a;flex-shrink:0;white-space:nowrap;">${timeStr}</div>
         </div>`;
@@ -9905,10 +10369,10 @@ function renderHistoryTab(){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px;">
       <div style="font-size:18px;font-weight:800;color:#60a5fa;">🕘 History</div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <input type="date" id="hist-date-picker" value="${dayKey}" max="${todayKey}"
+        ${(!currentMember || hasPermission('history_date_filter')) ? `<input type="date" id="hist-date-picker" value="${dayKey}" max="${todayKey}"
           onchange="historySelectedDate=this.value===('${todayKey}')?'':this.value;window._histTypeFilter='all';renderTab(11)"
           style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:8px 12px;color:#e8eaf0;font-size:13px;" />
-        ${!isToday?`<button onclick="historySelectedDate='';window._histTypeFilter='all';renderTab(11)" class="btn" style="background:#1e3a6e;border:1px solid #2a5aaa;color:#60a5fa;font-size:12px;font-weight:800;padding:8px 12px;">Today</button>`:""}
+        ${!isToday?`<button onclick="historySelectedDate='';window._histTypeFilter='all';renderTab(11)" class="btn" style="background:#1e3a6e;border:1px solid #2a5aaa;color:#60a5fa;font-size:12px;font-weight:800;padding:8px 12px;">Today</button>`:""}` : `<span style="font-size:12px;color:#4a5a7a;">Today only</span>`}
       </div>
     </div>
     <div style="font-size:12px;color:#4a5a7a;margin-bottom:14px;">${dateLabel}${isToday?" (Today)":""} · ${entries.length} event${entries.length!==1?"s":""}</div>
@@ -10659,7 +11123,7 @@ function handleAddPhoto(inp){
 
 async function saveNewCustomer(){
   if(requireOnline()) return;
-  const name=document.getElementById("m-name")?.value.trim();
+  if(!hasPermission('customer_create')) return notify("🚫 No permission to add customers","error");
   if(!name){notify("❌ Name is required","error");return;}
   let rawId=document.getElementById("m-id")?.value.trim();
   const id=rawId?rawId.toUpperCase():autoId();
@@ -10976,7 +11440,7 @@ function handleEditPhoto(inp){
   r.readAsDataURL(f);
 }
 async function saveEditCustomer(oldId){
-  const name=document.getElementById("m-name")?.value.trim();
+  if(!hasPermission('customer_edit')) return notify("🚫 No permission to edit customers","error");
   if(!name){notify("❌ Name is required");return;}
   const newId=(document.getElementById("m-id")?.value.trim()||oldId).toUpperCase();
   if(newId!==oldId&&idExists(newId,oldId)){notify("❌ ID already exists");return;}
@@ -11047,6 +11511,7 @@ async function savePhoto(id,photo){
 
 async function deleteCustomer(id){
   if(requireOnline()) return;
+  if(!hasPermission('customer_delete')) return notify("🚫 No permission to delete customers","error");
   if(!confirm("Delete this customer and all their purchases?"))return;
   const _c=customers.find(x=>x.id===id);
   const _cName=_c?_c.name:id;
@@ -11077,6 +11542,7 @@ function custDeselectAll(){
 }
 async function deleteSelectedCustomers(){
   if(requireOnline()) return;
+  if(!hasPermission('customer_bulk_delete')) return notify("🚫 No permission to bulk delete customers","error");
   if(custSelected.size===0)return;
   if(!confirm(`Delete ${custSelected.size} selected customer${custSelected.size>1?"s":""} and all their purchases? This cannot be undone.`))return;
   const ids=[...custSelected];
@@ -12846,7 +13312,9 @@ function invDeductSold(soldItems, custId){
 // Add stock entry
 function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice, gstRate, gstIncluded, hsnCode, expiryDate, minStock){
   if(requireOnline()) return;
-  let item = inventoryItems.find(x=>x.name===name);
+  const isNew = !inventoryItems.find(x=>x.name===name);
+  if(isNew && !hasPermission('inventory_add')) return notify("🚫 No permission to add inventory items","error");
+  if(!isNew && !hasPermission('inventory_restock')) return notify("🚫 No permission to restock inventory","error");
   if(!item){
     item = {id:autoId(), name, unit:unit||"unit", category:category||"General", stock:[], salesLog:[]};
     inventoryItems.push(item);
@@ -12905,7 +13373,7 @@ function invDeleteItem(name){
 
 function _confirmInvDelete(name){
   if(requireOnline()) return;
-  // Remove from inventory
+  if(!hasPermission('inventory_delete')) return notify("🚫 No permission to delete inventory items","error");
   inventoryItems = inventoryItems.filter(x=>x.name!==name);
   saveInventory();
   // Cascade: mark soldItem entries as _deleted in all customer purchases, deduct from totalSpend
@@ -13704,7 +14172,7 @@ function renderInventoryTab(){
 
 function invSubmitAdd(){
   if(requireOnline()) return;
-  const name=(document.getElementById("inv-name").value||"").trim();
+  if(!hasPermission('inventory_add')) return notify("🚫 No permission to add inventory items","error");
   const category=((document.getElementById("inv-category").value||"").trim()||"General").replace(/\b\w/g,c=>c.toUpperCase());
   const qty=parseFloat(document.getElementById("inv-qty").value||"0");
   const unit=(document.getElementById("inv-unit").value||"").trim();
@@ -13748,6 +14216,7 @@ function invSubmitAdd(){
 
 function invSubmitRestock(){
   if(requireOnline()) return;
+  if(!hasPermission('inventory_restock')) return notify("🚫 No permission to restock inventory","error");
   if(!invRestockSelected){notify("❌ No item selected","error");return;}
   const qty=parseFloat(document.getElementById("inv-qty").value||"0");
   const unit=(document.getElementById("inv-unit").value||"").trim();
@@ -16928,6 +17397,7 @@ function showBillModal(bill) {
 // ─── ENHANCED addPurchase with billing ────────────────────────
 async function addPurchase(custId, { amount, bill, date, notes, soldItems }) {
   if(requireOnline()) return;
+  if(!hasPermission('sale_create')) return notify("🚫 No permission to create sales","error");
   const amt = parseFloat(amount); if (!amt || amt <= 0) return;
   const c = customers.find(x => x.id === custId); if (!c) return;
 
