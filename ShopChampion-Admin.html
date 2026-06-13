@@ -2118,7 +2118,13 @@ window.addEventListener("load", () => {
   loadLicense();
 // Check if already logged in — always verify block status online first
   const savedPhone = localStorage.getItem("sc_auth_phone");
-  if (savedPhone && localStorage.getItem("sc_user_" + savedPhone)) {
+  // If a team member was active last time and didn't log out properly,
+  // never auto-login as the owner — force the login screen so the
+  // member must re-authenticate (or the owner can choose Owner Login).
+  if (localStorage.getItem("sc_member_active") === "1") {
+    localStorage.removeItem("sc_member_active");
+    authShowStep("phone");
+  } else if (savedPhone && localStorage.getItem("sc_user_" + savedPhone)) {
     authPhone = savedPhone;
     // Check block status before allowing auto-login
     (async () => {
@@ -3407,6 +3413,7 @@ function doLogout() {
   if(_memberSessionTimer) { clearInterval(_memberSessionTimer); _memberSessionTimer = null; }
   currentMember = null; _memberSessionToken = null;
   sessionStorage.removeItem("sc_member_token"); sessionStorage.removeItem("sc_member_id");
+  localStorage.removeItem("sc_member_active");
   // Hide member pill
   const pill = document.getElementById("header-member-pill");
   if(pill) pill.style.display = "none";
@@ -10143,8 +10150,16 @@ async function saveNewMember() {
       body: JSON.stringify({ p_shop_phone:authPhone, p_username:username.toLowerCase(), p_hash:hash, p_display_name:display, p_permissions:permissions })
     });
     const data = await res.json();
-    if(data && data.error) { errEl.textContent = data.error; errEl.style.display="block"; return; }
-    if(data === false) { errEl.textContent = "Username already exists."; errEl.style.display="block"; return; }
+    if(!res.ok) {
+      const msg = (data && (data.message || data.error || data.hint)) || "";
+      if(/USERNAME_TAKEN/i.test(msg)) {
+        errEl.textContent = "Username already exists.";
+      } else {
+        errEl.textContent = msg || "Failed to create member.";
+      }
+      errEl.style.display="block";
+      return;
+    }
     closeModal();
     notify("✅ Member created");
     renderTab(12);
@@ -10301,6 +10316,7 @@ async function memberLogin() {
       : (tokenData && tokenData.token ? tokenData.token : null);
     if(_memberSessionToken) sessionStorage.setItem("sc_member_token", _memberSessionToken);
     sessionStorage.setItem("sc_member_id", data.id);
+    localStorage.setItem("sc_member_active", "1");
 
     // Show member pill in header
     const pill = document.getElementById("header-member-pill");
@@ -10478,7 +10494,7 @@ function renderSettings(){
   const isProStyle = currentAppStyle === "pro";
   const styleLabel = isProStyle ? "Professional (current)" : "Game / Classic (current)";
   const curLang = localStorage.getItem("sc_lang") || "en";
-  const langNames = {en:"English",hi:"हिंदी",mr:"मराठी",gu:"ગુજરાતી"};
+  const langNames = {en:"English",hi:"हिंदी"};
   const curLangName = langNames[curLang] || "English";
   const fbConnected = !!(typeof db !== "undefined" && db);
   const voiceOn = voiceSettings.enabled;
@@ -11949,25 +11965,6 @@ document.addEventListener("DOMContentLoaded", () => {
 const LANGUAGES = {
   en:  { name:"English",    flag:"🇬🇧" },
   hi:  { name:"हिंदी",      flag:"🇮🇳" },
-  mr:  { name:"मराठी",      flag:"🇮🇳" },
-  gu:  { name:"ગુજરાતી",    flag:"🇮🇳" },
-  pa:  { name:"ਪੰਜਾਬੀ",    flag:"🇮🇳" },
-  bn:  { name:"বাংলা",       flag:"🇮🇳" },
-  ta:  { name:"தமிழ்",       flag:"🇮🇳" },
-  te:  { name:"తెలుగు",     flag:"🇮🇳" },
-  kn:  { name:"ಕನ್ನಡ",       flag:"🇮🇳" },
-  ml:  { name:"മലയാളം",    flag:"🇮🇳" },
-  ar:  { name:"العربية",    flag:"🇸🇦" },
-  fr:  { name:"Français",   flag:"🇫🇷" },
-  es:  { name:"Español",    flag:"🇪🇸" },
-  de:  { name:"Deutsch",    flag:"🇩🇪" },
-  pt:  { name:"Português",  flag:"🇧🇷" },
-  ru:  { name:"Русский",    flag:"🇷🇺" },
-  zh:  { name:"中文",        flag:"🇨🇳" },
-  ja:  { name:"日本語",      flag:"🇯🇵" },
-  ko:  { name:"한국어",      flag:"🇰🇷" },
-  id:  { name:"Indonesia",  flag:"🇮🇩" },
-  tr:  { name:"Türkçe",     flag:"🇹🇷" },
 };
 
 // Translation dictionary
@@ -12067,100 +12064,6 @@ const TRANSLATIONS = {
     fullName:"पूरा नाम", optional:"वैकल्पिक", autoId:"🎲 स्वचालित",
     saveChanges:"बदलाव सहेजें", saveName:"✅ नाम सहेजें", removeIcon:"🗑 आइकन हटाएं",
     themeLabel:"थीम", languageLabel:"भाषा", dayTheme:"☀️ दिन", nightTheme:"🌙 रात",
-  },
-  mr: {
-    adminPanel:"प्रशासक पॅनेल", leaderboard:"लीडरबोर्ड", customers:"ग्राहक",
-    purchase:"विक्री", analytics:"विश्लेषण", compare:"तुलना",
-    festivals:"सण बक्षिसे", settings:"सेटिंग्ज", logout:"बाहेर पडा",
-    addCustomer:"+ ग्राहक जोडा", exportCSV:"⬇ CSV निर्यात", addPurchase:"विक्री जोडा →",
-    totalSpend:"एकूण खर्च", points:"गुण", rank:"क्रमांक", visits:"भेटी",
-    lastVisit:"शेवटची भेट", firstVisit:"पहिली भेट", frequency:"वारंवारिता",
-    avgPerVisit:"प्रति भेट सरासरी", totalVisits:"एकूण भेटी", purchaseHistory:"खरेदी इतिहास",
-    noCustomers:"ग्राहक सापडले नाहीत", noPurchases:"अजून खरेदी नाही",
-    pushDisplay:"⬆ डिस्प्लेवर पाठवा", displaySetup:"📺 डिस्प्ले सेटअप",
-    searchPlaceholder:"🔍 नाव, फोन किंवा ID ने शोधा...",
-    customerProfile:"ग्राहक प्रोफाइल", back:"← मागे", edit:"✏️ संपादित करा",
-    addPurchaseBtn:"+ विक्री", deleteConfirm:"हा ग्राहक आणि त्यांच्या सर्व खरेदी हटवायच्या?",
-    deletePurchaseConfirm:"ही खरेदी हटवायची? ग्राहकाचा एकूण खर्च कमी होईल.",
-    today:"आज", allTime:"सर्व काळ", pickDate:"📆 तारीख निवडा",
-    showFor:"📅 दाखवा:", yearFilter:"📆 वर्ष:",
-    bill:"बिल", date:"तारीख", notes:"नोट्स", amount:"रक्कम (₹)",
-    searchFilter:"🔍 फिल्टर", filterDate:"📅 तारीख श्रेणी",
-    filterExact:"₹ अचूक रक्कम", filterRange:"📊 रक्कम श्रेणी",
-    clearFilter:"✕ साफ करा", apply:"लागू करा",
-    shopName:"दुकानाचे नाव", shopIcon:"दुकान चिन्ह",
-    displaySettings:"डिस्प्ले सेटिंग्ज", databaseStorage:"🔥 डेटाबेस स्टोरेज",
-    syncDisplay:"📺 सिंक आणि डिस्प्ले", customersOnDisplay:"डिस्प्लेवर ग्राहक",
-    firebaseConnected:"✅ Firebase जोडले आहे", localMode:"📦 स्थानिक स्टोरेज (डेमो)",
-    ready:"तयार", syncing:"पाठवत आहे...", synced:"लीडरबोर्ड सिंक झाले",
-    wrongPassword:"चुकीचा पासवर्ड", loginAdmin:"प्रशासक लॉगिन",
-    enterPassword:"पासवर्ड टाका (1234)", login:"लॉगिन →",
-    showing:"दाखवत आहे", of:"पैकी", purchases:"खरेदी", total:"एकूण",
-    visitNum:"भेट #", allTimeBracket:"(सर्व काळ:", yearRevenue:"महसूल",
-    activeCustomers:"सक्रिय ग्राहक", topEarner:"शीर्ष खर्चकर्ता",
-    avgSpend:"प्रति ग्राहक सरासरी", monthlyRevenue:"मासिक महसूल",
-    topCustomers:"शीर्ष ग्राहक", monthByMonth:"महिनानिहाय",
-    yearlyAnalytics:"📊 वार्षिक विश्लेषण", selectYear:"वर्ष निवडा:",
-    compareTitle:"⚖️ तुलना", compareDesc:"दिवस · महिना · वर्षानुसार महसूल तुलना",
-    dayMode:"📅 दिवस", monthMode:"📆 महिना", yearMode:"🗃 वर्ष", yearsMode:"⚖️ वर्ष तुलना",
-    festivalRewards:"सण बक्षिसे", festival:"सण", reward:"बक्षीस",
-    selectWinners:"विजेते निवडा:", announceWinners:"🎉 विजेते जाहीर करा",
-    pastAnnouncements:"मागील घोषणा", noOutstandingBorrows:"✅ प्रलंबित उधार नाही",
-    outstandingBorrows:"📌 प्रलंबित उधार", totalOwed:"एकूण देणे:",
-    addBorrow:"उधार नोंदवा →", borrowDetails:"📦 उधार तपशील",
-    pending:"प्रलंबित", returned:"परत केले", overdue:"अतिदेय",
-    markReturned:"✓ परत केले", borrowRecord:"उधार", noPhone:"फोन नाही",
-    whatsapp:"💬 व्हॉट्सअ‍ॅप", phone:"फोन नंबर", customerId:"ग्राहक ID",
-    fullName:"पूर्ण नाव", optional:"ऐच्छिक", autoId:"🎲 स्वयंचलित",
-    saveChanges:"बदल जतन करा", saveName:"✅ नाव जतन करा", removeIcon:"🗑 चिन्ह काढा",
-    themeLabel:"थीम", languageLabel:"भाषा", dayTheme:"☀️ दिवस", nightTheme:"🌙 रात्र",
-  },
-  gu: {
-    adminPanel:"એડ્મિન પેનલ", leaderboard:"લીડરબોર્ડ", customers:"ગ્રાહકો",
-    purchase:"વેચાણ", analytics:"વિશ્લેષણ", compare:"સરખામણી",
-    festivals:"તહેવાર પુરસ્કાર", settings:"સેટિંગ્સ", logout:"લૉગ આઉટ",
-    addCustomer:"+ ગ્રાહક ઉમેરો", exportCSV:"⬇ CSV નિકાસ", addPurchase:"વેચાણ ઉમેરો →",
-    totalSpend:"કુલ ખર્ચ", points:"પોઇન્ટ", rank:"ક્રમ", visits:"મુલાકાત",
-    lastVisit:"છેલ્લી મુલાકાત", firstVisit:"પ્રથમ મુલાકાત", frequency:"આવૃત્તિ",
-    avgPerVisit:"દરેક મુલાકાતે સરેરાશ", totalVisits:"કુલ મુલાકાત", purchaseHistory:"ખરીદી ઇતિહાસ",
-    noCustomers:"કોઈ ગ્રાહક મળ્યો નથી", noPurchases:"હજુ સુધી કોઈ ખરીદી નથી",
-    pushDisplay:"⬆ ડિસ્પ્લે પર મોકલો", displaySetup:"📺 ડિસ્પ્લે સેટઅપ",
-    searchPlaceholder:"🔍 નામ, ફોન અથવા ID થી શોધો...",
-    customerProfile:"ગ્રાહક પ્રોફાઇલ", back:"← પાછળ", edit:"✏️ સંપાદિત",
-    addPurchaseBtn:"+ વેચાણ", deleteConfirm:"આ ગ્રાહક અને તેમની બધી ખરીદી ડિલીટ કરો?",
-    deletePurchaseConfirm:"આ ખરીદી ડિલીટ કરો? ગ્રાહકનો કુલ ખર્ચ ઘટશે.",
-    today:"આજ", allTime:"હંમેશ", pickDate:"📆 તારીખ પસંદ કરો",
-    showFor:"📅 બતાવો:", yearFilter:"📆 વર્ષ:",
-    bill:"બિલ", date:"તારીખ", notes:"નોંધ", amount:"રકમ (₹)",
-    searchFilter:"🔍 ફિલ્ટર", filterDate:"📅 તારીખ શ્રેણી",
-    filterExact:"₹ ચોક્કસ રકમ", filterRange:"📊 રકમ શ્રેણી",
-    clearFilter:"✕ સાફ", apply:"લાગુ કરો",
-    shopName:"દુકાનનું નામ", shopIcon:"દુકાન આઇકન",
-    displaySettings:"ડિસ્પ્લે સેટિંગ્સ", databaseStorage:"🔥 ડેટાબેઝ સ્ટોરેજ",
-    syncDisplay:"📺 સિંક અને ડિસ્પ્લે", customersOnDisplay:"ડિસ્પ્લે પર ગ્રાહકો",
-    firebaseConnected:"✅ Firebase જોડાયેલ", localMode:"📦 લોકલ સ્ટોરેજ (ડેમો)",
-    ready:"તૈયાર", syncing:"મોકલી રહ્યા છીએ...", synced:"લીડરબોર્ડ સિંક થઈ ગઈ",
-    wrongPassword:"ખોટો પાસવર્ડ", loginAdmin:"એડ્મિન લૉગિન",
-    enterPassword:"પાસવર્ડ દાખલ કરો (1234)", login:"લૉગિન →",
-    showing:"બતાવી રહ્યા છીએ", of:"માંથી", purchases:"ખરીદી", total:"કુલ",
-    visitNum:"મુલાકાત #", allTimeBracket:"(હંમેશ:", yearRevenue:"આવક",
-    activeCustomers:"સક્રિય ગ્રાહકો", topEarner:"ટોચના ખર્ચ કરનાર",
-    avgSpend:"ગ્રાહક દીઠ સરેરાશ", monthlyRevenue:"માસિક આવક",
-    topCustomers:"ટોચના ગ્રાહકો", monthByMonth:"મહિના પ્રમાણે",
-    yearlyAnalytics:"📊 વાર્ષિક વિશ્લેષણ", selectYear:"વર્ષ પસંદ કરો:",
-    compareTitle:"⚖️ સરખામણી", compareDesc:"દિવસ · મહિના · વર્ષ પ્રમાણે આવક સરખામણી",
-    dayMode:"📅 દિવસ", monthMode:"📆 મહિનો", yearMode:"🗃 વર્ષ", yearsMode:"⚖️ વર્ષ સરખામણી",
-    festivalRewards:"તહેવાર પુરસ્કાર", festival:"તહેવાર", reward:"પુરસ્કાર",
-    selectWinners:"વિજેતા પસંદ કરો:", announceWinners:"🎉 વિજેતા જાહેર કરો",
-    pastAnnouncements:"ભૂતકાળની ઘોષણાઓ", noOutstandingBorrows:"✅ કોઈ ઉધાર બાકી નથી",
-    outstandingBorrows:"📌 ઉધાર બાકી", totalOwed:"કુલ બાકી:",
-    addBorrow:"ઉધાર નોંધો →", borrowDetails:"📦 ઉધાર વિગત",
-    pending:"બાકી", returned:"પાછું આપ્યું", overdue:"વિલંબ",
-    markReturned:"✓ પાછું આપ્યું", borrowRecord:"ઉધાર", noPhone:"ફોન નથી",
-    whatsapp:"💬 વ્હૉટ્સએપ", phone:"ફોન નંબર", customerId:"ગ્રાહક ID",
-    fullName:"પૂરું નામ", optional:"વૈકલ્પિક", autoId:"🎲 આઓ",
-    saveChanges:"ફેરફાર સાચવો", saveName:"✅ નામ સાચવો", removeIcon:"🗑 આઇકન દૂર કરો",
-    themeLabel:"થીમ", languageLabel:"ભાષા", dayTheme:"☀️ દિવસ", nightTheme:"🌙 રાત",
   },
 };
 
@@ -18476,7 +18379,7 @@ const STEPS_EN = [
   {
     icon:"⚙️", title:"Settings",
     text:"Personalise everything — language, theme, shop name, voice announcements, display screen, billing, and more. Replay this guide anytime from here.",
-    detail:"Settings is where you make ShopChampion truly yours. Change the app language to Hindi, Marathi, or Gujarati. Switch between Professional and Game themes. Set your shop name and icon that appears at the top. Enable voice announcements so the app reads out the customer name and purchase amount aloud when you save — great for busy counters. Configure the display screen to show your leaderboard on a connected TV. Set up billing preferences including paper size, GST type, and auto-WhatsApp receipts. You can also export all your customer data as a CSV, and manage purchase history. And of course — tap Introduction Guide here any time to replay this full tour.",
+    detail:"Settings is where you make ShopChampion truly yours. Change the app language between English and Hindi. Switch between Professional and Game themes. Set your shop name and icon that appears at the top. Enable voice announcements so the app reads out the customer name and purchase amount aloud when you save — great for busy counters. Configure the display screen to show your leaderboard on a connected TV. Set up billing preferences including paper size, GST type, and auto-WhatsApp receipts. You can also export all your customer data as a CSV, and manage purchase history. And of course — tap Introduction Guide here any time to replay this full tour.",
     speech:"Settings lets you personalise the entire app. Change language, theme, shop name, and enable voice announcements. Set up your display screen, billing preferences, and data export. You can also replay this introduction guide from here anytime.",
     tabIndex:9, targetId:"tab-content"
   }
@@ -18549,7 +18452,7 @@ const STEPS_HI = [
   {
     icon:"⚙️", title:"सेटिंग्स (Settings)",
     text:"ऐप को अपने हिसाब से सेट करें — भाषा, थीम, दुकान का नाम, आवाज़ की घोषणाएं, डिस्प्ले स्क्रीन, बिलिंग, और बहुत कुछ। यह गाइड यहाँ से कभी भी दोबारा देख सकते हैं।",
-    detail:"सेटिंग्स में आप ShopChampion को पूरी तरह अपनी पसंद का बना सकते हैं। भाषा हिंदी, मराठी, गुजराती या अंग्रेज़ी में बदलें। प्रोफ़ेशनल और गेम थीम में से चुनें। दुकान का नाम और आइकन सेट करें। आवाज़ की घोषणाएं चालू करें — जब भी खरीदारी सेव होगी, ऐप ग्राहक का नाम और रकम ज़ोर से बोलेगा। TV स्क्रीन से कनेक्ट करके लाइव लीडरबोर्ड डिस्प्ले सेट करें। बिलिंग में पेपर साइज़, GST टाइप, और WhatsApp रसीद ऑटो-भेजने की सेटिंग करें। सारे ग्राहकों का डेटा CSV में एक्सपोर्ट भी कर सकते हैं। और यहाँ 'Introduction Guide' पर टैप करके यह पूरी गाइड कभी भी दोबारा देख सकते हैं।",
+    detail:"सेटिंग्स में आप ShopChampion को पूरी तरह अपनी पसंद का बना सकते हैं। भाषा हिंदी या अंग्रेज़ी में बदलें। प्रोफ़ेशनल और गेम थीम में से चुनें। दुकान का नाम और आइकन सेट करें। आवाज़ की घोषणाएं चालू करें — जब भी खरीदारी सेव होगी, ऐप ग्राहक का नाम और रकम ज़ोर से बोलेगा। TV स्क्रीन से कनेक्ट करके लाइव लीडरबोर्ड डिस्प्ले सेट करें। बिलिंग में पेपर साइज़, GST टाइप, और WhatsApp रसीद ऑटो-भेजने की सेटिंग करें। सारे ग्राहकों का डेटा CSV में एक्सपोर्ट भी कर सकते हैं। और यहाँ 'Introduction Guide' पर टैप करके यह पूरी गाइड कभी भी दोबारा देख सकते हैं।",
     speech:"सेटिंग्स में ऐप को पूरी तरह अपनी पसंद का बनाएं। भाषा, थीम, दुकान का नाम, आवाज़ की घोषणाएं, डिस्प्ले स्क्रीन और बिलिंग सेट करें। Introduction Guide से यह पूरी गाइड कभी भी दोबारा देख सकते हैं।",
     tabIndex:9, targetId:"tab-content"
   }
