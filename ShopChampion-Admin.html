@@ -2733,6 +2733,17 @@ function _histDayKey(ts){
   const d = new Date(ts);
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
 }
+// ─── OFFLINE GUARD ─────────────────────────────────────────────
+// Call at the start of any function that creates/edits/deletes data.
+// If offline, shows a warning and returns true (caller should `return`).
+function requireOnline(){
+  if(!navigator.onLine){
+    notify("📵 You're offline — please reconnect to the internet to do this", "error");
+    return true; // blocked
+  }
+  return false; // ok to proceed
+}
+
 // type: 'sale'|'purchase'|'inventory'|'creditor'|'debtor'|'customer'|'other'
 // action: short verb phrase e.g. "Sale recorded", "Item deleted"
 // details: free text description
@@ -5116,6 +5127,7 @@ function openPartialPaymentModal(custId, borrowId){
 
 // ─── DELETE PURCHASE (used in profile modal) ─────────────────
 async function deletePurchase(custId,bill,dateEnc){
+  if(requireOnline()) return;
   if(!confirm("Delete this purchase? The customer's total spend will decrease."))return;
   const c=customers.find(x=>x.id===custId);if(!c)return;
   const date=decodeURIComponent(dateEnc);
@@ -7037,6 +7049,7 @@ function openAddCreditorModal(editId){
 }
 
 function saveCreditorModal(editId){
+  if(requireOnline()) return;
   const name = document.getElementById("cr-name")?.value.trim();
   if(!name){ notify("⚠️ Name is required"); return; }
 
@@ -7084,6 +7097,7 @@ function saveCreditorModal(editId){
 
 // ── Archive helper ────────────────────────────────────────────────────────────
 function archiveCreditor(id){
+  if(requireOnline()) return;
   const creditors = getCreditors();
   const cr = creditors.find(c=>c.id===id);
   if(!cr) return;
@@ -7096,6 +7110,7 @@ function archiveCreditor(id){
 }
 
 function archiveDebtor(id){
+  if(requireOnline()) return;
   const debtors = getDebtors();
   const dr = debtors.find(d=>d.id===id);
   if(!dr) return;
@@ -7108,6 +7123,7 @@ function archiveDebtor(id){
 }
 
 function unarchiveCreditor(id){
+  if(requireOnline()) return;
   const creditors = getCreditors();
   const cr = creditors.find(c=>c.id===id);
   if(!cr) return;
@@ -7119,6 +7135,7 @@ function unarchiveCreditor(id){
 }
 
 function unarchiveDebtor(id){
+  if(requireOnline()) return;
   const debtors = getDebtors();
   const dr = debtors.find(d=>d.id===id);
   if(!dr) return;
@@ -7130,6 +7147,7 @@ function unarchiveDebtor(id){
 }
 
 function _doSimpleDeleteCreditor(id){
+  if(requireOnline()) return;
   const creditors = getCreditors();
   const cr = creditors.find(c=>c.id===id);
   saveCreditors(creditors.filter(c=>c.id!==id));
@@ -7245,6 +7263,7 @@ function deleteCreditor(id){
 }
 
 function confirmHardDeleteCreditor(id){
+  if(requireOnline()) return;
   const creditors = getCreditors();
   const cr = creditors.find(c=>c.id===id);
   if(!cr) return;
@@ -7277,6 +7296,7 @@ function confirmHardDeleteCreditor(id){
 
 // ── Debtor delete ─────────────────────────────────────────────────────────────
 function deleteDebtor(id){
+  if(requireOnline()) return;
   const debtors = getDebtors();
   const dr = debtors.find(d=>d.id===id);
   if(!dr) return;
@@ -8107,6 +8127,7 @@ function crSelectBill(billId, remaining){
 }
 
 async function saveSmartPayment(){
+  if(requireOnline()) return;
   const creditorId  = document.getElementById("spm-creditor-id")?.value;
   const selectedBillsRaw = document.getElementById("spm-selected-bills")?.value||"";
   const selectedBillIds = selectedBillsRaw.split(",").filter(Boolean);
@@ -8252,6 +8273,7 @@ function openReturnModal(creditorId){
 }
 
 function saveCrTransaction(){
+  if(requireOnline()) return;
   const creditorId = document.getElementById("tx-creditor-id")?.value;
   const type    = document.getElementById("tx-type")?.value;
   const amount  = parseFloat(document.getElementById("tx-amount")?.value)||0;
@@ -8662,6 +8684,7 @@ function deleteCrTx(creditorId, origIdx){
 }
 
 async function deleteCrTransaction(creditorId, txId) {
+  if(requireOnline()) return;
   const creditors = getCreditors();
   const idx = creditors.findIndex(c => c.id === creditorId);
   if (idx < 0) return;
@@ -9006,6 +9029,7 @@ function openAddDebtorModal(editId){
 }
 
 function saveDebtorModal(editId){
+  if(requireOnline()) return;
   const name = document.getElementById("dr-name")?.value.trim();
   if(!name){ notify("⚠️ Name is required"); return; }
 
@@ -9466,6 +9490,7 @@ function openAddDebtTxModal(debtorId, defaultType){
 }
 
 function saveDebtTransaction(){
+  if(requireOnline()) return;
   const debtorId = document.getElementById("drtx-debtor-id")?.value;
   const type     = document.getElementById("drtx-type")?.value;
   const amtRaw   = parseFloat(document.getElementById("drtx-amount")?.value||"0");
@@ -9536,6 +9561,7 @@ function saveDebtTransaction(){
 }
 
 function deleteDebtTx(debtorId, origIdx){
+  if(requireOnline()) return;
   const debtors = getDebtors();
   const idx = debtors.findIndex(d=>d.id===debtorId);
   if(idx<0) return;
@@ -10632,6 +10658,7 @@ function handleAddPhoto(inp){
 }
 
 async function saveNewCustomer(){
+  if(requireOnline()) return;
   const name=document.getElementById("m-name")?.value.trim();
   if(!name){notify("❌ Name is required","error");return;}
   let rawId=document.getElementById("m-id")?.value.trim();
@@ -10803,6 +10830,7 @@ function bulkParseCSV(raw) {
 }
 
 async function bulkSaveAll() {
+  if(requireOnline()) return;
   const activePanel = document.getElementById('bulk-panel-csv').style.display === 'none' ? 'manual' : 'csv';
   let entries = [];
 
@@ -11018,6 +11046,7 @@ async function savePhoto(id,photo){
 }
 
 async function deleteCustomer(id){
+  if(requireOnline()) return;
   if(!confirm("Delete this customer and all their purchases?"))return;
   const _c=customers.find(x=>x.id===id);
   const _cName=_c?_c.name:id;
@@ -11047,6 +11076,7 @@ function custDeselectAll(){
   renderTab(1);
 }
 async function deleteSelectedCustomers(){
+  if(requireOnline()) return;
   if(custSelected.size===0)return;
   if(!confirm(`Delete ${custSelected.size} selected customer${custSelected.size>1?"s":""} and all their purchases? This cannot be undone.`))return;
   const ids=[...custSelected];
@@ -12815,6 +12845,7 @@ function invDeductSold(soldItems, custId){
 
 // Add stock entry
 function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice, gstRate, gstIncluded, hsnCode, expiryDate, minStock){
+  if(requireOnline()) return;
   let item = inventoryItems.find(x=>x.name===name);
   if(!item){
     item = {id:autoId(), name, unit:unit||"unit", category:category||"General", stock:[], salesLog:[]};
@@ -12873,6 +12904,7 @@ function invDeleteItem(name){
 }
 
 function _confirmInvDelete(name){
+  if(requireOnline()) return;
   // Remove from inventory
   inventoryItems = inventoryItems.filter(x=>x.name!==name);
   saveInventory();
@@ -13671,6 +13703,7 @@ function renderInventoryTab(){
 }
 
 function invSubmitAdd(){
+  if(requireOnline()) return;
   const name=(document.getElementById("inv-name").value||"").trim();
   const category=((document.getElementById("inv-category").value||"").trim()||"General").replace(/\b\w/g,c=>c.toUpperCase());
   const qty=parseFloat(document.getElementById("inv-qty").value||"0");
@@ -13714,6 +13747,7 @@ function invSubmitAdd(){
 }
 
 function invSubmitRestock(){
+  if(requireOnline()) return;
   if(!invRestockSelected){notify("❌ No item selected","error");return;}
   const qty=parseFloat(document.getElementById("inv-qty").value||"0");
   const unit=(document.getElementById("inv-unit").value||"").trim();
@@ -16893,6 +16927,7 @@ function showBillModal(bill) {
 
 // ─── ENHANCED addPurchase with billing ────────────────────────
 async function addPurchase(custId, { amount, bill, date, notes, soldItems }) {
+  if(requireOnline()) return;
   const amt = parseFloat(amount); if (!amt || amt <= 0) return;
   const c = customers.find(x => x.id === custId); if (!c) return;
 
@@ -17139,8 +17174,8 @@ window.addEventListener("load", async () => {
     if(db && authPhone && !fbUnsubscribe) startFirestoreListener();
   });
   window.addEventListener('offline', () => {
-    updateDbStatus("📵 Offline — changes saved locally", "#FFD700");
-    notify("📵 You're offline — data saves locally", "error");
+    updateDbStatus("📵 Offline — entries paused", "#FFD700");
+    notify("📵 You're offline — please reconnect to add or edit data", "error");
   });
   loadLicense();
   loadFreeTabs(); // load free/pro feature config from Supabase
