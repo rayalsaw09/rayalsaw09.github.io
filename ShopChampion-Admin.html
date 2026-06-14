@@ -2126,16 +2126,29 @@ window.addEventListener("load", () => {
   // DOMContentLoaded already cleared sc_member_active from localStorage before we get here.
   const _memberTokenPresent = !!(sessionStorage.getItem("sc_member_token") && sessionStorage.getItem("sc_member_id"));
   const _lastSessionWasMember = localStorage.getItem("sc_session_type") === "member";
+
   if (_memberWasActiveOnLoad && !_memberTokenPresent) {
-    // Fresh open after tab close — member must re-login, don't auto-login as admin
+    // Tab was closed while member was logged in — sessionStorage is gone, must re-login
     localStorage.removeItem("sc_member_active");
     authShowStep("phone");
   } else if (_lastSessionWasMember && !_memberTokenPresent) {
-    // Last session was a member login, app was closed — do NOT auto-login as admin
+    // App was reopened after member session — do NOT auto-login as admin
     localStorage.removeItem("sc_session_type");
     authShowStep("phone");
-  } else if (savedPhone && localStorage.getItem("sc_user_" + savedPhone)) {
-    // Either: normal admin auto-login, OR member refresh (tokens in sessionStorage will be restored via _tryRestoreMemberSession)
+  } else if (_memberTokenPresent) {
+    // Member refresh (sessionStorage tokens still alive) — restore member session
+    const shopPhone = sessionStorage.getItem("sc_member_shop_phone") || savedPhone;
+    if (shopPhone) {
+      authPhone = shopPhone;
+      (async () => {
+        await _tryRestoreMemberSession(shopPhone);
+        onLoginSuccess(shopPhone);
+      })();
+    } else {
+      authShowStep("phone");
+    }
+  } else if (savedPhone && localStorage.getItem("sc_user_" + savedPhone) && localStorage.getItem("sc_session_type") === "admin") {
+    // Admin auto-login — only if explicitly marked as admin session
     authPhone = savedPhone;
     // Check block status before allowing auto-login
     (async () => {
@@ -2160,7 +2173,6 @@ window.addEventListener("load", () => {
         }
       } catch(e) { /* network error — allow cached login */ }
       try {
-        await _tryRestoreMemberSession(savedPhone);
         onLoginSuccess(savedPhone);
       } catch(e) {
         console.error("Auto-login failed:", e);
@@ -3440,7 +3452,7 @@ function doLogout() {
   }
   if(_memberSessionTimer) { clearInterval(_memberSessionTimer); _memberSessionTimer = null; }
   currentMember = null; _memberSessionToken = null;
-  sessionStorage.removeItem("sc_member_token"); sessionStorage.removeItem("sc_member_id");
+  sessionStorage.removeItem("sc_member_token"); sessionStorage.removeItem("sc_member_id"); sessionStorage.removeItem("sc_member_shop_phone");
   localStorage.removeItem("sc_member_active");
   localStorage.removeItem("sc_session_type");
   // Hide member pill
@@ -10377,7 +10389,9 @@ async function memberLogin() {
     // Set up member session
     currentMember = { id: data.id, username: data.username, display_name: data.display_name, permissions: data.permissions };
     authPhone = data.shop_phone;
-    localStorage.setItem("sc_auth_phone", data.shop_phone);
+    // Store shop phone separately — do NOT overwrite sc_auth_phone (that is admin-only)
+    // so refreshing the login screen never auto-logs in as admin
+    sessionStorage.setItem("sc_member_shop_phone", data.shop_phone);
 
     // Issue session token
     const tokenRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/issue_member_session`, {
@@ -10428,15 +10442,15 @@ function _startMemberHeartbeat() {
         setTimeout(()=>doLogout(), 2000);
         return;
       }
-      // 2) Update last_seen_at so owner's Team tab shows "Online"
-      const patchRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?id=eq.${encodeURIComponent(currentMember.id)}`, {
-        method:"PATCH",
-        headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json","Prefer":"return=minimal"},
-        body: JSON.stringify({ last_seen_at: new Date().toISOString() })
+      // 2) Update last_seen_at via RPC so owner's Team tab shows "Online"
+      const patchRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/update_member_last_seen`, {
+        method:"POST",
+        headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
+        body: JSON.stringify({ p_member_id: currentMember.id, p_token: _memberSessionToken })
       });
       if(!patchRes.ok) {
         const errTxt = await patchRes.text();
-        console.warn("[Heartbeat] last_seen_at PATCH failed:", patchRes.status, errTxt, "— run the RLS fix SQL in Supabase");
+        console.warn("[Heartbeat] update_member_last_seen failed:", patchRes.status, errTxt);
       }
     } catch(e) { /* ignore network blips */ }
   };
@@ -10451,8 +10465,11 @@ function _startMemberHeartbeat() {
 async function _tryRestoreMemberSession(phone) {
   const memberId = sessionStorage.getItem("sc_member_id");
   const token = sessionStorage.getItem("sc_member_token");
-  console.log("[MemberRestore] memberId:", memberId, "token:", token ? "(present)" : "(none)", "phone:", phone);
-  if(!memberId || !token || !phone) { console.log("[MemberRestore] skipping — missing memberId/token/phone"); return; }
+  // sc_member_shop_phone is the source of truth — don't rely on the caller's phone (which may be the admin phone)
+  const shopPhone = sessionStorage.getItem("sc_member_shop_phone") || phone;
+  console.log("[MemberRestore] memberId:", memberId, "token:", token ? "(present)" : "(none)", "phone:", shopPhone);
+  if(!memberId || !token || !shopPhone) { console.log("[MemberRestore] skipping — missing memberId/token/phone"); return; }
+  phone = shopPhone;
   try {
     const verifyRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/verify_member_session`, {
       method:"POST",
