@@ -7161,7 +7161,8 @@ function openAddCreditorModal(editId){
 function saveCreditorModal(editId){
   if(requireOnline()) return;
   if(!hasPermission('creditor_create')) return notify("🚫 No permission to manage creditors","error");
-  if(!name){ notify("⚠️ Name is required"); return; }
+  const name = document.getElementById('cr-name')?.value.trim()||'';
+  if(!name){ notify("⚠️ Name is required"); document.getElementById('cr-name')?.focus(); return; }
 
   const gstinRaw = document.getElementById("cr-gstin")?.value.trim().toUpperCase()||"";
   if(gstinRaw && !isValidGSTIN(gstinRaw)){
@@ -9156,7 +9157,8 @@ function openAddDebtorModal(editId){
 function saveDebtorModal(editId){
   if(requireOnline()) return;
   if(!hasPermission('debtor_create')) return notify("🚫 No permission to manage debtors","error");
-  if(!name){ notify("⚠️ Name is required"); return; }
+  const name = document.getElementById('dr-name')?.value.trim()||'';
+  if(!name){ notify("⚠️ Name is required"); document.getElementById('dr-name')?.focus(); return; }
 
   const debtors = getDebtors();
 
@@ -11389,7 +11391,8 @@ function handleAddPhoto(inp){
 async function saveNewCustomer(){
   if(requireOnline()) return;
   if(!hasPermission('customer_create')) return notify("🚫 No permission to add customers","error");
-  if(!name){notify("❌ Name is required","error");return;}
+  const name = document.getElementById('m-name')?.value.trim()||'';
+  if(!name){notify("❌ Name is required","error"); document.getElementById('m-name')?.focus(); return;}
   let rawId=document.getElementById("m-id")?.value.trim();
   const id=rawId?rawId.toUpperCase():autoId();
   if(idExists(id,null)){notify("❌ ID already exists — try another or click 🎲 Auto","error");return;}
@@ -11706,7 +11709,8 @@ function handleEditPhoto(inp){
 }
 async function saveEditCustomer(oldId){
   if(!hasPermission('customer_edit')) return notify("🚫 No permission to edit customers","error");
-  if(!name){notify("❌ Name is required");return;}
+  const name = document.getElementById('m-name')?.value.trim()||'';
+  if(!name){notify("❌ Name is required"); document.getElementById('m-name')?.focus(); return;}
   const newId=(document.getElementById("m-id")?.value.trim()||oldId).toUpperCase();
   if(newId!==oldId&&idExists(newId,oldId)){notify("❌ ID already exists");return;}
   const phone=document.getElementById("m-phone")?.value.trim()||"";
