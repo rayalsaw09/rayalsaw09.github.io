@@ -7742,6 +7742,7 @@ function _crTxRender(creditorId){
         ${tx.note?`<div style="color:#7a8aaa;margin-bottom:8px;">📝 ${escHtml(tx.note)}</div>`:""}
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick='printTxBill(${JSON.stringify(tx)}, ${JSON.stringify(cr.name)}, "creditor")' style="cursor:pointer;background:#0a1628;border:1px solid #1e3a6e;border-radius:6px;color:#60a5fa;font-size:11px;font-weight:700;padding:5px 10px;">🧾 View Bill</button>
+          <button onclick='openEwayBillHelper(${JSON.stringify(tx)}, ${JSON.stringify(cr.name)})' style="cursor:pointer;background:#0a1a0a;border:1px solid #1a4a1a;border-radius:6px;color:#4ade80;font-size:11px;font-weight:700;padding:5px 10px;">🚛 E-Way Bill</button>
           ${(tx.syncStatus==="declined"||tx.syncStatus==="local")&&cr._fromShopConnect?`<button onclick="openRequestAgainModal('${creditorId}','${tx.id||""}',${tx.amount},'${(tx.note||"").replace(/'/g,"\'")}','${tx.date||""}','${(tx.invoiceNo||"").replace(/'/g,"\'")}','${tx.syncReqId}')" style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:6px;color:#f87171;font-size:11px;font-weight:700;padding:5px 10px;">🔄 Request Again</button>`:""}
           <button onclick="deleteCrTx('${creditorId}',${origIdx});setTimeout(()=>_crTxRender('${creditorId}'),300);" style="cursor:pointer;background:#1a0808;border:1px solid #5a1a1a;border-radius:6px;color:#f66;font-size:11px;font-weight:700;padding:5px 10px;">🗑 Delete</button>
         </div>
@@ -9446,6 +9447,7 @@ function _drTxRender(debtorId){
         ${tx.note?`<div style="color:#7a8aaa;margin-bottom:8px;">📝 ${escHtml(tx.note)}</div>`:""}
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick='printTxBill(${JSON.stringify(tx)}, ${JSON.stringify(dr.name)}, "debtor")' style="cursor:pointer;background:#0a1628;border:1px solid #1e3a6e;border-radius:6px;color:#60a5fa;font-size:11px;font-weight:700;padding:5px 10px;">🧾 View Bill</button>
+          <button onclick='openEwayBillHelper(${JSON.stringify(tx)}, ${JSON.stringify(dr.name)})' style="cursor:pointer;background:#0a1a0a;border:1px solid #1a4a1a;border-radius:6px;color:#4ade80;font-size:11px;font-weight:700;padding:5px 10px;">🚛 E-Way Bill</button>
           <button onclick="deleteDebtTx('${debtorId}',${origIdx});setTimeout(()=>_drTxRender('${debtorId}'),300);" style="cursor:pointer;background:#1a0808;border:1px solid #5a1a1a;border-radius:6px;color:#f66;font-size:11px;font-weight:700;padding:5px 10px;">🗑 Delete</button>
         </div>
       </div>
@@ -14997,7 +14999,7 @@ function _buildSharedLedgerHtml(entity, etype, peerName, connId) {
       <td style="padding:9px 8px;font-size:13px;color:${col};font-weight:700;">₹${Number(t.amount||0).toFixed(2)}</td>
       <td style="padding:9px 8px;font-size:12px;color:#7a8aaa;">${dt}</td>
       <td style="padding:9px 8px;font-size:12px;color:#7a8aaa;">${escHtml(t.notes||t.bill||"")}</td>
-      <td style="padding:9px 8px;font-size:12px;text-align:right;"><button onclick='printTxBill(${JSON.stringify(t)}, ${JSON.stringify(displayName)}, ${JSON.stringify(etype)})' style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:6px;color:#60a5fa;font-size:11px;font-weight:700;padding:4px 8px;">🧾 Bill</button></td></tr>`;
+      <td style="padding:9px 8px;font-size:12px;text-align:right;display:flex;gap:5px;justify-content:flex-end;"><button onclick='printTxBill(${JSON.stringify(t)}, ${JSON.stringify(displayName)}, ${JSON.stringify(etype)})' style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:6px;color:#60a5fa;font-size:11px;font-weight:700;padding:4px 8px;">🧾 Bill</button><button onclick='openEwayBillHelper(${JSON.stringify(t)}, ${JSON.stringify(displayName)})' style="cursor:pointer;background:#0a1a0a;border:1px solid #1a4a1a;border-radius:6px;color:#4ade80;font-size:11px;font-weight:700;padding:4px 8px;">🚛</button></td></tr>`;
   }).join("");
   return `<div style="max-height:78vh;overflow-y:auto;" id="sc-ledger-modal-content">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
@@ -15032,112 +15034,466 @@ function _buildSharedLedgerHtml(entity, etype, peerName, connId) {
 }
 
 // ── Print a single transaction as a professional Bill / Invoice ───────────────
-function printTxBill(tx, partyName, etype) {
-  const myShopName = (appSettings && appSettings.shopName) || "My Shop";
-  const isCreditor = etype === "creditor";
-  const dt = tx.date ? new Date(tx.date+ (tx.date.length<=10?"T00:00:00":"")).toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"}) : "-";
-  const lbl = {purchase:"Purchase Bill",payment:"Payment Receipt",return:(isCreditor?"Return / Dr Note":"Returned / Cr Note"),sale:"Sales Bill",receipt:"Payment Receipt"}[tx.type] || "Voucher";
-  const items = Array.isArray(tx.items) ? tx.items : (tx._invItem ? [{name:tx._invItem, qty:tx._invQty||1, rate:(tx._invQty?tx.amount/tx._invQty:tx.amount), amount:tx.amount, unit:""}] : []);
+// ── Number to Indian Words ─────────────────────────────────────────────────────
+function _numToWords(n) {
+  if (n === 0) return "Zero";
+  const ones = ["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+  const tens = ["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+  function h(num) {
+    if (num === 0) return "";
+    if (num < 20) return ones[num] + " ";
+    if (num < 100) return tens[Math.floor(num/10)] + (num%10?" "+ones[num%10]:"") + " ";
+    return ones[Math.floor(num/100)] + " Hundred " + h(num%100);
+  }
+  let w = "", rem = Math.floor(n);
+  const cr = Math.floor(rem/10000000); rem %= 10000000;
+  const lac = Math.floor(rem/100000); rem %= 100000;
+  const th = Math.floor(rem/1000); rem %= 1000;
+  if (cr) w += h(cr) + "Crore ";
+  if (lac) w += h(lac) + "Lakh ";
+  if (th) w += h(th) + "Thousand ";
+  w += h(rem);
+  return w.trim();
+}
+function amountInWords(amount) {
+  const total = Math.round(Number(amount||0) * 100);
+  const rupees = Math.floor(total / 100);
+  const paise  = total % 100;
+  let w = _numToWords(rupees) + " Rupees";
+  if (paise > 0) w += " and " + _numToWords(paise) + " Paise";
+  return w.toUpperCase() + " ONLY";
+}
 
-  // Enrich each item with GST/HSN from live inventory data as fallback.
-  // This fixes bills where gstRate was saved as 0 but the inventory item has GST set.
-  const enrichedItems = items.map(it => {
-    const invItem = (typeof inventoryItems !== 'undefined') ? inventoryItems.find(x => x.name === it.name) : null;
-    const gstRate = (it.gstRate != null && Number(it.gstRate) > 0) ? Number(it.gstRate) : (invItem?.gstRate || 0);
-    const hsn = (it.hsn && it.hsn.trim()) ? it.hsn.trim() : (invItem?.hsnCode || "");
-    const unit = it.unit || invItem?.unit || "";
-    return { ...it, gstRate, hsn, unit };
+// ── UPI QR Generator ─────────────────────────────────────────────────────────
+function upiQrUrl(upiId, amount, name) {
+  const upiStr = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(name||"")}&am=${amount||""}&cu=INR`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(upiStr)}`;
+}
+
+// ── E-Way Bill Smart Helper ───────────────────────────────────────────────────
+function openEwayBillHelper(tx, partyName) {
+  const shopName  = (appSettings && appSettings.shopName)  || "My Shop";
+  const shopGstin = getBillSetting("billGSTNumber") || (appSettings && appSettings.shopGstin) || "";
+  const totalAmt  = Number(tx.amount || 0).toFixed(2);
+  const invNo     = tx.invoiceNo || tx.bill || "";
+  const invDate   = tx.date || new Date().toISOString().slice(0,10);
+
+  // Pre-fill checklist data
+  const checks = [
+    { ok: !!shopGstin,          label: "Your GSTIN",        val: shopGstin || "❌ Not set — go to Billing Settings" },
+    { ok: !!invNo,              label: "Invoice Number",     val: invNo     || "❌ Not set on this transaction" },
+    { ok: !!partyName,          label: "Recipient Name",     val: partyName },
+    { ok: !!tx.partyGstin,      label: "Recipient GSTIN",   val: tx.partyGstin || "⚠️ Not saved (enter manually on portal)" },
+    { ok: Number(totalAmt)>0,   label: "Invoice Value",      val: "₹" + totalAmt },
+    { ok: true,                  label: "Transport Mode",    val: "Road (most common)" },
+  ];
+
+  const rows = checks.map(c => `
+    <tr style="border-bottom:1px solid #0d1525;">
+      <td style="padding:8px 10px;font-size:12px;color:#7a8aaa;">${c.label}</td>
+      <td style="padding:8px 10px;font-size:12px;font-weight:700;color:${c.ok?"#e8eaf0":"#f87171"};">${escHtml(c.val)}</td>
+      <td style="padding:8px 10px;text-align:center;font-size:14px;">${c.ok?"✅":"⚠️"}</td>
+    </tr>`).join("");
+
+  showModal("🚛 E-Way Bill Helper", `
+    <div style="font-size:12px;color:#7a8aaa;margin-bottom:14px;line-height:1.6;background:#0a1628;border:1px solid #1e3a6e;border-radius:8px;padding:10px 14px;">
+      <strong style="color:#93c5fd;">What is E-Way Bill?</strong><br>
+      Required by GST law when goods worth <strong style="color:#fff;">₹50,000+</strong> are transported.
+      Generated on the <strong style="color:#FFD700;">government portal</strong> — no app can do it directly without GSP registration.
+    </div>
+
+    <!-- Readiness checklist -->
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#FFD700;margin-bottom:8px;">📋 Your Invoice Readiness Check</div>
+    <table style="width:100%;border-collapse:collapse;background:#060d1a;border-radius:8px;overflow:hidden;margin-bottom:14px;">
+      <thead><tr style="background:#0d1a30;">
+        <th style="padding:7px 10px;text-align:left;font-size:10px;color:#4a5a7a;font-weight:800;text-transform:uppercase;">Field</th>
+        <th style="padding:7px 10px;text-align:left;font-size:10px;color:#4a5a7a;font-weight:800;text-transform:uppercase;">Value</th>
+        <th style="padding:7px 10px;text-align:center;font-size:10px;color:#4a5a7a;font-weight:800;text-transform:uppercase;">OK?</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <!-- Step by step guide -->
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#FFD700;margin-bottom:8px;">🪜 Step-by-Step on Portal</div>
+    <div style="background:#060d1a;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.9;color:#cdd5e8;">
+      <div><span style="background:#1a3a6e;color:#60a5fa;border-radius:4px;padding:1px 7px;font-weight:800;margin-right:6px;">1</span>Click <strong style="color:#FFD700;">"Open E-Way Bill Portal"</strong> below</div>
+      <div><span style="background:#1a3a6e;color:#60a5fa;border-radius:4px;padding:1px 7px;font-weight:800;margin-right:6px;">2</span>Login with your <strong>GSTIN + Password</strong> → Enter OTP from registered mobile</div>
+      <div><span style="background:#1a3a6e;color:#60a5fa;border-radius:4px;padding:1px 7px;font-weight:800;margin-right:6px;">3</span>Click <strong>E-Way Bill → Generate New</strong></div>
+      <div><span style="background:#1a3a6e;color:#60a5fa;border-radius:4px;padding:1px 7px;font-weight:800;margin-right:6px;">4</span>Fill: Transaction Type = <strong>Outward</strong>, Sub-type = <strong>Supply</strong></div>
+      <div><span style="background:#1a3a6e;color:#60a5fa;border-radius:4px;padding:1px 7px;font-weight:800;margin-right:6px;">5</span>Document Type = <strong>Tax Invoice</strong>, No = <strong style="color:#FFD700;">${escHtml(invNo||"your invoice number")}</strong>, Date = <strong style="color:#FFD700;">${escHtml(invDate)}</strong></div>
+      <div><span style="background:#1a3a6e;color:#60a5fa;border-radius:4px;padding:1px 7px;font-weight:800;margin-right:6px;">6</span>Fill recipient GSTIN: <strong style="color:#FFD700;">${escHtml(tx.partyGstin||"recipient GSTIN")}</strong>, Value: <strong style="color:#FFD700;">₹${totalAmt}</strong></div>
+      <div><span style="background:#1a3a6e;color:#60a5fa;border-radius:4px;padding:1px 7px;font-weight:800;margin-right:6px;">7</span>Add item HSN codes, vehicle number → Submit → Get <strong style="color:#22c55e;">12-digit EWB Number</strong></div>
+      <div><span style="background:#1a3a6e;color:#60a5fa;border-radius:4px;padding:1px 7px;font-weight:800;margin-right:6px;">8</span>Paste that number below → it will print on your invoice ✅</div>
+    </div>
+
+    <!-- Copy helper -->
+    <div style="background:#0d1a0d;border:1px solid #1a4a1a;border-radius:8px;padding:10px 14px;margin-bottom:14px;">
+      <div style="font-size:11px;color:#4ade80;font-weight:800;margin-bottom:6px;">📋 Quick Copy for Portal</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;">
+        ${shopGstin?`<div style="background:#060d1a;border-radius:6px;padding:6px 8px;cursor:pointer;" onclick="navigator.clipboard.writeText('${escHtml(shopGstin)}');notify('Copied GSTIN ✅')">
+          <div style="color:#4a5a7a;margin-bottom:2px;">Your GSTIN</div>
+          <div style="color:#60a5fa;font-family:monospace;font-weight:700;">${escHtml(shopGstin)}</div>
+        </div>`:""}
+        ${invNo?`<div style="background:#060d1a;border-radius:6px;padding:6px 8px;cursor:pointer;" onclick="navigator.clipboard.writeText('${escHtml(invNo)}');notify('Copied Invoice No ✅')">
+          <div style="color:#4a5a7a;margin-bottom:2px;">Invoice No.</div>
+          <div style="color:#fbbf24;font-family:monospace;font-weight:700;">${escHtml(invNo)}</div>
+        </div>`:""}
+        <div style="background:#060d1a;border-radius:6px;padding:6px 8px;cursor:pointer;" onclick="navigator.clipboard.writeText('${totalAmt}');notify('Copied Amount ✅')">
+          <div style="color:#4a5a7a;margin-bottom:2px;">Invoice Value</div>
+          <div style="color:#22c55e;font-family:monospace;font-weight:700;">${totalAmt}</div>
+        </div>
+        ${tx.partyGstin?`<div style="background:#060d1a;border-radius:6px;padding:6px 8px;cursor:pointer;" onclick="navigator.clipboard.writeText('${escHtml(tx.partyGstin)}');notify('Copied Party GSTIN ✅')">
+          <div style="color:#4a5a7a;margin-bottom:2px;">Party GSTIN</div>
+          <div style="color:#60a5fa;font-family:monospace;font-weight:700;">${escHtml(tx.partyGstin)}</div>
+        </div>`:""}
+      </div>
+    </div>
+
+    <!-- Paste back EWB number -->
+    <div style="margin-bottom:14px;">
+      <label style="font-size:11px;color:#FFD700;font-weight:800;display:block;margin-bottom:6px;">✅ Paste E-Way Bill Number Here (after generating)</label>
+      <div style="display:flex;gap:8px;">
+        <input id="ewb-number-input" class="input" placeholder="e.g. 123456789012 (12 digits)" maxlength="12" style="font-family:monospace;font-size:15px;font-weight:700;letter-spacing:2px;flex:1;margin-bottom:0;" oninput="this.value=this.value.replace(/\D/g,'')" />
+        <button onclick="
+          const n=document.getElementById('ewb-number-input').value.trim();
+          if(n.length!==12){notify('⚠️ EWB number must be 12 digits','error');return;}
+          window._pendingEwbTx.ewayBillNo=n;
+          notify('✅ E-Way Bill No. saved! Now click View Bill to print it.','success');
+          closeModal();
+          printTxBill(window._pendingEwbTx, window._pendingEwbParty, window._pendingEwbEtype);
+        " style="cursor:pointer;background:#1a4a1a;border:1px solid #22c55e;border-radius:8px;color:#22c55e;font-size:13px;font-weight:800;padding:0 14px;white-space:nowrap;">💾 Save & Print</button>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div style="display:flex;gap:8px;">
+      <a href="https://ewaybillgst.gov.in" target="_blank" style="flex:1;display:block;text-align:center;padding:12px;background:linear-gradient(135deg,#1a3a6e,#2563eb);color:#fff;border-radius:10px;text-decoration:none;font-size:14px;font-weight:800;">🌐 Open E-Way Bill Portal</a>
+      <button onclick="closeModal()" style="flex:1;cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:10px;color:#7a8aaa;font-size:14px;font-weight:700;padding:12px;">Cancel</button>
+    </div>
+  `);
+
+  // Store pending tx refs for the save callback
+  window._pendingEwbTx    = tx;
+  window._pendingEwbParty = partyName;
+  window._pendingEwbEtype = etype || "debtor";
+}
+
+// ── PROFESSIONAL GST INVOICE (Gujarat Freight Tools style) ────────────────────
+function printTxBill(tx, partyName, etype) {
+  const S  = (k, fb) => { try { return getBillSetting(k) || ""; } catch(e){} return ""; };
+  const AS = (k) => (appSettings && appSettings[k]) || "";
+  const myShopName  = AS("shopName")    || "My Shop";
+  const shopTagline = S("billShopTagline") || "";
+  const shopAddress = S("billShopAddress") || AS("shopAddress");
+  const shopCity    = AS("shopCity");
+  const shopGstin   = S("billGSTNumber")  || AS("shopGstin");
+  const shopPan     = S("billShopPan");
+  const shopPhone   = S("billShopPhone")  || AS("shopPhone");
+  const shopEmail   = S("billShopEmail")  || AS("shopEmail");
+  const shopWebsite = S("billShopWebsite");
+  const shopIcon    = AS("appIcon");
+  const bankName    = S("billBankName");
+  const bankBranch  = S("billBankBranch");
+  const bankAccNo   = S("billBankAccNo");
+  const bankIfsc    = S("billBankIfsc");
+  const upiId       = S("billUpiId");
+  const showQr      = S("billShowUpiQr") === true || S("billShowUpiQr") === "true";
+  const gstType     = S("billGSTType") || "none";
+  const isCreditor  = etype === "creditor";
+  const footer      = S("billFooter") || "Thank you for shopping with us!";
+  const ewayNo      = tx.ewayBillNo || "";
+
+  const fmtDate = (d) => d
+    ? new Date(d + (d.length <= 10 ? "T00:00:00" : "")).toLocaleDateString("en-IN", {day:"2-digit", month:"short", year:"numeric"})
+    : new Date().toLocaleDateString("en-IN", {day:"2-digit", month:"short", year:"numeric"});
+  const dt = fmtDate(tx.date);
+
+  const lblMap = { purchase:"TAX INVOICE (Purchase)", payment:"PAYMENT RECEIPT", return: isCreditor?"DEBIT NOTE":"CREDIT NOTE", sale:"TAX INVOICE", receipt:"PAYMENT RECEIPT" };
+  const lbl = lblMap[tx.type] || "TAX INVOICE";
+  const invNo = tx.invoiceNo || tx.bill || "—";
+
+  // ─── Items ────────────────────────────────────────────────────
+  const items = Array.isArray(tx.items) ? tx.items
+    : (tx._invItem ? [{name:tx._invItem, qty:tx._invQty||1, rate:(tx._invQty?tx.amount/tx._invQty:tx.amount), amount:tx.amount, unit:"NOS"}] : []);
+
+  const enriched = items.map(it => {
+    const inv = (typeof inventoryItems !== "undefined") ? inventoryItems.find(x => x.name === it.name) : null;
+    const gstRate = (it.gstRate != null && Number(it.gstRate) > 0) ? Number(it.gstRate) : (inv?.gstRate || 0);
+    const hsn  = (it.hsn && it.hsn.trim()) ? it.hsn.trim() : (inv?.hsnCode || "");
+    const unit = it.unit || inv?.unit || "NOS";
+    return {...it, gstRate, hsn, unit};
   });
 
-  const hasGSTItems = enrichedItems.some(it => Number(it.gstRate) > 0);
-  const hasHSN = enrichedItems.some(it => it.hsn && it.hsn.trim());
-  let itemRows = "";
-  if (items.length > 0) {
-    itemRows = enrichedItems.map((it,i) => {
-      const gst = Number(it.gstRate||0);
-      const taxableAmt = gst > 0 ? Number(it.amount||0) / (1 + gst/100) : Number(it.amount||0);
-      const taxAmt = Number(it.amount||0) - taxableAmt;
-      return `<tr>
-        <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${i+1}</td>
-        ${hasHSN ? `<td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">${escHtml(it.hsn||"")||"&mdash;"}</td>` : ""}
-        <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;">${escHtml(it.name||"-")}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;">${it.qty||0}${it.unit?" "+escHtml(it.unit):""}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;">₹${Number(it.rate||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
-        ${hasGSTItems ? `<td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:center;font-size:12px;">${gst > 0 ? gst+"%" : "&mdash;"}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-size:12px;color:#555;">${gst > 0 ? "₹"+taxAmt.toLocaleString("en-IN",{maximumFractionDigits:2}) : "&mdash;"}</td>` : ""}
-        <td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">₹${Number(it.amount||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
-      </tr>`;
-    }).join("");
-  }
+  const hasGST = enriched.some(it => Number(it.gstRate) > 0);
+  const hasHSN = enriched.some(it => it.hsn && it.hsn.trim());
+  const grandTotal = Number(tx.amount || 0);
+  const fmt = v => Number(v||0).toLocaleString("en-IN", {minimumFractionDigits:2, maximumFractionDigits:2});
+  const esc = s => escHtml ? escHtml(s||"") : String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
-  const colSpanTotal = 3 + (hasHSN?1:0) + (hasGSTItems?2:0);
-  const itemsTable = items.length > 0 ? `
-  <table style="width:100%;border-collapse:collapse;margin-top:20px;">
-    <thead><tr>
-      <th style="background:#f3f4f6;padding:9px 10px;text-align:left;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;width:36px;">#</th>
-      ${hasHSN ? `<th style="background:#f3f4f6;padding:9px 10px;text-align:left;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">HSN/SAC</th>` : ""}
-      <th style="background:#f3f4f6;padding:9px 10px;text-align:left;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Item</th>
-      <th style="background:#f3f4f6;padding:9px 10px;text-align:right;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Qty</th>
-      <th style="background:#f3f4f6;padding:9px 10px;text-align:right;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Rate</th>
-      ${hasGSTItems ? `<th style="background:#f3f4f6;padding:9px 10px;text-align:center;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">GST%</th>
-      <th style="background:#f3f4f6;padding:9px 10px;text-align:right;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Tax Amt</th>` : ""}
-      <th style="background:#f3f4f6;padding:9px 10px;text-align:right;font-size:12px;text-transform:uppercase;border-bottom:2px solid #d1d5db;">Amount</th>
-    </tr></thead>
-    <tbody>${itemRows}</tbody>
-    <tfoot>
-      ${hasGSTItems ? (() => {
-        const subtotal = enrichedItems.reduce((s,it)=>{ const g=Number(it.gstRate||0); return s+(g>0?Number(it.amount||0)/(1+g/100):Number(it.amount||0)); },0);
-        const totaltax = Number(tx.amount||0) - subtotal;
-        return `<tr style="background:#f9fafb;">
-          <td colspan="${colSpanTotal-2}" style="padding:8px 10px;text-align:right;font-size:12px;color:#555;">Taxable Amount:</td>
-          <td colspan="2" style="padding:8px 10px;text-align:right;font-size:12px;color:#555;">₹${subtotal.toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
+  // ─── GST Totals ───────────────────────────────────────────────
+  let taxableTotal = 0, cgstTotal = 0, sgstTotal = 0, igstTotal = 0;
+  const gstBuckets = {};
+  enriched.forEach(it => {
+    const g = Number(it.gstRate || 0), amt = Number(it.amount || 0);
+    const taxable = g > 0 ? amt / (1 + g/100) : amt;
+    const tax = amt - taxable;
+    taxableTotal += taxable;
+    if (gstType === "igst") { igstTotal += tax; }
+    else { cgstTotal += tax/2; sgstTotal += tax/2; }
+    if (g > 0) {
+      if (!gstBuckets[g]) gstBuckets[g] = {taxable:0, cgst:0, sgst:0, igst:0};
+      gstBuckets[g].taxable += taxable;
+      if (gstType === "igst") gstBuckets[g].igst += tax;
+      else { gstBuckets[g].cgst += tax/2; gstBuckets[g].sgst += tax/2; }
+    }
+  });
+  const totalTax = gstType === "igst" ? igstTotal : cgstTotal + sgstTotal;
+  const totalQty = enriched.reduce((s,it) => s + (Number(it.qty) || 0), 0);
+
+  // ─── Logo ──────────────────────────────────────────────────────
+  const logoHtml = shopIcon
+    ? `<img src="${shopIcon}" style="height:64px;max-width:110px;object-fit:contain;" />`
+    : `<div style="width:64px;height:64px;border-radius:8px;background:linear-gradient(135deg,#fff3,#fff1);border:2px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:#fff;">${esc(myShopName.slice(0,2).toUpperCase())}</div>`;
+
+  // ─── Item rows ─────────────────────────────────────────────────
+  const thS = `background:#1a3a6e;color:#fff;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:8px 7px;border:1px solid #0d2654;`;
+  const tdS = `padding:7px 7px;border-bottom:1px solid #e9ecef;font-size:12px;`;
+
+  const itemRows = enriched.map((it, i) => {
+    const g = Number(it.gstRate || 0), amt = Number(it.amount || 0);
+    const taxable = g > 0 ? amt/(1+g/100) : amt;
+    const tax = amt - taxable;
+    return `<tr style="${i%2===1?"background:#fafbff;":""}">
+      <td style="${tdS}text-align:center;">${i+1}</td>
+      <td style="${tdS}">${esc(it.name||"—")}</td>
+      ${hasHSN ? `<td style="${tdS}text-align:center;font-family:monospace;font-size:11px;">${esc(it.hsn||"—")}</td>` : ""}
+      <td style="${tdS}text-align:center;">${it.qty||0} ${esc(it.unit||"")}</td>
+      <td style="${tdS}text-align:right;">${fmt(it.rate||0)}</td>
+      <td style="${tdS}text-align:right;">${fmt(taxable)}</td>
+      ${gstType==="igst"
+        ? `<td style="${tdS}text-align:center;">${g>0?g+"%":"—"}</td><td style="${tdS}text-align:right;">${g>0?fmt(tax):"—"}</td>`
+        : `<td style="${tdS}text-align:center;">${g>0?g/2+"%":"—"}</td><td style="${tdS}text-align:right;">${g>0?fmt(tax/2):"—"}</td>
+           <td style="${tdS}text-align:center;">${g>0?g/2+"%":"—"}</td><td style="${tdS}text-align:right;">${g>0?fmt(tax/2):"—"}</td>`}
+      <td style="${tdS}text-align:right;font-weight:700;">${fmt(amt)}</td>
+    </tr>`;
+  }).join("");
+
+  // Blank filler rows
+  const fillerCount = Math.max(0, 5 - enriched.length);
+  const fillerRows  = Array(fillerCount).fill(`<tr style="height:28px;"><td colspan="20" style="border-bottom:1px solid #f0f0f0;"></td></tr>`).join("");
+
+  // Total row
+  const colsBefore = 3 + (hasHSN?1:0); // #, name, (hsn), qty+rate = 5 cols before taxable
+  const gstCols = gstType === "igst" ? 2 : 4;
+  const totalRow = `<tr style="background:#f0f4ff;font-weight:800;border-top:2px solid #1a3a6e;">
+    <td colspan="${colsBefore}" style="padding:8px 7px;text-align:right;font-size:12px;">Total</td>
+    <td style="padding:8px 7px;text-align:center;font-size:12px;">${totalQty} ${esc(enriched[0]?.unit||"NOS")}</td>
+    <td style="padding:8px 7px;"></td>
+    <td style="padding:8px 7px;text-align:right;">${fmt(taxableTotal)}</td>
+    ${gstType==="igst"
+      ? `<td style="padding:8px 7px;"></td><td style="padding:8px 7px;text-align:right;">${fmt(igstTotal)}</td>`
+      : `<td style="padding:8px 7px;"></td><td style="padding:8px 7px;text-align:right;">${fmt(cgstTotal)}</td>
+         <td style="padding:8px 7px;"></td><td style="padding:8px 7px;text-align:right;">${fmt(sgstTotal)}</td>`}
+    <td style="padding:8px 7px;text-align:right;font-size:14px;">₹${fmt(grandTotal)}</td>
+  </tr>`;
+
+  // ─── Bank section ──────────────────────────────────────────────
+  const hasBankDetails = bankName || bankAccNo || bankIfsc || upiId;
+  const bankBlock = hasBankDetails ? `
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:4px;margin-bottom:8px;">Bank Details</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      ${bankName   ? `<tr><td style="color:#555;padding:3px 0;width:96px;">Name</td><td style="font-weight:700;padding:3px 0;">${esc(bankName)}</td></tr>` : ""}
+      ${bankBranch ? `<tr><td style="color:#555;padding:3px 0;">Branch</td><td style="font-weight:700;padding:3px 0;">${esc(bankBranch)}</td></tr>` : ""}
+      ${bankAccNo  ? `<tr><td style="color:#555;padding:3px 0;">Acc. Number</td><td style="font-weight:700;font-family:monospace;padding:3px 0;">${esc(bankAccNo)}</td></tr>` : ""}
+      ${bankIfsc   ? `<tr><td style="color:#555;padding:3px 0;">IFSC</td><td style="font-weight:700;font-family:monospace;padding:3px 0;">${esc(bankIfsc)}</td></tr>` : ""}
+      ${upiId      ? `<tr><td style="color:#555;padding:3px 0;">UPI ID</td><td style="font-weight:700;color:#6a0dad;padding:3px 0;">${esc(upiId)}</td></tr>` : ""}
+    </table>
+    ${showQr && upiId ? `<div style="margin-top:10px;text-align:center;">
+      <img src="${upiQrUrl(upiId, grandTotal, myShopName)}" style="width:100px;height:100px;" onerror="this.style.display='none'" />
+      <div style="font-size:11px;font-weight:700;color:#6a0dad;margin-top:3px;">Pay using UPI</div>
+    </div>` : ""}` : `<div style="color:#aaa;font-size:12px;font-style:italic;padding:8px 0;">Add bank details in Billing Settings</div>`;
+
+  // ─── Full HTML Page ────────────────────────────────────────────
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(lbl)} — ${esc(partyName)}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Roboto',Arial,sans-serif;background:#dde3ea;color:#1a1a2e;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .invoice{max-width:860px;margin:18px auto;background:#fff;border:1px solid #b8c0cc;box-shadow:0 4px 24px rgba(0,0,0,.13);}
+  table{border-collapse:collapse;}
+  .divider{border:none;border-top:1px solid #dee2e6;margin:0;}
+  @media print{body{background:#fff}.invoice{margin:0;border:none;box-shadow:none}.no-print{display:none!important}}
+</style>
+</head>
+<body>
+<div class="invoice">
+
+  <!-- ══ HEADER ══ -->
+  <div style="background:linear-gradient(135deg,#1a3a6e 0%,#1e4db7 100%);padding:16px 22px 12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+      <div style="display:flex;align-items:center;gap:14px;">
+        ${logoHtml}
+        <div>
+          <div style="font-size:26px;font-weight:900;color:#fff;line-height:1;letter-spacing:.3px;">${esc(myShopName)}</div>
+          ${shopTagline ? `<div style="font-size:12px;color:#93c5fd;margin-top:4px;font-weight:500;">${esc(shopTagline)}</div>` : ""}
+        </div>
+      </div>
+      <div style="text-align:right;min-width:180px;">
+        ${shopPhone   ? `<div style="font-size:12px;color:#bfdbfe;margin-bottom:2px;">📞 ${esc(shopPhone)}</div>` : ""}
+        ${shopEmail   ? `<div style="font-size:12px;color:#bfdbfe;margin-bottom:2px;">✉️ ${esc(shopEmail)}</div>` : ""}
+        ${shopWebsite ? `<div style="font-size:12px;color:#bfdbfe;margin-bottom:2px;">🌐 ${esc(shopWebsite)}</div>` : ""}
+      </div>
+    </div>
+    ${shopAddress || shopPan ? `
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,.2);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+      <div style="font-size:11px;color:#bfdbfe;">${esc(shopAddress)}${shopCity ? ", " + esc(shopCity) : ""}</div>
+      ${shopGstin ? `<div style="font-size:11px;color:#bfdbfe;">GSTIN: <strong style="color:#fff;font-family:monospace;">${esc(shopGstin)}</strong></div>` : ""}
+      ${shopPan   ? `<div style="font-size:11px;color:#bfdbfe;">PAN: <strong style="color:#fff;font-family:monospace;">${esc(shopPan)}</strong></div>`   : ""}
+    </div>` : ""}
+  </div>
+
+  <!-- ══ TITLE BAR ══ -->
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 22px;background:#f4f6fb;border-bottom:2px solid #1a3a6e;">
+    <div style="font-size:17px;font-weight:900;color:#1a3a6e;letter-spacing:2px;">${esc(lbl)}</div>
+    <div style="font-size:10px;font-weight:800;color:#666;text-transform:uppercase;letter-spacing:1.5px;">ORIGINAL FOR RECIPIENT</div>
+  </div>
+
+  <!-- ══ PARTY + INVOICE META ══ -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid #dee2e6;">
+    <div style="padding:12px 16px;border-right:1px solid #dee2e6;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:4px;margin-bottom:8px;">Customer Detail</div>
+      <table style="width:100%;font-size:12px;border-collapse:collapse;">
+        <tr><td style="color:#666;padding:3px 0;width:90px;vertical-align:top;">M/S</td><td style="font-weight:800;font-size:14px;padding:3px 0;color:#1a1a2e;">${esc(partyName)}</td></tr>
+        ${tx.partyAddress ? `<tr><td style="color:#666;padding:3px 0;vertical-align:top;">Address</td><td style="padding:3px 0;">${esc(tx.partyAddress)}</td></tr>` : ""}
+        ${tx.partyPhone   ? `<tr><td style="color:#666;padding:3px 0;">Phone</td><td style="font-weight:600;padding:3px 0;">${esc(tx.partyPhone)}</td></tr>` : ""}
+        ${tx.partyGstin   ? `<tr><td style="color:#666;padding:3px 0;">GSTIN</td><td style="font-family:monospace;font-size:11px;padding:3px 0;">${esc(tx.partyGstin)}</td></tr>` : ""}
+        ${shopCity        ? `<tr><td style="color:#666;padding:3px 0;">Place of Supply</td><td style="padding:3px 0;">${esc(shopCity)}</td></tr>` : ""}
+      </table>
+    </div>
+    <div style="padding:12px 16px;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#1a3a6e;border-bottom:2px solid #1a3a6e;padding-bottom:4px;margin-bottom:8px;">Invoice Detail</div>
+      <table style="width:100%;font-size:12px;border-collapse:collapse;">
+        <tr>
+          <td style="color:#666;padding:3px 0;width:100px;">Invoice No.</td>
+          <td style="font-weight:700;font-family:monospace;padding:3px 0;">${esc(invNo)}</td>
+          <td style="color:#666;padding:3px 0 3px 12px;width:90px;">Invoice Date</td>
+          <td style="font-weight:700;padding:3px 0;">${dt}</td>
         </tr>
-        <tr style="background:#f9fafb;">
-          <td colspan="${colSpanTotal-2}" style="padding:8px 10px;text-align:right;font-size:12px;color:#555;">Total GST:</td>
-          <td colspan="2" style="padding:8px 10px;text-align:right;font-size:12px;color:#555;">₹${totaltax.toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
-        </tr>`;
-      })() : ""}
-      <tr style="background:#f0f4ff;">
-        <td colspan="${colSpanTotal}" style="padding:10px;font-weight:800;text-align:right;">Total:</td>
-        <td style="padding:10px;font-weight:800;text-align:right;">₹${Number(tx.amount||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</td>
-      </tr>
-    </tfoot>
-  </table>` : `
-  <div style="margin-top:24px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:18px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:14px;color:#374151;">${escHtml(tx.note||lbl)}</div>
-      <div style="font-size:24px;font-weight:800;">₹${Number(tx.amount||0).toLocaleString("en-IN",{maximumFractionDigits:2})}</div>
-    </div>
-  </div>`;
-
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(lbl)} — ${escHtml(partyName)}</title>
-  <style>
-    body{font-family:Arial,sans-serif;padding:30px;color:#111;max-width:800px;margin:0 auto;}
-    h1{margin:0;font-size:22px;}h2{margin:0;font-size:16px;color:#555;}
-    @media print{button{display:none}}
-  </style></head><body>
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
-    <div><h1>${escHtml(myShopName)}</h1><div style="font-size:12px;color:#6b7280;margin-top:4px;">${escHtml(lbl)}</div></div>
-    <div style="text-align:right;font-size:12px;color:#6b7280;">
-      <div>Date: ${dt}</div>
-      ${tx.invoiceNo?`<div>Ref / Invoice: <b>${escHtml(tx.invoiceNo)}</b></div>`:""}
-      <div>Printed: ${new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"})}</div>
+        ${ewayNo ? `<tr>
+          <td style="color:#666;padding:3px 0;">E-Way Bill</td>
+          <td colspan="3" style="font-weight:800;font-family:monospace;color:#1a3a6e;padding:3px 0;">
+            <span style="background:#e8f0ff;border:1px solid #1a3a6e;border-radius:4px;padding:2px 8px;">${esc(ewayNo)}</span>
+          </td>
+        </tr>` : ""}
+        ${tx.transport ? `<tr><td style="color:#666;padding:3px 0;">Transport</td><td colspan="3" style="padding:3px 0;">${esc(tx.transport)}</td></tr>` : ""}
+        ${shopGstin ? `<tr><td style="color:#666;padding:3px 0;">Our GSTIN</td><td colspan="3" style="font-family:monospace;font-size:11px;padding:3px 0;">${esc(shopGstin)}</td></tr>` : ""}
+      </table>
     </div>
   </div>
-  <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:8px;">
-    <div style="font-size:12px;color:#6b7280;">${isCreditor?"Supplier":"Customer"}</div>
-    <div style="font-size:17px;font-weight:700;">${escHtml(partyName)}</div>
-  </div>
-  ${itemsTable}
-  <div style="margin-top:30px;text-align:center;font-size:11px;color:#9ca3af;">Generated by ShopChampion</div>
-  <div style="margin-top:16px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:#1e40af;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🖨 Print / Save PDF</button></div>
-  </body></html>`;
 
-  const w = window.open("","_blank","width=860,height=700");
+  <!-- ══ ITEMS TABLE ══ -->
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="${thS}width:30px;text-align:center;">Sr.</th>
+          <th style="${thS}text-align:left;min-width:160px;">Name of Product / Service</th>
+          ${hasHSN ? `<th style="${thS}text-align:center;">HSN/SAC</th>` : ""}
+          <th style="${thS}text-align:center;">Qty</th>
+          <th style="${thS}text-align:right;">Rate</th>
+          <th style="${thS}text-align:right;">Taxable Value</th>
+          ${gstType === "igst"
+            ? `<th style="${thS}text-align:center;" colspan="2">IGST</th>`
+            : `<th style="${thS}text-align:center;" colspan="2">CGST</th><th style="${thS}text-align:center;" colspan="2">SGST</th>`}
+          <th style="${thS}text-align:right;">Total</th>
+        </tr>
+        ${gstType !== "none" ? `<tr style="background:#0f2a5a;">
+          <th colspan="${3+(hasHSN?1:0)}" style="padding:4px 7px;"></th>
+          <th style="padding:4px 7px;color:#93c5fd;font-size:10px;text-align:right;">₹</th>
+          <th style="padding:4px 7px;color:#93c5fd;font-size:10px;text-align:right;">₹</th>
+          ${gstType === "igst"
+            ? `<th style="padding:4px 7px;color:#93c5fd;font-size:10px;text-align:center;">%</th><th style="padding:4px 7px;color:#93c5fd;font-size:10px;text-align:right;">Amount</th>`
+            : `<th style="padding:4px 7px;color:#93c5fd;font-size:10px;text-align:center;">%</th><th style="padding:4px 7px;color:#93c5fd;font-size:10px;text-align:right;">Amount</th>
+               <th style="padding:4px 7px;color:#93c5fd;font-size:10px;text-align:center;">%</th><th style="padding:4px 7px;color:#93c5fd;font-size:10px;text-align:right;">Amount</th>`}
+          <th style="padding:4px 7px;color:#93c5fd;font-size:10px;text-align:right;">₹</th>
+        </tr>` : ""}
+      </thead>
+      <tbody>
+        ${itemRows || `<tr><td colspan="20" style="padding:20px;text-align:center;color:#9ca3af;font-style:italic;">No items on this transaction</td></tr>`}
+        ${fillerRows}
+      </tbody>
+      <tfoot>${totalRow}</tfoot>
+    </table>
+  </div>
+
+  <!-- ══ AMOUNT IN WORDS + TAX SUMMARY ══ -->
+  <div style="display:grid;grid-template-columns:55% 45%;border-top:2px solid #1a3a6e;">
+    <div style="padding:10px 16px;border-right:1px solid #dee2e6;">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#666;margin-bottom:5px;">Total in Words</div>
+      <div style="font-size:12px;font-weight:700;color:#1a3a6e;line-height:1.5;text-transform:uppercase;">${amountInWords(grandTotal)}</div>
+    </div>
+    <div style="padding:10px 16px;">
+      <table style="width:100%;font-size:12px;border-collapse:collapse;">
+        <tr><td style="color:#555;padding:4px 0;">Taxable Amount</td><td style="text-align:right;font-weight:600;padding:4px 0;">${fmt(taxableTotal)}</td></tr>
+        ${gstType === "igst"
+          ? `<tr><td style="color:#555;padding:4px 0;">Add : IGST</td><td style="text-align:right;font-weight:600;padding:4px 0;">${fmt(igstTotal)}</td></tr>`
+          : `<tr><td style="color:#555;padding:4px 0;">Add : CGST</td><td style="text-align:right;font-weight:600;padding:4px 0;">${fmt(cgstTotal)}</td></tr>
+             <tr><td style="color:#555;padding:4px 0;">Add : SGST</td><td style="text-align:right;font-weight:600;padding:4px 0;">${fmt(sgstTotal)}</td></tr>`}
+        <tr style="border-top:1px solid #dee2e6;"><td style="color:#555;padding:4px 0;">Total Tax</td><td style="text-align:right;font-weight:700;padding:4px 0;">${fmt(totalTax)}</td></tr>
+        <tr style="background:#1a3a6e;border-radius:4px;">
+          <td style="padding:7px 8px;color:#fff;font-weight:700;">Total Amount After Tax</td>
+          <td style="padding:7px 8px;text-align:right;font-size:16px;font-weight:900;color:#fff;">₹${fmt(grandTotal)}</td>
+        </tr>
+        <tr><td colspan="2" style="text-align:right;font-size:10px;color:#999;padding-top:3px;">(E &amp; O.E.)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ BANK DETAILS + SIGNATURE ══ -->
+  <div style="display:grid;grid-template-columns:55% 45%;border-top:1px solid #dee2e6;">
+    <div style="padding:12px 16px;border-right:1px solid #dee2e6;">${bankBlock}</div>
+    <div style="padding:12px 16px;display:flex;flex-direction:column;justify-content:space-between;min-height:120px;">
+      <div style="font-size:11px;color:#555;text-align:right;font-style:italic;">Certified that the particulars given above are true and correct.</div>
+      <div style="text-align:right;margin-top:auto;">
+        <div style="font-size:12px;font-weight:900;color:#1a3a6e;margin-bottom:48px;">For ${esc(myShopName)}</div>
+        <div style="border-top:1px solid #666;padding-top:5px;font-size:11px;color:#555;">Authorised Signatory</div>
+        <div style="font-size:10px;color:#aaa;margin-top:3px;font-style:italic;">This is a computer generated invoice, no signature required.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TERMS + FOOTER ══ -->
+  <div style="padding:10px 16px;border-top:1px solid #dee2e6;background:#f9fafb;">
+    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#1a3a6e;margin-bottom:5px;">Terms and Conditions</div>
+    <div style="font-size:11px;color:#555;line-height:1.8;">
+      Subject to local jurisdiction. Our responsibility ceases as soon as goods leave our premises.<br>
+      Goods once sold will not be taken back. Delivery Ex-Premises. Customer Signature: ____________________
+    </div>
+  </div>
+  <div style="text-align:center;padding:8px;background:#f0f4fb;border-top:1px solid #dee2e6;">
+    <div style="font-size:12px;color:#555;font-style:italic;">${esc(footer)}</div>
+  </div>
+
+  <!-- ══ PRINT BUTTON ══ -->
+  <div class="no-print" style="padding:16px;text-align:center;background:#f0f4fb;">
+    <button onclick="window.print()" style="display:inline-flex;align-items:center;gap:10px;padding:12px 40px;background:linear-gradient(135deg,#1a3a6e,#1e4db7);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:800;cursor:pointer;font-family:'Roboto',sans-serif;box-shadow:0 2px 12px rgba(26,58,110,.35);">
+      🖨️ &nbsp; Print / Save as PDF
+    </button>
+  </div>
+
+</div>
+</body></html>`;
+
+  const w = window.open("", "_blank", "width=930,height=800");
+  if (!w) { alert("Please allow popups for this site to view the invoice."); return; }
   w.document.write(html);
   w.document.close();
 }
-
 // ── Print a professional statement for a SHARED (party-statement) ledger ──────
 function printSharedLedgerStatement(entity, etype, displayName, peerName) {
   const txs = (entity.transactions || []).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
@@ -16645,6 +17001,18 @@ const BILLING_DEFAULTS = {
   billShopState: "",            // used for CGST+SGST vs IGST label
   billHSNEnabled: false,        // show HSN column on A4 invoice
   billShopLegalName: "",        // legal name from GSTIN lookup (auto-filled via proxy)
+  // ─── INVOICE EXTRA FIELDS ─────────────────────────────────────
+  billShopTagline:  "",   // e.g. "Manufacturing & Supply of Precision Tools"
+  billShopPhone:    "",   // shop phone for invoice header
+  billShopEmail:    "",   // shop email for invoice header
+  billShopWebsite:  "",   // shop website URL
+  billShopPan:      "",   // PAN number
+  billBankName:     "",   // e.g. ICICI
+  billBankBranch:   "",   // e.g. Surat
+  billBankAccNo:    "",   // account number
+  billBankIfsc:     "",   // IFSC code
+  billUpiId:        "",   // UPI ID for QR code
+  billShowUpiQr: false,   // show UPI QR on invoice
 };
 
 // ─── GSTIN AUTO-LOOKUP (Proxy pattern — no API key needed by shops) ──────────
@@ -17577,6 +17945,72 @@ function openBillingSettingsModal() {
   <div style="margin-bottom:16px;">
     <label style="font-size:12px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:6px;">📝 Bill Footer Message</label>
     <input id="bill-footer-input" class="input" value="${footer}" placeholder="Thank you! Visit Again 🙏" oninput="setBillSetting('billFooter',this.value)" />
+  </div>
+
+  <!-- ─── Invoice Extra Details ─── -->
+  <div style="border-top:1px solid #1e2a45;padding-top:14px;margin-bottom:16px;">
+    <div style="font-size:12px;color:#FFD700;font-weight:800;margin-bottom:10px;letter-spacing:.5px;">🧾 A4 INVOICE DETAILS</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">📱 Shop Phone</label>
+        <input class="input" value="${getBillSetting('billShopPhone')||''}" placeholder="02225820309" oninput="setBillSetting('billShopPhone',this.value)" style="margin-bottom:0;font-size:13px;" />
+      </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">✉️ Shop Email</label>
+        <input class="input" value="${getBillSetting('billShopEmail')||''}" placeholder="info@myshop.com" oninput="setBillSetting('billShopEmail',this.value)" style="margin-bottom:0;font-size:13px;" />
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">🌐 Website</label>
+        <input class="input" value="${getBillSetting('billShopWebsite')||''}" placeholder="www.myshop.com" oninput="setBillSetting('billShopWebsite',this.value)" style="margin-bottom:0;font-size:13px;" />
+      </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">🪪 PAN Number</label>
+        <input class="input" value="${getBillSetting('billShopPan')||''}" placeholder="AABCX1234Y" oninput="setBillSetting('billShopPan',this.value.toUpperCase())" style="margin-bottom:0;font-size:13px;text-transform:uppercase;font-family:monospace;" maxlength="10" />
+      </div>
+    </div>
+    <div style="margin-bottom:8px;">
+      <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">🏷️ Shop Tagline</label>
+      <input class="input" value="${getBillSetting('billShopTagline')||''}" placeholder="e.g. Manufacturing & Supply of Precision Tools" oninput="setBillSetting('billShopTagline',this.value)" style="margin-bottom:0;font-size:13px;" />
+    </div>
+  </div>
+
+  <!-- Bank Details -->
+  <div style="border-top:1px solid #1e2a45;padding-top:14px;margin-bottom:16px;">
+    <div style="font-size:12px;color:#FFD700;font-weight:800;margin-bottom:10px;letter-spacing:.5px;">🏦 BANK DETAILS (for invoice)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">Bank Name</label>
+        <input class="input" value="${getBillSetting('billBankName')||''}" placeholder="e.g. ICICI" oninput="setBillSetting('billBankName',this.value)" style="margin-bottom:0;font-size:13px;" />
+      </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">Branch</label>
+        <input class="input" value="${getBillSetting('billBankBranch')||''}" placeholder="e.g. Andheri West" oninput="setBillSetting('billBankBranch',this.value)" style="margin-bottom:0;font-size:13px;" />
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">Account Number</label>
+        <input class="input" value="${getBillSetting('billBankAccNo')||''}" placeholder="1234567890" oninput="setBillSetting('billBankAccNo',this.value)" style="margin-bottom:0;font-size:13px;font-family:monospace;" />
+      </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">IFSC Code</label>
+        <input class="input" value="${getBillSetting('billBankIfsc')||''}" placeholder="ICIC0001234" oninput="setBillSetting('billBankIfsc',this.value.toUpperCase())" style="margin-bottom:0;font-size:13px;text-transform:uppercase;font-family:monospace;" />
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;">
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">💳 UPI ID</label>
+        <input class="input" value="${getBillSetting('billUpiId')||''}" placeholder="yourshop@upi" oninput="setBillSetting('billUpiId',this.value)" style="margin-bottom:0;font-size:13px;" />
+      </div>
+      <div style="padding-top:16px;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" ${getBillSetting('billShowUpiQr')?'checked':''} onchange="setBillSetting('billShowUpiQr',this.checked)" style="width:16px;height:16px;accent-color:#FFD700;" />
+          <span style="font-size:12px;color:#7a8aaa;font-weight:700;">Show QR</span>
+        </label>
+      </div>
+    </div>
   </div>
 
   <button onclick="closeModal()" style="width:100%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);border:none;border-radius:12px;color:#fff;padding:13px;font-size:15px;font-weight:800;cursor:pointer;">✅ Done</button>
