@@ -3531,7 +3531,10 @@ function _tab2RestoreFields(saved) {
 function safeRenderTab(i) {
   // DEBOUNCE: coalesce rapid successive calls (e.g. Firestore onSnapshot + inventory update firing together)
   if (window._renderDebounceTimer) clearTimeout(window._renderDebounceTimer);
-  window._renderDebounceTimer = setTimeout(() => _safeRenderTabImmediate(i), 40);
+  window._renderDebounceTimer = setTimeout(() => {
+    _safeRenderTabImmediate(i);
+    if (currentLang !== "en") setTimeout(applyUITranslations, 80);
+  }, 40);
 }
 
 // ── Detail-page guard ─────────────────────────────────────────────────────────
@@ -12303,6 +12306,269 @@ function t(key) {
   return (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key]) || TRANSLATIONS.en[key] || key;
 }
 
+// ── UI Translation Overlay ────────────────────────────────────────────────────
+// Replaces hardcoded English text in rendered DOM with the current language.
+// This covers all tab content without rewriting every render function.
+const UI_STRINGS = {
+  hi: {
+    // Settings
+    "Settings": "सेटिंग्स",
+    "Pro Plan Active": "प्रो प्लान सक्रिय",
+    "Full access to all features": "सभी सुविधाओं तक पूरी पहुंच",
+    "Free Plan": "मुफ्त प्लान",
+    "Basic features — upgrade to unlock everything": "बुनियादी सुविधाएं — सब अनलॉक करें",
+    "Upgrade to Pro": "प्रो में अपग्रेड करें",
+    "Activate License": "लाइसेंस सक्रिय करें",
+    "Enter license key": "लाइसेंस की दर्ज करें",
+    "Shop Name": "दुकान का नाम",
+    "Shop Icon": "दुकान आइकन",
+    "Theme": "थीम",
+    "Language": "भाषा",
+    "Voice": "आवाज़",
+    "Voice Narration": "वॉयस नैरेशन",
+    "Display Settings": "डिस्प्ले सेटिंग्स",
+    "App Style": "ऐप स्टाइल",
+    "Professional": "प्रोफेशनल",
+    "Game / Classic": "गेम / क्लासिक",
+    "Dark Mode": "डार्क मोड",
+    "Light Mode": "लाइट मोड",
+    "Save": "सहेजें",
+    "Save Changes": "बदलाव सहेजें",
+    "Cancel": "रद्द करें",
+    "Delete": "हटाएं",
+    "Edit": "संपादित करें",
+    "Close": "बंद करें",
+    "Add": "जोड़ें",
+    "Search": "खोजें",
+    "Filter": "फ़िल्टर",
+    "Export": "निर्यात",
+    "Import": "आयात",
+    "Back": "वापस",
+    "Next": "अगला",
+    "Done": "हो गया",
+    "Confirm": "पुष्टि करें",
+    "Yes": "हाँ",
+    "No": "नहीं",
+    // Customers
+    "Customers": "ग्राहक",
+    "Add Customer": "ग्राहक जोड़ें",
+    "+ Add Customer": "+ ग्राहक जोड़ें",
+    "Customer Profile": "ग्राहक प्रोफाइल",
+    "Full Name": "पूरा नाम",
+    "Phone Number": "फ़ोन नंबर",
+    "Customer ID": "ग्राहक ID",
+    "Total Spend": "कुल खर्च",
+    "Total Visits": "कुल दौरे",
+    "Last Visit": "अंतिम दौरा",
+    "First Visit": "पहला दौरा",
+    "Points": "अंक",
+    "Rank": "रैंक",
+    "Purchase History": "खरीद इतिहास",
+    "No purchases yet": "अभी तक कोई खरीदारी नहीं",
+    "No customers found": "कोई ग्राहक नहीं मिला",
+    "Export CSV": "CSV निर्यात",
+    "⬇ Export CSV": "⬇ CSV निर्यात",
+    // Sales / Purchase tab
+    "Add Sale": "बिक्री जोड़ें",
+    "Add Sale →": "बिक्री जोड़ें →",
+    "Sale Amount": "बिक्री राशि",
+    "Amount": "राशि",
+    "Date": "दिनांक",
+    "Notes": "नोट्स",
+    "Bill": "बिल",
+    "Total": "कुल",
+    "Subtotal": "उप-कुल",
+    "Discount": "छूट",
+    "Tax": "कर",
+    "GST": "जीएसटी",
+    "Print Bill": "बिल प्रिंट करें",
+    "Add Item": "+ आइटम जोड़ें",
+    "Item Name": "आइटम का नाम",
+    "Qty": "मात्रा",
+    "Price": "मूल्य",
+    "Rate": "दर",
+    // Inventory
+    "Inventory": "इन्वेंटरी",
+    "Add Item": "आइटम जोड़ें",
+    "Category": "श्रेणी",
+    "Stock": "स्टॉक",
+    "Out of Stock": "स्टॉक खत्म",
+    "Low Stock": "कम स्टॉक",
+    "Min Stock": "न्यूनतम स्टॉक",
+    "Selling Price": "बिक्री मूल्य",
+    "Purchase Price": "खरीद मूल्य",
+    "Barcode": "बारकोड",
+    "HSN Code": "HSN कोड",
+    "Unit": "इकाई",
+    "items": "आइटम",
+    "Add Category": "श्रेणी जोड़ें",
+    // Creditors
+    "Creditors": "लेनदार",
+    "Add Creditor": "लेनदार जोड़ें",
+    "Creditor Name": "लेनदार का नाम",
+    "Balance": "शेष",
+    "Due": "बकाया",
+    "Paid": "भुगतान किया",
+    "Overdue": "अतिदेय",
+    "Bank Details": "बैंक विवरण",
+    "Bank Name": "बैंक का नाम",
+    "Account Number": "खाता संख्या",
+    "IFSC Code": "IFSC कोड",
+    "UPI ID": "UPI ID",
+    "Address": "पता",
+    "GSTIN": "GSTIN",
+    // Debtors
+    "Debtors": "देनदार",
+    "Add Debtor": "देनदार जोड़ें",
+    "Debtor Name": "देनदार का नाम",
+    "Amount Owed": "बकाया राशि",
+    "Record Payment": "भुगतान दर्ज करें",
+    // Alerts
+    "Alerts": "अलर्ट",
+    "Stock Alerts": "स्टॉक अलर्ट",
+    "No alerts": "कोई अलर्ट नहीं",
+    "items out of stock": "आइटम स्टॉक में नहीं",
+    "items low on stock": "आइटम कम स्टॉक में",
+    "Expiring Soon": "जल्द समाप्त",
+    "Overdue Payments": "अतिदेय भुगतान",
+    // History
+    "History": "इतिहास",
+    "Today": "आज",
+    "All Time": "सब समय",
+    "This Month": "इस महीने",
+    "Revenue": "आय",
+    "Sales": "बिक्री",
+    // Analytics
+    "Analytics": "विश्लेषण",
+    "Monthly Revenue": "मासिक आय",
+    "Active Customers": "सक्रिय ग्राहक",
+    "Top Customers": "शीर्ष ग्राहक",
+    "Avg Spend": "औसत खर्च",
+    "Top Earner": "शीर्ष खर्चकर्ता",
+    // Messages
+    "Messages": "संदेश",
+    "No messages": "कोई संदेश नहीं",
+    "Send Message": "संदेश भेजें",
+    // Team
+    "Team Members": "टीम सदस्य",
+    "+ Add Member": "+ सदस्य जोड़ें",
+    "Active": "सक्रिय",
+    "Blocked": "ब्लॉक",
+    "Online": "ऑनलाइन",
+    "Offline": "ऑफलाइन",
+    "Last login": "अंतिम लॉगिन",
+    "Block": "ब्लॉक करें",
+    "Unblock": "अनब्लॉक करें",
+    "Force Logout": "जबरदस्ती लॉगआउट",
+    // Common UI
+    "Loading...": "लोड हो रहा है...",
+    "Saving...": "सहेज रहे हैं...",
+    "No data": "कोई डेटा नहीं",
+    "Error": "त्रुटि",
+    "Success": "सफलता",
+    "Optional": "वैकल्पिक",
+    "Required": "आवश्यक",
+    "Unlimited": "असीमित",
+    "Included": "शामिल",
+    "✅ Included": "✅ शामिल",
+    "✅ Full access": "✅ पूरी पहुंच",
+    "✅ Ad-free": "✅ विज्ञापन-मुक्त",
+    "✅ Active": "✅ सक्रिय",
+    "🔒 Pro only": "🔒 केवल प्रो",
+    "Full access": "पूरी पहुंच",
+    "Ad-free": "विज्ञापन-मुक्त",
+    "With ads": "विज्ञापन के साथ",
+    "Pro only": "केवल प्रो",
+    "Never": "कभी नहीं",
+    "Show": "दिखाएं",
+    "Hide": "छुपाएं",
+    "Enable": "सक्षम करें",
+    "Disable": "अक्षम करें",
+    "Enabled": "सक्षम",
+    "Disabled": "अक्षम",
+    "On": "चालू",
+    "Off": "बंद",
+    "View": "देखें",
+    "View All": "सब देखें",
+    "Add": "जोड़ें",
+    "Update": "अपडेट करें",
+    "Reset": "रीसेट करें",
+    "Logout": "लॉगआउट",
+    "Login": "लॉगिन",
+    "Password": "पासवर्ड",
+    "Phone": "फ़ोन",
+    "Name": "नाम",
+    "WhatsApp": "व्हाट्सएप",
+    "Customers": "ग्राहक",
+    "Analytics Tab": "विश्लेषण टैब",
+    "Compare Tab": "तुलना टैब",
+    "Creditors / Debtors": "लेनदार / देनदार",
+    "WhatsApp Messaging": "व्हाट्सएप मैसेजिंग",
+    "Sales History Export & Bills": "बिक्री इतिहास और बिल",
+    "GST / GSTIN Auto-fill": "GST / GSTIN ऑटो-भरण",
+    "Push Notifications": "पुश सूचनाएं",
+    "Display Screen": "डिस्प्ले स्क्रीन",
+    "Shop Connect": "शॉप कनेक्ट",
+    "Rankings": "रैंकिंग",
+    "Leaderboard": "लीडरबोर्ड",
+    "Visit #": "दौरा #",
+    "visits": "दौरे",
+    "Borrow": "उधार",
+    "Outstanding Borrows": "लंबित उधार",
+    "No outstanding borrows": "कोई लंबित उधार नहीं",
+    "Mark Returned": "वापस किया",
+    "Returned": "वापस किया",
+    "Pending": "लंबित",
+    "Amount (₹)": "राशि (₹)",
+    "Shop address...": "दुकान का पता...",
+    "Any notes...": "कोई नोट्स...",
+  }
+};
+
+function applyUITranslations() {
+  if (currentLang === "en") return;
+  const map = UI_STRINGS[currentLang];
+  if (!map) return;
+
+  const mainApp = document.getElementById("main-app");
+  if (!mainApp) return;
+
+  // Walk all text nodes inside main-app and replace exact matches
+  const walker = document.createTreeWalker(mainApp, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      // Skip script/style content
+      const tag = node.parentElement?.tagName;
+      if (tag === "SCRIPT" || tag === "STYLE" || tag === "INPUT" || tag === "TEXTAREA") return NodeFilter.FILTER_SKIP;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+
+  nodes.forEach(node => {
+    const trimmed = node.textContent.trim();
+    if (map[trimmed]) {
+      // Preserve surrounding whitespace
+      node.textContent = node.textContent.replace(trimmed, map[trimmed]);
+    } else {
+      // Also check for partial matches (e.g. "✅ Included" inside longer text)
+      let text = node.textContent;
+      let changed = false;
+      Object.entries(map).forEach(([en, hi]) => {
+        if (text.includes(en)) { text = text.split(en).join(hi); changed = true; }
+      });
+      if (changed) node.textContent = text;
+    }
+  });
+
+  // Also translate placeholder attributes
+  mainApp.querySelectorAll("[placeholder]").forEach(el => {
+    const p = el.getAttribute("placeholder");
+    if (map[p]) el.setAttribute("placeholder", map[p]);
+  });
+}
+
 function setLanguage(lang) {
   currentLang = lang;
   localStorage.setItem("sc_lang", lang); // simple key, no phone dependency
@@ -12315,6 +12581,7 @@ function setLanguage(lang) {
   if (typeof renderTabs === "function") renderTabs();
   if (typeof safeRenderTab === "function") safeRenderTab(currentTab);
   if (typeof updateLoginLang === "function") updateLoginLang();
+  setTimeout(applyUITranslations, 100); // apply after render completes
   notify("🌐 Language changed to " + (LANGUAGES[lang]?.name || lang));
 }
 
