@@ -2125,9 +2125,14 @@ window.addEventListener("load", () => {
   // Use _memberWasActiveOnLoad (read at script parse time) to avoid a race where
   // DOMContentLoaded already cleared sc_member_active from localStorage before we get here.
   const _memberTokenPresent = !!(sessionStorage.getItem("sc_member_token") && sessionStorage.getItem("sc_member_id"));
+  const _lastSessionWasMember = localStorage.getItem("sc_session_type") === "member";
   if (_memberWasActiveOnLoad && !_memberTokenPresent) {
     // Fresh open after tab close — member must re-login, don't auto-login as admin
     localStorage.removeItem("sc_member_active");
+    authShowStep("phone");
+  } else if (_lastSessionWasMember && !_memberTokenPresent) {
+    // Last session was a member login, app was closed — do NOT auto-login as admin
+    localStorage.removeItem("sc_session_type");
     authShowStep("phone");
   } else if (savedPhone && localStorage.getItem("sc_user_" + savedPhone)) {
     // Either: normal admin auto-login, OR member refresh (tokens in sessionStorage will be restored via _tryRestoreMemberSession)
@@ -3058,6 +3063,7 @@ async function verifyPasswordOnline(phone, pass) {
       resetBfState(phone);
       localStorage.setItem("sc_auth_phone", phone);
       localStorage.setItem("sc_user_" + phone, hashed);
+      localStorage.setItem("sc_session_type", "admin");
       onLoginSuccess(phone);
     } else {
       // Check if blocked
@@ -3191,6 +3197,7 @@ async function submitResetPassword() {
 
   localStorage.setItem("sc_user_" + authPhone, hashed);
   localStorage.setItem("sc_auth_phone", authPhone);
+  localStorage.setItem("sc_session_type", "admin");
   notify("✅ Password reset successfully!");
   onLoginSuccess(authPhone);
 }
@@ -3435,6 +3442,7 @@ function doLogout() {
   currentMember = null; _memberSessionToken = null;
   sessionStorage.removeItem("sc_member_token"); sessionStorage.removeItem("sc_member_id");
   localStorage.removeItem("sc_member_active");
+  localStorage.removeItem("sc_session_type");
   // Hide member pill
   const pill = document.getElementById("header-member-pill");
   if(pill) pill.style.display = "none";
@@ -10255,8 +10263,17 @@ async function saveEditMember(memberId) {
   } catch(e) { errEl.textContent="Network error."; errEl.style.display="block"; }
 }
 
-async function toggleMemberBlock(memberId, block) {
-  if(!await scConfirm(block?"Block this member? They won't be able to log in.":"Unblock this member?")) return;
+function toggleMemberBlock(memberId, block) {
+  showConfirmModal(
+    block ? "Block Member" : "Unblock Member",
+    block ? "Block this member? They won't be able to log in." : "Unblock this member? They will regain access.",
+    `_doToggleMemberBlock('${memberId}',${block})`,
+    block ? "Block" : "Unblock",
+    block
+  );
+}
+async function _doToggleMemberBlock(memberId, block) {
+  closeModal();
   try {
     await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/update_member_details`, {
       method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
@@ -10266,14 +10283,23 @@ async function toggleMemberBlock(memberId, block) {
   } catch(e) { notify("Network error","error"); }
 }
 
-async function forceLogoutMember(memberId) {
-  if(!await scConfirm("Force logout this member? They will be kicked out immediately.")) return;
+function forceLogoutMember(memberId) {
+  showConfirmModal(
+    "Force Logout",
+    "Force logout this member? They will be kicked out of the app immediately.",
+    `_doForceLogoutMember('${memberId}')`,
+    "Force Logout",
+    true
+  );
+}
+async function _doForceLogoutMember(memberId) {
+  closeModal();
   try {
     const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/force_logout_member`, {
       method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
       body: JSON.stringify({ p_shop_phone:authPhone, p_member_id:memberId })
     });
-    // Also clear last_seen_at so owner's Team tab immediately shows Offline
+    // Clear last_seen_at so Team tab shows Offline immediately
     await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?id=eq.${encodeURIComponent(memberId)}`, {
       method:"PATCH",
       headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json","Prefer":"return=minimal"},
@@ -10284,8 +10310,17 @@ async function forceLogoutMember(memberId) {
   } catch(e) { notify("Network error","error"); }
 }
 
-async function deleteMember(memberId, displayName) {
-  if(!await scConfirm(`Delete member "${displayName}"? This cannot be undone.`)) return;
+function deleteMember(memberId, displayName) {
+  showConfirmModal(
+    "Delete Member",
+    `Delete <b>${escHtml(displayName)}</b>? This cannot be undone.`,
+    `_doDeleteMember('${memberId}')`,
+    "Delete",
+    true
+  );
+}
+async function _doDeleteMember(memberId) {
+  closeModal();
   try {
     await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/delete_shop_member`, {
       method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
@@ -10356,6 +10391,7 @@ async function memberLogin() {
     if(_memberSessionToken) sessionStorage.setItem("sc_member_token", _memberSessionToken);
     sessionStorage.setItem("sc_member_id", data.id);
     localStorage.setItem("sc_member_active", "1");
+    localStorage.setItem("sc_session_type", "member"); // prevents auto-admin-login on app reopen
 
     // Show member pill in header
     const pill = document.getElementById("header-member-pill");
@@ -10393,11 +10429,15 @@ function _startMemberHeartbeat() {
         return;
       }
       // 2) Update last_seen_at so owner's Team tab shows "Online"
-      await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?id=eq.${encodeURIComponent(currentMember.id)}`, {
+      const patchRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?id=eq.${encodeURIComponent(currentMember.id)}`, {
         method:"PATCH",
         headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json","Prefer":"return=minimal"},
         body: JSON.stringify({ last_seen_at: new Date().toISOString() })
       });
+      if(!patchRes.ok) {
+        const errTxt = await patchRes.text();
+        console.warn("[Heartbeat] last_seen_at PATCH failed:", patchRes.status, errTxt, "— run the RLS fix SQL in Supabase");
+      }
     } catch(e) { /* ignore network blips */ }
   };
 
