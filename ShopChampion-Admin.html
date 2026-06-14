@@ -2807,7 +2807,9 @@ function requireOnline(){
 // type: 'sale'|'purchase'|'inventory'|'creditor'|'debtor'|'customer'|'other'
 // action: short verb phrase e.g. "Sale recorded", "Item deleted"
 // details: free text description
-function addHistoryLog(type, action, details, extra){
+// groupId: optional — link multiple log entries that resulted from one user action,
+//          so the History tab can show "this also affected..." when clicked
+function addHistoryLog(type, action, details, extra, groupId){
   try{
     const now = Date.now();
     const dayKey = _histDayKey(now);
@@ -2821,7 +2823,8 @@ function addHistoryLog(type, action, details, extra){
       action: action||"",
       details: details||"",
       actor: actorName,
-      extra: extra||null
+      extra: extra||null,
+      groupId: groupId||null
     };
     list.push(entry);
     // Cap at 500 entries per day to avoid bloat
@@ -2834,6 +2837,7 @@ function addHistoryLog(type, action, details, extra){
     }
     // Live-refresh history tab if currently open
     if(currentTab===11) safeRenderTab(11);
+    return entry.id;
   } catch(e){ /* never break the app over logging */ }
 }
 // Load history for a given day (YYYY-MM-DD). Tries local first, syncs from cloud if empty.
@@ -8369,6 +8373,10 @@ function saveCrTransaction(){
   const idx = creditors.findIndex(c=>c.id===creditorId);
   if(idx<0){ notify("❌ Creditor not found"); return; }
 
+  // One groupId ties together this creditor transaction + any inventory stock
+  // changes it causes, so History can show "this also affected..." on click.
+  const _histGroupId = "G"+Date.now()+Math.random().toString(36).slice(2,5);
+
   // ── Multi-item link (purchase only) ──
   let multiItems = [];
   if(type === "purchase"){
@@ -8381,7 +8389,7 @@ function saveCrTransaction(){
       const gstRate = (it.gstRate!==undefined && it.gstRate!==null) ? it.gstRate : (item?.gstRate||0);
       const gstIncluded = item?.gstIncluded||"inclusive";
       const hsnCode = it.hsn || item?.hsnCode || "";
-      invAddStock(it.name, unit, it.qty, it.rate>0?it.rate:0, date, note||invoiceNo||"", cat, sp, gstRate, gstIncluded, hsnCode);
+      invAddStock(it.name, unit, it.qty, it.rate>0?it.rate:0, date, note||invoiceNo||"", cat, sp, gstRate, gstIncluded, hsnCode, undefined, undefined, _histGroupId);
     });
     multiItems = items.map(it=>{
       const invItem = inventoryItems.find(x=>x.name===it.name);
@@ -8421,7 +8429,7 @@ function saveCrTransaction(){
     createdAt:Date.now(), syncStatus:"local"
   });
   saveCreditors(creditors);
-  addHistoryLog('creditor',`Creditor ${type==="purchase"?"purchase":type==="payment"?"payment":"return"} recorded`,`${creditors[idx].name||'Creditor'} · ${formatINR(amount)}${invoiceNo?` · ${invoiceNo}`:''}`);
+  addHistoryLog('creditor',`Creditor ${type==="purchase"?"purchase":type==="payment"?"payment":"return"} recorded`,`${creditors[idx].name||'Creditor'} · ${formatINR(amount)}${invoiceNo?` · ${invoiceNo}`:''}`,null,_histGroupId);
   if(type==="payment"){
     const crTxMode = document.getElementById("tx-pay-mode")?.value||"Cash";
     cashRecordTx({direction:"out", amount, date, note:`Paid to ${creditors[idx].name||"creditor"}${note?(" · "+note):""}`, source:"creditor_payment", refId:txId, mode:crTxMode});
@@ -9595,6 +9603,9 @@ function saveDebtTransaction(){
   const idx = debtors.findIndex(d=>d.id===debtorId);
   if(idx<0){ notify("❌ Debtor not found","error"); return; }
 
+  // One groupId ties this debtor transaction to any inventory stock change it causes
+  const _histGroupId = "G"+Date.now()+Math.random().toString(36).slice(2,5);
+
   // ── Inventory deduction (sale only) ──
   let invLinked = false;
   let invItemName = "";
@@ -9619,7 +9630,7 @@ function saveDebtTransaction(){
         const cat  = item?.category||"General";
         const sp   = item?.sellingPrice||0;
         const costPerUnit = invQty > 0 ? amtRaw / invQty : 0;
-        invAddStock(itemName, unit, invQty, costPerUnit, date, note||"Customer return", cat, sp, item?.gstRate||0, item?.gstIncluded||"");
+        invAddStock(itemName, unit, invQty, costPerUnit, date, note||"Customer return", cat, sp, item?.gstRate||0, item?.gstIncluded||"", undefined, undefined, undefined, _histGroupId);
       }
       invLinked = true;
       invItemName = itemName;
@@ -9639,7 +9650,7 @@ function saveDebtTransaction(){
     createdAt: Date.now(),
   });
   saveDebtors(debtors);
-  addHistoryLog('debtor',`Debtor ${type==="payment"?"receipt":type==="return"?"return":"sale"} recorded`,`${debtors[idx].name||'Debtor'} · ${formatINR(amtRaw)}`);
+  addHistoryLog('debtor',`Debtor ${type==="payment"?"receipt":type==="return"?"return":"sale"} recorded`,`${debtors[idx].name||'Debtor'} · ${formatINR(amtRaw)}`,null,_histGroupId);
   if(type==="payment"){
     cashRecordTx({direction:"in", amount: amtRaw, date, note:`Received from ${debtors[idx].name||"customer"}${note?(" · "+note):""}`, source:"debtor_payment", refId:drTxId, mode});
   }
@@ -10417,6 +10428,41 @@ async function _tryRestoreMemberSession(phone) {
 
 // ═══════════════════════════════════════════════════════════════════
 
+// Show what a history entry affected. If it's part of a group (groupId set and
+// shared with other entries), show all of them together; otherwise show just this one.
+function showHistoryGroup(entryId, dayKey){
+  const entries = getHistoryForDay(dayKey);
+  const entry = entries.find(x=>x.id===entryId);
+  if(!entry) return;
+
+  const related = entry.groupId
+    ? entries.filter(x=>x.groupId===entry.groupId).sort((a,b)=>a.ts-b.ts)
+    : [entry];
+
+  const rows = related.map(e=>{
+    const meta = HIST_TYPE_META[e.type] || HIST_TYPE_META.other;
+    const timeStr = new Date(e.ts).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
+    const isThis = e.id===entryId;
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:${isThis?'#0d1a30':'#0a0e1a'};border:1px solid ${isThis?'#2a5aaa':'#1e2a45'};border-radius:10px;margin-top:8px;">
+      <div style="width:32px;height:32px;border-radius:8px;background:${meta.color}22;border:1px solid ${meta.color}55;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${meta.icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:800;color:#e8eaf0;">${escHtml(e.action)}${isThis?` <span style="font-size:10px;color:#60a5fa;font-weight:700;">(this entry)</span>`:""}</div>
+        ${e.details?`<div style="font-size:11px;color:#7a8aaa;margin-top:2px;line-height:1.4;">${escHtml(e.details)}</div>`:""}
+      </div>
+      <div style="font-size:10px;color:#4a5a7a;flex-shrink:0;white-space:nowrap;">${timeStr}</div>
+    </div>`;
+  }).join("");
+
+  const headline = related.length>1
+    ? `This action affected ${related.length} record${related.length!==1?"s":""}:`
+    : `This entry didn't affect any other records.`;
+
+  showWideModal(`${modalHeader("🔗 What this affected")}
+    <div style="font-size:12px;color:#7a8aaa;margin-bottom:4px;">${headline}</div>
+    ${rows}
+  `);
+}
+
 function renderHistoryTab(){
   const todayKey = _histDayKey(Date.now());
   // Members without date filter permission are locked to today
@@ -10461,12 +10507,16 @@ function renderHistoryTab(){
         const timeStr = new Date(e.ts).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
         const actor = e.actor || "Owner";
         const actorColor = actor === "Owner" ? "#FFD700" : "#a78bfa";
-        return `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:1px solid #0d1220;">
+        const groupCount = e.groupId ? entries.filter(x=>x.groupId===e.groupId).length : 1;
+        return `<div onclick="showHistoryGroup('${e.id}','${dayKey}')" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:1px solid #0d1220;cursor:pointer;" onmouseover="this.style.background='#0d1525'" onmouseout="this.style.background='transparent'">
           <div style="width:38px;height:38px;border-radius:10px;background:${meta.color}22;border:1px solid ${meta.color}55;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">${meta.icon}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:800;color:#e8eaf0;">${escHtml(e.action)}</div>
             ${e.details?`<div style="font-size:12px;color:#7a8aaa;margin-top:2px;line-height:1.4;">${escHtml(e.details)}</div>`:""}
-            <div style="margin-top:4px;"><span style="font-size:10px;background:${actorColor}22;color:${actorColor};border:1px solid ${actorColor}44;border-radius:8px;padding:1px 7px;font-weight:700;">👤 ${escHtml(actor)}</span></div>
+            <div style="margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span style="font-size:10px;background:${actorColor}22;color:${actorColor};border:1px solid ${actorColor}44;border-radius:8px;padding:1px 7px;font-weight:700;">👤 ${escHtml(actor)}</span>
+              ${groupCount>1?`<span style="font-size:10px;background:#60a5fa22;color:#60a5fa;border:1px solid #60a5fa44;border-radius:8px;padding:1px 7px;font-weight:700;">🔗 +${groupCount-1} more affected</span>`:""}
+            </div>
           </div>
           <div style="font-size:11px;color:#4a5a7a;flex-shrink:0;white-space:nowrap;">${timeStr}</div>
         </div>`;
@@ -13275,7 +13325,7 @@ function invDeductSold(soldItems, custId){
 }
 
 // Add stock entry
-function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice, gstRate, gstIncluded, hsnCode, expiryDate, minStock){
+function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellingPrice, gstRate, gstIncluded, hsnCode, expiryDate, minStock, groupId){
   if(requireOnline()) return;
   let item = inventoryItems.find(x=>x.name===name);
   const isNew = !item;
@@ -13297,7 +13347,7 @@ function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellin
   item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes, expiryDate: expiryDate||""});
   saveInventory();
   notify("✅ Stock added for "+name);
-  addHistoryLog('inventory','Stock added',`${name} · +${qty} ${unit||'unit'}${costPerUnit?` @ ₹${costPerUnit}`:''}`);
+  addHistoryLog('inventory','Stock added',`${name} · +${qty} ${unit||'unit'}${costPerUnit?` @ ₹${costPerUnit}`:''}`,null,groupId);
   invView="stock";
   invSelectedCat="";
   invSearchQuery="";
@@ -13906,9 +13956,10 @@ function renderInventoryTab(){
 
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Item / Product Name *</label>
       <input class="input" id="inv-name" placeholder="e.g. Basmati Rice 5kg..."
-        oninput="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var sellEl=document.getElementById('inv-sell-price');var minEl=document.getElementById('inv-min-stock');var gstEl=document.getElementById('inv-gst-rate');var hsnEl=document.getElementById('inv-hsn-add');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(sellEl&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);if(minEl&&ex.minStock>0)minEl.value=ex.minStock;if(gstEl)gstEl.value=String(ex.gstRate||0);if(hsnEl&&ex.hsnCode)hsnEl.value=ex.hsnCode;}})(this)"
+        oninput="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var sellEl=document.getElementById('inv-sell-price');var minEl=document.getElementById('inv-min-stock');var gstEl=document.getElementById('inv-gst-rate');var hsnEl=document.getElementById('inv-hsn-add');var bcEl=document.getElementById('inv-barcode-add');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(sellEl&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);if(minEl&&ex.minStock>0)minEl.value=ex.minStock;if(gstEl)gstEl.value=String(ex.gstRate||0);if(hsnEl&&ex.hsnCode)hsnEl.value=ex.hsnCode;if(bcEl&&ex.barcode)bcEl.value=ex.barcode;}invCheckDuplicateName(n);})(this)"
         value="${invPrefillName ? invPrefillName : ''}"
-        style="margin-bottom:12px;" />
+        style="margin-bottom:6px;" />
+      <div id="inv-dup-warning-add" style="font-size:11px;min-height:0;margin-bottom:8px;"></div>
 
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Category</label>
       <input class="input" id="inv-category" list="inv-category-list" placeholder="e.g. Grocery, Dairy, Snacks..."
@@ -13975,6 +14026,18 @@ function renderInventoryTab(){
           <div id="inv-hsn-msg-add" style="font-size:11px;min-height:14px;"></div>
           <div id="inv-cheat-add" style="display:none;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-top:6px;"></div>
         </div>
+      </div>
+
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:18px;">
+        <div style="font-size:12px;font-weight:800;color:#FFD700;margin-bottom:8px;">📦 Barcode <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional)</span></div>
+        <div style="font-size:11px;color:#7a8aaa;margin-bottom:8px;line-height:1.5;">Add a barcode now so staff can scan this item instead of searching by name. You can also add or change this later from Edit Item.</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="input" id="inv-barcode-add" type="text" placeholder="e.g. 8901234567890 or custom code like 1001"
+            value="${prefillItem ? escHtml(prefillItem.barcode||"") : ''}"
+            style="margin-bottom:0;font-family:monospace;flex:1;" />
+          <button type="button" onclick="startBarcodeScanIntoField('inv-barcode-add')" style="cursor:pointer;background:#1a3a1a;border:1px solid #22c55e;border-radius:8px;color:#22c55e;font-size:12px;font-weight:700;padding:9px 12px;white-space:nowrap;">📷 Scan</button>
+        </div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">💡 Custom code tip: assign short codes like 1001=Rice, 1002=Dal for easy scanning</div>
       </div>
 
       <div style="background:#0a1628;border:1px solid #1a3a5a;border-radius:10px;padding:14px;margin-bottom:18px;" ${prefillItem ? 'style="display:none;"' : ''}>
@@ -14124,6 +14187,7 @@ function renderInventoryTab(){
       <div style="font-size:18px;font-weight:800;color:#FFD700;">📦 Inventory</div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button onclick="if(db&&authPhone){if(invUnsubscribe){try{invUnsubscribe();}catch(e){}}invUnsubscribe=null;notify('🔄 Syncing from cloud...');loadInventoryFromFirestore(()=>{safeRenderTab(currentTab);notify('✅ Inventory synced');});}else{notify('☁️ Cloud sync not set up — data saved locally','info');}" title="Sync from cloud" style="background:#0a1628;border:1px solid #1e3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 10px;font-size:14px;">🔄</button>
+        ${invView==="stock"?`<button onclick="openInventoryHealthCheck()" title="Check for duplicate items" style="background:#0a1628;border:1px solid #1e3a5a;border-radius:8px;color:#FFD700;cursor:pointer;padding:7px 10px;font-size:14px;">🩺</button>`:""}
         ${invView==="stock"?`<button onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;">➕ Add New</button>`:""}
       </div>
     </div>
@@ -14147,10 +14211,21 @@ function invSubmitAdd(){
     : (parseFloat(_gstRateEl?.value||"0")||0);
   const gstIncluded = document.getElementById("inv-gst-included")?.value||"inclusive";
   const hsnCode = (document.getElementById("inv-hsn-add")?.value||"").trim();
+  const barcodeVal = (document.getElementById("inv-barcode-add")?.value||"").trim();
   if(!hasPermission('inventory_add')) return notify("🚫 No permission to add inventory items","error");
 
   // Find existing item or create new
   let item = inventoryItems.find(x=>x.name.trim().toLowerCase()===name.toLowerCase());
+
+  // ── Barcode conflict check: don't let two items share the same barcode ──
+  if(barcodeVal){
+    const clash = inventoryItems.find(x => x.barcode && String(x.barcode).trim()===barcodeVal && x!==item);
+    if(clash){
+      notify("❌ Barcode "+barcodeVal+" is already assigned to \""+clash.name+"\". Remove it there first or use a different code.","error");
+      return;
+    }
+  }
+
   if(item){
     // Update existing item definition
     if(unit) item.unit = unit;
@@ -14160,6 +14235,7 @@ function invSubmitAdd(){
     if(gstIncluded) item.gstIncluded = gstIncluded;
     if(hsnCode) item.hsnCode = hsnCode;
     if(minStock !== "") item.minStock = Number(minStock)||0;
+    if(barcodeVal) item.barcode = barcodeVal;
     notify("✅ Item updated: " + name);
   } else {
     // Create new item with zero stock
@@ -14168,6 +14244,7 @@ function invSubmitAdd(){
     if(gstIncluded) item.gstIncluded = gstIncluded;
     if(hsnCode) item.hsnCode = hsnCode;
     if(minStock !== "") item.minStock = Number(minStock)||0;
+    if(barcodeVal) item.barcode = barcodeVal;
     inventoryItems.push(item);
     notify("✅ Item added: " + name + " — use Creditor tab to add stock");
   }
@@ -15079,10 +15156,224 @@ function amountInWords(amount) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// BARCODE SCAN ENGINE
-// Supports: BarcodeDetector API (Chrome/Android) + ZXing-js fallback
-// Two modes: (A) scan into any input field, (B) scan to auto-fill item row
+// DUPLICATE ITEM PROTECTION
+// Layer 1: similar-name suggestion when a scanned barcode isn't found (see barcode engine)
+// Layer 2: warn when typing a name in Add Item that's similar to an existing item
+// Layer 3: Inventory Health Check — find & merge duplicate items
 // ══════════════════════════════════════════════════════════════════════════════
+
+// Normalize a name for fuzzy comparison: lowercase, trim, collapse spaces,
+// strip common punctuation so "Amul Butter 100g" ~ "amul-butter 100 g"
+function _invNormName(s){
+  return String(s||"")
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Simple Levenshtein distance (small strings only — item names)
+function _levenshtein(a, b){
+  if(a===b) return 0;
+  const al=a.length, bl=b.length;
+  if(al===0) return bl;
+  if(bl===0) return al;
+  let prev = new Array(bl+1);
+  let curr = new Array(bl+1);
+  for(let j=0;j<=bl;j++) prev[j]=j;
+  for(let i=1;i<=al;i++){
+    curr[0]=i;
+    for(let j=1;j<=bl;j++){
+      const cost = a[i-1]===b[j-1] ? 0 : 1;
+      curr[j] = Math.min(prev[j]+1, curr[j-1]+1, prev[j-1]+cost);
+    }
+    [prev,curr]=[curr,prev];
+  }
+  return prev[bl];
+}
+
+// Returns true if two item names look like the "same" product
+// (exact normalized match, one contains the other, or very small edit distance)
+function _namesLookSimilar(a, b){
+  const na = _invNormName(a), nb = _invNormName(b);
+  if(!na || !nb) return false;
+  if(na === nb) return true;
+  if(na.length>=4 && nb.length>=4 && (na.includes(nb) || nb.includes(na))) return true;
+  const maxLen = Math.max(na.length, nb.length);
+  if(maxLen <= 3) return false; // too short for fuzzy matching to be meaningful
+  const dist = _levenshtein(na, nb);
+  return dist <= (maxLen <= 8 ? 1 : 2);
+}
+
+// Find existing inventory items whose name looks similar to `name`, excluding an exact match
+function findSimilarInventoryItems(name, excludeName){
+  const target = (name||"").trim();
+  if(!target) return [];
+  return inventoryItems.filter(x=>{
+    if(excludeName && x.name===excludeName) return false;
+    if(x.name.trim().toLowerCase()===target.toLowerCase()) return false; // exact match handled separately
+    return _namesLookSimilar(x.name, target);
+  });
+}
+
+// ── Layer 2: live warning in Add Item form when typed name resembles an existing item ──
+function invCheckDuplicateName(name){
+  const el = document.getElementById("inv-dup-warning-add");
+  if(!el) return;
+  const n = (name||"").trim();
+  if(!n){ el.innerHTML=""; return; }
+
+  // Exact match → this will just update the existing item (normal, no warning)
+  const exact = inventoryItems.find(x=>x.name.trim().toLowerCase()===n.toLowerCase());
+  if(exact){ el.innerHTML=""; return; }
+
+  const similar = findSimilarInventoryItems(n, "");
+  if(!similar.length){ el.innerHTML=""; return; }
+
+  const rows = similar.slice(0,3).map(it=>{
+    const stock = invGetStock(it.name);
+    const sales = (it.salesLog||[]).length;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;background:#0a0e1a;border-radius:6px;margin-top:4px;">
+      <div style="min-width:0;">
+        <div style="font-weight:700;color:#e8eaf0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(it.name)}</div>
+        <div style="font-size:10px;color:#7a8aaa;">${stock} ${escHtml(it.unit||"unit")} in stock${sales?` · ${sales} past sale${sales!==1?"s":""}`:""}</div>
+      </div>
+      <button type="button" onclick="document.getElementById('inv-name').value='${it.name.replace(/'/g,"\\'")}';invCheckDuplicateName('${it.name.replace(/'/g,"\\'")}');document.getElementById('inv-name').dispatchEvent(new Event('input'));"
+        style="cursor:pointer;background:#1a3a6e;border:1px solid #2563eb;border-radius:6px;color:#fff;font-size:11px;font-weight:700;padding:6px 10px;white-space:nowrap;flex-shrink:0;">Edit this instead</button>
+    </div>`;
+  }).join("");
+
+  el.innerHTML = `<div style="background:#1a1200;border:1px solid #854d0e;border-radius:8px;padding:8px 10px;">
+    <div style="color:#FFD700;font-weight:800;">⚠️ Similar item${similar.length>1?"s":""} already exist${similar.length>1?"":"s"}</div>
+    <div style="color:#7a8aaa;margin-top:2px;">Adding "${escHtml(n)}" as new may split your stock, sales & analytics. Edit the existing item instead, or continue if this is genuinely a different product.</div>
+    ${rows}
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Layer 3: INVENTORY HEALTH CHECK — find & merge duplicate items
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Group inventory items into clusters of likely duplicates
+function invFindDuplicateGroups(){
+  const items = inventoryItems.slice();
+  const used = new Set();
+  const groups = [];
+  for(let i=0;i<items.length;i++){
+    if(used.has(items[i].name)) continue;
+    const group = [items[i]];
+    for(let j=i+1;j<items.length;j++){
+      if(used.has(items[j].name)) continue;
+      if(_namesLookSimilar(items[i].name, items[j].name)){
+        group.push(items[j]);
+        used.add(items[j].name);
+      }
+    }
+    if(group.length>1){
+      used.add(items[i].name);
+      groups.push(group);
+    }
+  }
+  return groups;
+}
+
+function openInventoryHealthCheck(){
+  const groups = invFindDuplicateGroups();
+  if(!groups.length){
+    showWideModal(`${modalHeader("🩺 Inventory Health Check")}
+      <div style="text-align:center;padding:24px 10px;">
+        <div style="font-size:40px;margin-bottom:10px;">✅</div>
+        <div style="font-size:14px;font-weight:800;color:#22c55e;margin-bottom:6px;">No duplicates found!</div>
+        <div style="font-size:12px;color:#7a8aaa;">All ${inventoryItems.length} item${inventoryItems.length!==1?"s":""} look unique. We'll keep checking as you add more items.</div>
+      </div>`);
+    return;
+  }
+
+  const groupsHtml = groups.map((group, gi)=>{
+    const itemsHtml = group.map((it,ii)=>{
+      const stock = invGetStock(it.name);
+      const sales = (it.salesLog||[]).length;
+      const val = invGetStockValue(it.name);
+      return `<label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:#0a0e1a;border-radius:8px;margin-top:6px;cursor:pointer;border:1px solid #1e2a45;">
+        <input type="radio" name="iv-merge-survivor-${gi}" value="${ii}" ${ii===0?"checked":""} style="margin-top:3px;" />
+        <div style="min-width:0;flex:1;">
+          <div style="font-weight:700;color:#e8eaf0;font-size:13px;">${escHtml(it.name)}${it.barcode?` <span style="font-size:10px;color:#22c55e;">📦 ${escHtml(it.barcode)}</span>`:""}</div>
+          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${stock} ${escHtml(it.unit||"unit")} in stock${val>0?` · ₹${val.toLocaleString("en-IN",{maximumFractionDigits:0})} value`:""} · ${sales} sale${sales!==1?"s":""} · ${escHtml(it.category||"General")}</div>
+        </div>
+      </label>`;
+    }).join("");
+
+    return `<div class="card" style="padding:14px;margin-bottom:12px;border:1px solid #854d0e;">
+      <div style="font-size:12px;font-weight:800;color:#FFD700;margin-bottom:4px;">⚠️ Possible duplicate group ${gi+1}</div>
+      <div style="font-size:11px;color:#7a8aaa;margin-bottom:4px;">Pick the item to <b style="color:#22c55e;">keep</b>. Stock, sales history and barcode from the others will be merged into it, then the others will be removed.</div>
+      ${itemsHtml}
+      <button onclick="invMergeGroup(${gi})" data-group='${escHtml(JSON.stringify(group.map(it=>it.name)))}'
+        style="margin-top:10px;width:100%;cursor:pointer;background:#1a3a1a;border:1px solid #22c55e;border-radius:8px;color:#22c55e;font-size:12px;font-weight:800;padding:10px;">
+        🔀 Merge this group
+      </button>
+    </div>`;
+  }).join("");
+
+  showWideModal(`${modalHeader("🩺 Inventory Health Check")}
+    <div style="font-size:12px;color:#7a8aaa;margin-bottom:12px;">Found ${groups.length} group${groups.length!==1?"s":""} of items with similar names. Review each — if they're really the same product, merge them so your stock and analytics stay accurate.</div>
+    ${groupsHtml}
+  `);
+}
+
+// Merge a duplicate group: combine stock, salesLog, keep best barcode/price/etc on the chosen survivor,
+// rename references in customer purchase/borrow history, then remove the other items.
+function invMergeGroup(gi){
+  const btn = document.querySelector(`button[onclick="invMergeGroup(${gi})"]`);
+  if(!btn) return;
+  const names = JSON.parse(btn.getAttribute("data-group"));
+  const group = names.map(n=>inventoryItems.find(x=>x.name===n)).filter(Boolean);
+  if(group.length<2) return;
+
+  const radios = document.getElementsByName(`iv-merge-survivor-${gi}`);
+  let survivorIdx = 0;
+  for(const r of radios){ if(r.checked) survivorIdx = Number(r.value); }
+  const survivor = group[survivorIdx];
+  const others = group.filter((_,i)=>i!==survivorIdx);
+
+  if(!confirm(`Merge ${others.map(o=>`"${o.name}"`).join(", ")} into "${survivor.name}"?\n\nThis combines stock & sales history and cannot be undone.`)) return;
+
+  others.forEach(other=>{
+    // Combine stock entries
+    survivor.stock = (survivor.stock||[]).concat(other.stock||[]);
+    // Combine sales log
+    survivor.salesLog = (survivor.salesLog||[]).concat(other.salesLog||[]);
+    // Keep barcode if survivor doesn't have one
+    if(!survivor.barcode && other.barcode) survivor.barcode = other.barcode;
+    // Keep selling price / GST / HSN / category / min stock if survivor missing them
+    if(!survivor.sellingPrice && other.sellingPrice) survivor.sellingPrice = other.sellingPrice;
+    if(survivor.gstRate===undefined && other.gstRate!==undefined) survivor.gstRate = other.gstRate;
+    if(!survivor.gstIncluded && other.gstIncluded) survivor.gstIncluded = other.gstIncluded;
+    if(!survivor.hsnCode && other.hsnCode) survivor.hsnCode = other.hsnCode;
+    if(!survivor.minStock && other.minStock) survivor.minStock = other.minStock;
+
+    // ── Rename references in customer purchase & borrow history ──
+    customers.forEach(c=>{
+      (c.purchases||[]).forEach(p=>{
+        (p.soldItems||[]).forEach(si=>{ if(si.name===other.name) si.name = survivor.name; });
+      });
+      (c.borrows||[]).forEach(b=>{
+        (b.items||[]).forEach(bi=>{ if(bi.name===other.name) bi.name = survivor.name; });
+      });
+    });
+
+    // Remove the duplicate from inventory
+    const idx = inventoryItems.indexOf(other);
+    if(idx>-1) inventoryItems.splice(idx,1);
+  });
+
+  saveInventory();
+  try{ saveCustomers && saveCustomers(); }catch(e){}
+  notify("✅ Merged successfully — your data is intact");
+  closeModal();
+  safeRenderTab(currentTab);
+}
+
+
 
 let _bcStream = null;   // active camera stream
 let _bcRafId  = null;   // requestAnimationFrame id
@@ -15227,36 +15518,95 @@ function startBarcodeScanIntoItemRow(rowId) {
       const row = document.querySelector(`[data-row-id="${rowId}"]`);
       if (row) { setTimeout(() => { row.querySelector(".pt-item-qty")?.focus(); }, 100); }
     } else {
-      // Not found — show options
-      showWideModal(`${modalHeader("📦 Barcode Not Found")}
-        <div style="text-align:center;padding:10px 0;">
-          <div style="font-size:48px;margin-bottom:10px;">🔍</div>
-          <div style="font-size:14px;color:#e8eaf0;font-weight:700;margin-bottom:6px;">No item found for barcode:</div>
-          <div style="font-size:20px;font-weight:900;font-family:monospace;color:#FFD700;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:8px 20px;display:inline-block;margin-bottom:16px;">${escHtml(code)}</div>
-          <div style="font-size:12px;color:#7a8aaa;margin-bottom:20px;">Would you like to assign this barcode to an existing item, or search manually?</div>
-          <div style="display:flex;flex-direction:column;gap:10px;max-width:320px;margin:0 auto;">
-            <button onclick="
-              closeModal();
-              const row = document.querySelector('[data-row-id=\\'${rowId}\\']');
-              if(row){ const inp = row.querySelector('.pt-item-name'); if(inp){ inp.value='${code}'; inp.focus(); ptItemTallySearch(inp,'${rowId}'); } }
-            " style="cursor:pointer;background:#1a3a6e;border:1px solid #2563eb;border-radius:10px;color:#fff;font-size:13px;font-weight:700;padding:12px;">
-              🔍 Search item manually with this code
-            </button>
-            <button onclick="
-              closeModal();
-              notify('Open Inventory → find the item → Edit → paste barcode ${escHtml(code)}', 'info');
-            " style="cursor:pointer;background:#1a3a1a;border:1px solid #22c55e;border-radius:10px;color:#22c55e;font-size:13px;font-weight:700;padding:12px;">
-              📦 Assign barcode to existing item in Inventory
-            </button>
-            <button onclick="closeModal()" style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:10px;color:#7a8aaa;font-size:13px;font-weight:700;padding:12px;">
-              Cancel
-            </button>
-          </div>
-        </div>
-      `);
+      _showBarcodeNotFoundModal(code, rowId);
     }
   });
 }
+
+// ── Barcode-not-found flow: suggest similar items, or search & assign right here ──
+function _showBarcodeNotFoundModal(code, rowId) {
+  // Layer 1: look for inventory items with a similar name that might just be missing this barcode
+  const similar = inventoryItems.filter(x=>!x.barcode); // only items without a barcode are candidates
+  const suggestions = similar.slice(0,5); // show a handful, refined further by search below
+
+  const suggestHtml = suggestions.length ? `
+    <div style="text-align:left;margin-bottom:14px;">
+      <div style="font-size:11px;color:#7a8aaa;margin-bottom:6px;">Or search for the item this barcode belongs to:</div>
+      <input id="bc-assign-search" class="input" placeholder="Type item name..." style="margin-bottom:8px;"
+        oninput="_bcAssignFilter(this.value,'${escHtml(code)}','${rowId}')" />
+      <div id="bc-assign-results" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;">
+        ${_bcAssignResultsHtml(suggestions, code, rowId)}
+      </div>
+    </div>` : "";
+
+  showWideModal(`${modalHeader("📦 Barcode Not Found")}
+    <div style="text-align:center;padding:10px 0;">
+      <div style="font-size:48px;margin-bottom:10px;">🔍</div>
+      <div style="font-size:14px;color:#e8eaf0;font-weight:700;margin-bottom:6px;">No item found for barcode:</div>
+      <div style="font-size:20px;font-weight:900;font-family:monospace;color:#FFD700;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:8px 20px;display:inline-block;margin-bottom:16px;">${escHtml(code)}</div>
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:16px;">Assign this barcode to an existing item, or search manually.</div>
+      ${suggestHtml}
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:320px;margin:0 auto;">
+        <button onclick="
+          closeModal();
+          const row = document.querySelector('[data-row-id=\\'${rowId}\\']');
+          if(row){ const inp = row.querySelector('.pt-item-name'); if(inp){ inp.value='${code}'; inp.focus(); ptItemTallySearch(inp,'${rowId}'); } }
+        " style="cursor:pointer;background:#1a3a6e;border:1px solid #2563eb;border-radius:10px;color:#fff;font-size:13px;font-weight:700;padding:12px;">
+          🔍 Search item manually with this code
+        </button>
+        <button onclick="closeModal()" style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:10px;color:#7a8aaa;font-size:13px;font-weight:700;padding:12px;">
+          Cancel
+        </button>
+      </div>
+    </div>
+  `);
+}
+
+// Render the list of items that can have this barcode assigned to them
+function _bcAssignResultsHtml(items, code, rowId) {
+  if(!items.length){
+    return `<div style="font-size:11px;color:#4a5a7a;padding:6px 0;">No matching items without a barcode. Try a different search, or add this as a new item.</div>`;
+  }
+  return items.map(it=>{
+    const stock = invGetStock(it.name);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;">
+      <div style="min-width:0;text-align:left;">
+        <div style="font-weight:700;color:#e8eaf0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(it.name)}</div>
+        <div style="font-size:10px;color:#7a8aaa;">${stock} ${escHtml(it.unit||"unit")} in stock${it.sellingPrice>0?` · ₹${Number(it.sellingPrice).toFixed(2)}`:""}</div>
+      </div>
+      <button onclick="_bcAssignBarcodeToItem('${it.name.replace(/'/g,"\\'")}','${escHtml(code)}','${rowId}')"
+        style="cursor:pointer;background:#1a3a1a;border:1px solid #22c55e;border-radius:8px;color:#22c55e;font-size:11px;font-weight:800;padding:8px 12px;white-space:nowrap;flex-shrink:0;">
+        ✅ Assign
+      </button>
+    </div>`;
+  }).join("");
+}
+
+// Live-filter the assign list as the user types
+function _bcAssignFilter(query, code, rowId) {
+  const q = (query||"").trim();
+  const results = inventoryItems.filter(x=>!x.barcode && (q ? tallyMatch(x.name, q) : true)).slice(0,8);
+  const el = document.getElementById("bc-assign-results");
+  if(el) el.innerHTML = _bcAssignResultsHtml(results, code, rowId);
+}
+
+// Save the scanned barcode to the chosen item, then auto-fill the sale/purchase row with it
+function _bcAssignBarcodeToItem(itemName, code, rowId) {
+  const item = inventoryItems.find(x=>x.name===itemName);
+  if(!item){ notify("❌ Item not found","error"); return; }
+  item.barcode = code;
+  saveInventory();
+  closeModal();
+  notify("✅ Barcode " + code + " assigned to " + itemName);
+  // Auto-fill the row with this item, as if it had scanned correctly the first time
+  const row = document.querySelector(`[data-row-id="${rowId}"]`);
+  if(row){
+    ptItemDdSelect(rowId, itemName, null);
+    setTimeout(() => { row.querySelector(".pt-item-qty")?.focus(); }, 100);
+  }
+}
+
+
 
 // ── UPI QR Generator ─────────────────────────────────────────────────────────
 function upiQrUrl(upiId, amount, name) {
