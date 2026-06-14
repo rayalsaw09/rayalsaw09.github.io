@@ -10032,30 +10032,29 @@ let _teamMembers = [];
 async function fetchTeamMembers() {
   if (requireOnline()) return [];
   try {
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/list_shop_members`, {
+    // Always use direct REST select=* so new columns like last_seen_at are always included
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?shop_phone=eq.${encodeURIComponent(authPhone)}&select=*&order=created_at.asc`, {
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      _teamMembers = Array.isArray(data) ? data : [];
+      return _teamMembers;
+    }
+    // Fallback to RPC if direct query is blocked by RLS
+    console.warn("[Team] direct sc_shop_members query failed:", res.status, "trying RPC");
+    const res2 = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/list_shop_members`, {
       method: "POST",
       headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
       body: JSON.stringify({ p_shop_phone: authPhone })
     });
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("[Team] list_shop_members RPC failed:", res.status, errText);
-      // Fallback: query sc_shop_members table directly via REST
-      const res2 = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?shop_phone=eq.${encodeURIComponent(authPhone)}&select=*`, {
-        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
-      });
-      if (!res2.ok) {
-        const errText2 = await res2.text();
-        console.error("[Team] sc_shop_members fallback failed:", res2.status, errText2);
-        notify("Failed to load members","error");
-        return [];
-      }
-      const data2 = await res2.json();
-      _teamMembers = Array.isArray(data2) ? data2 : [];
-      return _teamMembers;
+    if (!res2.ok) {
+      console.error("[Team] list_shop_members RPC also failed:", res2.status, await res2.text());
+      notify("Failed to load members","error");
+      return [];
     }
-    const data = await res.json();
-    _teamMembers = Array.isArray(data) ? data : [];
+    const data2 = await res2.json();
+    _teamMembers = Array.isArray(data2) ? data2 : [];
     return _teamMembers;
   } catch(e) { console.error("[Team] fetchTeamMembers exception:", e); notify("Failed to load members","error"); return []; }
 }
