@@ -13463,6 +13463,17 @@ function openInvEditModal(name){
           value="${item.minStock !== undefined ? item.minStock : ""}"
           style="margin-bottom:0;" />
       </div>
+      <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;">
+        <div style="font-size:12px;color:#FFD700;font-weight:800;margin-bottom:8px;">📦 Barcode</div>
+        <div style="font-size:11px;color:#7a8aaa;margin-bottom:8px;line-height:1.5;">Optional — add a barcode so staff can scan this item instead of searching by name.</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="input" id="iei-barcode" type="text" placeholder="e.g. 8901234567890 or custom code like 1001"
+            value="${escHtml(item.barcode||"")}"
+            style="margin-bottom:0;font-family:monospace;flex:1;" />
+          <button onclick="startBarcodeScanIntoField('iei-barcode')" style="cursor:pointer;background:#1a3a1a;border:1px solid #22c55e;border-radius:8px;color:#22c55e;font-size:12px;font-weight:700;padding:9px 12px;white-space:nowrap;">📷 Scan</button>
+        </div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">💡 Custom code tip: assign short codes like 1001=Rice, 1002=Dal for easy scanning</div>
+      </div>
       <div style="display:flex;gap:10px;margin-top:4px;">
         <button onclick="invEditModalSave(this.dataset.name)" data-name="${escHtml(name)}"
           style="flex:1;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-size:14px;font-weight:800;cursor:pointer;">
@@ -13541,6 +13552,8 @@ function invEditModalSave(name){
   item.gstIncluded = gstIncluded;
   if(hsnCode) item.hsnCode = hsnCode; else delete item.hsnCode;
   if(minStockVal !== "" && minStockVal !== null && minStockVal !== undefined) item.minStock = Number(minStockVal)||0;
+  const barcodeVal = (document.getElementById("iei-barcode")?.value||"").trim();
+  if(barcodeVal) item.barcode = barcodeVal; else delete item.barcode;
   saveInventory();
   closeModal();
   notify("\u2705 " + name + " updated");
@@ -13677,12 +13690,13 @@ function ptAddItemRow(){
     div.innerHTML=`
       <div style="display:grid;grid-template-columns:1fr 32px;gap:6px;margin-bottom:6px;align-items:center;position:relative;">
         <div style="position:relative;">
-          <input class="input pt-item-name" autocomplete="off" placeholder="Search item..." style="padding:9px 36px 9px 11px;font-size:13px;width:100%;box-sizing:border-box;"
+          <input class="input pt-item-name" autocomplete="off" placeholder="Search item or scan barcode..." style="padding:9px 60px 9px 11px;font-size:13px;width:100%;box-sizing:border-box;"
             oninput="ptItemTallySearch(this,'${rowId}')"
             onfocus="ptItemTallySearch(this,'${rowId}')"
             onblur="setTimeout(()=>ptHideItemDd('${rowId}'),200)"
             onkeydown="ptItemDdKey(event,'${rowId}')" />
-          <span onclick="ptToggleItemDd(this.previousElementSibling,'${rowId}')" style="position:absolute;right:9px;top:50%;transform:translateY(-50%);cursor:pointer;color:#7a8aaa;font-size:11px;pointer-events:all;">▼</span>
+          <span onclick="ptToggleItemDd(this.previousElementSibling,'${rowId}')" style="position:absolute;right:32px;top:50%;transform:translateY(-50%);cursor:pointer;color:#7a8aaa;font-size:11px;pointer-events:all;">▼</span>
+          <span onclick="startBarcodeScanIntoItemRow('${rowId}')" title="Scan barcode" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:15px;pointer-events:all;">📷</span>
           <div id="ptdd-${rowId}" style="display:none;position:absolute;left:0;top:100%;width:100%;background:#fff;border:1px solid #c8d0e8;border-radius:10px;z-index:9999;max-height:220px;overflow-y:auto;box-shadow:0 4px 24px rgba(0,0,0,0.15);margin-top:3px;"></div>
         </div>
         <button onclick="this.closest('.pt-item-row').remove();ptUpdateTotal()" style="background:#3a1a1a;border:none;border-radius:8px;color:#f66;cursor:pointer;height:36px;width:32px;font-size:16px;">✕</button>
@@ -15064,6 +15078,186 @@ function amountInWords(amount) {
   return w.toUpperCase() + " ONLY";
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// BARCODE SCAN ENGINE
+// Supports: BarcodeDetector API (Chrome/Android) + ZXing-js fallback
+// Two modes: (A) scan into any input field, (B) scan to auto-fill item row
+// ══════════════════════════════════════════════════════════════════════════════
+
+let _bcStream = null;   // active camera stream
+let _bcRafId  = null;   // requestAnimationFrame id
+let _bcActive = false;  // scan session active
+
+// ── Lookup item by barcode ────────────────────────────────────────────────────
+function findItemByBarcode(code) {
+  if (!code) return null;
+  return inventoryItems.find(it =>
+    it.barcode && String(it.barcode).trim() === String(code).trim()
+  ) || null;
+}
+
+// ── Stop camera cleanly ───────────────────────────────────────────────────────
+function _bcStop() {
+  _bcActive = false;
+  if (_bcRafId) { cancelAnimationFrame(_bcRafId); _bcRafId = null; }
+  if (_bcStream) { _bcStream.getTracks().forEach(t => t.stop()); _bcStream = null; }
+}
+
+// ── Core scan UI — opens camera modal ────────────────────────────────────────
+function _openBarcodeScanModal(onDetected) {
+  _bcStop();
+  _bcActive = true;
+
+  showWideModal(`${modalHeader("📷 Scan Barcode")}
+    <div style="text-align:center;">
+      <div style="position:relative;display:inline-block;border-radius:12px;overflow:hidden;background:#000;max-width:100%;">
+        <video id="bc-video" autoplay playsinline muted style="width:100%;max-width:460px;max-height:320px;display:block;"></video>
+        <canvas id="bc-canvas" style="display:none;"></canvas>
+        <!-- Laser line -->
+        <div style="position:absolute;top:50%;left:8%;right:8%;height:2px;background:linear-gradient(90deg,transparent,#22c55e,transparent);transform:translateY(-50%);box-shadow:0 0 8px #22c55e;pointer-events:none;"></div>
+        <!-- Corner marks -->
+        <div style="position:absolute;top:12%;left:8%;width:28px;height:28px;border-top:3px solid #22c55e;border-left:3px solid #22c55e;border-radius:3px 0 0 0;pointer-events:none;"></div>
+        <div style="position:absolute;top:12%;right:8%;width:28px;height:28px;border-top:3px solid #22c55e;border-right:3px solid #22c55e;border-radius:0 3px 0 0;pointer-events:none;"></div>
+        <div style="position:absolute;bottom:12%;left:8%;width:28px;height:28px;border-bottom:3px solid #22c55e;border-left:3px solid #22c55e;border-radius:0 0 0 3px;pointer-events:none;"></div>
+        <div style="position:absolute;bottom:12%;right:8%;width:28px;height:28px;border-bottom:3px solid #22c55e;border-right:3px solid #22c55e;border-radius:0 0 3px 0;pointer-events:none;"></div>
+      </div>
+      <div id="bc-status" style="margin-top:12px;font-size:13px;color:#93c5fd;font-weight:600;">Starting camera...</div>
+      <div style="margin-top:6px;font-size:11px;color:#4a5a7a;">Point camera at barcode — detects automatically</div>
+
+      <!-- Manual entry fallback -->
+      <div style="margin-top:14px;border-top:1px solid #1e2a45;padding-top:12px;">
+        <div style="font-size:11px;color:#7a8aaa;margin-bottom:6px;">Or enter barcode manually:</div>
+        <div style="display:flex;gap:8px;justify-content:center;">
+          <input id="bc-manual-input" class="input" type="text" placeholder="Type or paste barcode number" style="max-width:240px;margin-bottom:0;font-family:monospace;font-size:14px;text-align:center;"
+            onkeydown="if(event.key==='Enter'){const v=this.value.trim();if(v){_bcStop();closeModal();window._bcOnDetected&&window._bcOnDetected(v);}}" />
+          <button onclick="const v=document.getElementById('bc-manual-input').value.trim();if(v){_bcStop();closeModal();window._bcOnDetected&&window._bcOnDetected(v);}else{notify('Enter a barcode','error');}"
+            style="cursor:pointer;background:#1a3a1a;border:1px solid #22c55e;border-radius:8px;color:#22c55e;font-size:13px;font-weight:700;padding:9px 16px;">✅ Use</button>
+        </div>
+      </div>
+
+      <button onclick="_bcStop();closeModal();" style="margin-top:12px;cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:8px;color:#7a8aaa;font-size:13px;font-weight:700;padding:10px 28px;">✕ Cancel</button>
+    </div>
+  `);
+
+  window._bcOnDetected = onDetected;
+
+  // Start camera
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(stream => {
+      if (!_bcActive) { stream.getTracks().forEach(t => t.stop()); return; }
+      _bcStream = stream;
+      const video = document.getElementById("bc-video");
+      const status = document.getElementById("bc-status");
+      if (!video) { _bcStop(); return; }
+      video.srcObject = stream;
+      video.play();
+      if (status) status.textContent = "📷 Camera ready — scanning...";
+
+      // Try native BarcodeDetector first
+      if ("BarcodeDetector" in window) {
+        const detector = new BarcodeDetector({ formats: ["ean_13","ean_8","code_128","code_39","qr_code","upc_a","upc_e","itf","data_matrix"] });
+        const scan = async () => {
+          if (!_bcActive || !document.getElementById("bc-video")) return;
+          try {
+            const barcodes = await detector.detect(video);
+            if (barcodes.length > 0) {
+              const code = barcodes[0].rawValue;
+              _bcStop();
+              closeModal();
+              onDetected(code);
+              return;
+            }
+          } catch(e) {}
+          _bcRafId = requestAnimationFrame(scan);
+        };
+        video.addEventListener("playing", () => { _bcRafId = requestAnimationFrame(scan); }, { once: true });
+      } else {
+        // Fallback: load ZXing via CDN
+        if (status) status.textContent = "Loading scanner library...";
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.19.1/zxing.min.js";
+        script.onload = () => {
+          if (!_bcActive) return;
+          if (status) status.textContent = "📷 Camera ready — scanning...";
+          try {
+            const codeReader = new ZXing.BrowserMultiFormatReader();
+            codeReader.decodeFromVideoElement(video, (result, err) => {
+              if (result && _bcActive) {
+                _bcStop();
+                codeReader.reset();
+                closeModal();
+                onDetected(result.getText());
+              }
+            });
+            window._bcZxingReader = codeReader;
+          } catch(e) {
+            if (status) status.textContent = "❌ Scanner not supported. Use manual entry below.";
+          }
+        };
+        script.onerror = () => {
+          if (status) status.textContent = "⚠️ Camera scanner unavailable. Use manual entry below.";
+        };
+        document.head.appendChild(script);
+      }
+    })
+    .catch(err => {
+      const status = document.getElementById("bc-status");
+      if (status) status.textContent = "❌ Camera access denied. Use manual entry below.";
+    });
+}
+
+// ── Mode A: Scan into any plain input field (e.g. inventory barcode field) ────
+function startBarcodeScanIntoField(inputId) {
+  _openBarcodeScanModal(code => {
+    const el = document.getElementById(inputId);
+    if (el) { el.value = code; el.focus(); }
+    notify("✅ Barcode scanned: " + code);
+  });
+}
+
+// ── Mode B: Scan to auto-fill item row in purchase/sale form ─────────────────
+function startBarcodeScanIntoItemRow(rowId) {
+  _openBarcodeScanModal(code => {
+    const item = findItemByBarcode(code);
+    if (item) {
+      // Found — fill the row
+      ptItemDdSelect(rowId, item.name, null);
+      notify("✅ " + item.name + " — scanned & filled!");
+      // Focus qty field
+      const row = document.querySelector(`[data-row-id="${rowId}"]`);
+      if (row) { setTimeout(() => { row.querySelector(".pt-item-qty")?.focus(); }, 100); }
+    } else {
+      // Not found — show options
+      showWideModal(`${modalHeader("📦 Barcode Not Found")}
+        <div style="text-align:center;padding:10px 0;">
+          <div style="font-size:48px;margin-bottom:10px;">🔍</div>
+          <div style="font-size:14px;color:#e8eaf0;font-weight:700;margin-bottom:6px;">No item found for barcode:</div>
+          <div style="font-size:20px;font-weight:900;font-family:monospace;color:#FFD700;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:8px 20px;display:inline-block;margin-bottom:16px;">${escHtml(code)}</div>
+          <div style="font-size:12px;color:#7a8aaa;margin-bottom:20px;">Would you like to assign this barcode to an existing item, or search manually?</div>
+          <div style="display:flex;flex-direction:column;gap:10px;max-width:320px;margin:0 auto;">
+            <button onclick="
+              closeModal();
+              const row = document.querySelector('[data-row-id=\\'${rowId}\\']');
+              if(row){ const inp = row.querySelector('.pt-item-name'); if(inp){ inp.value='${code}'; inp.focus(); ptItemTallySearch(inp,'${rowId}'); } }
+            " style="cursor:pointer;background:#1a3a6e;border:1px solid #2563eb;border-radius:10px;color:#fff;font-size:13px;font-weight:700;padding:12px;">
+              🔍 Search item manually with this code
+            </button>
+            <button onclick="
+              closeModal();
+              notify('Open Inventory → find the item → Edit → paste barcode ${escHtml(code)}', 'info');
+            " style="cursor:pointer;background:#1a3a1a;border:1px solid #22c55e;border-radius:10px;color:#22c55e;font-size:13px;font-weight:700;padding:12px;">
+              📦 Assign barcode to existing item in Inventory
+            </button>
+            <button onclick="closeModal()" style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:10px;color:#7a8aaa;font-size:13px;font-weight:700;padding:12px;">
+              Cancel
+            </button>
+          </div>
+        </div>
+      `);
+    }
+  });
+}
+
 // ── UPI QR Generator ─────────────────────────────────────────────────────────
 function upiQrUrl(upiId, amount, name) {
   const upiStr = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(name||"")}&am=${amount||""}&cu=INR`;
@@ -15090,13 +15284,13 @@ function openEwayBillHelper(tx, partyName) {
 
   const rows = checks.map(c => `
     <tr style="border-bottom:1px solid #0d1525;">
-      <td style="padding:8px 10px;font-size:12px;color:#7a8aaa;">${c.label}</td>
-      <td style="padding:8px 10px;font-size:12px;font-weight:700;color:${c.ok?"#e8eaf0":"#f87171"};">${escHtml(c.val)}</td>
+      <td style="padding:8px 10px;font-size:12px;color:#bfdbfe;">${c.label}</td>
+      <td style="padding:8px 10px;font-size:12px;font-weight:700;color:${c.ok?"#ffffff":"#f87171"};">${escHtml(c.val)}</td>
       <td style="padding:8px 10px;text-align:center;font-size:14px;">${c.ok?"✅":"⚠️"}</td>
     </tr>`).join("");
 
   showWideModal(`${modalHeader("🚛 E-Way Bill Helper")}
-    <div style="font-size:12px;color:#7a8aaa;margin-bottom:14px;line-height:1.6;background:#0a1628;border:1px solid #1e3a6e;border-radius:8px;padding:10px 14px;">
+    <div style="font-size:12px;color:#bfdbfe;margin-bottom:14px;line-height:1.6;background:#0a1628;border:1px solid #1e3a6e;border-radius:8px;padding:10px 14px;">
       <strong style="color:#93c5fd;">What is E-Way Bill?</strong><br>
       Required by GST law when goods worth <strong style="color:#fff;">₹50,000+</strong> are transported.
       Generated on the <strong style="color:#FFD700;">government portal</strong> — no app can do it directly without GSP registration.
@@ -15106,16 +15300,16 @@ function openEwayBillHelper(tx, partyName) {
     <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#FFD700;margin-bottom:8px;">📋 Your Invoice Readiness Check</div>
     <table style="width:100%;border-collapse:collapse;background:#060d1a;border-radius:8px;overflow:hidden;margin-bottom:14px;">
       <thead><tr style="background:#0d1a30;">
-        <th style="padding:7px 10px;text-align:left;font-size:10px;color:#4a5a7a;font-weight:800;text-transform:uppercase;">Field</th>
-        <th style="padding:7px 10px;text-align:left;font-size:10px;color:#4a5a7a;font-weight:800;text-transform:uppercase;">Value</th>
-        <th style="padding:7px 10px;text-align:center;font-size:10px;color:#4a5a7a;font-weight:800;text-transform:uppercase;">OK?</th>
+        <th style="padding:7px 10px;text-align:left;font-size:10px;color:#93c5fd;font-weight:800;text-transform:uppercase;">Field</th>
+        <th style="padding:7px 10px;text-align:left;font-size:10px;color:#93c5fd;font-weight:800;text-transform:uppercase;">Value</th>
+        <th style="padding:7px 10px;text-align:center;font-size:10px;color:#93c5fd;font-weight:800;text-transform:uppercase;">OK?</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
 
     <!-- Step by step guide -->
     <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#FFD700;margin-bottom:8px;">🪜 Step-by-Step on Portal</div>
-    <div style="background:#060d1a;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.9;color:#cdd5e8;">
+    <div style="background:#060d1a;border:1px solid #1e3a6e;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.9;color:#e2e8f0;">
       <div><span style="background:#1a3a6e;color:#60a5fa;border-radius:4px;padding:1px 7px;font-weight:800;margin-right:6px;">1</span>Click <strong style="color:#FFD700;">"Open E-Way Bill Portal"</strong> below</div>
       <div><span style="background:#1a3a6e;color:#60a5fa;border-radius:4px;padding:1px 7px;font-weight:800;margin-right:6px;">2</span>Login with your <strong>GSTIN + Password</strong> → Enter OTP from registered mobile</div>
       <div><span style="background:#1a3a6e;color:#60a5fa;border-radius:4px;padding:1px 7px;font-weight:800;margin-right:6px;">3</span>Click <strong>E-Way Bill → Generate New</strong></div>
@@ -15128,22 +15322,22 @@ function openEwayBillHelper(tx, partyName) {
 
     <!-- Copy helper -->
     <div style="background:#0d1a0d;border:1px solid #1a4a1a;border-radius:8px;padding:10px 14px;margin-bottom:14px;">
-      <div style="font-size:11px;color:#4ade80;font-weight:800;margin-bottom:6px;">📋 Quick Copy for Portal</div>
+      <div style="font-size:11px;color:#4ade80;font-weight:800;margin-bottom:6px;">📋 Quick Copy for Portal — tap any box to copy</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px;">
         ${shopGstin?`<div style="background:#060d1a;border-radius:6px;padding:6px 8px;cursor:pointer;" onclick="navigator.clipboard.writeText('${escHtml(shopGstin)}');notify('Copied GSTIN ✅')">
-          <div style="color:#4a5a7a;margin-bottom:2px;">Your GSTIN</div>
+          <div style="color:#93c5fd;margin-bottom:2px;font-size:10px;">Your GSTIN</div>
           <div style="color:#60a5fa;font-family:monospace;font-weight:700;">${escHtml(shopGstin)}</div>
         </div>`:""}
         ${invNo?`<div style="background:#060d1a;border-radius:6px;padding:6px 8px;cursor:pointer;" onclick="navigator.clipboard.writeText('${escHtml(invNo)}');notify('Copied Invoice No ✅')">
-          <div style="color:#4a5a7a;margin-bottom:2px;">Invoice No.</div>
+          <div style="color:#93c5fd;margin-bottom:2px;">Invoice No.</div>
           <div style="color:#fbbf24;font-family:monospace;font-weight:700;">${escHtml(invNo)}</div>
         </div>`:""}
         <div style="background:#060d1a;border-radius:6px;padding:6px 8px;cursor:pointer;" onclick="navigator.clipboard.writeText('${totalAmt}');notify('Copied Amount ✅')">
-          <div style="color:#4a5a7a;margin-bottom:2px;">Invoice Value</div>
+          <div style="color:#93c5fd;margin-bottom:2px;">Invoice Value</div>
           <div style="color:#22c55e;font-family:monospace;font-weight:700;">${totalAmt}</div>
         </div>
         ${tx.partyGstin?`<div style="background:#060d1a;border-radius:6px;padding:6px 8px;cursor:pointer;" onclick="navigator.clipboard.writeText('${escHtml(tx.partyGstin)}');notify('Copied Party GSTIN ✅')">
-          <div style="color:#4a5a7a;margin-bottom:2px;">Party GSTIN</div>
+          <div style="color:#93c5fd;margin-bottom:2px;">Party GSTIN</div>
           <div style="color:#60a5fa;font-family:monospace;font-weight:700;">${escHtml(tx.partyGstin)}</div>
         </div>`:""}
       </div>
@@ -15168,7 +15362,7 @@ function openEwayBillHelper(tx, partyName) {
     <!-- Action buttons -->
     <div style="display:flex;gap:8px;">
       <a href="https://ewaybillgst.gov.in" target="_blank" style="flex:1;display:block;text-align:center;padding:12px;background:linear-gradient(135deg,#1a3a6e,#2563eb);color:#fff;border-radius:10px;text-decoration:none;font-size:14px;font-weight:800;">🌐 Open E-Way Bill Portal</a>
-      <button onclick="closeModal()" style="flex:1;cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:10px;color:#7a8aaa;font-size:14px;font-weight:700;padding:12px;">Cancel</button>
+      <button onclick="closeModal()" style="flex:1;cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:10px;color:#bfdbfe;font-size:14px;font-weight:700;padding:12px;">Cancel</button>
     </div>
   `);
 
