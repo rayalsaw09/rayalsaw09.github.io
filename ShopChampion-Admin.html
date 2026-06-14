@@ -15095,7 +15095,7 @@ function openEwayBillHelper(tx, partyName) {
       <td style="padding:8px 10px;text-align:center;font-size:14px;">${c.ok?"✅":"⚠️"}</td>
     </tr>`).join("");
 
-  showModal("🚛 E-Way Bill Helper", `
+  showWideModal(`${modalHeader("🚛 E-Way Bill Helper")}
     <div style="font-size:12px;color:#7a8aaa;margin-bottom:14px;line-height:1.6;background:#0a1628;border:1px solid #1e3a6e;border-radius:8px;padding:10px 14px;">
       <strong style="color:#93c5fd;">What is E-Way Bill?</strong><br>
       Required by GST law when goods worth <strong style="color:#fff;">₹50,000+</strong> are transported.
