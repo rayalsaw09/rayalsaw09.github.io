@@ -1901,7 +1901,7 @@ function loadSettingsFromCloud(cb) {
         if (d.voice_settings)    { voiceSettings     = { ...voiceSettings,     ...d.voice_settings    }; }
         if (d.theme)             { currentTheme = d.theme; if(currentAppStyle!=="pro") applyTheme(d.theme); }
         if (d.appStyle)          { currentAppStyle = d.appStyle; applyAppStyle(d.appStyle); }
-        if (d.lang)              { currentLang  = d.lang; }
+        if (d.lang)              { setLanguage(d.lang); }
         if (d.purchase_mode)     { try { localStorage.setItem(storageKey("purchase_mode"), d.purchase_mode); } catch {} }
         if (d.sync_data)         { syncBinId = d.sync_data.binId || ""; syncApiKey = d.sync_data.apiKey || ""; }
         if (d.license)           { try { localStorage.setItem(storageKey("license"), JSON.stringify(d.license)); } catch {} }
@@ -3354,6 +3354,7 @@ function onLoginSuccess(phone) {
     setTimeout(startPaymentRequestListener, 2000); // Start payment sync listener
     setTimeout(sweepAcceptedPaymentSyncRequests, 3000); // Catch any accepted requests missed while offline
     setTimeout(cleanupStaleSentRequests, 5000);         // Remove stale pending requests sent before role fix
+    setTimeout(checkLowStockAndNotify, 4000);           // Check low stock and notify once per day
     // Check Firestore — if doc doesn't exist but we have local data, push it up (first-time migration)
     loadInventoryFromFirestore((docExists)=>{
       if(!docExists && inventoryItems.length > 0){
@@ -9817,6 +9818,49 @@ function getAlertCount(){
   return count;
 }
 
+// ── Low Stock Notification System ─────────────────────────────────────────────
+// Runs once per day after inventory loads. Shows in-app banner + browser push.
+function checkLowStockAndNotify() {
+  try {
+    if (!inventoryItems || inventoryItems.length === 0) return;
+
+    // Only notify once per day per shop
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const lastKey = localStorage.getItem(storageKey("stock_alert_day"));
+    if (lastKey === todayKey) return;
+
+    const outOfStock = inventoryItems.filter(x => invGetStock(x.name) <= 0);
+    const lowStock   = inventoryItems.filter(x => { const s = invGetStock(x.name); return s > 0 && s <= (x.minStock || 5); });
+
+    if (outOfStock.length === 0 && lowStock.length === 0) return;
+
+    localStorage.setItem(storageKey("stock_alert_day"), todayKey);
+
+    // Build message
+    const parts = [];
+    if (outOfStock.length > 0) parts.push(`${outOfStock.length} item${outOfStock.length>1?"s":""} out of stock`);
+    if (lowStock.length   > 0) parts.push(`${lowStock.length} item${lowStock.length>1?"s":""} running low`);
+    const msg = "⚠️ Stock Alert: " + parts.join(" · ");
+
+    // 1) In-app banner (always shown)
+    const banner = document.createElement("div");
+    banner.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a0e00;border:2px solid #f59e0b;border-radius:14px;padding:12px 18px;font-size:13px;font-weight:700;z-index:99999;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px #0008;white-space:nowrap;cursor:pointer;max-width:90vw;";
+    banner.innerHTML = `<span>${msg}</span><span onclick="switchTab(10);this.parentElement.remove();" style="background:#f59e0b;color:#1a0e00;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:800;flex-shrink:0;">View →</span><span onclick="this.parentElement.remove();" style="color:#7a8aaa;font-size:16px;cursor:pointer;flex-shrink:0;">✕</span>`;
+    document.body.appendChild(banner);
+    setTimeout(() => { if (banner.parentElement) banner.remove(); }, 8000);
+
+    // 2) Browser push notification (if permission granted)
+    if (Notification && Notification.permission === "granted") {
+      const n = new Notification("ShopChampion — Stock Alert", {
+        body: parts.join("\n") + "\nTap to view Alerts tab.",
+        icon: "/favicon.ico",
+        tag: "stock-alert"
+      });
+      n.onclick = () => { window.focus(); switchTab(10); n.close(); };
+    }
+  } catch(e) { /* silent */ }
+}
+
 function renderAlertsTab(){
   // ── Section 1: Low Stock ──
   const lowStockItems = inventoryItems.filter(x=>{
@@ -12246,7 +12290,7 @@ Object.keys(LANGUAGES).forEach(lang => {
   TRANSLATIONS[lang] = {...TRANSLATIONS.en, ...TRANSLATIONS[lang]};
 });
 
-let currentLang = localStorage.getItem(storageKey("lang")) || "en";
+let currentLang = localStorage.getItem("sc_lang") || localStorage.getItem(storageKey("lang")) || "en";
 
 function t(key) {
   return (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key]) || TRANSLATIONS.en[key] || key;
@@ -12254,19 +12298,17 @@ function t(key) {
 
 function setLanguage(lang) {
   currentLang = lang;
-  localStorage.setItem(storageKey("lang"), lang);
-  document.getElementById("lang-label").textContent = lang.toUpperCase();
-  document.getElementById("lang-menu").style.display = "none";
+  localStorage.setItem("sc_lang", lang); // simple key, no phone dependency
+  const labelEl = document.getElementById("lang-label");
+  if (labelEl) labelEl.textContent = lang.toUpperCase();
+  const menuEl = document.getElementById("lang-menu");
+  if (menuEl) menuEl.style.display = "none";
   saveSettingsToCloud();
-  // Update header labels
-  const adminEl = document.querySelector('[style*="letter-spacing:2px"]');
-  if (adminEl) adminEl.textContent = t("adminPanel");
   // Re-render tabs and current tab
-  renderTabs();
-  safeRenderTab(currentTab);
-  // Update login screen if visible
-  updateLoginLang();
-  notify("🌐 Language changed to " + LANGUAGES[lang].name);
+  if (typeof renderTabs === "function") renderTabs();
+  if (typeof safeRenderTab === "function") safeRenderTab(currentTab);
+  if (typeof updateLoginLang === "function") updateLoginLang();
+  notify("🌐 Language changed to " + (LANGUAGES[lang]?.name || lang));
 }
 
 function updateLoginLang() {
