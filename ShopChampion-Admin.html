@@ -2104,6 +2104,7 @@ window.addEventListener('load', () => {
   applyTextSize(); // restore saved text size — uses zoom
   const _origSwitchTab = switchTab;
   switchTab = function(i) {
+    if (i !== 12 && window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
     _origSwitchTab(i);
     updateBottomNav(i);
   };
@@ -10108,6 +10109,9 @@ function collectPermissions(prefix) {
 }
 
 async function renderTeamTab(el) {
+  // Clear any existing auto-refresh timer
+  if (window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
+
   el.innerHTML = `<div style="padding:20px;text-align:center;color:#4a5a7a;">⏳ Loading members...</div>`;
   const members = await fetchTeamMembers();
 
@@ -10126,7 +10130,7 @@ async function renderTeamTab(el) {
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
               ${m.blocked ? `<span style="background:#3a0808;color:#f66;border:1px solid #5a1a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🔴 Blocked</span>` : `<span style="background:#0a1a0a;color:#4f4;border:1px solid #1a3a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🟢 Active</span>`}
-              <span style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?"● Online":"○ Offline"}</span>
+              <span id="member-status-${m.id}" style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?"● Online":"○ Offline"}</span>
             </div>
           </div>
           <div style="font-size:11px;color:#4a5a7a;margin-bottom:10px;">Last login: ${lastLogin}</div>
@@ -10142,10 +10146,26 @@ async function renderTeamTab(el) {
   el.innerHTML = `<div style="padding:16px 14px 80px;max-width:760px;margin:0 auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <div style="font-size:18px;font-weight:800;color:#a78bfa;">👤 Team Members</div>
-      <button onclick="openAddMemberModal()" class="btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:13px;font-weight:800;padding:9px 16px;">+ Add Member</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button onclick="renderTab(12)" class="btn" style="background:#0a0e1a;border:1px solid #1e2a45;color:#7a8aaa;font-size:13px;font-weight:800;padding:9px 12px;" title="Refresh">🔄</button>
+        <button onclick="openAddMemberModal()" class="btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:13px;font-weight:800;padding:9px 16px;">+ Add Member</button>
+      </div>
     </div>
     ${memberCards}
   </div>`;
+
+  // Auto-refresh online status every 20s while Team tab is open
+  window._teamRefreshTimer = setInterval(async () => {
+    if (currentTab !== 12) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; return; }
+    const fresh = await fetchTeamMembers();
+    // Only update the status indicators, not the whole tab (avoids closing modals)
+    fresh.forEach(m => {
+      const lastSeenMs = m.last_seen_at ? Date.now() - new Date(m.last_seen_at).getTime() : Infinity;
+      const isOnline = lastSeenMs < 2 * 60 * 1000;
+      const statusEl = document.getElementById(`member-status-${m.id}`);
+      if (statusEl) statusEl.innerHTML = `<span style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?"● Online":"○ Offline"}</span>`;
+    });
+  }, 20000);
 }
 
 function openAddMemberModal() {
