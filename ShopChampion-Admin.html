@@ -1558,7 +1558,10 @@ function getTabs(){
     if(k === "team" && currentMember) return;
     // Member tab visibility filter
     if(currentMember && !isTabVisible(k)) return;
-    let label = isPro ? TABS_LABEL_PRO[i] : (TABS_ICON[i]+" "+t(k));
+    // Use t() for all languages; fall back to Pro English labels only for English
+    let label = isPro
+      ? (currentLang === "en" ? TABS_LABEL_PRO[i] : t(k))
+      : (TABS_ICON[i]+" "+t(k));
     // Low stock badge on inventory tab (index 5)
     if(i===5 && inventoryItems && inventoryItems.length>0){
       const oos = inventoryItems.filter(x=>invGetStock(x.name)<=0).length;
@@ -2084,7 +2087,7 @@ function toggleMoreMenu() {
     menu.innerHTML = MOBILE_MORE_TABS.filter(i => visibleTabs.includes(i)).map(i => `
       <button class="more-menu-btn${currentTab === i ? ' active' : ''}" onclick="mobileTab(${i});closeMoreMenu()">
         <span class="mm-icon">${TABS_ICON[i]}</span>
-        <span class="mm-label">${TABS_BASE[i].charAt(0).toUpperCase() + TABS_BASE[i].slice(1)}</span>
+        <span class="mm-label">${currentLang === "en" ? (TABS_LABEL_PRO[i] || TABS_BASE[i]) : t(TABS_BASE[i])}</span>
       </button>
     `).join('');
     menu.classList.add('open');
@@ -12236,8 +12239,12 @@ const TRANSLATIONS = {
     themeLabel:"Theme", languageLabel:"Language", dayTheme:"☀️ Day", nightTheme:"🌙 Night",
   },
   hi: {
-    adminPanel:"एडमिन पैनल", leaderboard:"लीडरबोर्ड", customers:"ग्राहक",
-    purchase:"बिक्री", analytics:"विश्लेषण", compare:"तुलना",
+    // Tab names (TABS_BASE keys)
+    leaderboard:"रैंकिंग", customers:"ग्राहक", sales:"बिक्री",
+    analytics:"विश्लेषण", compare:"तुलना", inventory:"इन्वेंटरी",
+    creditors:"लेनदार", debtors:"देनदार", messages:"संदेश",
+    settings:"सेटिंग्स", alerts:"अलर्ट", history:"इतिहास", team:"टीम",
+    adminPanel:"एडमिन पैनल",
     festivals:"उत्सव पुरस्कार", settings:"सेटिंग्स", logout:"लॉगआउट",
     addCustomer:"+ ग्राहक जोड़ें", exportCSV:"⬇ CSV निर्यात", addPurchase:"बिक्री जोड़ें →",
     totalSpend:"कुल खर्च", points:"अंक", rank:"रैंक", visits:"दौरे",
