@@ -2207,6 +2207,10 @@ function getTabs(){
 // ─── HELPERS ─────────────────────────────────────────────────
 function getPoints(n) { return Math.floor(n / 10); }
 function formatINR(n) { return "₹" + Number(n).toLocaleString("en-IN"); }
+// MED-03: Always compute totalSpend from source to avoid denorm drift
+function getCustomerTotalSpend(c) {
+  return (c.purchases || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+}
 
 // ─── THEME-AWARE TINT HELPERS ──────────────────────────────────
 // Returns true when the current visual theme has a light page/card background
@@ -2599,7 +2603,7 @@ function updateDbStatus(msg, color) {
 // ── Save / mutate helpers ──
 async function saveCustomers() {
   if (useLocalOnly) {
-    try { localStorage.setItem(storageKey("customers_v2"), JSON.stringify(customers)); } catch {}
+    safeLocalSet(storageKey("customers_v2"), JSON.stringify(customers));
     return;
   }
   // Firebase: each customer is its own document (id = customer id)
@@ -2832,7 +2836,10 @@ window.addEventListener("load", () => {
 });
 
 function getSorted() {
-  return [...customers].sort((a,b)=>b.totalSpend-a.totalSpend).map((c,i)=>({...c,rank:i+1,points:getPoints(c.totalSpend)}));
+  return [...customers]
+    .map(c => ({ ...c, totalSpend: getCustomerTotalSpend(c) }))
+    .sort((a,b)=>b.totalSpend-a.totalSpend)
+    .map((c,i)=>({...c,rank:i+1,points:getPoints(c.totalSpend)}));
 }
 
 // ─── DISPLAY SETTINGS ────────────────────────────────────────
@@ -3392,6 +3399,31 @@ function rankBadge(rank) {
   return `<div class="rank-circle" style="width:40px;height:40px;background:${bg};border:1px solid ${col}44;color:${col};font-size:13px;font-weight:800;flex-shrink:0;">${rank}</div>`;
 }
 
+// ─── SAFE PRINT WINDOW ────────────────────────────────────────
+// MED-08: Replace deprecated document.write with Blob URL approach
+function openPrintWindow(html, width, height) {
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const w = window.open(url, '_blank', width && height ? `width=${width},height=${height}` : '');
+  if (!w) { alert("Please allow popups for this site to print."); URL.revokeObjectURL(url); return; }
+  w.addEventListener('load', () => { setTimeout(() => URL.revokeObjectURL(url), 5000); });
+}
+
+// ─── SAFE LOCAL STORAGE ───────────────────────────────────────
+// CRIT-09: Handle QuotaExceededError instead of silently swallowing it
+function safeLocalSet(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (e) {
+    if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+      notify("⚠️ Local storage full — data saved to cloud only. Clear browser cache if issues persist.", "error");
+      console.error("[Storage] QuotaExceededError for key:", key);
+    }
+    return false;
+  }
+}
+
 // ─── NOTIFICATIONS ────────────────────────────────────────────
 function notify(msg, type){
   const el=document.getElementById("notification");
@@ -3599,17 +3631,20 @@ async function checkPhone() {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 6000);
 
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=phone,blocked`, {
-      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON },
+    // MED-09: Use timing-safe RPC instead of direct table query to prevent phone enumeration
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/check_phone_exists`, {
+      method: "POST",
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_phone: phone }),
       signal: controller.signal
     });
     clearTimeout(timer);
 
     if (!res.ok) { goNewUser(); resetBtn(); return; }
-    const rows = await res.json();
+    const result = await res.json();
 
-    if (rows && rows.length > 0) {
-      if (rows[0].blocked === true) {
+    if (result && result.exists) {
+      if (result.blocked === true) {
         errEl.innerHTML = "🚫 Your account has been blocked. Please contact the shop owner.";
         errEl.style.display = "block";
         resetBtn(); return;
@@ -3798,6 +3833,9 @@ async function loadSecurityQuestion(phone) {
 }
 
 async function verifySecurityAnswer() {
+  // CRIT-01 FIX: Now calls issue_reset_token RPC which verifies the security answer
+  // server-side and returns a one-time token. submitResetPassword() requires this
+  // token — so it cannot be called from console without passing the real answer first.
   const answer = (document.getElementById("auth-secq-answer")?.value || "").trim().toLowerCase();
   const errEl = document.getElementById("auth-secq-err");
   const btn = document.getElementById("secq-verify-btn");
@@ -3810,22 +3848,35 @@ async function verifySecurityAnswer() {
 
   try {
     const hashed = await scHashPassword(authPhone, answer);
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/check_security_answer`, {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/issue_reset_token`, {
       method: "POST",
       headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_phone: authPhone, p_hash: hashed })
+      body: JSON.stringify({ p_phone: authPhone, p_secq_hash: hashed })
     });
-    const ok = await res.json();
-    if (ok === true) {
-      const resetPhoneEl = document.getElementById("auth-reset-phone");
-      if (resetPhoneEl) resetPhoneEl.textContent = authPhone;
-      authShowStep("resetpass");
-    } else {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      if (body?.message?.includes("locked_out")) {
+        errEl.textContent = "❌ Too many attempts. Try again in 1 hour.";
+      } else {
+        errEl.textContent = "❌ Wrong answer. Please try again.";
+      }
+      errEl.style.display = "block";
+      if (btn) btn.disabled = false;
+      if (txt) txt.textContent = "Verify Answer →";
+      return;
+    }
+    const token = await res.json();
+    if (!token) {
       errEl.textContent = "❌ Wrong answer. Please try again.";
       errEl.style.display = "block";
       if (btn) btn.disabled = false;
       if (txt) txt.textContent = "Verify Answer →";
+      return;
     }
+    window._scResetToken = token; // stored in memory only — never in localStorage
+    const resetPhoneEl = document.getElementById("auth-reset-phone");
+    if (resetPhoneEl) resetPhoneEl.textContent = authPhone;
+    authShowStep("resetpass");
   } catch(e) {
     errEl.textContent = "❌ Error verifying. Check your connection.";
     errEl.style.display = "block";
@@ -3835,6 +3886,8 @@ async function verifySecurityAnswer() {
 }
 
 async function submitResetPassword() {
+  // CRIT-01 FIX: Uses server-issued token from verifySecurityAnswer().
+  // No token = cannot reset, even from browser console.
   const p1 = (document.getElementById("auth-resetpass1")?.value || "").trim();
   const p2 = (document.getElementById("auth-resetpass2")?.value || "").trim();
   const errEl = document.getElementById("auth-reset-err");
@@ -3842,7 +3895,11 @@ async function submitResetPassword() {
   const txt = document.getElementById("reset-save-txt");
   errEl.style.display = "none";
 
-  if (!p1 || p1.length < 4) { errEl.textContent = "❌ Password must be at least 4 characters"; errEl.style.display = "block"; return; }
+  if (!window._scResetToken) {
+    errEl.textContent = "❌ Session expired. Please restart the forgot password flow.";
+    errEl.style.display = "block"; return;
+  }
+  if (!p1 || p1.length < 8) { errEl.textContent = "❌ Password must be at least 8 characters"; errEl.style.display = "block"; return; }
   if (p1 !== p2) { errEl.textContent = "❌ Passwords don't match"; errEl.style.display = "block"; return; }
 
   if (btn) btn.disabled = true;
@@ -3850,23 +3907,36 @@ async function submitResetPassword() {
 
   const hashed = await scHashPassword(authPhone, p1);
   try {
-    await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(authPhone)}`, {
-      method: "PATCH",
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/reset_password_with_token`, {
+      method: "POST",
       headers: {
         "apikey": SC_SUPABASE_ANON,
         "Authorization": "Bearer " + SC_SUPABASE_ANON,
-        "Content-Type": "application/json",
-        "Prefer": "return=minimal"
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({ password_hash: hashed })
+      body: JSON.stringify({ p_phone: authPhone, p_token: window._scResetToken, p_new_hash: hashed })
     });
-  } catch(e) { /* save locally even if Supabase fails */ }
-
-  localStorage.setItem("sc_user_" + authPhone, hashed);
-  localStorage.setItem("sc_auth_phone", authPhone);
-  localStorage.setItem("sc_session_type", "admin");
-  notify("✅ Password reset successfully!");
-  onLoginSuccess(authPhone);
+    const ok = await res.json();
+    if (!ok) {
+      errEl.textContent = "❌ Reset failed — token expired or already used. Please restart.";
+      errEl.style.display = "block";
+      window._scResetToken = null;
+      if (btn) btn.disabled = false;
+      if (txt) txt.textContent = "Save New Password →";
+      return;
+    }
+    window._scResetToken = null;
+    localStorage.setItem("sc_user_" + authPhone, hashed);
+    localStorage.setItem("sc_auth_phone", authPhone);
+    localStorage.setItem("sc_session_type", "admin");
+    notify("✅ Password reset successfully!");
+    onLoginSuccess(authPhone);
+  } catch(e) {
+    errEl.textContent = "❌ Network error. Please try again.";
+    errEl.style.display = "block";
+    if (btn) btn.disabled = false;
+    if (txt) txt.textContent = "Save New Password →";
+  }
 }
 // ── End Security Question Reset Flow ───────────────────────────
 
@@ -3900,8 +3970,8 @@ async function setNewPassword() {
     document.getElementById("auth-shop-name")?.focus();
     return;
   }
-  if (!p1 || p1.length < 4) {
-    errEl.textContent = "❌ Password must be at least 4 characters";
+  if (!p1 || p1.length < 8) {
+    errEl.textContent = "❌ Password must be at least 8 characters";
     errEl.style.display = "block";
     return;
   }
@@ -4098,6 +4168,18 @@ function doLogin() {
 }
 
 function doLogout() {
+  // MED-06: Clear all active intervals to prevent memory leaks and ghost polling
+  if (window._blockCheckTimer) { clearInterval(window._blockCheckTimer); window._blockCheckTimer = null; }
+  if (window._bfTimer) { clearInterval(window._bfTimer); window._bfTimer = null; }
+  if (window._ptLiveTimer) { clearInterval(window._ptLiveTimer); window._ptLiveTimer = null; }
+  if (window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
+  scStopPolling();
+  const adState = window._scAdState;
+  if (adState) {
+    if (adState.bannerTimer) { clearInterval(adState.bannerTimer); adState.bannerTimer = null; }
+    if (adState.floatTimer) { clearInterval(adState.floatTimer); adState.floatTimer = null; }
+    if (adState.listener) { try { adState.listener(); } catch(_) {} adState.listener = null; }
+  }
   // Clear member session token if logged in as member
   if(currentMember && _memberSessionToken) {
     const _membId = currentMember.id;
@@ -6949,9 +7031,7 @@ function printBalanceSheet(){
   <div style="margin-top:16px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:#1e40af;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🖨 Print / Save PDF</button></div>
   </body></html>`;
 
-  const w = window.open("","_blank","width=860,height=700");
-  w.document.write(html);
-  w.document.close();
+  openPrintWindow(html, 860, 700);
 }
 
 // ─── COMPARE MODE ─────────────────────────────────────────────
@@ -7996,7 +8076,7 @@ function loadCreditors(){
 }
 
 function saveCreditors(list){
-  try { localStorage.setItem(creditorsKey(), JSON.stringify(list)); } catch {}
+  safeLocalSet(creditorsKey(), JSON.stringify(list));
   // Push to Firebase if connected
   if(db && authPhone){
     db.collection("users").doc(authPhone).collection("app_data").doc("creditors")
@@ -10010,9 +10090,7 @@ function printCreditorStatement(id){
   <div style="margin-top:16px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:#1e40af;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🖨 Print / Save PDF</button></div>
   </body></html>`;
 
-  const w = window.open("","_blank","width=860,height=700");
-  w.document.write(html);
-  w.document.close();
+  openPrintWindow(html, 860, 700);
 }
 
 // ─── END CREDITORS MODULE ────────────────────────────────────────────────────
@@ -10030,7 +10108,7 @@ function loadDebtors(){
 }
 
 function saveDebtors(list){
-  try { localStorage.setItem(debtorsKey(), JSON.stringify(list)); } catch {}
+  safeLocalSet(debtorsKey(), JSON.stringify(list));
   if(db && authPhone){
     db.collection("users").doc(authPhone).collection("app_data").doc("debtors")
       .set({ list, updatedAt: Date.now() }).catch(()=>{});
@@ -10062,7 +10140,7 @@ function loadExpenses(){
 }
 
 function saveExpenses(list){
-  try { localStorage.setItem(expensesKey(), JSON.stringify(list)); } catch {}
+  safeLocalSet(expensesKey(), JSON.stringify(list));
   if(db && authPhone){
     db.collection("users").doc(authPhone).collection("app_data").doc("expenses")
       .set({ list, updatedAt: Date.now() }).catch(()=>{});
@@ -10290,7 +10368,7 @@ function renderExpensesTab(){
   const calFirstDay = new Date(calYear,calMonth,1).getDay();
   const calDays = new Date(calYear,calMonth+1,0).getDate();
   const calExpByDate = {};
-  all.filter(e=>{ const d=new Date(e.date||""); return d.getMonth()===calMonth&&d.getFullYear()===calYear; })
+  all.filter(e=>{ const d = e.date ? new Date(e.date + "T00:00:00") : null; return d && !isNaN(d.getTime()) && d.getMonth()===calMonth&&d.getFullYear()===calYear; })
      .forEach(e=>{ const dk=e.date; calExpByDate[dk]=(calExpByDate[dk]||[]).concat(e); });
   const calMonthNames=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const calPrev = calMonth===0?{year:calYear-1,month:11}:{year:calYear,month:calMonth-1};
@@ -10699,11 +10777,10 @@ function expPrintReport(){
   const all = getExpenses();
   const now = new Date();
   const thisMonth=now.getMonth(), thisYear=now.getFullYear();
-  const monthExps = all.filter(e=>{ const d=new Date(e.date||""); return d.getMonth()===thisMonth&&d.getFullYear()===thisYear; });
+  const monthExps = all.filter(e=>{ const d = e.date ? new Date(e.date + "T00:00:00") : null; return d && !isNaN(d.getTime()) && d.getMonth()===thisMonth&&d.getFullYear()===thisYear; });
   const monthTotal = monthExps.reduce((s,e)=>s+Number(e.amount),0);
   const shopName = (appSettings&&appSettings.shopName)||"My Shop";
-  const w = window.open("","_blank");
-  w.document.write(`<!DOCTYPE html><html><head><title>Expense Report</title><style>
+  const html = `<!DOCTYPE html><html><head><title>Expense Report</title><style>
     body{font-family:sans-serif;padding:24px;color:#111;} table{width:100%;border-collapse:collapse;margin-top:16px;}
     th{background:#f1f5f9;padding:8px 12px;text-align:left;font-size:12px;border:1px solid #e2e8f0;}
     td{padding:8px 12px;font-size:12px;border:1px solid #e2e8f0;}
@@ -10714,8 +10791,8 @@ function expPrintReport(){
   <table><thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Description</th><th>Recurring</th></tr></thead><tbody>
   ${monthExps.map(e=>`<tr><td>${e.date}</td><td>${e.category}</td><td>₹${Number(e.amount).toLocaleString("en-IN")}</td><td>${e.note||"—"}</td><td>${e.recurring?"Yes":"—"}</td></tr>`).join("")}
   <tr class="total"><td colspan="2"><b>Total</b></td><td><b>₹${monthTotal.toLocaleString("en-IN")}</b></td><td colspan="2"></td></tr>
-  </tbody></table></body></html>`);
-  w.document.close(); w.print();
+  </tbody></table></body></html>`;
+  openPrintWindow(html);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -11548,9 +11625,7 @@ function printDebtorStatement(id){
   <tbody>${rows}</tbody></table>
   </body></html>`;
 
-  const w=window.open("","_blank","width=860,height=700");
-  w.document.write(html);
-  w.document.close();
+  openPrintWindow(html, 860, 700);
 }
 
 // ─── END DEBTORS MODULE ──────────────────────────────────────────────────────
@@ -12039,7 +12114,7 @@ async function saveNewMember() {
   errEl.style.display = "none";
 
   if(!username || !display || !pass) { errEl.textContent="Fill all fields."; errEl.style.display="block"; return; }
-  if(pass.length < 4) { errEl.textContent="Password min 4 chars."; errEl.style.display="block"; return; }
+  if(pass.length < 8) { errEl.textContent="Password must be at least 8 characters."; errEl.style.display="block"; return; }
   if(pass !== pass2) { errEl.textContent="Passwords don't match."; errEl.style.display="block"; return; }
 
   const permissions = collectPermissions("nm");
@@ -12106,7 +12181,7 @@ async function saveEditMember(memberId) {
   const permissions = collectPermissions("em");
   let passwordHash = null;
   if(pass) {
-    if(pass.length < 4) { errEl.textContent="Password min 4 chars."; errEl.style.display="block"; return; }
+    if(pass.length < 8) { errEl.textContent="Password must be at least 8 characters."; errEl.style.display="block"; return; }
     const m = _teamMembers.find(x=>x.id===memberId);
     passwordHash = await scHashPassword((m?m.username:""), pass);
   }
@@ -13994,7 +14069,7 @@ async function saveEditCustomer(oldId){
 function openPhotoModal(id){
   const c=customers.find(x=>x.id===id);if(!c)return;
   tempPhoto=c.photo||"";
-  showModal(`${modalHeader("Photo — "+c.name)}
+  showModal(`${modalHeader("Photo — "+escHtml(c.name))}
     <div style="display:flex;justify-content:center;margin-bottom:16px;">
       <div class="photo-upload-box" style="width:100px;height:100px;" onclick="document.getElementById('ph-file').click()">
         ${tempPhoto?`<img src="${tempPhoto}" />`:`<div class="upload-hint" style="padding:14px;">📷<br>Upload</div>`}
@@ -14087,7 +14162,7 @@ async function deleteSelectedCustomers(){
 function openPurchaseModal(id){
   const c=getSorted().find(x=>x.id===id);if(!c)return;
   const bill="B"+String(Date.now()).slice(-4),now=new Date().toISOString().slice(0,16);
-  showModal(`${modalHeader("Add Sale — "+c.name)}
+  showModal(`${modalHeader("Add Sale — "+escHtml(c.name))}
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Amount (₹)</label>
     <input class="input" type="number" id="m-amt" placeholder="0.00" style="margin-bottom:14px;font-size:20px;font-weight:700;" oninput="pmPts()" autofocus />
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
@@ -14110,7 +14185,7 @@ function openBulkPurchaseModal(id) {
   document.getElementById("modal-container").innerHTML = `
   <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
   <div class="modal-box" style="max-width:520px;">
-    ${modalHeader("📦 Bulk Purchase — " + c.name)}
+    ${modalHeader("📦 Bulk Purchase — " + escHtml(c.name))}
 
     <div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#6aaa8a;">
       💡 Enter all purchase amounts separated by <strong style="color:#fff;">commas</strong> — like your notebook:<br>
@@ -15422,12 +15497,25 @@ function updateLicenseUI() {
   try { renderTabs(); safeRenderTab(currentTab); } catch {}
 }
 
+// MED-11: Re-validate license against Supabase if more than 24h since last check
+var _lastLicenseCheck = 0;
+async function _maybeRevalidateLicense() {
+  if (licensePlan !== "pro" || licenseStatus !== "pro") return;
+  const now = Date.now();
+  if (now - _lastLicenseCheck < 24 * 60 * 60 * 1000) return; // checked within 24h
+  _lastLicenseCheck = now;
+  await validateLicenseOnline();
+}
+
 // Checks whether a main tab (0-6) is accessible in current plan
 function isTabAllowed(i) {
   // Alerts tab (index 11) is always available — avoids collision with sub-feature index 10 (Push to Display)
   if (i === 11) return true;
-  // Pro user — all tabs unlocked
-  if (licensePlan === "pro" && licenseStatus === "pro") return true;
+  // Pro user — all tabs unlocked (trigger background re-check every 24h)
+  if (licensePlan === "pro" && licenseStatus === "pro") {
+    _maybeRevalidateLicense().catch(() => {});
+    return true;
+  }
   // Free/expired — only explicitly allowed free tabs
   return FREE_TABS.includes(i);
 }
@@ -15746,8 +15834,23 @@ function invCollection(){
   return db.collection("users").doc(authPhone||"unknown").collection("inventory_data");
 }
 
+// MED-04: Inventory stock cache — avoids O(n) recalculation on every render
+var _invStockCache = null; // { itemName: stockQty }
+
+function _buildStockCache() {
+  _invStockCache = {};
+  inventoryItems.forEach(item => {
+    const total = (item.stock    || []).reduce((s, e) => s + Number(e.qty), 0);
+    const sold  = (item.salesLog || []).reduce((s, e) => s + Number(e.qty), 0);
+    _invStockCache[item.name] = Math.max(0, total - sold);
+  });
+}
+
+function _invalidateStockCache() { _invStockCache = null; }
+
 // Save to Firestore (primary) + localStorage (cache)
 function saveInventory(){
+  _invalidateStockCache(); // MED-04: force cache rebuild on next read
   // DEBOUNCE: coalesce rapid saves (e.g. editing selling price + unit in quick succession)
   if (window._invSaveTimer) clearTimeout(window._invSaveTimer);
   window._invSaveTimer = setTimeout(_doSaveInventory, 300);
@@ -15799,6 +15902,7 @@ function loadInventoryFromFirestore(cb){
       if(data && Array.isArray(data.items)){
         console.log("[Inv] Initial GET: got", data.items.length, "items");
         inventoryItems = data.items;
+        _invalidateStockCache(); // MED-04
         try{ localStorage.setItem(invKey("items"), JSON.stringify(inventoryItems)); } catch(e){}
         safeRenderTab(currentTab);
       }
@@ -15818,6 +15922,7 @@ function loadInventoryFromFirestore(cb){
       if(data && Array.isArray(data.items)){
         console.log("[Inv] onSnapshot: got", data.items.length, "items");
         inventoryItems = data.items;
+        _invalidateStockCache(); // MED-04
         try{ localStorage.setItem(invKey("items"), JSON.stringify(inventoryItems)); } catch(e){}
         safeRenderTab(currentTab);
       }
@@ -15835,11 +15940,9 @@ function loadInventoryFromFirestore(cb){
 
 // Current stock for an item = sum of stock entries qty - sold qty
 function invGetStock(itemName){
-  const item = inventoryItems.find(x=>x.name===itemName);
-  if(!item) return 0;
-  const total = (item.stock||[]).reduce((s,e)=>s+Number(e.qty),0);
-  const sold  = (item.salesLog||[]).reduce((s,e)=>s+Number(e.qty),0);
-  return Math.max(0, total - sold);
+  // MED-04: use cache; build it if missing (first call after load or invalidation)
+  if (!_invStockCache) _buildStockCache();
+  return _invStockCache[itemName] ?? 0;
 }
 
 // Returns list of {itemName, unit, expiryDate, qty, daysLeft, status} for stock entries
@@ -16984,9 +17087,12 @@ async function scInitFCM() {
     const token = await messaging.getToken({ vapidKey: SC_FCM_VAPID_KEY, serviceWorkerRegistration: reg });
     if (!token) return;
     _scFcmToken = token;
-    await scSupa(`sc_users?phone=eq.${encodeURIComponent(authPhone)}`, {
-      method:"PATCH", body:JSON.stringify({ fcm_token: token })
-    });
+    // MED-10: Store FCM token via secure RPC instead of direct PATCH on sc_users
+    await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/save_fcm_token`, {
+      method: "POST",
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_phone: authPhone, p_token: token })
+    }).catch(() => {});
     // Foreground message: show in-app banner
     messaging.onMessage(payload => {
       const { title, body } = payload.notification || {};
@@ -17008,10 +17114,13 @@ async function scSendPush(toPhone, title, body) {
   if (!toPhone || !authPhone) return;
   if (typeof SC_FCM_PUSH_URL === "undefined" || !SC_FCM_PUSH_URL) return;
   try {
-    const res = await scSupa(`sc_users?phone=eq.${encodeURIComponent(toPhone)}&select=fcm_token`,
-      {method:"GET",headers:{"Prefer":""}});
-    const users = await res.json();
-    const token = users && users[0] && users[0].fcm_token;
+    // MED-10: Read FCM token from secure sc_push_tokens table via RPC
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/get_fcm_token`, {
+      method: "POST",
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_phone: toPhone })
+    });
+    const token = await res.json();
     if (!token) return;
     fetch(SC_FCM_PUSH_URL, {
       method:"POST",
@@ -18619,10 +18728,7 @@ function printTxBill(tx, partyName, etype) {
 </div>
 </body></html>`;
 
-  const w = window.open("", "_blank", "width=930,height=800");
-  if (!w) { alert("Please allow popups for this site to view the invoice."); return; }
-  w.document.write(html);
-  w.document.close();
+  openPrintWindow(html, 930, 800);
 }
 // ── Print a professional statement for a SHARED (party-statement) ledger ──────
 function printSharedLedgerStatement(entity, etype, displayName, peerName) {
@@ -18687,9 +18793,7 @@ function printSharedLedgerStatement(entity, etype, displayName, peerName) {
   <div style="margin-top:16px;text-align:center;"><button onclick="window.print()" style="padding:10px 24px;background:#1e40af;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;">🖨 Print / Save PDF</button></div>
   </body></html>`;
 
-  const w = window.open("","_blank","width=860,height=700");
-  w.document.write(html);
-  w.document.close();
+  openPrintWindow(html, 860, 700);
 }
 
 function _scStopLedgerListener() {
@@ -20904,7 +21008,7 @@ async function showCustomerBillHistory(custId) {
   document.getElementById("modal-container").innerHTML = `
   <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
   <div class="modal-box" style="max-width:520px;">
-    ${modalHeader("🧾 Bills — " + c.name)}
+    ${modalHeader("🧾 Bills — " + escHtml(c.name))}
     <div style="text-align:center;padding:30px;color:#4a5a7a;font-size:13px;">⏳ Loading bills...</div>
   </div></div>`;
 
@@ -20933,7 +21037,7 @@ async function showCustomerBillHistory(custId) {
   document.getElementById("modal-container").innerHTML = `
   <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
   <div class="modal-box" style="max-width:520px;">
-    ${modalHeader("🧾 Bills — " + c.name)}
+    ${modalHeader("🧾 Bills — " + escHtml(c.name))}
     <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;overflow:hidden;max-height:65vh;overflow-y:auto;">
       ${billsHtml}
     </div>
@@ -21183,6 +21287,7 @@ window.addEventListener("load", async () => {
   loadLicense();
   loadFreeTabs(); // load free/pro feature config from Supabase
   if (licenseKey && licenseStatus === "pro") {
+    _lastLicenseCheck = Date.now(); // MED-11: mark as just checked on login
     validateLicenseOnline().then(() => updateLicenseUI());
   }
 });
