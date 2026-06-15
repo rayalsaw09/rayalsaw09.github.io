@@ -302,7 +302,7 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   body.pro-theme [style*="color:#7a8aaa"],
   body.pro-theme [style*="color: #7a8aaa"] { color: #64748b !important; }
   body.pro-theme [style*="color:#4a5a7a"],
-  body.pro-theme [style*="color: #4a5a7a"] { color: #94a3b8 !important; }
+  body.pro-theme [style*="color: #4a5a7a"] { color: #64748b !important; }
   body.pro-theme [style*="color:#2a3a5a"],
   body.pro-theme [style*="color: #2a3a5a"] { color: #cbd5e1 !important; }
   body.pro-theme [style*="color:#556"],
@@ -323,6 +323,14 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   body.pro-theme [style*="color: #FFD700"] { color: #1d4ed8 !important; }
   body.pro-theme [style*="color:#4f4"],
   body.pro-theme [style*="color: #4f4"] { color: #16a34a !important; }
+  body.pro-theme [style*="color:#f44"],
+  body.pro-theme [style*="color: #f44"] { color: #dc2626 !important; }
+  body.pro-theme [style*="color:#f84"],
+  body.pro-theme [style*="color: #f84"] { color: #c2410c !important; }
+  body.pro-theme [style*="color:#f59e0b"],
+  body.pro-theme [style*="color: #f59e0b"] { color: #b45309 !important; }
+  body.pro-theme [style*="color:#f66"],
+  body.pro-theme [style*="color: #f66"] { color: #dc2626 !important; }
 
   /* Pro rank badges */
   body.pro-theme .rank-circle[style*="background:#1a2e50"] { background: #dbeafe !important; color: #1d4ed8 !important; border-color: #bfdbfe !important; }
@@ -1123,7 +1131,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <div id="fb-config-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
 
       <button class="btn" onclick="setupStep1Next()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:15px;font-weight:800;margin-bottom:10px;">आगे → JSONBin सेटअप</button>
-      <button class="btn" onclick="useDemoMode()" style="background:#0a0e1a;color:#4a5a7a;border:1px solid #1e2a45;width:100%;padding:9px;font-size:12px;">सेटअप छोड़ें — लोकल डेमो इस्तेमाल करें (सीमित, डिस्प्ले सिंक नहीं)</button>
+      <button class="btn" onclick="useDemoMode()" style="background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;width:100%;padding:9px;font-size:12px;">सेटअप छोड़ें — लोकल डेमो इस्तेमाल करें (सीमित, डिस्प्ले सिंक नहीं)</button>
     </div>
 
     <!-- STEP 2: JSONBin -->
@@ -1149,7 +1157,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <button class="btn" onclick="setupStep2Finish()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:15px;font-weight:800;margin-bottom:10px;">✅ सेटअप पूरा करें और शुरू करें →</button>
       <div style="display:flex;gap:10px;">
         <button class="btn" onclick="setupGoBack()" style="background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;flex:1;padding:9px;font-size:12px;">← पीछे</button>
-        <button class="btn" onclick="setupStep2Skip()" style="background:#0a0e1a;color:#4a5a7a;border:1px solid #1e2a45;flex:1;padding:9px;font-size:12px;">अभी के लिए डिस्प्ले सिंक छोड़ें</button>
+        <button class="btn" onclick="setupStep2Skip()" style="background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;flex:1;padding:9px;font-size:12px;">अभी के लिए डिस्प्ले सिंक छोड़ें</button>
       </div>
     </div>
 
@@ -1169,7 +1177,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
     <button class="btn" onclick="checkLicense()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:15px;font-weight:800;margin-bottom:10px;">
       <span id="license-btn-text">✅ सक्रिय करें →</span>
     </button>
-    <button class="btn" onclick="useFreeMode()" style="background:#0a0e1a;color:#4a5a7a;border:1px solid #1e2a45;width:100%;padding:9px;font-size:12px;">फ्री मोड में जारी रखें (सीमित सुविधाएं)</button>
+    <button class="btn" onclick="useFreeMode()" style="background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;width:100%;padding:9px;font-size:12px;">फ्री मोड में जारी रखें (सीमित सुविधाएं)</button>
   </div>
 </div>
 
@@ -6205,7 +6213,7 @@ function renderAnalytics(sorted){
     <!-- ── TOP BAR: Year Picker + Export ── -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
       <div style="display:flex;gap:6px;flex-wrap:wrap;">${yearBtns}</div>
-      <button onclick="exportYearCSV(${analyticsYear})" style="cursor:pointer;border-radius:20px;padding:5px 13px;border:1px solid #1e2a45;background:#0a0e1a;color:#4a5a7a;font-size:11px;font-weight:700;">${t('anExportBtn')} ${analyticsYear}</button>
+      <button onclick="exportYearCSV(${analyticsYear})" style="cursor:pointer;border-radius:20px;padding:5px 13px;border:1px solid #1e2a45;background:#0a0e1a;color:#7a8aaa;font-size:11px;font-weight:700;">${t('anExportBtn')} ${analyticsYear}</button>
     </div>
 
     <!-- ── HERO STATUS CARD ── -->
@@ -13617,20 +13625,22 @@ function cpPurchaseCard(p,custId){
   const statusBadge=isBorrow
     ?(isPending
         ?(isPartialB
-            ?`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#1a0e0033;color:#f59e0b;border:1px solid #92400e;">💛 PARTIAL · ${formatINR(remaining)} left</span>`
+            ?`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#2a1500;color:#f59e0b;border:1px solid #92400e;">💛 PARTIAL · ${formatINR(remaining)} left</span>`
             :`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${isOverdue?'#3a0a00':'#2a1500'};color:${isOverdue?'#f44':'#f84'};border:1px solid ${isOverdue?'#6a1a00':'#5a3000'};">📦 ${isOverdue?'OVERDUE':'PENDING'}</span>`)
         :`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#0a1a0a;color:#4f4;border:1px solid #1a4a1a;">✅ RETURNED</span>`)
     :"";
   const amtColor=isBorrow?(isPending?(isOverdue?'#f44':isPartialB?'#f59e0b':'#f84'):'#4f4'):'#e8eaf0';
   const borderStyle=isBorrow?`border-left:3px solid ${isPending?(isOverdue?'#f44':isPartialB?'#f59e0b':'#f84'):'#4f4'};`:'';
-  const clickHandler = !isBorrow ? `onclick="reprintBill('${p.bill}')" style="${borderStyle}padding:12px 16px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"` : `style="${borderStyle}padding:12px 16px;"`;
+  const clickHandler = !isBorrow
+    ? `onclick="reprintBill('${p.bill}')" style="${borderStyle}padding:12px 16px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"`
+    : `onclick="showBorrowSlipModal('${custId}','${p.bill}')" style="${borderStyle}padding:12px 16px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"`;
   return `<div class="purchase-card" ${clickHandler}>
     <div style="flex:1;">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-weight:800;font-size:16px;color:${amtColor};">${formatINR(p.amount)}</span>
         ${statusBadge}
         ${(!isBorrow&&isSubFeatureAllowed(11))?`<span style="font-size:11px;font-weight:700;color:#5af;background:#0a1a2a;border-radius:6px;padding:2px 8px;">Visit #${p.visitNum}</span>`:""}
-        ${!isBorrow?`<span style="font-size:10px;color:#4a5a7a;margin-left:auto;">🧾 tap to view bill</span>`:""}
+        ${!isBorrow?`<span style="font-size:10px;color:#4a5a7a;margin-left:auto;">🧾 tap to view bill</span>`:`<span style="font-size:10px;color:#4a5a7a;margin-left:auto;">🧾 tap to view slip</span>`}
       </div>
       <div style="font-size:12px;color:#556;margin-top:4px;">${isBorrow?'📦 Borrow':'Bill'}: <strong style="color:#7a8aaa;">${p.bill}</strong>${isSubFeatureAllowed(13)?` &nbsp;·&nbsp; 📅 ${new Date(p.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} <span style="font-size:11px;color:#4a5a7a;">⏱ ${new Date(p.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true})}</span>`:" "}</div>
       ${isBorrow&&p.due?`<div style="font-size:11px;color:${isOverdue?'#f44':'#7a8aaa'};margin-top:2px;">Due: ${new Date(p.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${isOverdue?' ⚠️':''}</div>`:''}
@@ -13658,19 +13668,21 @@ function phPurchaseCardHTML(p,custId){
   const statusBadge=isBorrow
     ?(isPending
         ?(isPartialB
-            ?`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#1a0e0033;color:#f59e0b;border:1px solid #92400e;">💛 PARTIAL · ${formatINR(remaining)} left</span>`
+            ?`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#2a1500;color:#f59e0b;border:1px solid #92400e;">💛 PARTIAL · ${formatINR(remaining)} left</span>`
             :`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${isOverdue?'#3a0a00':'#2a1500'};color:${isOverdue?'#f44':'#f84'};border:1px solid ${isOverdue?'#6a1a00':'#5a3000'};">📦 ${isOverdue?'OVERDUE':'PENDING'}</span>`)
         :`<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#0a1a0a;color:#4f4;border:1px solid #1a4a1a;">✅ RETURNED</span>`)
     :"";
   const amtColor=isBorrow?(isPending?(isOverdue?'#f44':isPartialB?'#f59e0b':'#f84'):'#4f4'):'#e8eaf0';
   const borderStyle=isBorrow?`border-left:3px solid ${isPending?(isOverdue?'#f44':isPartialB?'#f59e0b':'#f84'):'#4f4'};`:'';
-  const phClickHandler = !isBorrow ? `onclick="reprintBill('${p.bill}')" style="${borderStyle}cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"` : `style="${borderStyle}"`;
+  const phClickHandler = !isBorrow
+    ? `onclick="reprintBill('${p.bill}')" style="${borderStyle}cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"`
+    : `onclick="showBorrowSlipModal('${custId}','${p.bill}')" style="${borderStyle}cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"`;
   return `<div class="purchase-card" ${phClickHandler}>
     <div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-weight:700;color:${amtColor};">${formatINR(p.amount)}</span>
         ${statusBadge}
-        ${!isBorrow?`<span style="font-size:10px;color:#4a5a7a;margin-left:auto;">🧾 tap to view</span>`:""}
+        ${!isBorrow?`<span style="font-size:10px;color:#4a5a7a;margin-left:auto;">🧾 tap to view</span>`:`<span style="font-size:10px;color:#4a5a7a;margin-left:auto;">🧾 tap to view slip</span>`}
       </div>
       <div style="font-size:11px;color:#556;margin-top:2px;">${isBorrow?'📦 Borrow':'Bill'}: ${p.bill}${isSubFeatureAllowed(13)?` · ${new Date(p.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} <span style="font-size:10px;color:#4a5a7a;">⏱ ${new Date(p.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true})}</span>`:" "}</div>
       ${isBorrow&&p.due?`<div style="font-size:10px;color:${isOverdue?'#f44':'#7a8aaa'};">Due: ${new Date(p.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${isOverdue?' ⚠️':''}</div>`:''}
