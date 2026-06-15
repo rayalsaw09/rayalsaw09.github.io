@@ -186,8 +186,15 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   body.pro-theme [style*="background: #081a08"] { background: #eafbea !important; border-color: #b6e8b6 !important; }
   body.pro-theme [style*="background:#1a0808"],
   body.pro-theme [style*="background: #1a0808"] { background: #fdeaea !important; border-color: #f3bcbc !important; }
-  body.pro-theme [style*="color:#e8eaf0"],
-  body.pro-theme [style*="color: #e8eaf0"] { color: #1a2030 !important; }
+  /* Scoped fixes: only convert light text (#e8eaf0/#fca5a5) to dark on the specific
+     elements whose background ALSO switches to a light shade above. A blanket
+     [style*="color:#e8eaf0"] rule previously made text invisible on the many
+     dark cards (#0a0e1a, #0d1525, etc.) that keep their dark background in pro-theme
+     (e.g. Analytics "Top Items", History entries). */
+  body.pro-theme [style*="background:#0a1628"][style*="color:#e8eaf0"],
+  body.pro-theme [style*="background: #0a1628"][style*="color: #e8eaf0"] { color: #1a2030 !important; }
+  body.pro-theme [style*="background:#1a0808"][style*="color:#fca5a5"],
+  body.pro-theme [style*="background: #1a0808"][style*="color: #fca5a5"] { color: #b91c1c !important; }
   body.pro-theme [style*="color:#a0b0d0"],
   body.pro-theme [style*="color: #a0b0d0"] { color: #475569 !important; }
   body.pro-theme [style*="color:#4a5a7a"],
@@ -196,8 +203,6 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   body.pro-theme [style*="color: #60a5fa"] { color: #2563eb !important; }
   body.pro-theme [style*="color:#7a8aaa"],
   body.pro-theme [style*="color: #7a8aaa"] { color: #64748b !important; }
-  body.pro-theme [style*="color:#fca5a5"],
-  body.pro-theme [style*="color: #fca5a5"] { color: #b91c1c !important; }
   body.pro-theme [style*="color:#86efac"],
   body.pro-theme [style*="color: #86efac"] { color: #15803d !important; }
   body.pro-theme [style*="border:1px solid #1e2a45"],
