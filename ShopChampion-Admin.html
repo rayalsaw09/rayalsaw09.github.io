@@ -10156,7 +10156,7 @@ function renderAlertsTab(){
 let historySelectedDate = ""; // "" = today; else "YYYY-MM-DD"
 
 const HIST_TYPE_META = {
-  sale:      {icon:"💰", color:"#4ade80", label:currentLang==='hi'?'बिक्री':'Sale'},
+  sale:      {icon:"💰", color:"#4ade80", label:"Sale"},
   purchase:  {icon:"📦", color:"#f59e0b", label:"Purchase"},
   inventory: {icon:"📦", color:"#7ab3ff", label:"Inventory"},
   customer:  {icon:"👤", color:"#a78bfa", label:"Customer"},
@@ -10783,7 +10783,7 @@ function renderHistoryTab(){
   const filterPills = ["all",...Object.keys(HIST_TYPE_META)].map(k=>{
     const cnt = k==="all" ? entries.length : (counts[k]||0);
     if(k!=="all" && cnt===0) return "";
-    const meta = k==="all" ? {icon:"🕘",color:"#60a5fa",label:"All"} : HIST_TYPE_META[k];
+    const meta = k==="all" ? {icon:"🕘",color:"#60a5fa",label:currentLang==='hi'?'सभी':'All'} : {...HIST_TYPE_META[k], label: k==='sale'?(currentLang==='hi'?'बिक्री':'Sale'):HIST_TYPE_META[k].label};
     const active = activeFilter===k;
     return `<button onclick="window._histTypeFilter='${k}';renderTab(11)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${active?meta.color:'#1e2a45'};background:${active?meta.color+'22':'transparent'};color:${active?meta.color:'#4a5a7a'};font-size:12px;font-weight:${active?'800':'600'};white-space:nowrap;flex-shrink:0;">${meta.icon} ${meta.label}${cnt?` (${cnt})`:''}</button>`;
   }).join("");
