@@ -9734,34 +9734,48 @@ function loadExpensesFromCloud(){
     }).catch(()=>{});
 }
 
+// ── Category metadata ─────────────────────────────────────────
+var EXP_CATS = [
+  { key:"Rent",        icon:"🏠", color:"#f87171" },
+  { key:"Salary",      icon:"👨‍💼", color:"#fb923c" },
+  { key:"Electricity", icon:"⚡", color:"#fbbf24" },
+  { key:"Water",       icon:"💧", color:"#38bdf8" },
+  { key:"Internet",    icon:"🌐", color:"#818cf8" },
+  { key:"Transport",   icon:"🚚", color:"#34d399" },
+  { key:"Packaging",   icon:"📦", color:"#a78bfa" },
+  { key:"Maintenance", icon:"🔧", color:"#94a3b8" },
+  { key:"GST/Tax",     icon:"🧾", color:"#f472b6" },
+  { key:"Marketing",   icon:"📣", color:"#22d3ee" },
+  { key:"Other",       icon:"📌", color:"#e2e8f0" }
+];
+
 function expCategoryIcon(cat){
-  const icons = {
-    "Rent":"🏠", "किराया":"🏠",
-    "Salary / Staff":"👤", "वेतन / स्टाफ":"👤",
-    "Electricity / Utilities":"⚡", "बिजली / यूटिलिटी":"⚡",
-    "Packaging":"📦", "पैकेजिंग":"📦",
-    "Transport / Delivery":"🚚", "ट्रांसपोर्ट / डिलीवरी":"🚚",
-    "Marketing":"📣", "मार्केटिंग":"📣",
-    "Repairs & Maintenance":"🔧", "मरम्मत और रखरखाव":"🔧",
-    "Miscellaneous":"💰", "विविध":"💰"
-  };
-  return icons[cat] || "💰";
+  const c = EXP_CATS.find(x=>x.key===cat||x.key===cat?.split(" /")[0]);
+  return c ? c.icon : "💰";
 }
-
-function expCategories(){
-  return [
-    t("expCatRent"), t("expCatSalary"), t("expCatElec"),
-    t("expCatPack"), t("expCatTransport"), t("expCatMarketing"),
-    t("expCatRepairs"), t("expCatOther")
-  ];
+function expCategoryColor(cat){
+  const c = EXP_CATS.find(x=>x.key===cat||x.key===cat?.split(" /")[0]);
+  return c ? c.color : "#a0aec0";
 }
+function expCategories(){ return EXP_CATS.map(c=>c.key); }
 
-function addExpense(category, amount, note, date){
+// ── State for expenses tab UI ─────────────────────────────────
+var _expFilter = "month"; // today|week|month|year|custom
+var _expCatFilter = "";
+var _expSearch = "";
+var _expPage = 0;
+var _expPageSize = 10;
+var _expEditId = null;
+var _expCalMonth = null; // {year, month} for calendar view
+var _expView = "list"; // list|calendar
+
+function addExpense(category, amount, note, date, recurring){
   const list = getExpenses();
   const entry = {
     id: "EXP_" + Date.now() + "_" + Math.random().toString(36).slice(2,6).toUpperCase(),
     category, amount: Number(amount)||0, note: note||"",
     date: date || new Date().toISOString().slice(0,10),
+    recurring: !!recurring,
     createdAt: Date.now()
   };
   list.unshift(entry);
@@ -9770,110 +9784,516 @@ function addExpense(category, amount, note, date){
   return entry;
 }
 
+function updateExpense(id, category, amount, note, date, recurring){
+  const list = getExpenses();
+  const idx = list.findIndex(e=>e.id===id);
+  if(idx===-1) return;
+  list[idx] = { ...list[idx], category, amount: Number(amount)||0, note: note||"", date, recurring: !!recurring };
+  saveExpenses(list);
+  logHistory({ type:"expense_edit", desc:`Expense edited: ${category} — ${formatINR(Number(amount))}` });
+}
+
 function deleteExpense(id){
   const list = getExpenses().filter(e=>e.id!==id);
   saveExpenses(list);
   logHistory({ type:"expense_delete", desc:`Expense deleted (${id})` });
 }
 
-function renderExpensesTab(){
-  const expenses = getExpenses();
-  const now = new Date();
-  const thisMonth = now.getMonth(), thisYear = now.getFullYear(), yr = String(thisYear);
+function duplicateExpense(id){
+  const e = getExpenses().find(x=>x.id===id);
+  if(!e) return;
+  addExpense(e.category, e.amount, e.note, new Date().toISOString().slice(0,10), e.recurring);
+  notify("✅ Expense duplicated");
+  safeRenderTab(currentTab);
+}
 
-  let monthTotal = 0, yearTotal = 0;
-  expenses.forEach(e=>{
+// ── Filter helper ─────────────────────────────────────────────
+function expFilteredList(){
+  const all = getExpenses();
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0,10);
+  const thisMonth = now.getMonth(), thisYear = now.getFullYear();
+  const weekAgo = new Date(now); weekAgo.setDate(now.getDate()-6);
+
+  return all.filter(e=>{
     const d = new Date(e.date||"");
-    if(d.getMonth()===thisMonth && d.getFullYear()===thisYear) monthTotal += Number(e.amount)||0;
-    if(String(d.getFullYear())===yr) yearTotal += Number(e.amount)||0;
+    const dStr = e.date||"";
+    // time filter
+    if(_expFilter==="today" && dStr!==todayStr) return false;
+    if(_expFilter==="week" && d < weekAgo) return false;
+    if(_expFilter==="month" && !(d.getMonth()===thisMonth && d.getFullYear()===thisYear)) return false;
+    if(_expFilter==="year" && d.getFullYear()!==thisYear) return false;
+    if(_expFilter==="recurring" && !e.recurring) return false;
+    // category filter
+    if(_expCatFilter && e.category!==_expCatFilter) return false;
+    // search
+    if(_expSearch){
+      const q=_expSearch.toLowerCase();
+      if(!(e.category||"").toLowerCase().includes(q) && !(e.note||"").toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+// ── Sales data helper (recomputes without full analytics context) ──
+function expGetSalesData(){
+  const now = new Date();
+  const thisMonth=now.getMonth(), thisYear=now.getFullYear(), yr=String(thisYear);
+  let monthSales=0, yearSales=0;
+  // customer retail sales
+  try{
+    const custs = typeof getSorted==="function" ? getSorted() : [];
+    custs.forEach(c=>{
+      (c.purchases||[]).forEach(p=>{
+        const d=new Date(p.date||"");
+        if(d.getMonth()===thisMonth&&d.getFullYear()===thisYear) monthSales+=Number(p.amount)||0;
+        if(String(d.getFullYear())===yr) yearSales+=Number(p.amount)||0;
+      });
+    });
+  }catch(e){}
+  // debtor B2B sales
+  try{
+    getDebtors().forEach(dr=>(dr.transactions||[]).filter(t=>t.type==="sale").forEach(t=>{
+      const d=new Date(t.date||"");
+      if(d.getMonth()===thisMonth&&d.getFullYear()===thisYear) monthSales+=Number(t.amount)||0;
+      if(String(d.getFullYear())===yr) yearSales+=Number(t.amount)||0;
+    }));
+  }catch(e){}
+  return { monthSales, yearSales };
+}
+
+// ── Main render ───────────────────────────────────────────────
+function renderExpensesTab(){
+  const all = getExpenses();
+  const now = new Date();
+  const thisMonth=now.getMonth(), thisYear=now.getFullYear(), yr=String(thisYear);
+  const todayStr=now.toISOString().slice(0,10);
+
+  // ── Compute summary numbers ──
+  let todayTotal=0, monthTotal=0, yearTotal=0, prevMonthTotal=0;
+  const prevMonth = thisMonth===0?11:thisMonth-1;
+  const prevMonthYear = thisMonth===0?thisYear-1:thisYear;
+
+  // 12-month trend
+  const trendData = [];
+  for(let i=11;i>=0;i--){
+    const d=new Date(thisYear,thisMonth-i,1);
+    trendData.push({ label: d.toLocaleString("en-IN",{month:"short"}), year:d.getFullYear(), month:d.getMonth(), total:0 });
+  }
+
+  all.forEach(e=>{
+    const d=new Date(e.date||""); const amt=Number(e.amount)||0;
+    if(e.date===todayStr) todayTotal+=amt;
+    if(d.getMonth()===thisMonth&&d.getFullYear()===thisYear) monthTotal+=amt;
+    if(String(d.getFullYear())===yr) yearTotal+=amt;
+    if(d.getMonth()===prevMonth&&d.getFullYear()===prevMonthYear) prevMonthTotal+=amt;
+    const slot=trendData.find(s=>s.month===d.getMonth()&&s.year===d.getFullYear());
+    if(slot) slot.total+=amt;
   });
 
-  // Group by category for summary
+  const daysInMonth = new Date(thisYear,thisMonth+1,0).getDate();
+  const dayAvg = monthTotal>0 ? Math.round(monthTotal/now.getDate()) : 0;
+  const pctChange = prevMonthTotal>0 ? Math.round((monthTotal-prevMonthTotal)/prevMonthTotal*100) : null;
+
+  // ── Category breakdown this month ──
   const catTotals = {};
-  expenses.filter(e=>{ const d=new Date(e.date||""); return d.getMonth()===thisMonth && d.getFullYear()===thisYear; })
-    .forEach(e=>{ catTotals[e.category]=(catTotals[e.category]||0)+Number(e.amount); });
+  all.filter(e=>{ const d=new Date(e.date||""); return d.getMonth()===thisMonth&&d.getFullYear()===thisYear; })
+     .forEach(e=>{ catTotals[e.category]=(catTotals[e.category]||0)+Number(e.amount); });
+  const topCat = Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
+  const topCatPct = topCat&&monthTotal>0 ? Math.round(topCat[1]/monthTotal*100) : 0;
 
-  const cats = expCategories();
-  const todayStr = new Date().toISOString().slice(0,10);
+  // ── Sales & profit ──
+  const { monthSales, yearSales } = expGetSalesData();
+  const monthProfit = monthSales - monthTotal;
+  const monthMargin = monthSales>0 ? Math.round(monthProfit/monthSales*100) : 0;
+  const yearExpTotal = yearTotal;
+  const yearProfit = yearSales - yearExpTotal;
 
-  return `<div style="padding:12px;max-width:600px;margin:0 auto;">
+  // ── Chart ──
+  const trendMax = Math.max(...trendData.map(s=>s.total),1);
+  const chartH = 80;
+  const chartPoints = trendData.map((s,i)=>{
+    const x = (i/(trendData.length-1))*100;
+    const y = chartH - (s.total/trendMax)*chartH;
+    return `${x},${y}`;
+  }).join(" ");
 
-    <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div style="font-size:20px;font-weight:800;color:var(--text-main);">${t('expTitle')}</div>
-    </div>
+  // ── Filtered list for table ──
+  const filtered = expFilteredList();
+  const totalPages = Math.ceil(filtered.length/_expPageSize);
+  const pageItems = filtered.slice(_expPage*_expPageSize, (_expPage+1)*_expPageSize);
 
-    <!-- Month + Year summary cards -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-      <div style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:14px;padding:14px;">
-        <div style="font-size:10px;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">${t('expTotal')}</div>
-        <div style="font-size:22px;font-weight:800;color:#f87171;">${formatINR(monthTotal)}</div>
-      </div>
-      <div style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:14px;padding:14px;">
-        <div style="font-size:10px;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">${t('expYearTotal')}</div>
-        <div style="font-size:22px;font-weight:800;color:#fb923c;">${formatINR(yearTotal)}</div>
-      </div>
-    </div>
+  // ── Calendar ──
+  const calYear = _expCalMonth ? _expCalMonth.year : thisYear;
+  const calMonth = _expCalMonth ? _expCalMonth.month : thisMonth;
+  const calFirstDay = new Date(calYear,calMonth,1).getDay();
+  const calDays = new Date(calYear,calMonth+1,0).getDate();
+  const calExpByDate = {};
+  all.filter(e=>{ const d=new Date(e.date||""); return d.getMonth()===calMonth&&d.getFullYear()===calYear; })
+     .forEach(e=>{ const dk=e.date; calExpByDate[dk]=(calExpByDate[dk]||[]).concat(e); });
+  const calMonthNames=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const calPrev = calMonth===0?{year:calYear-1,month:11}:{year:calYear,month:calMonth-1};
+  const calNext = calMonth===11?{year:calYear+1,month:0}:{year:calYear,month:calMonth+1};
 
-    <!-- Category breakdown this month -->
-    ${Object.keys(catTotals).length > 0 ? `
-    <div style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:14px;padding:14px;margin-bottom:14px;">
-      <div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">This Month by Category</div>
-      ${Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>`
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border-main);">
-          <div style="font-size:13px;color:var(--text-main);">${expCategoryIcon(cat)} ${cat}</div>
-          <div style="font-size:13px;font-weight:700;color:#f87171;">${formatINR(amt)}</div>
-        </div>`).join("")}
-    </div>` : ""}
+  const inp = (id,type,ph,val,extra="")=>`<input id="${id}" type="${type}" placeholder="${ph}" value="${val||""}" style="width:100%;box-sizing:border-box;background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:10px 12px;font-size:13px;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#1e2a45'" ${extra}/>`;
+  const sel = (id,opts,val)=>`<select id="${id}" style="width:100%;box-sizing:border-box;background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:10px 12px;font-size:13px;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#1e2a45'">${opts.map(o=>`<option value="${o.v}" ${o.v===val?"selected":""}>${o.l}</option>`).join("")}</select>`;
 
-    <!-- Add Expense Form -->
-    <div style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:14px;padding:14px;margin-bottom:14px;">
-      <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-bottom:10px;">➕ ${t('expAdd')}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-        <select id="exp-cat" style="background:var(--bg-input,#0a0e1a);border:1px solid var(--border-main);border-radius:8px;color:var(--text-main);padding:9px 10px;font-size:13px;">
-          ${cats.map(c=>`<option value="${c}">${expCategoryIcon(c)} ${c}</option>`).join("")}
-        </select>
-        <input id="exp-amt" type="number" min="0" placeholder="${t('expAmount')} (₹)" style="background:var(--bg-input,#0a0e1a);border:1px solid var(--border-main);border-radius:8px;color:var(--text-main);padding:9px 10px;font-size:13px;"/>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-        <input id="exp-note" type="text" placeholder="${t('expNote')}" style="background:var(--bg-input,#0a0e1a);border:1px solid var(--border-main);border-radius:8px;color:var(--text-main);padding:9px 10px;font-size:13px;"/>
-        <input id="exp-date" type="date" value="${todayStr}" style="background:var(--bg-input,#0a0e1a);border:1px solid var(--border-main);border-radius:8px;color:var(--text-main);padding:9px 10px;font-size:13px;"/>
-      </div>
-      <button onclick="expSaveFromForm()" style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);border:none;border-radius:10px;color:#fff;padding:11px;font-size:14px;font-weight:700;cursor:pointer;">${t('expSave')}</button>
-    </div>
+  const editingExp = _expEditId ? all.find(e=>e.id===_expEditId) : null;
 
-    <!-- Expenses list -->
+  return `
+<style>
+.exp-card{background:rgba(13,19,33,0.85);border:1.5px solid #1e2a45;border-radius:16px;padding:18px;backdrop-filter:blur(8px);transition:box-shadow 0.2s,transform 0.2s;}
+.exp-card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.4);transform:translateY(-2px);}
+.exp-stat{display:flex;flex-direction:column;gap:4px;}
+.exp-stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;}
+.exp-stat-val{font-size:24px;font-weight:900;line-height:1;}
+.exp-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;}
+.exp-btn{border:none;border-radius:10px;font-weight:700;cursor:pointer;transition:opacity 0.15s,transform 0.1s;font-size:13px;}
+.exp-btn:hover{opacity:0.88;transform:scale(0.98);}
+.exp-quick{background:#1e2a45;border:1px solid #2d3f5e;border-radius:8px;color:#94a3b8;font-size:12px;font-weight:600;padding:7px 12px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.exp-quick:hover{background:#2d3f5e;color:#e2e8f0;border-color:#6366f1;}
+.exp-table-row{display:grid;grid-template-columns:2fr 1fr 1fr 1.5fr auto;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid #1a2235;transition:background 0.15s;}
+.exp-table-row:hover{background:#0d1321;}
+.exp-table-hdr{display:grid;grid-template-columns:2fr 1fr 1fr 1.5fr auto;gap:8px;align-items:center;padding:8px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#4a5a7a;border-bottom:1px solid #1e2a45;}
+.exp-mobile-row{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:1px solid #1a2235;transition:background 0.15s;}
+.exp-mobile-row:hover{background:#0d1321;}
+@media(max-width:600px){.exp-table-row,.exp-table-hdr{display:none!important;}.exp-grid-4{grid-template-columns:1fr 1fr!important;}}
+@media(min-width:601px){.exp-mobile-row{display:none!important;}}
+.exp-insight{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;margin-bottom:8px;font-size:13px;}
+.exp-cal-day{border-radius:8px;padding:4px;cursor:pointer;transition:background 0.15s;min-height:36px;font-size:12px;font-weight:600;text-align:center;}
+.exp-cal-day:hover{background:#1e2a45;}
+.exp-progress-bar{height:6px;border-radius:3px;background:#1e2a45;overflow:hidden;margin-top:4px;}
+.exp-progress-fill{height:100%;border-radius:3px;transition:width 0.6s cubic-bezier(.4,0,.2,1);}
+</style>
+
+<div style="padding:12px 10px;max-width:700px;margin:0 auto;">
+
+<!-- ── HEADER ── -->
+<div style="margin-bottom:18px;">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">
     <div>
-      ${expenses.length === 0
-        ? `<div style="text-align:center;padding:40px;color:var(--text-dim);font-size:14px;">💸 ${t('expNoExp')}</div>`
-        : expenses.map(e=>`
-        <div style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
-          <div style="display:flex;align-items:center;gap:10px;min-width:0;">
-            <div style="font-size:22px;">${expCategoryIcon(e.category)}</div>
-            <div style="min-width:0;">
-              <div style="font-size:13px;font-weight:700;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.category}</div>
-              ${e.note ? `<div style="font-size:11px;color:var(--text-dim);margin-top:1px;">${escHtml(e.note)}</div>` : ""}
-              <div style="font-size:11px;color:var(--text-dimmer);margin-top:2px;">${new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-            <div style="font-size:15px;font-weight:800;color:#f87171;">${formatINR(e.amount)}</div>
-            <button onclick="expDeleteEntry('${e.id}')" style="background:#2a0808;border:1px solid #4a1515;border-radius:7px;color:#f66;font-size:11px;padding:5px 9px;cursor:pointer;">🗑</button>
-          </div>
-        </div>`).join("")}
+      <div style="font-size:22px;font-weight:900;color:#e2e8f0;letter-spacing:-0.3px;">💸 Expenses Management</div>
+      <div style="font-size:12px;color:#64748b;margin-top:3px;">Track, analyze, and manage all business expenses</div>
     </div>
-  </div>`;
+    <div style="text-align:right;">
+      <div style="font-size:10px;color:#4a5a7a;">Last updated</div>
+      <div style="font-size:12px;font-weight:700;color:#94a3b8;">${now.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div>
+      <div style="font-size:11px;color:#f87171;font-weight:700;margin-top:2px;">This month: ${formatINR(monthTotal)}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SUMMARY CARDS ── -->
+<div class="exp-grid-4" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+  <div class="exp-card" style="border-color:#f8717130;">
+    <div class="exp-stat-label">Today</div>
+    <div class="exp-stat-val" style="color:#f87171;">${formatINR(todayTotal)}</div>
+    <div style="font-size:10px;color:#64748b;margin-top:4px;">📅 ${new Date().toLocaleDateString("en-IN",{weekday:"short"})}</div>
+  </div>
+  <div class="exp-card" style="border-color:#fb923c30;">
+    <div class="exp-stat-label">This Month</div>
+    <div class="exp-stat-val" style="color:#fb923c;">${formatINR(monthTotal)}</div>
+    <div style="font-size:10px;color:#64748b;margin-top:4px;">${pctChange!==null ? `<span style="color:${pctChange>0?"#f87171":"#34d399"};">${pctChange>0?"▲":"▼"} ${Math.abs(pctChange)}% vs last</span>` : "First month"}</div>
+  </div>
+  <div class="exp-card" style="border-color:#a78bfa30;">
+    <div class="exp-stat-label">This Year</div>
+    <div class="exp-stat-val" style="color:#a78bfa;">${formatINR(yearTotal)}</div>
+    <div style="font-size:10px;color:#64748b;margin-top:4px;">📆 ${yr}</div>
+  </div>
+  <div class="exp-card" style="border-color:#38bdf830;">
+    <div class="exp-stat-label">Daily Avg</div>
+    <div class="exp-stat-val" style="color:#38bdf8;">${formatINR(dayAvg)}</div>
+    <div style="font-size:10px;color:#64748b;margin-top:4px;">per day this month</div>
+  </div>
+</div>
+
+<!-- ── INSIGHTS ── -->
+${(topCat||pctChange!==null||prevMonthTotal>0) ? `
+<div class="exp-card" style="margin-bottom:16px;">
+  <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">💡 Smart Insights</div>
+  ${topCat ? `<div class="exp-insight" style="background:#1e1a2e;">
+    <span>💡</span><span style="color:#c4b5fd;">${expCategoryIcon(topCat[0])} <b>${topCat[0]}</b> accounts for <b>${topCatPct}%</b> of expenses this month (${formatINR(topCat[1])}).</span>
+  </div>` : ""}
+  ${pctChange!==null && pctChange>0 ? `<div class="exp-insight" style="background:#2a1a1a;">
+    <span>⚠</span><span style="color:#fca5a5;">Expenses <b>increased by ${pctChange}%</b> compared to last month.</span>
+  </div>` : ""}
+  ${pctChange!==null && pctChange<=0 ? `<div class="exp-insight" style="background:#0d2218;">
+    <span>💰</span><span style="color:#6ee7b7;">You <b>saved ${formatINR(prevMonthTotal-monthTotal)}</b> compared to last month (${Math.abs(pctChange)}% less spending).</span>
+  </div>` : ""}
+  ${monthSales>0 && monthTotal>0 ? `<div class="exp-insight" style="background:#0d1a2e;">
+    <span>📊</span><span style="color:#93c5fd;">Expenses are <b>${Math.round(monthTotal/monthSales*100)}% of monthly revenue</b>. ${monthTotal/monthSales>0.5?"Consider reducing overhead.":"Healthy spending ratio."}</span>
+  </div>` : ""}
+</div>` : ""}
+
+<!-- ── TREND CHART ── -->
+<div class="exp-card" style="margin-bottom:16px;">
+  <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">📈 12-Month Expense Trend</div>
+  <div style="position:relative;height:100px;margin-bottom:4px;">
+    <svg viewBox="0 -4 100 ${chartH+8}" preserveAspectRatio="none" style="width:100%;height:90px;overflow:visible;">
+      <defs>
+        <linearGradient id="expGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#6366f1" stop-opacity="0.3"/>
+          <stop offset="100%" stop-color="#6366f1" stop-opacity="0.02"/>
+        </linearGradient>
+      </defs>
+      <!-- Grid lines -->
+      ${[0,0.25,0.5,0.75,1].map(v=>`<line x1="0" y1="${chartH*v}" x2="100" y2="${chartH*v}" stroke="#1e2a45" stroke-width="0.3" vector-effect="non-scaling-stroke"/>`).join("")}
+      <!-- Fill area -->
+      <polygon points="0,${chartH} ${chartPoints} 100,${chartH}" fill="url(#expGrad)"/>
+      <!-- Line -->
+      <polyline points="${chartPoints}" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      <!-- Dots -->
+      ${trendData.map((s,i)=>{
+        const x=(i/(trendData.length-1))*100;
+        const y=chartH-(s.total/trendMax)*chartH;
+        return s.total>0?`<circle cx="${x}" cy="${y}" r="2.5" fill="#6366f1" stroke="#0d1321" stroke-width="1" vector-effect="non-scaling-stroke"/>`:""
+      }).join("")}
+    </svg>
+  </div>
+  <div style="display:flex;justify-content:space-between;">
+    ${trendData.filter((_,i)=>i%2===0).map(s=>`<div style="font-size:9px;color:#4a5a7a;text-align:center;">${s.label}</div>`).join("")}
+  </div>
+  <div style="display:flex;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:6px;">
+    ${trendData.slice(-3).map(s=>`<div style="background:#0d1321;border:1px solid #1e2a45;border-radius:8px;padding:6px 10px;flex:1;min-width:70px;">
+      <div style="font-size:10px;color:#64748b;">${s.label}</div>
+      <div style="font-size:13px;font-weight:700;color:#a78bfa;">${formatINR(s.total)}</div>
+    </div>`).join("")}
+  </div>
+</div>
+
+<!-- ── CATEGORY BREAKDOWN ── -->
+${monthTotal>0 ? `
+<div class="exp-card" style="margin-bottom:16px;">
+  <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">🗂 Category Breakdown — ${calMonthNames[thisMonth]} ${thisYear}</div>
+  ${Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>{
+    const pct=Math.round(amt/monthTotal*100);
+    const clr=expCategoryColor(cat);
+    return `<div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+        <div style="font-size:13px;color:#e2e8f0;">${expCategoryIcon(cat)} ${cat}</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="font-size:11px;color:#64748b;">${pct}%</span>
+          <span style="font-size:13px;font-weight:700;color:${clr};">${formatINR(amt)}</span>
+        </div>
+      </div>
+      <div class="exp-progress-bar"><div class="exp-progress-fill" style="width:${pct}%;background:${clr};"></div></div>
+    </div>`;
+  }).join("")}
+</div>` : ""}
+
+<!-- ── PROFIT IMPACT ── -->
+<div class="exp-card" style="margin-bottom:16px;border-color:#22d3ee30;">
+  <div style="font-size:11px;font-weight:800;color:#22d3ee;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">📊 Profit Impact — This Month</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
+    <div style="text-align:center;">
+      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Sales</div>
+      <div style="font-size:17px;font-weight:800;color:#34d399;">${formatINR(monthSales)}</div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Expenses</div>
+      <div style="font-size:17px;font-weight:800;color:#f87171;">${formatINR(monthTotal)}</div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Profit</div>
+      <div style="font-size:17px;font-weight:800;color:${monthProfit>=0?"#22d3ee":"#f87171"};">${formatINR(monthProfit)}</div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Margin</div>
+      <div style="font-size:17px;font-weight:800;color:${monthMargin>=0?"#a78bfa":"#f87171"};">${monthSales>0?monthMargin+"%":"—"}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD / EDIT EXPENSE ── -->
+<div class="exp-card" style="margin-bottom:16px;border-color:#6366f130;" id="exp-form-card">
+  <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:14px;">${editingExp?"✏️ Edit Expense":"➕ Add Expense"}</div>
+
+  <!-- Quick add buttons -->
+  ${!editingExp ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+    ${["Rent","Salary","Electricity","Internet","Transport","GST/Tax"].map(cat=>
+      `<button class="exp-quick" onclick="document.getElementById('exp-cat').value='${cat}';document.getElementById('exp-cat').dispatchEvent(new Event('change'))">+ ${expCategoryIcon(cat)} ${cat}</button>`
+    ).join("")}
+  </div>` : ""}
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+    <div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">Category</div>
+      ${sel("exp-cat", EXP_CATS.map(c=>({v:c.key,l:c.icon+" "+c.key})), editingExp?editingExp.category:"")}
+    </div>
+    <div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">Amount (₹)</div>
+      ${inp("exp-amt","number","e.g. 5000",editingExp?editingExp.amount:"",'min="0" step="1"')}
+    </div>
+  </div>
+  <div style="margin-bottom:10px;">
+    <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">Description</div>
+    <textarea id="exp-note" placeholder="e.g. Monthly shop rent payment" style="width:100%;box-sizing:border-box;background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:10px 12px;font-size:13px;outline:none;resize:vertical;min-height:60px;transition:border 0.2s;font-family:inherit;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#1e2a45'">${editingExp?escHtml(editingExp.note||""):""}</textarea>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+    <div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">Date</div>
+      ${inp("exp-date","date","",editingExp?editingExp.date:todayStr)}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding-top:22px;">
+      <input type="checkbox" id="exp-recurring" ${editingExp&&editingExp.recurring?"checked":""} style="width:16px;height:16px;accent-color:#6366f1;cursor:pointer;"/>
+      <label for="exp-recurring" style="font-size:13px;color:#94a3b8;cursor:pointer;">Recurring Monthly</label>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;">
+    <button class="exp-btn" onclick="expSaveFromForm()" style="flex:1;background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;padding:12px;">${editingExp?"💾 Update Expense":"💾 Save Expense"}</button>
+    ${editingExp ? `<button class="exp-btn" onclick="_expEditId=null;safeRenderTab(currentTab);" style="background:#1e2a45;color:#94a3b8;padding:12px 18px;">Cancel</button>` : ""}
+  </div>
+</div>
+
+<!-- ── HISTORY ── -->
+<div class="exp-card" style="margin-bottom:16px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+    <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;">📋 Expense History</div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <!-- View toggle -->
+      <button class="exp-quick" onclick="_expView='list';safeRenderTab(currentTab);" style="${_expView==="list"?"background:#1e2d4a;border-color:#6366f1;color:#818cf8;":""}">📋 List</button>
+      <button class="exp-quick" onclick="_expView='calendar';safeRenderTab(currentTab);" style="${_expView==="calendar"?"background:#1e2d4a;border-color:#6366f1;color:#818cf8;":""}">📅 Calendar</button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+    ${["today","week","month","year","recurring"].map(f=>`
+      <button class="exp-quick" onclick="_expFilter='${f}';_expPage=0;safeRenderTab(currentTab);" style="${_expFilter===f?"background:#1e2d4a;border-color:#6366f1;color:#818cf8;":""}">
+        ${{today:"Today",week:"This Week",month:"Month",year:"Year",recurring:"🔄 Recurring"}[f]}
+      </button>`).join("")}
+  </div>
+
+  <!-- Search & category filter -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+    <input id="exp-search" type="text" placeholder="🔍 Search expenses..." value="${escHtml(_expSearch)}"
+      oninput="_expSearch=this.value;_expPage=0;safeRenderTab(currentTab);"
+      style="background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;width:100%;"/>
+    <select onchange="_expCatFilter=this.value;_expPage=0;safeRenderTab(currentTab);"
+      style="background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;width:100%;">
+      <option value="">All Categories</option>
+      ${EXP_CATS.map(c=>`<option value="${c.key}" ${_expCatFilter===c.key?"selected":""}>${c.icon} ${c.key}</option>`).join("")}
+    </select>
+  </div>
+
+  ${_expView==="calendar" ? `
+  <!-- ── CALENDAR VIEW ── -->
+  <div style="margin-bottom:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <button class="exp-quick" onclick="_expCalMonth={year:${calPrev.year},month:${calPrev.month}};safeRenderTab(currentTab);">‹ Prev</button>
+      <div style="font-weight:700;color:#e2e8f0;">${calMonthNames[calMonth]} ${calYear}</div>
+      <button class="exp-quick" onclick="_expCalMonth={year:${calNext.year},month:${calNext.month}};safeRenderTab(currentTab);">Next ›</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px;">
+      ${["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-size:10px;font-weight:700;color:#4a5a7a;padding:4px;">${d}</div>`).join("")}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;">
+      ${Array.from({length:calFirstDay},(_,i)=>`<div key="${i}"></div>`).join("")}
+      ${Array.from({length:calDays},(_,i)=>{
+        const day=i+1;
+        const dk=`${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+        const dayExps=calExpByDate[dk]||[];
+        const dayTotal=dayExps.reduce((s,e)=>s+Number(e.amount),0);
+        const isToday=dk===todayStr;
+        return `<div class="exp-cal-day" style="${isToday?"background:#1e2d4a;border:1.5px solid #6366f1;":"border:1px solid #1a2235;"}${dayTotal>0?"border-color:#f87171;":""}"
+          onclick="${dayTotal>0?`expShowCalDay('${dk}',${JSON.stringify(dayExps.map(e=>e.id))})`:""}"
+          title="${dayTotal>0?formatINR(dayTotal):""}">
+          <div style="color:${isToday?"#818cf8":"#94a3b8"};">${day}</div>
+          ${dayTotal>0?`<div style="font-size:9px;color:#f87171;font-weight:700;margin-top:2px;">${formatINR(dayTotal)}</div>`:""}
+        </div>`;
+      }).join("")}
+    </div>
+  </div>
+  <div id="exp-cal-detail" style="display:none;background:#0d1321;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-top:8px;"></div>
+  ` : `
+  <!-- ── LIST VIEW ── -->
+  ${filtered.length===0 ? `
+    <div style="text-align:center;padding:50px 20px;">
+      <div style="font-size:48px;margin-bottom:12px;">💸</div>
+      <div style="font-size:16px;font-weight:700;color:#e2e8f0;margin-bottom:6px;">No expenses recorded yet.</div>
+      <div style="font-size:13px;color:#64748b;margin-bottom:16px;">Start tracking your business expenses to gain financial insights.</div>
+      <button class="exp-btn" onclick="document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;padding:11px 24px;">+ Add First Expense</button>
+    </div>` : `
+    <!-- Desktop table -->
+    <div class="exp-table-hdr">
+      <div>Category / Description</div><div>Amount</div><div>Date</div><div>Tags</div><div>Actions</div>
+    </div>
+    ${pageItems.map(e=>`
+    <div class="exp-table-row">
+      <div style="min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:#e2e8f0;">${expCategoryIcon(e.category)} ${e.category}</div>
+        ${e.note?`<div style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(e.note)}</div>`:""}
+      </div>
+      <div style="font-size:14px;font-weight:800;color:${expCategoryColor(e.category)};">${formatINR(e.amount)}</div>
+      <div style="font-size:12px;color:#94a3b8;">${new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>
+      <div>${e.recurring?`<span class="exp-badge" style="background:#1a1e3a;color:#818cf8;">🔄 Recurring</span>`:"<span style='color:#4a5a7a;font-size:11px;'>—</span>"}</div>
+      <div style="display:flex;gap:5px;">
+        <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#1e2a45;border:none;border-radius:6px;color:#818cf8;font-size:11px;padding:5px 8px;cursor:pointer;" title="Edit">✏️</button>
+        <button onclick="duplicateExpense('${e.id}')" style="background:#1e2a45;border:none;border-radius:6px;color:#34d399;font-size:11px;padding:5px 8px;cursor:pointer;" title="Duplicate">📋</button>
+        <button onclick="expDeleteEntry('${e.id}')" style="background:#2a0808;border:1px solid #4a1515;border-radius:6px;color:#f87171;font-size:11px;padding:5px 8px;cursor:pointer;" title="Delete">🗑</button>
+      </div>
+    </div>`).join("")}
+
+    <!-- Mobile cards -->
+    ${pageItems.map(e=>`
+    <div class="exp-mobile-row">
+      <div style="font-size:24px;line-height:1;">${expCategoryIcon(e.category)}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-size:13px;font-weight:700;color:#e2e8f0;">${e.category}</div>
+          <div style="font-size:14px;font-weight:800;color:${expCategoryColor(e.category)};">${formatINR(e.amount)}</div>
+        </div>
+        ${e.note?`<div style="font-size:11px;color:#64748b;margin-top:2px;">${escHtml(e.note)}</div>`:""}
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+          <span style="font-size:11px;color:#4a5a7a;">${new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span>
+          ${e.recurring?`<span class="exp-badge" style="background:#1a1e3a;color:#818cf8;font-size:10px;">🔄</span>`:""}
+        </div>
+        <div style="display:flex;gap:5px;margin-top:6px;">
+          <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#1e2a45;border:none;border-radius:6px;color:#818cf8;font-size:11px;padding:5px 8px;cursor:pointer;">✏️ Edit</button>
+          <button onclick="duplicateExpense('${e.id}')" style="background:#1e2a45;border:none;border-radius:6px;color:#34d399;font-size:11px;padding:5px 8px;cursor:pointer;">📋 Copy</button>
+          <button onclick="expDeleteEntry('${e.id}')" style="background:#2a0808;border:1px solid #4a1515;border-radius:6px;color:#f87171;font-size:11px;padding:5px 8px;cursor:pointer;">🗑</button>
+        </div>
+      </div>
+    </div>`).join("")}
+
+    <!-- Pagination -->
+    ${totalPages>1 ? `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid #1e2a45;">
+      <div style="font-size:12px;color:#64748b;">Showing ${_expPage*_expPageSize+1}–${Math.min((_expPage+1)*_expPageSize,filtered.length)} of ${filtered.length}</div>
+      <div style="display:flex;gap:6px;">
+        ${_expPage>0?`<button class="exp-quick" onclick="_expPage=${_expPage-1};safeRenderTab(currentTab);">‹ Prev</button>`:""}
+        ${_expPage<totalPages-1?`<button class="exp-quick" onclick="_expPage=${_expPage+1};safeRenderTab(currentTab);">Next ›</button>`:""}
+      </div>
+    </div>` : ""}
+  `}
+  `}
+
+  <!-- Export row -->
+  <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:12px;border-top:1px solid #1a2235;margin-top:4px;">
+    <button class="exp-btn" onclick="expExportCSV()" style="background:#1e2a45;color:#94a3b8;padding:8px 14px;font-size:12px;">📊 Export CSV</button>
+    <button class="exp-btn" onclick="expPrintReport()" style="background:#1e2a45;color:#94a3b8;padding:8px 14px;font-size:12px;">🖨 Print Report</button>
+  </div>
+</div>
+
+</div>`;
 }
 
 function expSaveFromForm(){
   const cat  = document.getElementById("exp-cat")?.value||"";
   const amt  = parseFloat(document.getElementById("exp-amt")?.value||"0");
-  const note = document.getElementById("exp-note")?.value?.trim()||"";
+  const note = (document.getElementById("exp-note")?.value||"").trim();
   const date = document.getElementById("exp-date")?.value||new Date().toISOString().slice(0,10);
+  const recurring = document.getElementById("exp-recurring")?.checked||false;
   if(!cat){ notify("Please select a category","error"); return; }
-  if(!amt || amt <= 0){ notify("Please enter a valid amount","error"); return; }
-  addExpense(cat, amt, note, date);
-  notify("✅ Expense saved!");
+  if(!amt||amt<=0){ notify("Please enter a valid amount","error"); return; }
+  if(_expEditId){
+    updateExpense(_expEditId, cat, amt, note, date, recurring);
+    _expEditId = null;
+    notify("✅ Expense updated!");
+  } else {
+    addExpense(cat, amt, note, date, recurring);
+    notify("✅ Expense saved!");
+  }
   safeRenderTab(currentTab);
 }
 
@@ -9882,6 +10302,59 @@ function expDeleteEntry(id){
   deleteExpense(id);
   notify("Expense deleted");
   safeRenderTab(currentTab);
+}
+
+function expShowCalDay(dateStr, ids){
+  const exps = getExpenses().filter(e=>ids.includes(e.id));
+  const el = document.getElementById("exp-cal-detail");
+  if(!el) return;
+  el.style.display = "block";
+  const dayTotal = exps.reduce((s,e)=>s+Number(e.amount),0);
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-size:13px;font-weight:700;color:#e2e8f0;">📅 ${new Date(dateStr).toLocaleDateString("en-IN",{day:"numeric",month:"long"})}</div>
+      <div style="font-size:13px;font-weight:800;color:#f87171;">${formatINR(dayTotal)}</div>
+    </div>
+    ${exps.map(e=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #1e2a45;font-size:12px;">
+      <span style="color:#94a3b8;">${expCategoryIcon(e.category)} ${e.category}${e.note?" — "+escHtml(e.note):""}</span>
+      <span style="color:${expCategoryColor(e.category)};font-weight:700;">${formatINR(e.amount)}</span>
+    </div>`).join("")}`;
+}
+
+function expExportCSV(){
+  const all = getExpenses();
+  if(!all.length){ notify("No expenses to export","error"); return; }
+  const rows = [["Date","Category","Amount","Description","Recurring"]];
+  all.forEach(e=>rows.push([e.date, e.category, e.amount, e.note||"", e.recurring?"Yes":"No"]));
+  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+  a.download = `expenses_${new Date().toISOString().slice(0,7)}.csv`;
+  a.click();
+  notify("✅ CSV downloaded!");
+}
+
+function expPrintReport(){
+  const all = getExpenses();
+  const now = new Date();
+  const thisMonth=now.getMonth(), thisYear=now.getFullYear();
+  const monthExps = all.filter(e=>{ const d=new Date(e.date||""); return d.getMonth()===thisMonth&&d.getFullYear()===thisYear; });
+  const monthTotal = monthExps.reduce((s,e)=>s+Number(e.amount),0);
+  const shopName = (appSettings&&appSettings.shopName)||"My Shop";
+  const w = window.open("","_blank");
+  w.document.write(`<!DOCTYPE html><html><head><title>Expense Report</title><style>
+    body{font-family:sans-serif;padding:24px;color:#111;} table{width:100%;border-collapse:collapse;margin-top:16px;}
+    th{background:#f1f5f9;padding:8px 12px;text-align:left;font-size:12px;border:1px solid #e2e8f0;}
+    td{padding:8px 12px;font-size:12px;border:1px solid #e2e8f0;}
+    .total{font-weight:700;} h2{margin:0 0 4px;} .sub{color:#64748b;font-size:13px;}
+  </style></head><body>
+  <h2>${shopName} — Expense Report</h2>
+  <div class="sub">${now.toLocaleString("en-IN",{month:"long",year:"numeric"})} &nbsp;|&nbsp; Generated: ${now.toLocaleString("en-IN")}</div>
+  <table><thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Description</th><th>Recurring</th></tr></thead><tbody>
+  ${monthExps.map(e=>`<tr><td>${e.date}</td><td>${e.category}</td><td>₹${Number(e.amount).toLocaleString("en-IN")}</td><td>${e.note||"—"}</td><td>${e.recurring?"Yes":"—"}</td></tr>`).join("")}
+  <tr class="total"><td colspan="2"><b>Total</b></td><td><b>₹${monthTotal.toLocaleString("en-IN")}</b></td><td colspan="2"></td></tr>
+  </tbody></table></body></html>`);
+  w.document.close(); w.print();
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
