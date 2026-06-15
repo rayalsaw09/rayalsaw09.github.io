@@ -2514,6 +2514,7 @@ function saveSettingsToCloud(extraFields) {
 }
 
 // Writes a minimal public-readable profile to shop_profiles/{phone}
+// CRIT-06: Includes Firebase uid so Firestore Rules can verify ownership via isOwner()
 function _savePublicShopProfile(){
   if(!db || !authPhone) return;
   const shopId = "SC-" + String(authPhone).slice(-6);
@@ -2527,8 +2528,25 @@ function _savePublicShopProfile(){
     address:  appSettings.shopAddress || "",
     updatedAt: Date.now()
   };
-  db.collection("shop_profiles").doc(authPhone).set(profile, {merge:true})
-    .catch(e=>console.warn("Public profile save error:",e));
+  // Include Firebase uid for Firestore Rules ownership check (isOwner helper)
+  // Sign in anonymously if not already authenticated so request.auth is set
+  const doWrite = (uid) => {
+    if (uid) profile.uid = uid;
+    db.collection("shop_profiles").doc(authPhone).set(profile, {merge:true})
+      .catch(e=>console.warn("Public profile save error:",e));
+  };
+  try {
+    const currentUser = firebase.auth().currentUser;
+    if (currentUser) {
+      doWrite(currentUser.uid);
+    } else {
+      firebase.auth().signInAnonymously()
+        .then(cred => doWrite(cred.user.uid))
+        .catch(() => doWrite(null)); // write without uid if auth fails
+    }
+  } catch(e) {
+    doWrite(null);
+  }
 }
 
 // ── Cloud settings: load all user prefs from Firestore ──
@@ -2576,6 +2594,7 @@ function startFirestoreListener() {
   fbUnsubscribe = userCol().onSnapshot(snap => {
     customers = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
     customers.forEach(c=>{ if(!c.photo)c.photo=""; if(!c.purchases)c.purchases=[]; if(!c.borrows)c.borrows=[]; });
+    _invalidateAnalyticsCache(); // MED-05: rebuild cache on live data change
     safeRenderTab(currentTab);
     updateDbStatus("🔥 Firebase · live", "#4f4");
   }, err => {
@@ -2602,6 +2621,7 @@ function updateDbStatus(msg, color) {
 
 // ── Save / mutate helpers ──
 async function saveCustomers() {
+  _invalidateAnalyticsCache(); // MED-05: invalidate on any customer/purchase change
   if (useLocalOnly) {
     safeLocalSet(storageKey("customers_v2"), JSON.stringify(customers));
     return;
@@ -6139,13 +6159,10 @@ function exportYearCSV(year){
 var analyticsYear = new Date().getFullYear();
 
 function getAnalyticsYears(){
-  const years = new Set();
-  customers.forEach(c=>(c.purchases||[]).forEach(p=>{
-    const y=parseInt((p.date||"").slice(0,4));
-    if(y>=2000&&y<=2100) years.add(y);
-  }));
-  if(!years.size) years.add(new Date().getFullYear());
-  return [...years].sort((a,b)=>b-a);
+  // MED-05: use cache instead of O(n) loop
+  const years = _cachedAnalyticsYears();
+  if(!years.length) return [new Date().getFullYear()];
+  return years;
 }
 
 function setAnalyticsYear(y){ analyticsYear=y; renderTab(3); }
@@ -6162,26 +6179,25 @@ function renderAnalytics(sorted){
   if(!years.includes(analyticsYear)) analyticsYear = years[0];
   const yr = String(analyticsYear);
 
-  // ── Revenue from customer purchases ──
+  // ── Revenue from customer purchases (MED-05: O(1) cache lookups) ──
   function monthSpend(c, mo, ye){
-    return (c.purchases||[]).filter(p=>{
-      const d = new Date(p.date||"");
-      return d.getMonth()===mo && d.getFullYear()===ye;
-    }).reduce((a,p)=>a+Number(p.amount),0);
+    // Still needed for per-customer filtering (bestCust, activeThisMonth)
+    const key = `${ye}-${String(mo+1).padStart(2,'0')}`;
+    return (c.purchases||[]).filter(p=>(p.date||'').slice(0,7)===key)
+      .reduce((a,p)=>a+Number(p.amount),0);
   }
   function yearSpend(c,y){ return (c.purchases||[]).filter(p=>(p.date||"").slice(0,4)===y).reduce((a,p)=>a+Number(p.amount),0); }
 
-  const custMonthSales     = sorted.reduce((a,c)=>a+monthSpend(c,thisMonth,thisYear),0);
-  const custPrevMonthSales = sorted.reduce((a,c)=>a+monthSpend(c,prevMonth,prevMonthYear),0);
-  const custYearSales      = sorted.reduce((a,c)=>a+yearSpend(c,yr),0);
+  // Use cache for totals — O(1) instead of O(customers × purchases)
+  const custMonthSales     = _cachedMonthSales(thisMonth, thisYear);
+  const custPrevMonthSales = _cachedMonthSales(prevMonth, prevMonthYear);
+  const custYearSales      = _cachedYearSales(yr);
 
+  // activeThisMonth / activeYearCustomers still need per-customer check (for count display)
   const activeThisMonth    = sorted.filter(c=>monthSpend(c,thisMonth,thisYear)>0);
   const activeYearCustomers= sorted.filter(c=>yearSpend(c,yr)>0);
 
-  let totalTxns=0;
-  sorted.forEach(c=>(c.purchases||[]).forEach(p=>{
-    if((p.date||"").slice(0,4)===yr) totalTxns++;
-  }));
+  const totalTxns = _analyticsCache?._txnCount?.[yr] || 0;
 
   // ── Purchase cost: inventory restocks + creditor cash-only purchases ──
   // IMPORTANT: exclude _fromInventory and _invItem flags to prevent double-counting
@@ -6310,15 +6326,9 @@ function renderAnalytics(sorted){
   // ── Year picker buttons ──
   const yearBtns = years.map(y=>`<button onclick="setAnalyticsYear(${y})" style="cursor:pointer;border-radius:20px;padding:5px 14px;border:1.5px solid ${y===analyticsYear?'#6366f1':'#1e2a45'};background:${y===analyticsYear?'#1e1b4b':'transparent'};color:${y===analyticsYear?'#a5b4fc':'#4a5a7a'};font-size:12px;font-weight:700;transition:all 0.2s;">${y}</button>`).join("");
 
-  // ── Monthly bar chart data ──
-  const monthlySales = Array(12).fill(0);
+  // ── Monthly bar chart data (MED-05: use cache for customer sales) ──
+  const monthlySales = _cachedMonthlySales(yr); // O(12) cache lookup
   const monthlyCost  = Array(12).fill(0);
-  sorted.forEach(c=>(c.purchases||[]).forEach(p=>{
-    if((p.date||"").slice(0,4)===yr){
-      const m=parseInt((p.date||"").slice(5,7))-1;
-      if(m>=0&&m<12) monthlySales[m]+=Number(p.amount);
-    }
-  }));
   getDebtors().forEach(dr=>(dr.transactions||[]).filter(t=>t.type==="sale").forEach(t=>{
     if((t.date||"").slice(0,4)===yr){
       const m=parseInt((t.date||"").slice(5,7))-1;
@@ -15837,6 +15847,60 @@ function invCollection(){
 // MED-04: Inventory stock cache — avoids O(n) recalculation on every render
 var _invStockCache = null; // { itemName: stockQty }
 
+// MED-05: Analytics bucket cache — avoids O(n²) recomputation on every render
+// Structure: { 'YYYY-MM': salesAmount, ..., _years: Set, _txnCount: { 'YYYY': n } }
+var _analyticsCache = null;
+
+function _buildAnalyticsCache() {
+  _analyticsCache = { _years: new Set(), _txnCount: {} };
+  customers.forEach(c => (c.purchases || []).forEach(p => {
+    const ds = p.date || '';
+    if (!ds) return;
+    const key = ds.slice(0, 7); // 'YYYY-MM'
+    const yr  = ds.slice(0, 4);
+    if (!_analyticsCache[key]) _analyticsCache[key] = 0;
+    _analyticsCache[key] += Number(p.amount) || 0;
+    const y = parseInt(yr);
+    if (y >= 2000 && y <= 2100) _analyticsCache._years.add(y);
+    _analyticsCache._txnCount[yr] = (_analyticsCache._txnCount[yr] || 0) + 1;
+  }));
+}
+
+function _invalidateAnalyticsCache() { _analyticsCache = null; }
+
+// Get total sales for a given month+year from cache
+function _cachedMonthSales(mo, ye) {
+  if (!_analyticsCache) _buildAnalyticsCache();
+  const key = `${ye}-${String(mo + 1).padStart(2, '0')}`;
+  return _analyticsCache[key] || 0;
+}
+
+// Get total sales for a given year from cache
+function _cachedYearSales(yr) {
+  if (!_analyticsCache) _buildAnalyticsCache();
+  let total = 0;
+  for (let m = 0; m < 12; m++) {
+    const key = `${yr}-${String(m + 1).padStart(2, '0')}`;
+    total += _analyticsCache[key] || 0;
+  }
+  return total;
+}
+
+// Get monthly breakdown array [Jan..Dec] for a year from cache
+function _cachedMonthlySales(yr) {
+  if (!_analyticsCache) _buildAnalyticsCache();
+  return Array.from({ length: 12 }, (_, m) => {
+    const key = `${yr}-${String(m + 1).padStart(2, '0')}`;
+    return _analyticsCache[key] || 0;
+  });
+}
+
+// Get years that have purchase data
+function _cachedAnalyticsYears() {
+  if (!_analyticsCache) _buildAnalyticsCache();
+  return [..._analyticsCache._years].sort((a, b) => b - a);
+}
+
 function _buildStockCache() {
   _invStockCache = {};
   inventoryItems.forEach(item => {
@@ -19157,37 +19221,83 @@ async function sendShopConnectRequest(targetProfile, myRoleForThem, theirRoleFor
 }
 
 function _showFirestoreRulesError(errMsg){
-  const rules = `// ShopChampion — Firestore Security Rules v5
+  const rules = `// ShopChampion — Firestore Security Rules v6
+// CRIT-06 hardened: each shop can only read/write its own data.
+// Apply in Firebase Console -> Firestore -> Rules -> Publish
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // User shop data — customers, purchases, leaderboard
-    match /users/{userId}/{document=**} {
-      allow read, write: if true;
+    // Helper: is the caller the authenticated owner of this phone slot?
+    // Each shop writes its Firebase uid into shop_profiles on login,
+    // so we resolve uid -> phone here.
+    function isOwner(phone) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/shop_profiles/$(phone))
+        && get(/databases/$(database)/documents/shop_profiles/$(phone)).data.uid == request.auth.uid;
     }
 
-    // Leaderboard display screen data
-    match /sc_shops/{shopId}/{document=**} {
-      allow read, write: if true;
+    // Private shop data (customers, inventory, settings, expenses, etc.)
+    // Only the owning shop can read or write its own subtree.
+    match /users/{phone}/{document=**} {
+      allow read, write: if isOwner(phone);
     }
 
-    // Public shop profiles — for Shop ID search feature
+    // Public shop profiles
+    // Anyone can read (needed for Shop ID search / connect feature).
+    // Only the owning shop can write its own profile.
     match /shop_profiles/{phone} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isOwner(phone);
     }
 
-    // Shop Connect — cross-shop connection requests
+    // Leaderboard display data (sc_shops)
+    // Display screen reads publicly. Only owning shop can write.
+    match /sc_shops/{phone}/{document=**} {
+      allow read: if true;
+      allow write: if isOwner(phone);
+    }
+
+    // Shop Connect requests (subcollection path)
+    // Any authenticated shop can send a request. Only the target reads/manages its inbox.
     match /shop_requests/{phone}/requests/{reqId} {
-      allow read, write: if true;
-    }
-    match /shop_connect_requests/{reqId} {
-      allow read, write: if true;
+      allow read: if isOwner(phone);
+      allow create: if request.auth != null;
+      allow update, delete: if isOwner(phone)
+        || (request.auth != null && isOwner(resource.data.fromPhone));
     }
 
-    // Payment sync requests — cross-shop payment sync
+    // Shop Connect requests (flat collection path)
+    // Sender and recipient can read and update. Anyone authenticated can create.
+    match /shop_connect_requests/{reqId} {
+      allow read: if request.auth != null
+        && (isOwner(resource.data.toPhone) || isOwner(resource.data.fromPhone));
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null
+        && (isOwner(resource.data.toPhone) || isOwner(resource.data.fromPhone));
+    }
+
+    // Payment sync requests
+    // Either party in the payment sync can read/write.
     match /payment_sync_requests/{reqId} {
-      allow read, write: if true;
+      allow read: if request.auth != null
+        && (isOwner(resource.data.fromPhone) || isOwner(resource.data.toPhone));
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null
+        && (isOwner(resource.data.fromPhone) || isOwner(resource.data.toPhone));
+    }
+
+    // Ad impressions (Display app writes, ad owner reads stats)
+    // Display screen has no auth so impression writes are left open (non-sensitive counters).
+    match /ad_impressions/{adOwner}/shops/{shopId}/ads/{adId} {
+      allow read: if isOwner(adOwner);
+      allow write: if true;
+    }
+
+    // Global settings — read-only for all clients, write only via Admin SDK / Console
+    match /global_settings/{doc} {
+      allow read: if true;
+      allow write: if false;
     }
   }
 }`;
@@ -19196,7 +19306,7 @@ service cloud.firestore {
     ${modalHeader("🔒 Firestore Rules — Fix Required")}
     <div style="font-size:13px;color:#fbbf24;background:#1a0e00;border:1px solid #d97706;border-radius:10px;padding:12px 14px;margin-bottom:14px;line-height:1.6;">
       <b>Error:</b> ${escHtml(errMsg||"Missing or insufficient permissions")}<br>
-      <span style="font-size:12px;color:#7a8aaa;">The <b>shop_requests</b> collection needs read/write rules in your Firebase console.</span>
+      <span style="font-size:12px;color:#7a8aaa;">Your Firestore rules need to be updated to lock down shop data. Apply the rules below.</span>
     </div>
     <div style="font-size:12px;color:#7a8aaa;margin-bottom:10px;line-height:1.7;">
       <b style="color:#e8eaf0;">How to fix (takes 1 minute):</b><br>
@@ -19212,7 +19322,7 @@ service cloud.firestore {
       </button>
     </div>
     <div style="font-size:11px;color:#4a5a7a;line-height:1.6;margin-bottom:14px;">
-      These rules allow ShopChampion shops to read/write their own data and send connect requests to other shops. No personal data is exposed beyond what shops choose to share in their public profile.
+      These rules lock each shop to its own data — no shop can read or write another shop's customers, inventory, or settings. Connect requests and payment syncs are restricted to the two parties involved.
     </div>
     <button onclick="closeModal()" class="btn" style="width:100%;background:#1a2540;color:#7a8aaa;padding:10px;font-size:13px;">Close</button>
   `);
