@@ -7551,7 +7551,7 @@ function deleteDebtor(id){
 
   const txs = dr.transactions || [];
   if(txs.length === 0){
-    if(!confirm("Delete " + dr.name + "? ${t('dbCannotUndo')}")) return;
+    if(!confirm("Delete " + dr.name + "? " + t('dbCannotUndo'))) return;
     saveDebtors(debtors.filter(d=>d.id!==id));
     addHistoryLog('debtor','Debtor deleted', dr.name);
     closeModal();
@@ -9167,7 +9167,7 @@ function renderDebtorsTab(){
     ${filtered.length===0 ? `
       <div style="text-align:center;padding:60px 20px;color:#4a5a7a;">
         <div style="font-size:48px;margin-bottom:12px;">🧾</div>
-        <div style="font-size:16px;font-weight:700;color:#7a8aaa;">${searchVal?"${t('dbNoDebtors')}":"${t('dbNoDebtors')}"}</div>
+        <div style="font-size:16px;font-weight:700;color:#7a8aaa;">${t('dbNoDebtors')}</div>
         <div style="font-size:13px;margin-top:6px;">${searchVal?"Try a different search":"Click '+ Add Manually' to add your first debtor"}</div>
       </div>
     ` : `
@@ -11190,7 +11190,7 @@ function _showHistManager(){
       <button onclick="_hmDeleteAll()" style="flex:1;padding:8px 4px;border-radius:8px;border:1px solid #4a1a1a;background:#1a0808;color:#f66;font-size:12px;font-weight:800;cursor:pointer;">🔥 Delete ALL</button>
     </div>
     <div id="hm-list" style="max-height:42vh;overflow-y:auto;border:1px solid #1a2035;border-radius:12px;background:#070b14;margin-bottom:10px;">
-      ${rows||'<div style="padding:20px;text-align:center;color:#4a5a7a;">${t('stNoCustomers')}</div>'}
+      ${rows||`<div style="padding:20px;text-align:center;color:#4a5a7a;">${t('stNoCustomers')}</div>`}
     </div>
     <div id="hm-sel-bar" style="display:none;background:#0a1a0a;border:1px solid #1a4a1a;border-radius:10px;padding:10px 14px;margin-bottom:10px;align-items:center;justify-content:space-between;">
       <span id="hm-sel-count" style="font-size:13px;font-weight:700;color:#4f4;">0 selected</span>
@@ -11675,7 +11675,7 @@ function bulkAddRow() {
   const container = document.getElementById('bulk-rows');
   if (!container) return;
   const count = container.children.length;
-  if (count >= 50) { document.getElementById('bulk-status').innerHTML = '<span style="color:#f66;">${t('stMax50Reached')}</span>'; return; }
+  if (count >= 50) { document.getElementById('bulk-status').innerHTML = `<span style="color:#f66;">${t('stMax50Reached')}</span>`; return; }
   const row = document.createElement('div');
   row.style.cssText = 'display:grid;grid-template-columns:2fr 1.3fr 1.3fr 32px;gap:6px;align-items:center;';
   row.innerHTML = `
@@ -12948,7 +12948,7 @@ const UI_STRINGS = {
     "Due": "बकाया",
     "Paid": "भुगतान किया",
     "Overdue": "अतिदेय",
-    "${t('invBankDetails')}": "बैंक विवरण",
+    "Bank Details": "बैंक विवरण",
     "Bank Name": "बैंक का नाम",
     "Account Number": "खाता संख्या",
     "IFSC Code": "IFSC कोड",
@@ -16116,7 +16116,7 @@ function _buildSharedLedgerHtml(entity, etype, peerName, connId) {
       <div id="sc-ledger-bal" style="font-size:18px;font-weight:800;color:${balColor};">${balLabel}</div>
     </div>
     ${txns.length === 0
-      ? '<div style="text-align:center;padding:30px;color:#4a5a7a;">${t('crNoTxYet')}</div>'
+      ? `<div style="text-align:center;padding:30px;color:#4a5a7a;">${t('crNoTxYet')}</div>`
       : `<table style="width:100%;border-collapse:collapse;">
           <thead><tr style="border-bottom:1px solid #1e2a45;">
             <th style="padding:8px;font-size:11px;color:#7a8aaa;text-align:left;">TYPE</th>
