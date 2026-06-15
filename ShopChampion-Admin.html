@@ -20502,7 +20502,7 @@ var STEPS_HI = [
 ];
 
 // ── State ──
-var _guideLang = 'en';
+var _guideLang = (typeof currentLang !== 'undefined' && currentLang) ? currentLang : 'en';
 var _guideStepIdx = 0;
 var _guideSteps = STEPS_EN;
 var _guideActive = false;
@@ -20516,6 +20516,8 @@ window.scGuideInit = function(isNewUser){
 };
 
 window.scGuideOpenReplay = function(){
+  // Sync guide language to current app language when opening
+  if(typeof currentLang !== 'undefined' && currentLang) _guideLang = currentLang;
   _buildReplayMenu();
   const el = document.getElementById('sc-guide-replay');
   el.style.display = 'flex';
@@ -20529,7 +20531,8 @@ window.scGuideStartLang = function(lang){
   _guideStepIdx = 0;
   _guideActive = true;
   localStorage.setItem('sc_guide_shown','1');
-  if(typeof setLanguage === 'function') setLanguage(lang);
+  // Do NOT call setLanguage here — guide narration language is separate from app UI language
+  // The app language is controlled only by the Language setting in Settings tab
   _showBackdrop();
   _showStep(_guideStepIdx);
 };
