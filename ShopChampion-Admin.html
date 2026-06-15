@@ -1667,6 +1667,14 @@ var TRANSLATIONS = {
     statusLossSub:"Loss:", statusExpenses:"— expenses exceed revenue",
     anSalesVs:"Sales", anVs:"vs",
     anRevenue:"💸 Revenue", anExpenses:"📦 Expenses", anProfit:"✨ Profit",
+    expenses:"Expenses", expTitle:"💸 Expenses", expAdd:"+ Add Expense",
+    expCategory:"Category", expAmount:"Amount", expNote:"Note (optional)", expDate:"Date",
+    expSave:"Save Expense", expDelete:"Delete", expNoExp:"No expenses recorded yet.",
+    expTotal:"Total This Month", expYearTotal:"Total This Year",
+    expCatRent:"Rent", expCatSalary:"Salary / Staff", expCatElec:"Electricity / Utilities",
+    expCatPack:"Packaging", expCatTransport:"Transport / Delivery",
+    expCatMarketing:"Marketing", expCatRepairs:"Repairs & Maintenance",
+    expCatOther:"Miscellaneous",
     anYearSales:"🛒 YEAR SALES", anYearProfit:"💰 YEAR PROFIT",
     anStockValue:"🏪 STOCK VALUE NOW", anNetFlow:"⚖️ NET MONEY FLOW",
     anTransactions:"transactions", anCustomers:"customers",
@@ -1921,6 +1929,14 @@ var TRANSLATIONS = {
     statusLossSub:"नुकसान:", statusExpenses:"— खर्च आमदनी से अधिक",
     anSalesVs:"बिक्री", anVs:"बनाम",
     anRevenue:"💸 आमदनी", anExpenses:"📦 खर्च", anProfit:"✨ मुनाफा",
+    expenses:"खर्च", expTitle:"💸 खर्च", expAdd:"+ खर्च जोड़ें",
+    expCategory:"श्रेणी", expAmount:"राशि", expNote:"नोट (वैकल्पिक)", expDate:"तारीख",
+    expSave:"खर्च सेव करें", expDelete:"हटाएं", expNoExp:"अभी तक कोई खर्च दर्ज नहीं।",
+    expTotal:"इस महीने का कुल खर्च", expYearTotal:"इस साल का कुल खर्च",
+    expCatRent:"किराया", expCatSalary:"वेतन / स्टाफ", expCatElec:"बिजली / यूटिलिटी",
+    expCatPack:"पैकेजिंग", expCatTransport:"ट्रांसपोर्ट / डिलीवरी",
+    expCatMarketing:"मार्केटिंग", expCatRepairs:"मरम्मत और रखरखाव",
+    expCatOther:"विविध",
     anYearSales:"🛒 वार्षिक बिक्री", anYearProfit:"💰 वार्षिक मुनाफा",
     anStockValue:"🏪 मौजूदा स्टॉक मूल्य", anNetFlow:"⚖️ शुद्ध धन प्रवाह",
     anTransactions:"लेनदेन", anCustomers:"ग्राहक",
@@ -2125,9 +2141,9 @@ async function scHashPassword(phone, password) {
 // ─── CONSTANTS ───────────────────────────────────────────────
 var FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 var REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
-var TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings","alerts","history","team"];
+var TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","expenses","messages","settings","alerts","history","team"];
 var TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️","⚠️","🕘","👤"];
-var TABS_LABEL_PRO = ["Rankings","Customers","Add Sale","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings","Alerts","History","Team"];
+var TABS_LABEL_PRO = ["Rankings","Customers","Add Sale","Analytics","Compare","Inventory","Creditors","Debtors","Expenses","Messages","Settings","Alerts","History","Team"];
 var _shopRequestsUnread = 0; // badge count for messages tab
 function getTabs(){
   const isPro = currentAppStyle === "pro";
@@ -2148,12 +2164,12 @@ function getTabs(){
       if(oos>0) label += ` <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle;">${oos}</span>`;
       else if(low>0) label += ` <span style="background:${isPro?'#f59e0b':'#FFD700'};color:${isPro?'#fff':'#1a0a00'};border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle;">${low}</span>`;
     }
-    // Unread badge on messages tab (index 8)
-    if(i===8 && _shopRequestsUnread>0){
+    // Unread badge on messages tab (index 9)
+    if(i===9 && _shopRequestsUnread>0){
       label += ` <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle;">${_shopRequestsUnread}</span>`;
     }
-    // Alert count badge on alerts tab (index 10)
-    if(i===10){
+    // Alert count badge on alerts tab (index 11)
+    if(i===11){
       const alertCount = (typeof getAlertCount === "function") ? getAlertCount() : 0;
       if(alertCount>0) label += ` <span style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;vertical-align:middle;">${alertCount}</span>`;
     }
@@ -2540,6 +2556,7 @@ function startFirestoreListener() {
     loadInventoryFromFirestore(null);
     loadCreditorsFromCloud();
     loadDebtorsFromCloud();
+    loadExpensesFromCloud();
     loadCashLedgerFromCloud();
     // Load shop connection requests (messages inbox)
     loadShopRequests();
@@ -3465,7 +3482,7 @@ function addHistoryLog(type, action, details, extra, groupId){
         .set({ list, updatedAt: now }, {merge:true}).catch(()=>{});
     }
     // Live-refresh history tab if currently open
-    if(currentTab===11) safeRenderTab(11);
+    if(currentTab===12) safeRenderTab(12);
     return entry.id;
   } catch(e){ /* never break the app over logging */ }
 }
@@ -3482,7 +3499,7 @@ function loadHistoryFromCloud(dayKey){
         const data = doc.data();
         if(data.list){
           try{ localStorage.setItem(historyLogKey(dayKey), JSON.stringify(data.list)); }catch{}
-          if(currentTab===11) safeRenderTab(11);
+          if(currentTab===12) safeRenderTab(12);
         }
       }
     }).catch(()=>{});
@@ -3937,7 +3954,7 @@ function onLoginSuccess(phone) {
   setTimeout(()=>{
     scLoadConnections().then(()=>scLoadPendingRequests()).then(()=>{
       scStartPolling();
-      if(currentTab===8) safeRenderTab(8);
+      if(currentTab===9) safeRenderTab(9);
     });
     scInitFCM(); // request push permission and save FCM token
   }, 1200);
@@ -4366,7 +4383,8 @@ function renderTab(i){
   else if(i===5)el.innerHTML=renderInventoryTab();
   else if(i===6)el.innerHTML=renderCreditorsTab();
   else if(i===7)el.innerHTML=renderDebtorsTab();
-  else if(i===8){
+  else if(i===8)el.innerHTML=renderExpensesTab();
+  else if(i===9){
     // If a chat is open, re-render the full chat shell first (DOM was wiped by tab switch)
     if (_scActiveChatPhone) {
       const peerConn = _scConnections.find(c=>scPeerPhone(c)===_scActiveChatPhone);
@@ -4391,10 +4409,10 @@ function renderTab(i){
       return Promise.all(loads);
     }).then(()=>{ el.innerHTML = renderMessagesTab(); });
   }
-  else if(i===9)el.innerHTML=renderSettings();
-  else if(i===10)el.innerHTML=renderAlertsTab();
-  else if(i===11)el.innerHTML=renderHistoryTab();
-  else if(i===12)renderTeamTab(el);
+  else if(i===10)el.innerHTML=renderSettings();
+  else if(i===11)el.innerHTML=renderAlertsTab();
+  else if(i===12)el.innerHTML=renderHistoryTab();
+  else if(i===13)renderTeamTab(el);
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
 }
 
@@ -6088,10 +6106,19 @@ function renderAnalytics(sorted){
   const allPrevMonthSales = custPrevMonthSales + totalPrevMonthDebtorSales;
   const allYearSales      = custYearSales + totalYearDebtorSales;
 
+  // ── Overhead expenses ──
+  let totalMonthExp=0, totalPrevMonthExp=0, totalYearExp=0;
+  getExpenses().forEach(e=>{
+    const d = new Date(e.date||"");
+    if(d.getMonth()===thisMonth && d.getFullYear()===thisYear) totalMonthExp+=Number(e.amount)||0;
+    if(d.getMonth()===prevMonth && d.getFullYear()===prevMonthYear) totalPrevMonthExp+=Number(e.amount)||0;
+    if(String(d.getFullYear())===yr) totalYearExp+=Number(e.amount)||0;
+  });
+
   // ── Profit ──
-  const monthProfit      = allMonthSales - totalMonthCost;
-  const prevMonthProfit  = allPrevMonthSales - totalPrevMonthCost;
-  const yearProfit       = allYearSales - totalYearCost;
+  const monthProfit      = allMonthSales - totalMonthCost - totalMonthExp;
+  const prevMonthProfit  = allPrevMonthSales - totalPrevMonthCost - totalPrevMonthExp;
+  const yearProfit       = allYearSales - totalYearCost - totalYearExp;
   const salesGrowth = allPrevMonthSales > 0
     ? Math.round((allMonthSales - allPrevMonthSales)/allPrevMonthSales*100) : null;
   const profitGrowth = prevMonthProfit !== 0
@@ -6581,12 +6608,15 @@ function _bsComputeData(){
 
   const cash = _bsGetCashInHand();
 
+  // Overhead expenses reduce net worth (they are cash outflows not tracked in creditors)
+  const totalExpenses = getExpenses().reduce((s,e)=>s+Number(e.amount||0),0);
+
   const totalAssets = cash + totalInventoryValue + totalReceivables;
-  const totalLiabilities = totalPayables;
+  const totalLiabilities = totalPayables + totalExpenses;
   const netWorth = totalAssets - totalLiabilities;
 
   return { creditors, debtors, payables, receivables, totalPayables, totalReceivables,
-    inventoryRows, totalInventoryValue, cash, totalAssets, totalLiabilities, netWorth };
+    inventoryRows, totalInventoryValue, cash, totalAssets, totalLiabilities, netWorth, totalExpenses };
 }
 
 function openBalanceSheet(){
@@ -6688,6 +6718,7 @@ function openBalanceSheet(){
       <div style="background:#08101e;border:1px solid #1e2a45;border-radius:12px;padding:14px;">
         <div style="font-size:13px;font-weight:800;color:#f87171;margin-bottom:6px;">📉 LIABILITIES</div>
         ${row("Payables (You owe creditors)", d.totalPayables, {indent:true})}
+        ${row("Overhead Expenses (Total)", d.totalExpenses, {indent:true, color:"#fb923c"})}
         ${row("TOTAL LIABILITIES", d.totalLiabilities, {bold:true, border:true, color:"#f87171"})}
       </div>
 
@@ -6859,6 +6890,7 @@ function printBalanceSheet(){
     <table><thead><tr><th>Liabilities</th><th style="text-align:right;">Amount</th></tr></thead>
     <tbody>
       ${row("Payables (Creditors)", d.totalPayables, {indent:true})}
+      ${row("Overhead Expenses", d.totalExpenses, {indent:true})}
       ${row("Total Liabilities", d.totalLiabilities, {bold:true, border:true})}
     </tbody></table>
   </div>
@@ -9670,6 +9702,188 @@ function loadDebtorsFromCloud(){
     }).catch(()=>{});
 }
 
+// ═══════════════════════════════════════════════════════════════
+// ── EXPENSES ─────────────────────────────────────────────────
+// Each expense: { id, category, amount, note, date, createdAt }
+// ═══════════════════════════════════════════════════════════════
+function expensesKey(){ return storageKey("expenses"); }
+
+function loadExpenses(){
+  try { const s=localStorage.getItem(expensesKey()); return s?JSON.parse(s):[]; }
+  catch { return []; }
+}
+
+function saveExpenses(list){
+  try { localStorage.setItem(expensesKey(), JSON.stringify(list)); } catch {}
+  if(db && authPhone){
+    db.collection("users").doc(authPhone).collection("app_data").doc("expenses")
+      .set({ list, updatedAt: Date.now() }).catch(()=>{});
+  }
+}
+
+function getExpenses(){ return loadExpenses(); }
+
+function loadExpensesFromCloud(){
+  if(!db || !authPhone) return;
+  db.collection("users").doc(authPhone).collection("app_data").doc("expenses")
+    .get().then(doc=>{
+      if(doc && doc.exists){
+        const data = doc.data();
+        if(data.list) try { localStorage.setItem(expensesKey(), JSON.stringify(data.list)); } catch {}
+      }
+    }).catch(()=>{});
+}
+
+function expCategoryIcon(cat){
+  const icons = {
+    "Rent":"🏠", "किराया":"🏠",
+    "Salary / Staff":"👤", "वेतन / स्टाफ":"👤",
+    "Electricity / Utilities":"⚡", "बिजली / यूटिलिटी":"⚡",
+    "Packaging":"📦", "पैकेजिंग":"📦",
+    "Transport / Delivery":"🚚", "ट्रांसपोर्ट / डिलीवरी":"🚚",
+    "Marketing":"📣", "मार्केटिंग":"📣",
+    "Repairs & Maintenance":"🔧", "मरम्मत और रखरखाव":"🔧",
+    "Miscellaneous":"💰", "विविध":"💰"
+  };
+  return icons[cat] || "💰";
+}
+
+function expCategories(){
+  return [
+    t("expCatRent"), t("expCatSalary"), t("expCatElec"),
+    t("expCatPack"), t("expCatTransport"), t("expCatMarketing"),
+    t("expCatRepairs"), t("expCatOther")
+  ];
+}
+
+function addExpense(category, amount, note, date){
+  const list = getExpenses();
+  const entry = {
+    id: "EXP_" + Date.now() + "_" + Math.random().toString(36).slice(2,6).toUpperCase(),
+    category, amount: Number(amount)||0, note: note||"",
+    date: date || new Date().toISOString().slice(0,10),
+    createdAt: Date.now()
+  };
+  list.unshift(entry);
+  saveExpenses(list);
+  logHistory({ type:"expense_add", desc:`Expense: ${category} — ${formatINR(entry.amount)}`, amount: entry.amount });
+  return entry;
+}
+
+function deleteExpense(id){
+  const list = getExpenses().filter(e=>e.id!==id);
+  saveExpenses(list);
+  logHistory({ type:"expense_delete", desc:`Expense deleted (${id})` });
+}
+
+function renderExpensesTab(){
+  const expenses = getExpenses();
+  const now = new Date();
+  const thisMonth = now.getMonth(), thisYear = now.getFullYear(), yr = String(thisYear);
+
+  let monthTotal = 0, yearTotal = 0;
+  expenses.forEach(e=>{
+    const d = new Date(e.date||"");
+    if(d.getMonth()===thisMonth && d.getFullYear()===thisYear) monthTotal += Number(e.amount)||0;
+    if(String(d.getFullYear())===yr) yearTotal += Number(e.amount)||0;
+  });
+
+  // Group by category for summary
+  const catTotals = {};
+  expenses.filter(e=>{ const d=new Date(e.date||""); return d.getMonth()===thisMonth && d.getFullYear()===thisYear; })
+    .forEach(e=>{ catTotals[e.category]=(catTotals[e.category]||0)+Number(e.amount); });
+
+  const cats = expCategories();
+  const todayStr = new Date().toISOString().slice(0,10);
+
+  return `<div style="padding:12px;max-width:600px;margin:0 auto;">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:20px;font-weight:800;color:var(--text-main);">${t('expTitle')}</div>
+    </div>
+
+    <!-- Month + Year summary cards -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:14px;padding:14px;">
+        <div style="font-size:10px;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">${t('expTotal')}</div>
+        <div style="font-size:22px;font-weight:800;color:#f87171;">${formatINR(monthTotal)}</div>
+      </div>
+      <div style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:14px;padding:14px;">
+        <div style="font-size:10px;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">${t('expYearTotal')}</div>
+        <div style="font-size:22px;font-weight:800;color:#fb923c;">${formatINR(yearTotal)}</div>
+      </div>
+    </div>
+
+    <!-- Category breakdown this month -->
+    ${Object.keys(catTotals).length > 0 ? `
+    <div style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:14px;padding:14px;margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">This Month by Category</div>
+      ${Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border-main);">
+          <div style="font-size:13px;color:var(--text-main);">${expCategoryIcon(cat)} ${cat}</div>
+          <div style="font-size:13px;font-weight:700;color:#f87171;">${formatINR(amt)}</div>
+        </div>`).join("")}
+    </div>` : ""}
+
+    <!-- Add Expense Form -->
+    <div style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:14px;padding:14px;margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-bottom:10px;">➕ ${t('expAdd')}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <select id="exp-cat" style="background:var(--bg-input,#0a0e1a);border:1px solid var(--border-main);border-radius:8px;color:var(--text-main);padding:9px 10px;font-size:13px;">
+          ${cats.map(c=>`<option value="${c}">${expCategoryIcon(c)} ${c}</option>`).join("")}
+        </select>
+        <input id="exp-amt" type="number" min="0" placeholder="${t('expAmount')} (₹)" style="background:var(--bg-input,#0a0e1a);border:1px solid var(--border-main);border-radius:8px;color:var(--text-main);padding:9px 10px;font-size:13px;"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <input id="exp-note" type="text" placeholder="${t('expNote')}" style="background:var(--bg-input,#0a0e1a);border:1px solid var(--border-main);border-radius:8px;color:var(--text-main);padding:9px 10px;font-size:13px;"/>
+        <input id="exp-date" type="date" value="${todayStr}" style="background:var(--bg-input,#0a0e1a);border:1px solid var(--border-main);border-radius:8px;color:var(--text-main);padding:9px 10px;font-size:13px;"/>
+      </div>
+      <button onclick="expSaveFromForm()" style="width:100%;background:linear-gradient(135deg,#7c3aed,#4f46e5);border:none;border-radius:10px;color:#fff;padding:11px;font-size:14px;font-weight:700;cursor:pointer;">${t('expSave')}</button>
+    </div>
+
+    <!-- Expenses list -->
+    <div>
+      ${expenses.length === 0
+        ? `<div style="text-align:center;padding:40px;color:var(--text-dim);font-size:14px;">💸 ${t('expNoExp')}</div>`
+        : expenses.map(e=>`
+        <div style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+            <div style="font-size:22px;">${expCategoryIcon(e.category)}</div>
+            <div style="min-width:0;">
+              <div style="font-size:13px;font-weight:700;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.category}</div>
+              ${e.note ? `<div style="font-size:11px;color:var(--text-dim);margin-top:1px;">${escHtml(e.note)}</div>` : ""}
+              <div style="font-size:11px;color:var(--text-dimmer);margin-top:2px;">${new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <div style="font-size:15px;font-weight:800;color:#f87171;">${formatINR(e.amount)}</div>
+            <button onclick="expDeleteEntry('${e.id}')" style="background:#2a0808;border:1px solid #4a1515;border-radius:7px;color:#f66;font-size:11px;padding:5px 9px;cursor:pointer;">🗑</button>
+          </div>
+        </div>`).join("")}
+    </div>
+  </div>`;
+}
+
+function expSaveFromForm(){
+  const cat  = document.getElementById("exp-cat")?.value||"";
+  const amt  = parseFloat(document.getElementById("exp-amt")?.value||"0");
+  const note = document.getElementById("exp-note")?.value?.trim()||"";
+  const date = document.getElementById("exp-date")?.value||new Date().toISOString().slice(0,10);
+  if(!cat){ notify("Please select a category","error"); return; }
+  if(!amt || amt <= 0){ notify("Please enter a valid amount","error"); return; }
+  addExpense(cat, amt, note, date);
+  notify("✅ Expense saved!");
+  safeRenderTab(currentTab);
+}
+
+function expDeleteEntry(id){
+  if(!confirm("Delete this expense?")) return;
+  deleteExpense(id);
+  notify("Expense deleted");
+  safeRenderTab(currentTab);
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function debtBalance(dr){
   const sold     = (dr.transactions||[]).filter(t=>t.type==="sale").reduce((s,t)=>s+t.amount,0);
@@ -10770,7 +10984,7 @@ var HIST_TYPE_META = {
 
 // Default permissions for new members (safe defaults: read-only-ish)
 var DEFAULT_MEMBER_PERMISSIONS = {
-  tabs: { leaderboard:true, customers:true, sales:true, analytics:false, compare:false, inventory:true, creditors:false, debtors:false, messages:true, settings:false, alerts:true, history:true },
+  tabs: { leaderboard:true, customers:true, sales:true, analytics:false, compare:false, inventory:true, creditors:false, debtors:false, expenses:false, messages:true, settings:false, alerts:true, history:true },
   actions: {
     sale_create:true, sale_delete:false,
     customer_create:true, customer_edit:true, customer_delete:false, customer_bulk_delete:false,
@@ -10807,8 +11021,8 @@ var PERM_TABS_META = [
   {key:"sales",label:"Sales"},{key:"analytics",label:"Analytics"},
   {key:"compare",label:"Compare"},{key:"inventory",label:"Inventory"},
   {key:"creditors",label:"Creditors"},{key:"debtors",label:"Debtors"},
-  {key:"messages",label:"Messages"},{key:"settings",label:"Settings"},
-  {key:"alerts",label:"Alerts"},{key:"history",label:"History"}
+  {key:"expenses",label:"Expenses"},{key:"messages",label:"Messages"},
+  {key:"settings",label:"Settings"},{key:"alerts",label:"Alerts"},{key:"history",label:"History"}
 ];
 
 var _teamMembers = [];
@@ -13965,8 +14179,8 @@ function updateLicenseUI() {
 
 // Checks whether a main tab (0-6) is accessible in current plan
 function isTabAllowed(i) {
-  // Alerts tab (index 10) is always available — avoids collision with sub-feature index 10 (Push to Display)
-  if (i === 10) return true;
+  // Alerts tab (index 11) is always available — avoids collision with sub-feature index 10 (Push to Display)
+  if (i === 11) return true;
   // Pro user — all tabs unlocked
   if (licensePlan === "pro" && licenseStatus === "pro") return true;
   // Free/expired — only explicitly allowed free tabs
@@ -15501,7 +15715,7 @@ async function scRequestPushPermission() {
     await scInitFCM();
     if (_scFcmToken) {
       notify("✅ Push notifications enabled on this device!");
-      safeRenderTab(9); // refresh settings to show active state
+      safeRenderTab(10); // refresh settings to show active state
     } else {
       notify("❌ Failed to get push token. Check console for details.","error");
     }
@@ -15804,7 +16018,7 @@ async function scConfirmUnlink(connId) {
     _scConnections = _scConnections.filter(c=>c.id!==connId);
     _scActiveChatPhone = null;
     notify("✅ Shop unlinked successfully");
-    safeRenderTab(8);
+    safeRenderTab(9);
   } catch(e) {
     notify("❌ Failed to unlink: " + (e.message||""), "error");
   }
@@ -18103,7 +18317,7 @@ async function scOpenChat(peerPhone, connId) {
 
 function scCloseChat() {
   _scActiveChatPhone = null;
-  safeRenderTab(8);
+  safeRenderTab(9);
 }
 
 // ── Helpers called from inline onclick ────────────────────────────────────────
