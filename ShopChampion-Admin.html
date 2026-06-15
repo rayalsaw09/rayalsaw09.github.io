@@ -6287,7 +6287,7 @@ function renderAnalytics(sorted){
       </div>
       <div style="background:var(--bg-card);border:1px solid #3a1a1a;border-radius:14px;padding:12px 10px;">
         <div style="font-size:10px;color:var(--text-dim);font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;">${t('anExpenses')}</div>
-        <div style="font-size:17px;font-weight:900;color:#f87171;line-height:1;">${fmt(totalMonthCost)}</div>
+        <div style="font-size:17px;font-weight:900;color:#f87171;line-height:1;">${fmt(totalMonthCost+totalMonthExp)}</div>
         <div style="font-size:10px;color:var(--text-dimmer);margin-top:3px;">${MONTHS[thisMonth]} ${thisYear}</div>
       </div>
       <div style="background:var(--bg-card);border:1.5px solid ${monthProfit>=0?'#1a3a1a':'#3a1a1a'};border-radius:14px;padding:12px 10px;">
@@ -6308,7 +6308,7 @@ function renderAnalytics(sorted){
       <div style="background:var(--bg-card);border:1px solid ${yearProfit>=0?'#1a3a1a':'#3a1a1a'};border-radius:14px;padding:12px;">
         <div style="font-size:10px;color:var(--text-dim);font-weight:700;margin-bottom:5px;">${t('anYearProfit')} ${yr}</div>
         <div style="font-size:19px;font-weight:900;color:${yearProfit>=0?'#22c55e':'#ef4444'};line-height:1;">${yearProfit>=0?'+':''}${fmt(yearProfit)}</div>
-        <div style="font-size:10px;color:var(--text-dimmer);margin-top:4px;">vs expenses ${fmt(totalYearCost)}</div>
+        <div style="font-size:10px;color:var(--text-dimmer);margin-top:4px;">vs expenses ${fmt(totalYearCost+totalYearExp)}</div>
       </div>
       <div style="background:var(--bg-card);border:1px solid #2a2a0a;border-radius:14px;padding:12px;">
         <div style="font-size:10px;color:var(--text-dim);font-weight:700;margin-bottom:5px;">${t('anStockValue')}</div>
@@ -9780,7 +9780,7 @@ function addExpense(category, amount, note, date, recurring){
   };
   list.unshift(entry);
   saveExpenses(list);
-  logHistory({ type:"expense_add", desc:`Expense: ${category} — ${formatINR(entry.amount)}`, amount: entry.amount });
+  addHistoryLog("expense", "Expense added", `${category} — ${formatINR(entry.amount)}${note?" ("+note+")":""}`);
   return entry;
 }
 
@@ -9790,13 +9790,15 @@ function updateExpense(id, category, amount, note, date, recurring){
   if(idx===-1) return;
   list[idx] = { ...list[idx], category, amount: Number(amount)||0, note: note||"", date, recurring: !!recurring };
   saveExpenses(list);
-  logHistory({ type:"expense_edit", desc:`Expense edited: ${category} — ${formatINR(Number(amount))}` });
+  addHistoryLog("expense", "Expense edited", `${category} — ${formatINR(Number(amount))}`);
 }
 
 function deleteExpense(id){
-  const list = getExpenses().filter(e=>e.id!==id);
+  const all = getExpenses();
+  const removed = all.find(e=>e.id===id);
+  const list = all.filter(e=>e.id!==id);
   saveExpenses(list);
-  logHistory({ type:"expense_delete", desc:`Expense deleted (${id})` });
+  addHistoryLog("expense", "Expense deleted", removed?`${removed.category} — ${formatINR(removed.amount)}`:id);
 }
 
 function duplicateExpense(id){
@@ -9859,7 +9861,18 @@ function expGetSalesData(){
       if(String(d.getFullYear())===yr) yearSales+=Number(t.amount)||0;
     }));
   }catch(e){}
-  return { monthSales, yearSales };
+  // creditor purchase costs (COGS — same logic as analytics tab)
+  let monthCost=0, yearCost=0;
+  try{
+    getCreditors().filter(cr=>cr.id!=="CR_UNRECONCILED").forEach(cr=>(cr.transactions||[]).filter(t=>
+      t.type==="purchase" && !t._invItem && !t._fromInventory
+    ).forEach(t=>{
+      const d = new Date(t.date||"");
+      if(d.getMonth()===thisMonth && d.getFullYear()===thisYear) monthCost+=Number(t.amount)||0;
+      if((t.date||"").slice(0,4)===yr) yearCost+=Number(t.amount)||0;
+    }));
+  }catch(e){}
+  return { monthSales, yearSales, monthCost, yearCost };
 }
 
 // ── Main render ───────────────────────────────────────────────
@@ -9903,10 +9916,10 @@ function renderExpensesTab(){
   const topCatPct = topCat&&monthTotal>0 ? Math.round(topCat[1]/monthTotal*100) : 0;
 
   // ── Sales & profit ──
-  const { monthSales, yearSales } = expGetSalesData();
-  const monthProfit = monthSales - monthTotal;
+  const { monthSales, yearSales, monthCost, yearCost } = expGetSalesData();
+  const monthProfit = monthSales - monthTotal - monthCost;
   const monthMargin = monthSales>0 ? Math.round(monthProfit/monthSales*100) : 0;
-  const yearExpTotal = yearTotal;
+  const yearExpTotal = yearTotal + yearCost;
   const yearProfit = yearSales - yearExpTotal;
 
   // ── Chart ──
@@ -10091,7 +10104,7 @@ ${monthTotal>0 ? `
     </div>
     <div style="text-align:center;">
       <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Expenses</div>
-      <div style="font-size:17px;font-weight:800;color:#f87171;">${formatINR(monthTotal)}</div>
+      <div style="font-size:17px;font-weight:800;color:#f87171;">${formatINR(monthTotal+monthCost)}</div>
     </div>
     <div style="text-align:center;">
       <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Profit</div>
