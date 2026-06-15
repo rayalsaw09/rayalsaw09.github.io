@@ -1476,22 +1476,22 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
     <div id="header-shop-icon" style="font-size:28px;">🏆</div>
     <div>
       <div id="header-shop-name" style="font-size:20px;font-weight:800;background:linear-gradient(90deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">Shop Champion</div>
-      <div style="font-size:11px;color:#556;letter-spacing:2px;text-transform:uppercase;">एडमिन पैनल</div>
+      <div id="header-admin-label" style="font-size:11px;color:#556;letter-spacing:2px;text-transform:uppercase;">Admin Panel</div>
     </div>
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
       <!-- Hidden lang menu — still works from settings -->
       <div id="lang-menu" style="display:none;position:fixed;right:14px;top:60px;background:var(--bg-card);border:1px solid var(--border-main);border-radius:12px;padding:8px;z-index:9999;min-width:160px;box-shadow:0 8px 32px #0008;"></div>
       <span id="lang-label" style="display:none;">EN</span>
-      <span id="header-plan-pill" onclick="renderTab(9)" title="प्लान विवरण देखें" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;background:#0a1a3a;color:#88aaff;border:1px solid #1a2a5a;">🆓 फ्री</span>
-      <span id="header-member-pill" style="display:none;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;background:#1a0a3a;color:#a78bfa;border:1px solid #3a1a7a;cursor:pointer;" onclick="if(confirm('टीम मेंबर के रूप में लॉगआउट करें?'))doLogout();">👤 <span id="header-member-name"></span></span>
-      <button class="btn" id="push-btn" onclick="this.textContent='⏳';pushSync().finally(()=>this.textContent='⬆ भेजें');" title="डिस्प्ले पर भेजें" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:7px 14px;font-size:13px;font-weight:800;">⬆ भेजें</button>
+      <span id="header-plan-pill" onclick="renderTab(9)" title="View plan details" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;background:#0a1a3a;color:#88aaff;border:1px solid #1a2a5a;">🆓 Free</span>
+      <span id="header-member-pill" style="display:none;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;background:#1a0a3a;color:#a78bfa;border:1px solid #3a1a7a;cursor:pointer;" onclick="if(confirm(currentLang==='hi'?'टीम मेंबर के रूप में लॉगआउट करें?':'Logout as team member?'))doLogout();">👤 <span id="header-member-name"></span></span>
+      <button class="btn" id="push-btn" id="push-sync-btn" onclick="this.textContent='⏳';pushSync().finally(()=>this.textContent=t('pushDisplay'));" title="Send to Display" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:7px 14px;font-size:13px;font-weight:800;">⬆ Send</button>
     </div>
   </div>
 
   <!-- Sync Banner -->
   <div id="sync-banner">
     <div id="sync-status-dot"></div>
-    <span style="font-size:12px;color:#4f4;font-weight:700;" id="sync-status-text">तैयार</span>
+    <span style="font-size:12px;color:#4f4;font-weight:700;" id="sync-status-text">Ready</span>
     <span id="db-status-text" style="display:none;font-size:11px;color:#4a5a7a;margin-left:4px;"></span>
     <span style="font-size:11px;color:#556;" id="sync-time"></span>
     <button class="btn" onclick="showFirebaseSettings()" style="display:none;">🔥 Firebase</button>
@@ -2470,7 +2470,13 @@ function loadSettingsFromCloud(cb) {
         if (d.voice_settings)    { voiceSettings     = { ...voiceSettings,     ...d.voice_settings    }; }
         if (d.theme)             { currentTheme = d.theme; if(currentAppStyle!=="pro") applyTheme(d.theme); }
         if (d.appStyle)          { currentAppStyle = d.appStyle; applyAppStyle(d.appStyle); }
-        if (d.lang)              { setLanguage(d.lang); }
+        if (d.lang) {
+          // Only apply cloud language if user hasn't set a local preference
+          // Local preference (sc_lang) always wins over cloud to prevent revert on refresh
+          const localLang = localStorage.getItem("sc_lang");
+          if (!localLang) { setLanguage(d.lang); }
+          else { currentLang = localLang; } // keep local preference
+        }
         if (d.purchase_mode)     { try { localStorage.setItem(storageKey("purchase_mode"), d.purchase_mode); } catch {} }
         if (d.sync_data)         { syncBinId = d.sync_data.binId || ""; syncApiKey = d.sync_data.apiKey || ""; }
         if (d.license)           { try { localStorage.setItem(storageKey("license"), JSON.stringify(d.license)); } catch {} }
@@ -3117,6 +3123,15 @@ function updateAppHeader() {
       : "🏆";
   }
   document.title = appSettings.shopName + " — Admin";
+  // Update admin label with current language
+  const adminLabelEl = document.getElementById("header-admin-label");
+  if (adminLabelEl) adminLabelEl.textContent = t("adminPanel");
+  // Update push button text
+  const pushBtn = document.getElementById("push-sync-btn");
+  if (pushBtn && !pushBtn.textContent.includes("⏳")) pushBtn.textContent = "⬆ " + t("pushDisplay").replace("⬆ ","");
+  // Update sync status text if it shows the ready state
+  const syncTxt = document.getElementById("sync-status-text");
+  if (syncTxt && (syncTxt.textContent === "Ready" || syncTxt.textContent === "तैयार")) syncTxt.textContent = t("ready");
 }
 
 // ─── LEADERBOARD DATE FILTER ─────────────────────────────────
@@ -3907,7 +3922,13 @@ function onLoginSuccess(phone) {
   try { const sd=localStorage.getItem(storageKey("sync_data"));        if(sd){const p=JSON.parse(sd);syncBinId=p.binId;syncApiKey=p.apiKey;} } catch {}
   try { const th=localStorage.getItem(storageKey("theme"));            if(th) { currentTheme=th; if(currentAppStyle!=="pro") applyTheme(th); } } catch {}
   try { const as2=localStorage.getItem(storageKey("appStyle"));        if(as2) { currentAppStyle=as2; applyAppStyle(as2); } else { applyAppStyle("pro"); } } catch {}
-  try { const lg=localStorage.getItem(storageKey("lang"));             if(lg) currentLang=lg; } catch {}
+  try {
+    // Prefer sc_lang (user's explicit choice); fall back to phone-prefixed key
+    const lgSimple = localStorage.getItem("sc_lang");
+    const lgKeyed  = localStorage.getItem(storageKey("lang"));
+    const lg = lgSimple || lgKeyed;
+    if (lg) { currentLang = lg; localStorage.setItem("sc_lang", lg); if(authPhone) localStorage.setItem(storageKey("lang"), lg); }
+  } catch {}
   // ── Firebase config — always use config.js values, save to localStorage for UI ──
   try { localStorage.setItem(storageKey("fb_config"), JSON.stringify(SC_FIREBASE_CONFIG)); } catch {}
   if (!db) { try { initFirebase(SC_FIREBASE_CONFIG); } catch {} }
@@ -3969,7 +3990,7 @@ function onLoginSuccess(phone) {
   loadLicense();
   updateLicenseUI();
   updateAppHeader();
-  if (currentLang !== "en") setTimeout(applyUITranslations, 500); // apply Hindi after app fully loads
+  setTimeout(applyUITranslations, 500); // apply translations after app fully loads (also reverses if en)
   // Periodically check if account has been blocked by seller
   checkIfBlocked(phone);
   if (window._blockCheckTimer) clearInterval(window._blockCheckTimer);
@@ -13089,12 +13110,53 @@ var UI_STRINGS = {
 };
 
 function applyUITranslations() {
-  if (currentLang === "en") return;
-  const map = UI_STRINGS[currentLang];
-  if (!map) return;
-
+  // Build a combined map: for non-English langs apply forward translation,
+  // for English apply reverse translation (undo any previous translations)
   const mainApp = document.getElementById("main-app");
   if (!mainApp) return;
+
+  if (currentLang === "en") {
+    // Reverse: walk all non-English lang maps and build hi->en reverse map
+    const reverseMap = {};
+    Object.keys(UI_STRINGS).forEach(lang => {
+      if (lang === "en") return;
+      Object.entries(UI_STRINGS[lang]).forEach(([en, translated]) => {
+        reverseMap[translated] = en;
+      });
+    });
+    // Walk DOM and reverse any translated text back to English
+    const walker = document.createTreeWalker(mainApp, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const tag = node.parentElement?.tagName;
+        if (tag === "SCRIPT" || tag === "STYLE" || tag === "INPUT" || tag === "TEXTAREA") return NodeFilter.FILTER_SKIP;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => {
+      const trimmed = node.textContent.trim();
+      if (reverseMap[trimmed]) {
+        node.textContent = node.textContent.replace(trimmed, reverseMap[trimmed]);
+      } else {
+        let text = node.textContent;
+        let changed = false;
+        Object.entries(reverseMap).forEach(([hi, en]) => {
+          if (text.includes(hi)) { text = text.split(hi).join(en); changed = true; }
+        });
+        if (changed) node.textContent = text;
+      }
+    });
+    // Reverse placeholders too
+    mainApp.querySelectorAll("[placeholder]").forEach(el => {
+      const p = el.getAttribute("placeholder");
+      if (reverseMap[p]) el.setAttribute("placeholder", reverseMap[p]);
+    });
+    return;
+  }
+
+  const map = UI_STRINGS[currentLang];
+  if (!map) return;
 
   // Walk all text nodes inside main-app and replace exact matches
   const walker = document.createTreeWalker(mainApp, NodeFilter.SHOW_TEXT, {
@@ -13156,6 +13218,8 @@ function setRegLang(lang) {
 function setLanguage(lang) {
   currentLang = lang;
   localStorage.setItem("sc_lang", lang); // simple key, no phone dependency
+  // Also save to phone-prefixed key so onLoginSuccess reads consistent value
+  try { if (authPhone) localStorage.setItem(storageKey("lang"), lang); } catch {}
   const labelEl = document.getElementById("lang-label");
   if (labelEl) labelEl.textContent = lang.toUpperCase();
   const menuEl = document.getElementById("lang-menu");
@@ -13165,6 +13229,8 @@ function setLanguage(lang) {
   if (typeof renderTabs === "function") renderTabs();
   if (typeof safeRenderTab === "function") safeRenderTab(currentTab);
   if (typeof updateLoginLang === "function") updateLoginLang();
+  if (typeof updateAppHeader === "function") updateAppHeader();
+  if (typeof updateLicenseUI === "function") updateLicenseUI();
   setTimeout(applyUITranslations, 100); // apply after render completes
   notify("🌐 Language changed to " + (LANGUAGES[lang]?.name || lang));
 }
@@ -13841,7 +13907,7 @@ function updateLicenseUI() {
   const pill = document.getElementById("header-plan-pill");
   if (pill) {
     const isPro = licensePlan === "pro" && licenseStatus === "pro";
-    pill.textContent = isPro ? "⭐ Pro" : "🆓 Free";
+    pill.textContent = isPro ? ("⭐ " + (currentLang==="hi"?"प्रो":"Pro")) : ("🆓 " + t("freePlan").replace("मुफ्त प्लान","फ्री").replace("Free Plan","Free"));
     pill.style.background = isPro ? "linear-gradient(135deg,#1a3a1a,#0a2a0a)" : "#0a1a3a";
     pill.style.color       = isPro ? "#4f4" : "#88aaff";
     pill.style.border      = isPro ? "1px solid #2a5a2a" : "1px solid #1a2a5a";
