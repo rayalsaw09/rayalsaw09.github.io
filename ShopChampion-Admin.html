@@ -7846,7 +7846,7 @@ function openAddCreditorModal(editId){
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div>
-          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">" + t('crPhone') + "</label>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t('crPhone')}</label>
           <input class="input" id="cr-phone" type="tel" placeholder="9876543210" value="${escHtml(cr?.phone||"")}" style="margin-bottom:0;" />
         </div>
         <div>
@@ -8328,12 +8328,12 @@ function openCreditorDetail(id){
           </div>
           <div id="cr-tx-custom-range" style="display:none;grid-template-columns:1fr 1fr;gap:8px;">
             <div>
-              <label style="font-size:10px;color:#4a5a7a;font-weight:700;display:block;margin-bottom:3px;">" + t('crFromDate') + "</label>
+              <label style="font-size:10px;color:#4a5a7a;font-weight:700;display:block;margin-bottom:3px;">${t('crFromDate')}</label>
               <input id="cr-tx-from" type="date" oninput="_crTxOnCustomDate('${id}')"
                 style="width:100%;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:7px 10px;color:#e8eaf0;font-size:12px;box-sizing:border-box;outline:none;" />
             </div>
             <div>
-              <label style="font-size:10px;color:#4a5a7a;font-weight:700;display:block;margin-bottom:3px;">" + t('crToDate') + "</label>
+              <label style="font-size:10px;color:#4a5a7a;font-weight:700;display:block;margin-bottom:3px;">${t('crToDate')}</label>
               <input id="cr-tx-to" type="date" oninput="_crTxOnCustomDate('${id}')"
                 style="width:100%;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:7px 10px;color:#e8eaf0;font-size:12px;box-sizing:border-box;outline:none;" />
             </div>
@@ -8534,7 +8534,7 @@ function _crTxRender(creditorId){
   const finalColor=finalBal>0?"#f59e0b":finalBal<0?"#22c55e":"#7a8aaa";
   const totalsRow=`<div style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;gap:4px;padding:7px 10px;border-top:2px solid #1e2a45;background:#0a0e1a;">
     <div></div>
-    <div style="font-size:11px;font-weight:800;color:#7a8aaa;">" + t('crTotal') + "</div>
+    <div style="font-size:11px;font-weight:800;color:#7a8aaa;">${t('crTotal')}</div>
     <div style="text-align:right;font-size:11px;font-weight:800;color:#fbbf24;">${formatINR(totalPurchase)}</div>
     <div style="text-align:right;font-size:11px;font-weight:800;color:#4ade80;">${formatINR(totalOut)}</div>
     <div style="text-align:right;"><div style="font-size:12px;font-weight:800;color:${finalColor};">${formatINR(Math.abs(finalBal))}</div><div style="font-size:9px;color:${finalColor};font-weight:700;">${finalBal>0?"Dr":finalBal<0?"Cr":"✓"}</div></div>
@@ -8553,7 +8553,7 @@ function openRequestAgainModal(creditorId, txId, amount, note, date, invoiceNo, 
     ${modalHeader("🔄 Request Again — " + escHtml(cr.name))}
     <div style="display:flex;flex-direction:column;gap:14px;">
       <div style="background:#0a1220;border:1px solid #1e3a6e;border-radius:12px;padding:14px;">
-        <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:4px;">" + t('crPayment') + "</div>
+        <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:4px;">${t('crPayment')}</div>
         <div style="font-size:22px;font-weight:800;color:#22c55e;">${formatINR(amount)}</div>
         ${note?`<div style="font-size:12px;color:#a0b0d0;margin-top:4px;">${escHtml(note)}</div>`:""}
         <div style="font-size:11px;color:#4a5a7a;">${date}</div>
@@ -8911,7 +8911,7 @@ function openSmartPaymentModal(creditorId){
             style="margin-bottom:0;font-size:20px;font-weight:800;border-color:#22c55e33;" />
         </div>
         <div>
-          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">" + t('crPayMode') + "</label>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t('crPayMode')}</label>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             ${["Cash","UPI","NEFT","Cheque","Other"].map((m,i)=>`
               <button onclick="document.querySelectorAll('.spm-mode-btn').forEach(b=>b.style.background='#0a0e1a');document.querySelectorAll('.spm-mode-btn').forEach(b=>b.style.borderColor='#1e2a45');document.querySelectorAll('.spm-mode-btn').forEach(b=>b.style.color='#4a5a7a');this.style.background='#001a0e';this.style.borderColor='#22c55e';this.style.color='#22c55e';document.getElementById('spm-mode').value='${m}'"
@@ -8926,7 +8926,7 @@ function openSmartPaymentModal(creditorId){
             <input class="input" id="spm-date" type="date" value="${today}" style="margin-bottom:0;" />
           </div>
           <div>
-            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">" + t('crRefUtr') + "</label>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t('crRefUtr')}</label>
             <input class="input" id="spm-ref" placeholder="UTR or cheque no." style="margin-bottom:0;" />
           </div>
         </div>
@@ -8981,6 +8981,7 @@ function crSelectBill(billId, remaining){
 async function saveSmartPayment(){
   if(requireOnline()) return;
   if(!hasPermission('creditor_tx')) return notify("🚫 No permission to record creditor payments","error");
+  const creditorId  = document.getElementById("spm-creditor-id")?.value||"";
   const selectedBillsRaw = document.getElementById("spm-selected-bills")?.value||"";
   const selectedBillIds = selectedBillsRaw.split(",").filter(Boolean);
   const amount      = parseFloat(document.getElementById("spm-amount")?.value)||0;
@@ -9100,7 +9101,7 @@ function openReturnModal(creditorId){
         <input class="input" id="tx-amount" type="number" inputmode="decimal" placeholder="0" min="0" style="margin-bottom:0;font-size:20px;font-weight:800;" />
       </div>
       <div>
-        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">" + t('crReason') + "</label>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t('crReason')}</label>
         <input class="input" id="tx-note" placeholder="e.g. Damaged goods returned" style="margin-bottom:0;" />
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -9109,7 +9110,7 @@ function openReturnModal(creditorId){
           <input class="input" id="tx-date" type="date" value="${today}" style="margin-bottom:0;" />
         </div>
         <div>
-          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">" + t('crDebitNote') + "</label>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t('crDebitNote')}</label>
           <input class="input" id="tx-invoice" placeholder="DN-001" style="margin-bottom:0;" />
         </div>
       </div>
@@ -9857,7 +9858,7 @@ function openAddDebtorModal(editId){
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div>
-          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">" + t('crPhone') + "</label>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t('crPhone')}</label>
           <input class="input" id="dr-phone" type="tel" placeholder="9876543210" value="${escHtml(dr?.phone||"")}" style="margin-bottom:0;" />
         </div>
         <div>
@@ -10056,12 +10057,12 @@ function openDebtorDetail(id){
           </div>
           <div id="dr-tx-custom-range" style="display:none;grid-template-columns:1fr 1fr;gap:8px;">
             <div>
-              <label style="font-size:10px;color:#4a5a7a;font-weight:700;display:block;margin-bottom:3px;">" + t('crFromDate') + "</label>
+              <label style="font-size:10px;color:#4a5a7a;font-weight:700;display:block;margin-bottom:3px;">${t('crFromDate')}</label>
               <input id="dr-tx-from" type="date" oninput="_drTxOnCustomDate('${id}')"
                 style="width:100%;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:7px 10px;color:#e8eaf0;font-size:12px;box-sizing:border-box;outline:none;" />
             </div>
             <div>
-              <label style="font-size:10px;color:#4a5a7a;font-weight:700;display:block;margin-bottom:3px;">" + t('crToDate') + "</label>
+              <label style="font-size:10px;color:#4a5a7a;font-weight:700;display:block;margin-bottom:3px;">${t('crToDate')}</label>
               <input id="dr-tx-to" type="date" oninput="_drTxOnCustomDate('${id}')"
                 style="width:100%;background:#0a0e1a;border:1px solid #1e2a45;border-radius:8px;padding:7px 10px;color:#e8eaf0;font-size:12px;box-sizing:border-box;outline:none;" />
             </div>
@@ -10244,7 +10245,7 @@ function _drTxRender(debtorId){
   const finalColor=finalBal>0?"#22c55e":finalBal<0?"#f59e0b":"#7a8aaa";
   const totalsRow=`<div style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;gap:4px;padding:7px 10px;border-top:2px solid #1e2a45;background:#0a0e1a;">
     <div></div>
-    <div style="font-size:11px;font-weight:800;color:#7a8aaa;">" + t('crTotal') + "</div>
+    <div style="font-size:11px;font-weight:800;color:#7a8aaa;">${t('crTotal')}</div>
     <div style="text-align:right;font-size:11px;font-weight:800;color:#4ade80;">${formatINR(totalSale2)}</div>
     <div style="text-align:right;font-size:11px;font-weight:800;color:#60a5fa;">${formatINR(totalIn2)}</div>
     <div style="text-align:right;"><div style="font-size:12px;font-weight:800;color:${finalColor};">${formatINR(Math.abs(finalBal))}</div><div style="font-size:9px;color:${finalColor};font-weight:700;">${finalBal>0?"Dr":finalBal<0?"Cr":"✓"}</div></div>
@@ -12238,7 +12239,7 @@ function openBulkAddModal() {
       <div style="font-size:12px;color:#5a8aaa;margin-bottom:10px;">Add up to 50 customers at once. Name is required, Phone and ID are optional.</div>
       <div style="display:grid;grid-template-columns:2fr 1.3fr 1.3fr 32px;gap:6px;margin-bottom:6px;">
         <div style="font-size:11px;color:#7a8aaa;font-weight:700;padding:0 4px;">FULL NAME *</div>
-        <div style="font-size:11px;color:#7a8aaa;font-weight:700;padding:0 4px;">" + t('crPhone') + "</div>
+        <div style="font-size:11px;color:#7a8aaa;font-weight:700;padding:0 4px;">${t('crPhone')}</div>
         <div style="font-size:11px;color:#7a8aaa;font-weight:700;padding:0 4px;">ID (auto if blank)</div>
         <div></div>
       </div>
@@ -19286,7 +19287,7 @@ function renderBillHTML(bill) {
           ` : ""}
           ${bill.taxTotal > 0 && isIGST ? `<tr><td style="padding:4px 8px;font-size:12px;color:#555;">IGST</td><td style="padding:4px 8px;font-size:12px;color:#555;text-align:right;">₹${(bill.taxTotal||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</td></tr>` : ""}
           <tr style="border-top:2px solid #111;">
-            <td style="padding:8px 8px;font-size:16px;font-weight:900;color:#111;">" + t('crTotal') + "</td>
+            <td style="padding:8px 8px;font-size:16px;font-weight:900;color:#111;">${t('crTotal')}</td>
             <td style="padding:8px 8px;font-size:18px;font-weight:900;color:#111;text-align:right;">₹${bill.total.toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
           </tr>
         </table>
@@ -19343,7 +19344,7 @@ function renderBillHTML(bill) {
     <div style="border-top:2px solid #111;padding-top:8px;margin-top:4px;">
       ${thermalGSTBlock}
       <div style="display:flex;justify-content:space-between;align-items:center;${bill.taxTotal>0&&hasGST?"margin-top:6px;border-top:1px dashed #ccc;padding-top:6px;":""}">
-        <span style="font-size:15px;font-weight:900;color:#111;letter-spacing:1px;">" + t('crTotal') + "</span>
+        <span style="font-size:15px;font-weight:900;color:#111;letter-spacing:1px;">${t('crTotal')}</span>
         <span style="font-size:18px;font-weight:900;color:#111;">₹${bill.total.toLocaleString("en-IN")}</span>
       </div>
     </div>
