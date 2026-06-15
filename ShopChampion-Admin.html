@@ -1550,6 +1550,556 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 </div>
 
 <script>
+// ─── LANGUAGE ─────────────────────────────────────────────────
+var LANGUAGES = {
+  en:  { name:"English",    flag:"🇬🇧" },
+  hi:  { name:"हिंदी",      flag:"🇮🇳" },
+};
+
+// Translation dictionary
+var TRANSLATIONS = {
+  en: {
+    adminPanel:"Admin Panel", leaderboard:"Leaderboard", customers:"Customers",
+    purchase:"Add Sale", analytics:"Analytics", compare:"Compare",
+    inventory:"Inventory", creditors:"Creditors", debtors:"Debtors", alerts:"Alerts", history:"History",
+    messages:"Messages",
+    festivals:"Festival Rewards", settings:"Settings", logout:"Logout",
+    addCustomer:"+ Add Customer", exportCSV:"⬇ Export CSV", addPurchase:"Add Sale →",
+    totalSpend:"Total Spend", points:"Points", rank:"Rank", visits:"visits",
+    lastVisit:"Last Visit", firstVisit:"First Visit", frequency:"Frequency",
+    avgPerVisit:"Avg per Visit", totalVisits:"Total Visits", purchaseHistory:"Purchase History",
+    noCustomers:"No customers found", noPurchases:"No purchases yet",
+    pushDisplay:"⬆ Push to Display", displaySetup:"📺 Display Setup",
+    searchPlaceholder:"🔍 Search by name, phone or ID...",
+    customerProfile:"Customer Profile", back:"← पीछे", edit:"✏️ Edit", next:"Next",
+    addPurchaseBtn:"+ Sale", deleteConfirm:"Delete this customer and all their purchases?",
+    deletePurchaseConfirm:"Delete this purchase? The customer's total spend will decrease.",
+    today:"Today", allTime:"All Time", pickDate:"📆 Pick Date",
+    showFor:"📅 Show For:", yearFilter:"📆 YEAR:",
+    bill:"Bill", date:"Date", notes:"Notes", amount:"Amount (₹)",
+    searchFilter:"🔍 Filter by", filterDate:"📅 Date Range",
+    filterExact:"₹ Exact Amount", filterRange:"📊 Amount Range",
+    clearFilter:"✕ Clear", apply:"Apply",
+    shopName:"Shop Name", shopIcon:"Shop Icon",
+    displaySettings:"Display Settings", databaseStorage:"🔥 Database Storage",
+    syncDisplay:"📺 Sync & Display", customersOnDisplay:"Customers on Display Screen",
+    firebaseConnected:"✅ Firebase Connected", localMode:"📦 Local storage (demo mode)",
+    ready:"Ready", syncing:"Pushing...", synced:"Leaderboard synced",
+    wrongPassword:"Wrong password", loginAdmin:"ADMIN LOGIN",
+    enterPassword:"Enter Password (1234)", login:"Login →",
+    showing:"Showing", of:"of", purchases:"purchases", total:"Total",
+    visitNum:"Visit #", allTimeBracket:"(all-time:", yearRevenue:"Revenue",
+    activeCustomers:"Active Customers", topEarner:"Top Earner",
+    avgSpend:"Avg Spend/Customer", monthlyRevenue:"Monthly Revenue",
+    topCustomers:"Top Customers", monthByMonth:"Month-by-Month",
+    yearlyAnalytics:"📊 Yearly Analytics", selectYear:"SELECT YEAR:",
+    compareTitle:"⚖️ Compare", compareDesc:"Revenue comparison by day · month · year",
+    dayMode:"📅 Day", monthMode:"📆 Month", yearMode:"🗃 Year", yearsMode:"⚖️ Compare Years",
+    festivalRewards:"Festival Rewards", festival:"Festival", reward:"Reward",
+    selectWinners:"Select winners:", announceWinners:"🎉 Announce Winners",
+    pastAnnouncements:"Past Announcements", noOutstandingBorrows:"✅ No outstanding borrows",
+    outstandingBorrows:"📌 Outstanding Borrows", totalOwed:"Total owed:",
+    addBorrow:"Record Borrow →", borrowDetails:"📦 Borrow Details",
+    pending:"PENDING", returned:"RETURNED", overdue:"OVERDUE",
+    markReturned:"✓ Returned", borrowRecord:"Borrow", noPhone:"No phone",
+    whatsapp:"💬 WhatsApp", phone:"Phone Number", customerId:"Customer ID",
+    fullName:"Full Name", optional:"Optional", autoId:"🎲 Auto",
+    saveChanges:"Save Changes", saveName:"✅ Save Name", removeIcon:"🗑 Remove Icon",
+    themeLabel:"Theme", languageLabel:"Language", dayTheme:"☀️ Day", nightTheme:"🌙 Night",
+    // Customers tab extras
+    never:"Never", rankHash:"Rank #", bulk:"👥 Bulk",
+    gstStatus:"🔢 GST Status:", allCustomers:"👥 All",
+    gstRegistered:"✅ GST Registered", notRegistered:"❌ Not Registered",
+    notVisitedSince:"⚠️ Not visited since:", days7:"7 Days", month1:"1 Month", months3:"3 Months",
+    pickDateBtn:"📅 Pick Date",
+    showingInactive:"Showing", inactiveDays:"7+ days", inactiveMonth:"1+ month", inactiveMonths3:"3+ months", inactiveSince:"since",
+    loadMore:"Load More", remaining:"remaining",
+    customersFooter:"customers",
+    selectedCount:"selected", deleteSelected:"🗑️ Delete", cancelSelect:"✕ Cancel",
+    custHeading:"Customers", filtered:"filtered",
+    searchCustPlaceholder:"🔍 Search name, phone, ID...",
+    noCustomersFound:"No customers found",
+    // Sales tab extras
+    salesHeading:"🧾 Sales", addSaleTab:"🧾 Add Sale",
+    inventoryMode:"Inventory Mode", invModeDesc:"Amount auto-calculated from items × price",
+    switchMode:"Switch", standardMode:"Standard Mode", stdModeDesc:"Enter amount manually",
+    searchCustomer:"Search Customer", searchByNamePhone:"Search by name, phone or ID...",
+    purchaseAmount:"Purchase Amount (₹)",
+    itemsSoldInv:"🛒 Items Sold — enter qty & selling price",
+    itemsSoldStd:"Items Sold (optional — deducts from Inventory)",
+    scanBarcode:"📷 Scan Barcode to Add Item",
+    addItemBtn:"➕ Add Item", billNumber:"Bill Number", dateTime:"Date & Time",
+    changeDate:"✏️ Change", closeDate:"❌ Close", currentTime:"🕐 Current Time",
+    notesOptional:"Notes (optional)", notesPlaceholder:"e.g. Diwali purchase...",
+    addSaleBtn:"Add Sale →",
+    recordNewBorrow:"📋 Record a new borrow",
+    itemsBorrowed:"🛒 Items Borrowed",
+    amtBorrowed:"Amount Borrowed (₹)", autoFilledItems:"← auto-filled from items above",
+    dueDateOptional:"Due Date (optional)",
+    recordBorrowBtn:"Record Borrow →",
+    outstandingBorrowsLabel:"📌 Outstanding Borrows",
+    totalOwedLabel:"Total owed:", owesLabel:"Owes",
+    noDescription:"No description",
+    borrowedLabel:"Borrowed:", dueLabel:"Due:", overdueLabel:"⚠️ Overdue",
+    partialLabel:"💛 Partial", leftLabel:"left",
+    returnedBtn:"✓ Returned", slipBtn:"🧾 Slip",
+    detailsBtn:"Details", noOutstandingBorrows:"✅ No outstanding borrows",
+    borrowSubtab:"📦 Borrow",
+    // Analytics
+    anMonths:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+    statusWell:"Business is doing well", statusSlow:"Sales are a bit slow",
+    statusNoActivity:"No activity this month yet", statusLoss:"Running at a loss this month",
+    statusProfitSub:"Profit this month:", statusProfitableSub:"Profitable at",
+    statusDipped:"— but sales dipped", statusRecordSales:"Record sales to see your business health",
+    statusLossSub:"Loss:", statusExpenses:"— expenses exceed revenue",
+    anSalesVs:"Sales", anVs:"vs",
+    anRevenue:"💸 Revenue", anExpenses:"📦 Expenses", anProfit:"✨ Profit",
+    anYearSales:"🛒 YEAR SALES", anYearProfit:"💰 YEAR PROFIT",
+    anStockValue:"🏪 STOCK VALUE NOW", anNetFlow:"⚖️ NET MONEY FLOW",
+    anTransactions:"transactions", anCustomers:"customers",
+    anItemsTracked:"items tracked", anSuppliers:"suppliers", anDebtors:"debtors",
+    anReceivable:"receivable", anPayable:"payable",
+    anMonthlyTrend:"📈 Monthly Trend", anSalesLegend:"Sales", anCostLegend:"Cost",
+    anBills:"Bills", anAvgCust:"Avg/Cust",
+    anCustSection:"👥 Customers", anTotal:"Total", anActive:"Active",
+    anAvgSpend:"Avg Spend", anTopCust:"Top Customer this Month",
+    anTopItems:"🏆 Top Items", anLossItems:"⚠️ Loss Items",
+    anSellingBelow:"Selling below cost",
+    anMoneyFlow:"Money Flow", anAllTimeBalance:"All-time balances",
+    anYouOwe:"📤 YOU OWE", anOwedToYou:"📥 OWED TO YOU", anNet:"🏦 NET",
+    anCashInHand:"Cash in Hand", anLiveBalance:"live balance",
+    anViewCashLedger:"📜 View Cash Flow Ledger",
+    anViewBalanceSheet:"📊 View Balance Sheet",
+    anLowStock:"Low Stock Alert", anItems:"items",
+    anExportBtn:"⬇ Export", outOfStock:"OUT",
+    // Compare tab
+    cmpTitle:"⚖️ Compare", cmpSubtitle:"Revenue · Expenses · Profit — customers, debtors & creditors combined",
+    cmpDayBtn:"📅 Day", cmpMonthBtn:"📆 Month", cmpYearBtn:"🗃 Year", cmpYearsBtn:"⚖️ Compare Years",
+    cmpDailyBreakdown:"Daily Breakdown", cmpMonthByMonth:"Month-by-Month",
+    cmpYearByYear:"Year-by-Year Comparison", cmpYearOverYear:"Year-over-Year",
+    cmpToday:"Today", cmpNow:"Now", cmpNew:"New", cmpMon:"MON", cmpDiff:"DIFF",
+    cmpTotal:"Total", cmpTotalChange:"Total change:", cmpSalesCount:"sale", cmpSalesCountP:"sales",
+    cmpSelectBase:"📅 Select Base Year (shows that year + all previous)",
+    cmpYearAGold:"📅 Year A (Gold)", cmpYearBBlue:"📅 Year B (Blue)",
+    cmpMonthlyBreakdown:"monthly breakdown", cmpVs:"vs",
+    cmpRevenueLegend:"Revenue", cmpCostLegend:"Cost", cmpProfitLegend:"Profit",
+    cmpAllMonths:"All months of", cmpRevenueByYear:"Revenue by Year (up to",
+    cmpCost:"cost",
+    // Creditors tab
+    crHeading:"🏦 Creditors", crSuppliers:"supplier", crPayable:"Total payable:",
+    crAddManually:"+ Add Manually", crArchived:"📦 Archived",
+    crTotalSuppliers:"Total Suppliers", crTotalPayable:"Total Payable",
+    crPaidMonth:"Paid This Month", crPurchasedMonth:"Purchased This Month",
+    crUnreconciled:"Unreconciled Purchases", crEntries:"entry", crEntriesP:"entries",
+    crWithoutCreditor:"without a creditor. Tap to review.",
+    crSearchPlaceholder:"🔍 Search creditor by name or phone...",
+    crGstStatus:"🔢 GST Status:", crAll:"🏢 All",
+    crGstReg:"✅ GST Registered", crNotReg:"❌ Not Registered",
+    crNoCreditors:"No creditors found", crTotalYouOweLabel:"Total You Owe",
+    crBalance:"Balance:", crLinked:"Linked", crGstin:"GSTIN",
+    crMoveTo:"Move to Creditor", crTarget:"Target Creditor",
+    crSelectAll:"Select All", crTap:"Tap", crDeleting:"Deleting",
+    crPurchaseDr:"Purchase (Dr)", crPaymentCr:"Payment (Cr)", crInvoice:"Invoice",
+    crDate:"DATE", crItem:"ITEM / DESCRIPTION", crReason:"ITEM / REASON",
+    crDebitNote:"DEBIT NOTE / REF", crPayMode:"PAYMENT MODE", crPayment:"PAYMENT",
+    crNotes:"NOTES", crFromDate:"FROM DATE", crToDate:"TO DATE",
+    crTotal:"TOTAL", crPhone:"PHONE", crAddress:"ADDRESS",
+    crInvoiceRef:"INVOICE / REF NO.", crRefUtr:"REF / UTR NO.",
+    crAmount:"Amount", crCancel:"Cancel", crType:"Type",
+    crCredit:"Credit", crDebit:"Debit",
+    crClosingBalance:"Closing Balance:", crTotalYouOwe:"TOTAL YOU OWE",
+    crTxHistory:"Transaction History", crNoCredFound:"No Creditors Found",
+    crNoTxYet:"No transactions yet", crNotFound:"Not found",
+    crNegativeItems:"ITEMS THAT WOULD GO NEGATIVE:",
+    crStockReversed:"STOCK THAT WOULD BE REVERSED:",
+    crNoInvLinked:"No inventory stock linked to this creditor.",
+    crNoUnreconciled:"No unreconciled entries to move.",
+    crStatement:"Creditor Statement", crNoteOptional:"NOTE (optional)",
+    // Debtors tab
+    dbHeading:"📥 Debtors", dbCustomers:"customers", dbReceivable:"Total receivable:",
+    dbDate:"DATE", dbDescription:"DESCRIPTION", dbReceivedVia:"RECEIVED VIA",
+    dbFromDate:"FROM DATE", dbToDate:"TO DATE", dbTotal:"TOTAL",
+    dbPhone:"PHONE", dbAddress:"ADDRESS", dbNotes:"NOTES",
+    dbAmount:"Amount", dbBalance:"Balance:", dbType:"Type", dbCancel:"Cancel",
+    dbDebtor:"Debtor:", dbSale:"Sale", dbSaleDr:"Sale (Dr)",
+    dbReceipt:"Receipt", dbReceiptCr:"Receipt (Cr)", dbTransaction:"Transaction",
+    dbTxHistory:"Transaction History", dbNoTxYet:"No transactions yet",
+    dbNotFound:"Not found", dbCannotUndo:"This cannot be undone.",
+    dbStatement:"Debtor Statement", dbNoDebtors:"No debtors found",
+    dbClosingBalance:"Closing Balance:",
+    // Alerts tab
+    alEverything:"Everything that needs your attention, in one place.",
+    alAddTeam:"Add Team Member", alUsername:"Username", alDisplayName:"Display Name",
+    alPassword:"Password", alConfirmPassword:"Confirm Password", alPermissions:"Permissions",
+    alUsernameReadOnly:"Username (read-only)",
+    alCurrent:"Current:", alOldestUnpaidBill:"Oldest unpaid bill:",
+    alOldestUnpaidSale:"Oldest unpaid sale:",
+    alNoTeamMembers:"No team members yet. Add your first member below.",
+    alNewPassword:"New Password (leave blank to keep current)",
+    // History tab
+    alToday:"Today", alTodayOnly:"Today only",
+    // Settings tab
+    stBoldClassic:"Bold · Classic", stCleanBusiness:"Clean · Business",
+    stGame:"Game", stProfessional:"Professional",
+    stShopName:"Shop Name", stLanguage:"Language", stEnableVoice:"Enable Voice",
+    stTemplate:"Template", stAddPhoto:"Add Photo", stRemovePhoto:"Remove Photo",
+    stCancel:"Cancel", stClose:"Close", stSaveChanges:"Save Changes",
+    stChangesApply:"Changes apply immediately",
+    stProPlan:"Pro Plan Active", stFullAccess:"Full access to all features",
+    stFreePlan:"Free Plan",
+    stUnlimited:"Unlimited customers · All features · Ad-free display",
+    stProFeature:"Pro Feature",
+    stPasteCSV:"Paste CSV/spreadsheet data below, or upload a CSV file.",
+    stExpectedCols:"Expected columns:", stName:"Name", stPhoneOptional:"Phone (optional)",
+    stIdOptional:"ID (optional)", stMax200:"Max 200 rows",
+    stMax50Reached:"Maximum 50 rows reached.",
+    stFillNames:"Fill in names above to add customers.",
+    stNoPurchasesFilter:"No purchases match this filter",
+    stNoPurchasesSearch:"No purchases match your search",
+    stNoCustomers:"No customers", stNoPurchasesYet:"No purchases yet",
+    stNoPhone:"No phone",
+    stNewPassword:"New Password", stConfirmPassword:"Confirm Password",
+    stEnterPassword:"Enter your password to continue.",
+    stChooseTvDisplay:"Choose what appears on your TV leaderboard screen",
+    stCategory:"CATEGORY", stUnit:"UNIT", stMinStock:"MIN STOCK ALERT",
+    stCompanyName:"COMPANY / LEGAL NAME", stPhone:"PHONE",
+    stBillHash:"Bill #", stCustomerId:"Customer ID",
+    stOptional:"Optional", stNotes:"Notes", stDate:"Date",
+    stQty:"Quantity", stTotalAmount:"Total Amount:", stActive:"Active",
+    stIdAuto:"ID (auto if blank)", stUpload:"Upload",
+    stRemoveFromInv:"This will remove it from inventory and all stock logs.",
+    stPurchaseRecords:"Those purchase records will have this item removed.",
+    // Inventory tab
+    invNoInventory:"No inventory yet",
+    invAddFirst:"Add your first product to start tracking stock",
+    invOutOfStock:"Out of Stock", invLowStock:"Low Stock", invTotalStockValue:"Total Stock Value",
+    invName:"Name", invCategory:"Category", invDate:"Date", invQty:"Qty",
+    invRate:"Rate", invAmount:"Amount", invBalance:"Balance", invDescription:"Description",
+    invUnit:"Unit", invField:"Field", invValue:"Value", invSr:"Sr.",
+    invType:"TYPE", invQtyHeader:"QTY",
+    invTaxInvoice:"Tax Invoice", invBill:"BILL", invOriginalRecipient:"ORIGINAL FOR RECIPIENT",
+    invTaxableAmount:"Taxable Amount", invTaxableValue:"Taxable Value",
+    invTotalTax:"Total Tax", invTotalAfterTax:"Total Amount After Tax",
+    invTotalInWords:"Total in Words", invTerms:"Terms and Conditions",
+    invAuthorisedSignatory:"Authorised Signatory", invPlaceOfSupply:"Place of Supply",
+    invInvoiceNo:"Invoice No.", invInvoiceDate:"Invoice Date",
+    invInvoiceDetail:"Invoice Detail", invInvoiceValue:"Invoice Value", invEWayBill:"E-Way Bill",
+    invCancel:"Cancel", invClose:"Close", invPublish:"Publish",
+    invProducts:"Products", invEditInstead:"Edit this instead",
+    invClosingBalance:"Closing Balance", invClosingBalanceColon:"Closing Balance:",
+    invNoTransactions:"No transactions", invNoTxYet:"No transactions yet",
+    invNoSalesYet:"No sales recorded yet.", invNoItemsOnTx:"No items on this transaction",
+    invNoDuplicates:"No duplicates found!",
+    invLedgerNA:"Ledger Not Available", invLoadingLedger:"Loading shared ledger...",
+    invAutoRecorded:"Auto-recorded when you add purchases in Purchase tab",
+    invNoProfileInfo:"No additional profile info shared by this shop.",
+    invNegativeItems:"ITEMS THAT WOULD GO NEGATIVE:", invStockReversed:"STOCK THAT WOULD BE REVERSED:",
+    invNoItemBarcode:"No item found for barcode:",
+    invEnterBarcode:"Or enter barcode manually:", invSearchBarcode:"Or search for the item this barcode belongs to:",
+    invStartCamera:"Starting camera...",
+    invBankDetails:"Bank Details", invAccNumber:"Acc. Number", invBranch:"Branch",
+    invAddBankDetails:"Add bank details in Billing Settings",
+    invOutward:"Outward", invPan:"PAN:", invMs:"M/S", invSupply:"Supply",
+    invTransport:"Transport", invRefInvoice:"Ref / Invoice", invPriceIs:"PRICE IS",
+    invProductService:"Name of Product / Service", invCustomerDetail:"Customer Detail",
+    invExpiryAlerts:"Expiry Alerts", invMinStockWarning:"Min Stock Warning",
+    invPickItem:"Pick the item to", invSharingWith:"You are currently sharing",
+    // Messages tab
+    msgNoShops:"No connected shops yet",
+    msgAddShop:"Add a shop using their SC-XXXXXX ID to start chatting.",
+    msgLoginRequired:"Log in to use Messages.",
+    msgExpiry:"Messages expire after 7 days · Max 50 per conversation",
+  },
+  hi: {
+    // Tab names (TABS_BASE keys)
+    leaderboard:"रैंकिंग", customers:"ग्राहक", sales:"बिक्री",
+    analytics:"विश्लेषण", compare:"तुलना", inventory:"इन्वेंटरी",
+    creditors:"लेनदार", debtors:"देनदार", messages:"संदेश",
+    settings:"सेटिंग्स", alerts:"अलर्ट", history:"इतिहास", team:"टीम",
+    adminPanel:"एडमिन पैनल",
+    festivals:"उत्सव पुरस्कार", settings:"सेटिंग्स", logout:"लॉगआउट",
+    addCustomer:"+ ग्राहक जोड़ें", exportCSV:"⬇ CSV निर्यात", addPurchase:"बिक्री जोड़ें →",
+    totalSpend:"कुल खर्च", points:"अंक", rank:"रैंक", visits:"दौरे",
+    lastVisit:"अंतिम दौरा", firstVisit:"पहला दौरा", frequency:"आवृत्ति",
+    avgPerVisit:"प्रति दौरा औसत", totalVisits:"कुल दौरे", purchaseHistory:"खरीद इतिहास",
+    noCustomers:"कोई ग्राहक नहीं मिला", noPurchases:"अभी तक कोई खरीदारी नहीं",
+    pushDisplay:"⬆ डिस्प्ले पर भेजें", displaySetup:"📺 डिस्प्ले सेटअप",
+    searchPlaceholder:"🔍 नाम, फ़ोन या ID से खोजें...",
+    customerProfile:"ग्राहक प्रोफाइल", back:"← वापस", edit:"✏️ संपादित", next:"अगला",
+    addPurchaseBtn:"+ बिक्री", deleteConfirm:"इस ग्राहक और उनकी सभी खरीदारी हटाएं?",
+    deletePurchaseConfirm:"यह खरीदारी हटाएं? ग्राहक का कुल खर्च कम हो जाएगा।",
+    today:"आज", allTime:"सब समय", pickDate:"📆 दिनांक चुनें",
+    showFor:"📅 दिखाएं:", yearFilter:"📆 वर्ष:",
+    bill:"बिल", date:"दिनांक", notes:"नोट्स", amount:"राशि (₹)",
+    searchFilter:"🔍 फ़िल्टर करें", filterDate:"📅 दिनांक सीमा",
+    filterExact:"₹ सटीक राशि", filterRange:"📊 राशि सीमा",
+    clearFilter:"✕ साफ", apply:"लागू करें",
+    shopName:"दुकान का नाम", shopIcon:"दुकान आइकन",
+    displaySettings:"डिस्प्ले सेटिंग्स", databaseStorage:"🔥 डेटाबेस स्टोरेज",
+    syncDisplay:"📺 सिंक और डिस्प्ले", customersOnDisplay:"डिस्प्ले पर ग्राहक",
+    firebaseConnected:"✅ Firebase जुड़ा हुआ है", localMode:"📦 लोकल स्टोरेज (डेमो)",
+    ready:"तैयार", syncing:"भेजा जा रहा है...", synced:"लीडरबोर्ड सिंक हुआ",
+    wrongPassword:"गलत पासवर्ड", loginAdmin:"एडमिन लॉगिन",
+    enterPassword:"पासवर्ड दर्ज करें (1234)", login:"लॉगिन →",
+    showing:"दिखा रहे हैं", of:"में से", purchases:"खरीदारी", total:"कुल",
+    visitNum:"दौरा #", allTimeBracket:"(सब समय:", yearRevenue:"आय",
+    activeCustomers:"सक्रिय ग्राहक", topEarner:"शीर्ष खर्चकर्ता",
+    avgSpend:"प्रति ग्राहक औसत", monthlyRevenue:"मासिक आय",
+    topCustomers:"शीर्ष ग्राहक", monthByMonth:"माह दर माह",
+    yearlyAnalytics:"📊 वार्षिक विश्लेषण", selectYear:"वर्ष चुनें:",
+    compareTitle:"⚖️ तुलना", compareDesc:"दिन · माह · वर्ष से राजस्व तुलना",
+    dayMode:"📅 दिन", monthMode:"📆 माह", yearMode:"🗃 वर्ष", yearsMode:"⚖️ वर्ष तुलना",
+    festivalRewards:"उत्सव पुरस्कार", festival:"उत्सव", reward:"पुरस्कार",
+    selectWinners:"विजेता चुनें:", announceWinners:"🎉 विजेता घोषित करें",
+    pastAnnouncements:"पिछली घोषणाएं", noOutstandingBorrows:"✅ कोई लंबित उधार नहीं",
+    outstandingBorrows:"📌 लंबित उधार", totalOwed:"कुल बकाया:",
+    addBorrow:"उधार दर्ज करें →", borrowDetails:"📦 उधार विवरण",
+    pending:"लंबित", returned:"वापस किया", overdue:"अतिदेय",
+    markReturned:"✓ वापस किया", borrowRecord:"उधार", noPhone:"फ़ोन नहीं",
+    whatsapp:"💬 व्हाट्सएप", phone:"फ़ोन नंबर", customerId:"ग्राहक ID",
+    fullName:"पूरा नाम", optional:"वैकल्पिक", autoId:"🎲 स्वचालित",
+    saveChanges:"बदलाव सहेजें", saveName:"✅ नाम सहेजें", removeIcon:"🗑 आइकन हटाएं",
+    themeLabel:"थीम", languageLabel:"भाषा", dayTheme:"☀️ दिन", nightTheme:"🌙 रात",
+    // Customers tab extras
+    never:"कभी नहीं", rankHash:"रैंक #", bulk:"👥 थोक",
+    gstStatus:"🔢 GST स्थिति:", allCustomers:"👥 सभी",
+    gstRegistered:"✅ GST पंजीकृत", notRegistered:"❌ पंजीकृत नहीं",
+    notVisitedSince:"⚠️ इतने दिनों से नहीं आए:", days7:"7 दिन", month1:"1 महीना", months3:"3 महीने",
+    pickDateBtn:"📅 दिनांक चुनें",
+    showingInactive:"दिखा रहे हैं", inactiveDays:"7+ दिन", inactiveMonth:"1+ महीना", inactiveMonths3:"3+ महीने", inactiveSince:"से",
+    loadMore:"और लोड करें", remaining:"शेष",
+    customersFooter:"ग्राहक",
+    selectedCount:"चुने गए", deleteSelected:"🗑️ हटाएं", cancelSelect:"✕ रद्द",
+    custHeading:"ग्राहक", filtered:"फ़िल्टर किए",
+    searchCustPlaceholder:"🔍 नाम, फ़ोन, ID खोजें...",
+    noCustomersFound:"कोई ग्राहक नहीं मिला",
+    // Sales tab extras
+    salesHeading:"🧾 बिक्री", addSaleTab:"🧾 बिक्री जोड़ें",
+    inventoryMode:"इन्वेंटरी मोड", invModeDesc:"राशि आइटम × कीमत से स्वतः भरी जाती है",
+    switchMode:"बदलें", standardMode:"सामान्य मोड", stdModeDesc:"राशि मैन्युअल दर्ज करें",
+    searchCustomer:"ग्राहक खोजें", searchByNamePhone:"नाम, फ़ोन या ID से खोजें...",
+    purchaseAmount:"बिक्री राशि (₹)",
+    itemsSoldInv:"🛒 बेचे गए आइटम — मात्रा और कीमत दर्ज करें",
+    itemsSoldStd:"बेचे गए आइटम (वैकल्पिक — इन्वेंटरी से घटाएगा)",
+    scanBarcode:"📷 बारकोड स्कैन करके आइटम जोड़ें",
+    addItemBtn:"➕ आइटम जोड़ें", billNumber:"बिल नंबर", dateTime:"दिनांक और समय",
+    changeDate:"✏️ बदलें", closeDate:"❌ बंद करें", currentTime:"🕐 वर्तमान समय",
+    notesOptional:"नोट्स (वैकल्पिक)", notesPlaceholder:"जैसे दिवाली खरीदारी...",
+    addSaleBtn:"बिक्री जोड़ें →",
+    recordNewBorrow:"📋 नया उधार दर्ज करें",
+    itemsBorrowed:"🛒 उधार लिए आइटम",
+    amtBorrowed:"उधार राशि (₹)", autoFilledItems:"← ऊपर के आइटमों से स्वतः भरा",
+    dueDateOptional:"देय दिनांक (वैकल्पिक)",
+    recordBorrowBtn:"उधार दर्ज करें →",
+    outstandingBorrowsLabel:"📌 लंबित उधार",
+    totalOwedLabel:"कुल बकाया:", owesLabel:"बकाया",
+    noDescription:"कोई विवरण नहीं",
+    borrowedLabel:"उधार:", dueLabel:"देय:", overdueLabel:"⚠️ अतिदेय",
+    partialLabel:"💛 आंशिक", leftLabel:"शेष",
+    returnedBtn:"✓ वापस किया", slipBtn:"🧾 पर्ची",
+    detailsBtn:"विवरण", noOutstandingBorrows:"✅ कोई लंबित उधार नहीं",
+    borrowSubtab:"📦 उधार",
+    // Analytics
+    anMonths:["जन","फर","मार","अप्र","मई","जून","जुल","अग","सित","अक्ट","नव","दिस"],
+    statusWell:"व्यापार अच्छा चल रहा है", statusSlow:"बिक्री थोड़ी धीमी है",
+    statusNoActivity:"इस महीने कोई गतिविधि नहीं", statusLoss:"इस महीने घाटे में चल रहा है",
+    statusProfitSub:"इस महीने मुनाफा:", statusProfitableSub:"मुनाफे में",
+    statusDipped:"— पर बिक्री कम हुई", statusRecordSales:"बिक्री दर्ज करें तो व्यापार की स्थिति दिखेगी",
+    statusLossSub:"नुकसान:", statusExpenses:"— खर्च आमदनी से अधिक",
+    anSalesVs:"बिक्री", anVs:"बनाम",
+    anRevenue:"💸 आमदनी", anExpenses:"📦 खर्च", anProfit:"✨ मुनाफा",
+    anYearSales:"🛒 वार्षिक बिक्री", anYearProfit:"💰 वार्षिक मुनाफा",
+    anStockValue:"🏪 मौजूदा स्टॉक मूल्य", anNetFlow:"⚖️ शुद्ध धन प्रवाह",
+    anTransactions:"लेनदेन", anCustomers:"ग्राहक",
+    anItemsTracked:"आइटम ट्रैक किए", anSuppliers:"आपूर्तिकर्ता", anDebtors:"देनदार",
+    anReceivable:"प्राप्य", anPayable:"देय",
+    anMonthlyTrend:"📈 मासिक रुझान", anSalesLegend:"बिक्री", anCostLegend:"लागत",
+    anBills:"बिल", anAvgCust:"औसत/ग्राहक",
+    anCustSection:"👥 ग्राहक", anTotal:"कुल", anActive:"सक्रिय",
+    anAvgSpend:"औसत खर्च", anTopCust:"इस महीने का शीर्ष ग्राहक",
+    anTopItems:"🏆 शीर्ष आइटम", anLossItems:"⚠️ घाटे के आइटम",
+    anSellingBelow:"लागत से कम पर बेच रहे हैं",
+    anMoneyFlow:"धन प्रवाह", anAllTimeBalance:"सब समय का बैलेंस",
+    anYouOwe:"📤 आप पर बकाया", anOwedToYou:"📥 आपका बकाया", anNet:"🏦 शुद्ध",
+    anCashInHand:"नकद हाथ में", anLiveBalance:"लाइव बैलेंस",
+    anViewCashLedger:"📜 नकद खाता देखें",
+    anViewBalanceSheet:"📊 बैलेंस शीट देखें",
+    anLowStock:"कम स्टॉक अलर्ट", anItems:"आइटम",
+    anExportBtn:"⬇ निर्यात", outOfStock:"खत्म",
+    // Compare tab
+    cmpTitle:"⚖️ तुलना", cmpSubtitle:"आमदनी · खर्च · मुनाफा — ग्राहक, देनदार और लेनदार मिलाकर",
+    cmpDayBtn:"📅 दिन", cmpMonthBtn:"📆 माह", cmpYearBtn:"🗃 वर्ष", cmpYearsBtn:"⚖️ वर्ष तुलना",
+    cmpDailyBreakdown:"दैनिक विवरण", cmpMonthByMonth:"माह दर माह",
+    cmpYearByYear:"वर्ष-दर-वर्ष तुलना", cmpYearOverYear:"वर्ष-दर-वर्ष",
+    cmpToday:"आज", cmpNow:"अभी", cmpNew:"नया", cmpMon:"माह", cmpDiff:"अंतर",
+    cmpTotal:"कुल", cmpTotalChange:"कुल बदलाव:", cmpSalesCount:"बिक्री", cmpSalesCountP:"बिक्री",
+    cmpSelectBase:"📅 आधार वर्ष चुनें (वह वर्ष और सभी पिछले वर्ष दिखाएगा)",
+    cmpYearAGold:"📅 वर्ष A (सुनहरा)", cmpYearBBlue:"📅 वर्ष B (नीला)",
+    cmpMonthlyBreakdown:"मासिक विवरण", cmpVs:"बनाम",
+    cmpRevenueLegend:"आमदनी", cmpCostLegend:"लागत", cmpProfitLegend:"मुनाफा",
+    cmpAllMonths:"सभी महीने", cmpRevenueByYear:"वर्ष के अनुसार आमदनी (तक",
+    cmpCost:"लागत",
+    // Creditors tab
+    crHeading:"🏦 लेनदार", crSuppliers:"आपूर्तिकर्ता", crPayable:"कुल देय:",
+    crAddManually:"+ मैन्युअल जोड़ें", crArchived:"📦 संग्रहीत",
+    crTotalSuppliers:"कुल आपूर्तिकर्ता", crTotalPayable:"कुल देय",
+    crPaidMonth:"इस माह भुगतान", crPurchasedMonth:"इस माह खरीद",
+    crUnreconciled:"अनसुलझी खरीद", crEntries:"प्रविष्टि", crEntriesP:"प्रविष्टियां",
+    crWithoutCreditor:"बिना लेनदार के। टैप करके देखें।",
+    crSearchPlaceholder:"🔍 नाम या फ़ोन से लेनदार खोजें...",
+    crGstStatus:"🔢 GST स्थिति:", crAll:"🏢 सभी",
+    crGstReg:"✅ GST पंजीकृत", crNotReg:"❌ पंजीकृत नहीं",
+    crNoCreditors:"कोई लेनदार नहीं मिला", crTotalYouOwe:"कुल आप पर बकाया",
+    crBalance:"बकाया:", crLinked:"जुड़ा हुआ", crGstin:"GSTIN",
+    crMoveTo:"लेनदार में ले जाएं", crTarget:"लक्ष्य लेनदार",
+    crSelectAll:"सभी चुनें", crTap:"टैप करें", crDeleting:"हटाया जा रहा है",
+    crPurchaseDr:"खरीद (Dr)", crPaymentCr:"भुगतान (Cr)", crInvoice:"चालान",
+    crDate:"दिनांक", crItem:"आइटम / विवरण", crReason:"आइटम / कारण",
+    crDebitNote:"डेबिट नोट / संदर्भ", crPayMode:"भुगतान मोड", crPayment:"भुगतान",
+    crNotes:"नोट्स", crFromDate:"दिनांक से", crToDate:"दिनांक तक",
+    crTotal:"कुल", crPhone:"फ़ोन", crAddress:"पता",
+    crInvoiceRef:"चालान / संदर्भ सं.", crRefUtr:"संदर्भ / UTR सं.",
+    crAmount:"राशि", crCancel:"रद्द करें", crType:"प्रकार",
+    crCredit:"क्रेडिट", crDebit:"डेबिट",
+    crClosingBalance:"समापन बैलेंस:", crTotalYouOweLabel:"कुल आप पर बकाया",
+    crTxHistory:"लेनदेन इतिहास", crNoCredFound:"कोई लेनदार नहीं मिला",
+    crNoTxYet:"अभी तक कोई लेनदेन नहीं", crNotFound:"नहीं मिला",
+    crNegativeItems:"आइटम जो ऋणात्मक हो जाएंगे:", crStockReversed:"स्टॉक जो वापस होगा:",
+    crNoInvLinked:"इस लेनदार से कोई इन्वेंटरी स्टॉक नहीं जुड़ा।",
+    crNoUnreconciled:"ले जाने के लिए कोई अनसुलझी प्रविष्टि नहीं।",
+    crStatement:"लेनदार विवरण", crNoteOptional:"नोट (वैकल्पिक)",
+    // Debtors tab
+    dbHeading:"📥 देनदार", dbCustomers:"ग्राहक", dbReceivable:"कुल प्राप्य:",
+    dbDate:"दिनांक", dbDescription:"विवरण", dbReceivedVia:"प्राप्त माध्यम",
+    dbFromDate:"दिनांक से", dbToDate:"दिनांक तक", dbTotal:"कुल",
+    dbPhone:"फ़ोन", dbAddress:"पता", dbNotes:"नोट्स",
+    dbAmount:"राशि", dbBalance:"बैलेंस:", dbType:"प्रकार", dbCancel:"रद्द करें",
+    dbDebtor:"देनदार:", dbSale:"बिक्री", dbSaleDr:"बिक्री (Dr)",
+    dbReceipt:"रसीद", dbReceiptCr:"रसीद (Cr)", dbTransaction:"लेनदेन",
+    dbTxHistory:"लेनदेन इतिहास", dbNoTxYet:"अभी तक कोई लेनदेन नहीं",
+    dbNotFound:"नहीं मिला", dbCannotUndo:"इसे पूर्ववत नहीं किया जा सकता।",
+    dbStatement:"देनदार विवरण", dbNoDebtors:"कोई देनदार नहीं मिला",
+    dbClosingBalance:"समापन बैलेंस:",
+    // Alerts tab
+    alEverything:"आपका ध्यान चाहिए, सब एक जगह।",
+    alAddTeam:"टीम सदस्य जोड़ें", alUsername:"यूज़रनेम", alDisplayName:"प्रदर्शन नाम",
+    alPassword:"पासवर्ड", alConfirmPassword:"पासवर्ड की पुष्टि", alPermissions:"अनुमतियां",
+    alUsernameReadOnly:"यूज़रनेम (केवल पढ़ने योग्य)",
+    alCurrent:"वर्तमान:", alOldestUnpaidBill:"सबसे पुराना अवैतनिक बिल:",
+    alOldestUnpaidSale:"सबसे पुराना अवैतनिक बिक्री:",
+    alNoTeamMembers:"अभी कोई टीम सदस्य नहीं। पहला सदस्य नीचे जोड़ें।",
+    alNewPassword:"नया पासवर्ड (खाली रखें तो पुराना रहेगा)",
+    // History tab
+    alToday:"आज", alTodayOnly:"केवल आज",
+    // Settings tab
+    stBoldClassic:"बोल्ड · क्लासिक", stCleanBusiness:"साफ · व्यापार",
+    stGame:"गेम", stProfessional:"पेशेवर",
+    stShopName:"दुकान का नाम", stLanguage:"भाषा", stEnableVoice:"आवाज़ सक्षम करें",
+    stTemplate:"टेम्पलेट", stAddPhoto:"फ़ोटो जोड़ें", stRemovePhoto:"फ़ोटो हटाएं",
+    stCancel:"रद्द करें", stClose:"बंद करें", stSaveChanges:"बदलाव सहेजें",
+    stChangesApply:"बदलाव तुरंत लागू होते हैं",
+    stProPlan:"प्रो प्लान सक्रिय", stFullAccess:"सभी सुविधाओं की पूर्ण पहुंच",
+    stFreePlan:"मुफ़्त प्लान",
+    stUnlimited:"असीमित ग्राहक · सभी सुविधाएं · विज्ञापन-मुक्त डिस्प्ले",
+    stProFeature:"प्रो सुविधा",
+    stPasteCSV:"नीचे CSV/स्प्रेडशीट डेटा पेस्ट करें, या CSV फ़ाइल अपलोड करें।",
+    stExpectedCols:"अपेक्षित कॉलम:", stName:"नाम", stPhoneOptional:"फ़ोन (वैकल्पिक)",
+    stIdOptional:"ID (वैकल्पिक)", stMax200:"अधिकतम 200 पंक्तियां",
+    stMax50Reached:"अधिकतम 50 पंक्तियां पहुंच गई।",
+    stFillNames:"नाम भरें तो ग्राहक जोड़े जा सकते हैं।",
+    stNoPurchasesFilter:"इस फ़िल्टर से कोई खरीद मेल नहीं खाती",
+    stNoPurchasesSearch:"आपकी खोज से कोई खरीद मेल नहीं खाती",
+    stNoCustomers:"कोई ग्राहक नहीं", stNoPurchasesYet:"अभी कोई खरीद नहीं",
+    stNoPhone:"फ़ोन नहीं",
+    stNewPassword:"नया पासवर्ड", stConfirmPassword:"पासवर्ड की पुष्टि",
+    stEnterPassword:"जारी रखने के लिए पासवर्ड दर्ज करें।",
+    stChooseTvDisplay:"TV लीडरबोर्ड पर क्या दिखाना है चुनें",
+    stCategory:"श्रेणी", stUnit:"इकाई", stMinStock:"न्यूनतम स्टॉक अलर्ट",
+    stCompanyName:"कंपनी / कानूनी नाम", stPhone:"फ़ोन",
+    stBillHash:"बिल #", stCustomerId:"ग्राहक ID",
+    stOptional:"वैकल्पिक", stNotes:"नोट्स", stDate:"दिनांक",
+    stQty:"मात्रा", stTotalAmount:"कुल राशि:", stActive:"सक्रिय",
+    stIdAuto:"ID (खाली = स्वचालित)", stUpload:"अपलोड",
+    stRemoveFromInv:"यह इन्वेंटरी और सभी स्टॉक लॉग से हट जाएगा।",
+    stPurchaseRecords:"उन खरीद रिकॉर्ड से यह आइटम हटा दिया जाएगा।",
+    // Inventory tab
+    invNoInventory:"अभी कोई इन्वेंटरी नहीं",
+    invAddFirst:"स्टॉक ट्रैक करना शुरू करने के लिए पहला उत्पाद जोड़ें",
+    invOutOfStock:"स्टॉक खत्म", invLowStock:"कम स्टॉक", invTotalStockValue:"कुल स्टॉक मूल्य",
+    invName:"नाम", invCategory:"श्रेणी", invDate:"दिनांक", invQty:"मात्रा",
+    invRate:"दर", invAmount:"राशि", invBalance:"बैलेंस", invDescription:"विवरण",
+    invUnit:"इकाई", invField:"फ़ील्ड", invValue:"मूल्य", invSr:"क्र.",
+    invType:"प्रकार", invQtyHeader:"मात्रा",
+    invTaxInvoice:"कर चालान", invBill:"बिल", invOriginalRecipient:"मूल प्राप्तकर्ता के लिए",
+    invTaxableAmount:"कर योग्य राशि", invTaxableValue:"कर योग्य मूल्य",
+    invTotalTax:"कुल कर", invTotalAfterTax:"कर के बाद कुल राशि",
+    invTotalInWords:"शब्दों में कुल", invTerms:"नियम और शर्तें",
+    invAuthorisedSignatory:"अधिकृत हस्ताक्षरकर्ता", invPlaceOfSupply:"आपूर्ति का स्थान",
+    invInvoiceNo:"चालान सं.", invInvoiceDate:"चालान दिनांक",
+    invInvoiceDetail:"चालान विवरण", invInvoiceValue:"चालान मूल्य", invEWayBill:"ई-वे बिल",
+    invCancel:"रद्द करें", invClose:"बंद करें", invPublish:"प्रकाशित करें",
+    invProducts:"उत्पाद", invEditInstead:"इसे संपादित करें",
+    invClosingBalance:"समापन बैलेंस", invClosingBalanceColon:"समापन बैलेंस:",
+    invNoTransactions:"कोई लेनदेन नहीं", invNoTxYet:"अभी कोई लेनदेन नहीं",
+    invNoSalesYet:"अभी कोई बिक्री दर्ज नहीं।", invNoItemsOnTx:"इस लेनदेन पर कोई आइटम नहीं",
+    invNoDuplicates:"कोई डुप्लीकेट नहीं मिला!",
+    invLedgerNA:"खाता उपलब्ध नहीं", invLoadingLedger:"साझा खाता लोड हो रहा है...",
+    invAutoRecorded:"खरीद टैब में खरीद जोड़ने पर स्वतः दर्ज होता है",
+    invNoProfileInfo:"इस दुकान द्वारा कोई अतिरिक्त प्रोफ़ाइल जानकारी साझा नहीं।",
+    invNegativeItems:"आइटम जो ऋणात्मक हो जाएंगे:", invStockReversed:"स्टॉक जो वापस होगा:",
+    invNoItemBarcode:"इस बारकोड के लिए कोई आइटम नहीं मिला:",
+    invEnterBarcode:"या बारकोड मैन्युअल दर्ज करें:", invSearchBarcode:"या इस बारकोड का आइटम खोजें:",
+    invStartCamera:"कैमरा शुरू हो रहा है...",
+    invBankDetails:"बैंक विवरण", invAccNumber:"खाता सं.", invBranch:"शाखा",
+    invAddBankDetails:"बिलिंग सेटिंग में बैंक विवरण जोड़ें",
+    invOutward:"आउटवर्ड", invPan:"PAN:", invMs:"M/S", invSupply:"आपूर्ति",
+    invTransport:"परिवहन", invRefInvoice:"संदर्भ / चालान", invPriceIs:"कीमत है",
+    invProductService:"उत्पाद / सेवा का नाम", invCustomerDetail:"ग्राहक विवरण",
+    invExpiryAlerts:"समाप्ति अलर्ट", invMinStockWarning:"न्यूनतम स्टॉक चेतावनी",
+    invPickItem:"आइटम चुनें", invSharingWith:"आप वर्तमान में साझा कर रहे हैं",
+    // Messages tab
+    msgNoShops:"अभी कोई जुड़ी दुकान नहीं",
+    msgAddShop:"चैट शुरू करने के लिए SC-XXXXXX ID से दुकान जोड़ें।",
+    msgLoginRequired:"मैसेज उपयोग करने के लिए लॉगिन करें।",
+    msgExpiry:"मैसेज 7 दिन बाद हटते हैं · प्रति बातचीत अधिकतम 50",
+  },
+};
+
+// Fill missing translations from English
+Object.keys(LANGUAGES).forEach(lang => {
+  if (!TRANSLATIONS[lang]) TRANSLATIONS[lang] = {};
+  TRANSLATIONS[lang] = {...TRANSLATIONS.en, ...TRANSLATIONS[lang]};
+});
+
+var currentLang = localStorage.getItem("sc_lang") || localStorage.getItem(storageKey("lang")) || "en";
+
+function t(key) {
+  return (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key]) || TRANSLATIONS.en[key] || key;
+}
+
+
+
+// Data: inventoryItems = [{id, name, unit, stock:[{qty, costPerUnit, date, notes}]}]
+// Data: inventorySales = [{date, itemName, qty, custName}]  (auto-logged on ptSubmit)
+
+var inventoryItems = [];
+
+var _scConnections      = [];
+var _scPendingReqs      = [];
+var _scActiveChatPhone  = null;
+var _scMessages         = {};
+var _scUnreadCounts     = {};
+var _scPollTimer        = null;
+var _scConnPollTimer    = null;
+var _scBlockedShopIds   = []; // SC-IDs blocked by this shop (stored in localStorage)
+var _scPeerLedgerCache  = {}; // peerPhone -> { balance, balLabel, name } fetched from peer Firebase
+var invView = "stock"; // "stock" | "add" | "restock" | "log" | "detail" | "category"
+var invRestockSearch = ""; // search query for restock tab
+var invRestockSelected = null; // selected item name for restock
+var invPrefillName = ""; // pre-fill name when Restock button is clicked
+var invSelectedCat = ""; // currently selected category pill
+var invSearchQuery = ""; // search box text
+
 // ─── SUPABASE CONFIG (defined first so all functions can use it) ───
 // ── Secure password hashing (Web Crypto SHA-256) ──
 // Replaces insecure btoa encoding. Phone number acts as a unique per-user salt.
@@ -1560,12 +2110,12 @@ async function scHashPassword(phone, password) {
 }
 
 // ─── CONSTANTS ───────────────────────────────────────────────
-const FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
-const REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
-const TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings","alerts","history","team"];
-const TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️","⚠️","🕘","👤"];
-const TABS_LABEL_PRO = ["Rankings","Customers","Add Sale","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings","Alerts","History","Team"];
-let _shopRequestsUnread = 0; // badge count for messages tab
+var FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
+var REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
+var TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","messages","settings","alerts","history","team"];
+var TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️","⚠️","🕘","👤"];
+var TABS_LABEL_PRO = ["Rankings","Customers","Add Sale","Analytics","Compare","Inventory","Creditors","Debtors","Messages","Settings","Alerts","History","Team"];
+var _shopRequestsUnread = 0; // badge count for messages tab
 function getTabs(){
   const isPro = currentAppStyle === "pro";
   const result = [];
@@ -1658,17 +2208,17 @@ function addDeletedId(id) {
 function isDeletedId(id) { return getDeletedIds().has(id); }
 
 // ─── FIREBASE / STORAGE LAYER ────────────────────────────────
-let db = null, storage = null, useLocalOnly = false;
-let customers = [], prevRanks={}, currentTab=0, notifTimeout=null, tempPhoto="";
+var db = null, storage = null, useLocalOnly = false;
+var customers = [], prevRanks={}, currentTab=0, notifTimeout=null, tempPhoto="";
 // ── Pagination state ──
-let lbPage = 0;           // current leaderboard page (0-based)
-const LB_PAGE_SIZE = 50; // leaderboard rows per page
-let custPage = 0;         // customers tab: how many loaded so far (multiples of CUST_BATCH)
-const CUST_BATCH = 50;   // customers loaded per scroll batch
-let custSelectMode = false;  // multi-select mode toggle
-let custSelected = new Set(); // selected customer IDs
-let custFilteredIds = [];     // IDs of currently filtered/visible customers (for Select All)
-let fbUnsubscribe = null; // real-time listener handle
+var lbPage = 0;           // current leaderboard page (0-based)
+var LB_PAGE_SIZE = 50; // leaderboard rows per page
+var custPage = 0;         // customers tab: how many loaded so far (multiples of CUST_BATCH)
+var CUST_BATCH = 50;   // customers loaded per scroll batch
+var custSelectMode = false;  // multi-select mode toggle
+var custSelected = new Set(); // selected customer IDs
+var custFilteredIds = [];     // IDs of currently filtered/visible customers (for Select All)
+var fbUnsubscribe = null; // real-time listener handle
 
 // ── Firebase init ──
 function initFirebase(cfg) {
@@ -1683,7 +2233,7 @@ function initFirebase(cfg) {
 
 // ── Setup screen logic ──
 // ── Setup wizard: Step 1 (Firebase) ──
-let _pendingFbCfg = null;
+var _pendingFbCfg = null;
 function setupStep1Next() {
   const raw = document.getElementById("fb-config-input").value.trim();
   const errEl = document.getElementById("fb-config-err");
@@ -2002,7 +2552,7 @@ async function deleteOneCustomer(id) {
 
 
 // ── PWA Install Prompt ─────────────────────────────────────────
-let _deferredInstallPrompt = null;
+var _deferredInstallPrompt = null;
 
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
@@ -2073,8 +2623,8 @@ window.addEventListener('appinstalled', () => {
 })();
 
 // ── Mobile Bottom Nav ──────────────────────────────────────────
-const MOBILE_MAIN_TABS = [0, 1, 2, 5]; // leaderboard, customers, purchase, inventory
-const MOBILE_MORE_TABS = [3, 4, 6, 7, 8, 9, 10, 11, 12];    // analytics, compare, creditors, debtors, messages, settings, alerts, history, team
+var MOBILE_MAIN_TABS = [0, 1, 2, 5]; // leaderboard, customers, purchase, inventory
+var MOBILE_MORE_TABS = [3, 4, 6, 7, 8, 9, 10, 11, 12];    // analytics, compare, creditors, debtors, messages, settings, alerts, history, team
 
 function mobileTab(i) {
   closeMoreMenu();
@@ -2210,7 +2760,7 @@ function getSorted() {
 }
 
 // ─── DISPLAY SETTINGS ────────────────────────────────────────
-let displaySettings = {
+var displaySettings = {
   showCount: 10,
   fields: {name:true, userId:true, points:true, amount:true, visits:false, highestPurchase:false}
 };
@@ -2220,7 +2770,7 @@ function saveDisplaySettings() {
   saveSettingsToCloud();
 }
 
-let appSettings = {shopName:"Shop Champion", appIcon:"", autoPriceMode:"auto"};
+var appSettings = {shopName:"Shop Champion", appIcon:"", autoPriceMode:"auto"};
 try { const as=localStorage.getItem(storageKey("app_settings")); if(as) appSettings={...appSettings,...JSON.parse(as)}; } catch {}
 function saveAppSettings() {
   try { localStorage.setItem(storageKey("app_settings"),JSON.stringify(appSettings)); } catch {}
@@ -2230,7 +2780,7 @@ function saveAppSettings() {
 
 // ─── VOICE ANNOUNCEMENT SETTINGS ─────────────────────────────
 // ─── VOICE ANNOUNCEMENT ENGINE ───────────────────────────────
-let voiceSettings = {
+var voiceSettings = {
   enabled: true,
   voiceLang: "en",   // "en" or "hi" or "auto"
   template: "Congratulations {name}! You just purchased {amount} worth of amazing stuff! You are now ranked number {rank} on our leaderboard. Thank you for shopping with us!",
@@ -2248,14 +2798,14 @@ function saveVoiceSettings() {
 }
 
 // All preset templates per language
-const VOICE_PRESETS_EN = [
+var VOICE_PRESETS_EN = [
   { label:"🎉 Celebratory", text:"Congratulations {name}! You just purchased {amount} worth of amazing stuff! You are now ranked number {rank} on our leaderboard. Thank you for shopping with us!" },
   { label:"💎 Premium",     text:"Welcome back, {name}. Your purchase of {amount} has been recorded. You hold position {rank} on our leaderboard. We appreciate your loyalty." },
   { label:"🏆 Champion",    text:"Attention everyone! {name} just made a power purchase of {amount} and is Champion number {rank} on our leaderboard! Keep shopping and climb higher!" },
   { label:"✨ Friendly",    text:"Hey {name}! Great choice today — {amount} well spent! You are at rank {rank} right now. Come back soon and keep rising!" },
   { label:"🌟 Royal",       text:"Dear {name}, it is our honour to announce your purchase of {amount}. You stand proud at rank {rank} on the leaderboard. Thank you for your patronage!" },
 ];
-const VOICE_PRESETS_HI = [
+var VOICE_PRESETS_HI = [
   { label:"🎉 उत्सव",       text:"बधाई हो {name} जी! आपने {amount} की शानदार खरीदारी की! लीडरबोर्ड पर आपकी रैंक है नंबर {rank}! धन्यवाद, फिर पधारें!" },
   { label:"💎 प्रीमियम",    text:"स्वागत है {name} जी! आपकी {amount} की खरीदारी दर्ज हो गई है। आप हमारे लीडरबोर्ड पर {rank} नंबर पर हैं। आपकी वफादारी का शुक्रिया!" },
   { label:"🏆 चैंपियन",     text:"ध्यान दीजिए! {name} ने {amount} की जबरदस्त खरीदारी की और वो हमारे लीडरबोर्ड पर नंबर {rank} चैंपियन बन गए! और ऊपर चढ़ते रहो!" },
@@ -2266,7 +2816,7 @@ const VOICE_PRESETS_HI = [
 // ─── VOICE ENGINE (robust async + language-aware) ────────────
 
 // Voices load async — cache them and retry
-let _voiceCache = [];
+var _voiceCache = [];
 function _loadVoices() {
   if (!window.speechSynthesis) return;
   const v = window.speechSynthesis.getVoices();
@@ -2338,16 +2888,16 @@ function getBestVoice(lang) {
 // Converts ANY Devanagari text to phonetic English that sounds natural
 // when spoken by an English TTS voice (tuned for en-IN accent).
 
-const _DEV_VOWELS = {
+var _DEV_VOWELS = {
   "अ":"u","आ":"aa","इ":"i","ई":"ee","उ":"oo","ऊ":"oo",
   "ए":"ay","ऐ":"ai","ओ":"o","औ":"au","ऋ":"ri","अं":"un","अः":"uh"
 };
-const _DEV_MATRAS = {
+var _DEV_MATRAS = {
   "ा":"aa","ि":"i","ी":"ee","ु":"oo","ू":"oo",
   "े":"ay","ै":"ai","ो":"o","ौ":"au","ृ":"ri",
   "ं":"n","ः":"h","ँ":"n","्":""  // halant (virama) = suppress inherent vowel
 };
-const _DEV_CONS = {
+var _DEV_CONS = {
   "क":"k","ख":"kh","ग":"g","घ":"gh","ङ":"ng",
   "च":"ch","छ":"chh","ज":"j","झ":"jh","ञ":"ny",
   "ट":"t","ठ":"th","ड":"d","ढ":"dh","ण":"n",
@@ -2361,7 +2911,7 @@ const _DEV_CONS = {
 };
 
 // High-quality whole-phrase overrides for natural TTS pronunciation
-const _HI_PHRASE_OVERRIDES = [
+var _HI_PHRASE_OVERRIDES = [
   ["बधाई हो","badhaaee ho"],
   ["बहुत बहुत बधाई","bahut bahut badhaaee"],
   ["धन्यवाद","dhanyavaad"],
@@ -2571,7 +3121,7 @@ function updateAppHeader() {
 
 // ─── LEADERBOARD DATE FILTER ─────────────────────────────────
 // mode: "all" | "today" | "custom" | "year"
-let lbFilter = { mode: "all", customDate: "", year: new Date().getFullYear() };
+var lbFilter = { mode: "all", customDate: "", year: new Date().getFullYear() };
 
 function todayStr() { return new Date().toISOString().slice(0,10); }
 
@@ -2604,7 +3154,7 @@ function getSortedFiltered() {
 }
 
 // ─── SYNC ─────────────────────────────────────────────────────
-let syncBinId=null, syncApiKey=null, lastSyncTime=null;
+var syncBinId=null, syncApiKey=null, lastSyncTime=null;
 try { const sd=localStorage.getItem(storageKey("sync_data")); if(sd){const p=JSON.parse(sd);syncBinId=p.binId;syncApiKey=p.apiKey;} } catch {}
 function saveSyncData() {
   try { localStorage.setItem(storageKey("sync_data"),JSON.stringify({binId:syncBinId,apiKey:syncApiKey})); } catch {}
@@ -2771,7 +3321,7 @@ function notify(msg, type){
 }
 
 // ─── CONFETTI ─────────────────────────────────────────────────
-let cFrame,cTimeout;
+var cFrame,cTimeout;
 function startConfetti(){
   const cv=document.getElementById("confetti-canvas");cv.style.display="block";cv.width=innerWidth;cv.height=innerHeight;
   const ctx=cv.getContext("2d"),CC=["#FFD700","#FFA500","#FF6347","#00CED1","#9370DB","#32CD32"];
@@ -2784,15 +3334,15 @@ function startConfetti(){
 // ══════════════════════════════════════════════
 // AUTH SYSTEM — Mobile + Password + OTP
 // ══════════════════════════════════════════════
-let authConfirmResult = null;
-let recaptchaVerifier  = null;
-let authMode = ""; // "new_user" | "forgot"
-let authPhone = "";
+var authConfirmResult = null;
+var recaptchaVerifier  = null;
+var authMode = ""; // "new_user" | "forgot"
+var authPhone = "";
 // ── Team Member state ──────────────────────────────────────────
-let currentMember = null; // null = shop owner logged in; object = team member
+var currentMember = null; // null = shop owner logged in; object = team member
 // { id, username, display_name, permissions: { tabs:{...}, actions:{...} } }
-let _memberSessionToken = null; // session token stored locally for heartbeat
-let _memberSessionTimer = null; // interval handle for heartbeat
+var _memberSessionToken = null; // session token stored locally for heartbeat
+var _memberSessionTimer = null; // interval handle for heartbeat
 
 function hasPermission(actionKey) {
   if (!currentMember) return true; // owner always has full permission
@@ -2807,11 +3357,11 @@ function isTabVisible(tabKey) {
   if (!tabs) return false;
   return !!tabs[tabKey];
 }
-let _loginSuccessFired = false; // guard: prevent double auto-login from DOMContentLoaded + window.load
+var _loginSuccessFired = false; // guard: prevent double auto-login from DOMContentLoaded + window.load
 // Read sc_member_active NOW (before any event listener clears it from localStorage).
 // This prevents a race condition where DOMContentLoaded removes the flag before
 // window.load checks it, causing the admin to be auto-logged in after a member session.
-const _memberWasActiveOnLoad = localStorage.getItem("sc_member_active") === "1";
+var _memberWasActiveOnLoad = localStorage.getItem("sc_member_active") === "1";
 // ─── PER-ACCOUNT STORAGE KEY ─────────────────────────────────
 // All localStorage keys are prefixed with the logged-in phone number
 // so two accounts on the same browser never share data.
@@ -2994,8 +3544,8 @@ async function checkPhone() {
 
 // ── Step 2a: Login with password ──
 // ── Brute-force login protection ──────────────────────────────
-const SC_MAX_ATTEMPTS  = 5;          // max wrong passwords
-const SC_LOCKOUT_MS    = 15 * 60 * 1000; // 15 minutes in ms
+var SC_MAX_ATTEMPTS  = 5;          // max wrong passwords
+var SC_LOCKOUT_MS    = 15 * 60 * 1000; // 15 minutes in ms
 
 function bfKey(phone) { return "sc_bf_" + phone; }
 
@@ -3523,7 +4073,7 @@ function updateSyncStatus(){
 
 // ─── Safe render: always preserves Purchase form state ──────────
 // IDs of every input/textarea on the Purchase tab (tab 2) that should survive re-renders
-const _TAB2_FIELD_IDS = [
+var _TAB2_FIELD_IDS = [
   "pt-search","pt-sel","pt-amt","pt-bill","pt-notes","pt-date","pt-date-val",
   "bw-search","bw-sel","bw-amt","bw-date","bw-due"
 ];
@@ -3928,9 +4478,9 @@ function renderLeaderboard(sorted){
 }
 
 // ─── CUSTOMERS ────────────────────────────────────────────────
-let custDateFilter = 'all'; // 'all' | '7d' | '30d' | 'custom'
-let custCustomDate = '';
-let custGstFilter  = 'all'; // 'all' | 'gst' | 'nogst'
+var custDateFilter = 'all'; // 'all' | '7d' | '30d' | 'custom'
+var custCustomDate = '';
+var custGstFilter  = 'all'; // 'all' | 'gst' | 'nogst'
 // custPage and related vars declared at top level
 
 function setCustDateFilter(f, date='') {
@@ -4103,7 +4653,7 @@ function refreshCustSearch(q){
 }
 
 // ─── PURCHASE TAB ─────────────────────────────────────────────
-let ptView = "purchase"; // "purchase" | "borrow"
+var ptView = "purchase"; // "purchase" | "borrow"
 function renderPurchaseTab(sorted){
   // Borrow summary: all customers with pending or partial borrows
   const pendingBorrows = customers.filter(c=>(c.borrows||[]).some(b=>b.status==="pending"||b.status==="partial"||b.status==="pending_payment"));
@@ -4758,7 +5308,7 @@ function invUpdateGstPreview(formType){
 
 
 // ── HSN Lookup Table & Kirana Cheat Sheet ──────────────────────────────────
-const HSN_GST_MAP = {
+var HSN_GST_MAP = {
   // 0% — Fresh/unprocessed essentials
   "0401":0,"0402":0,"0403":0,"0404":0,  // Milk & dairy (fresh/unprocessed)
   "0701":0,"0702":0,"0703":0,"0704":0,"0705":0,"0706":0,"0707":0,"0708":0,"0709":0, // Vegetables
@@ -4824,7 +5374,7 @@ const HSN_GST_MAP = {
   "8703":28, // Motor cars
 };
 
-const KIRANA_CHEATSHEET = [
+var KIRANA_CHEATSHEET = [
   { rate: 0,  color: "#22c55e", label: "0% — No GST",   items: "Fresh milk, Rice, Wheat, Vegetables, Fruits, Eggs, Bread, Salt, Unbranded flour/sugar" },
   { rate: 5,  color: "#84cc16", label: "5%",             items: "Packed tea/coffee, Edible oils (mustard, sunflower), Butter, Cheese, Sugar (branded), Packed flour (atta), Medicines" },
   { rate: 12, color: "#facc15", label: "12%",            items: "Ghee, Dry fruits, Fruit juice, Jam & jelly, Chocolate, Frozen vegetables, Namkeen (loose packed)" },
@@ -5412,7 +5962,7 @@ function exportYearCSV(year){
 }
 
 // ─── ANALYTICS ───────────────────────────────────────────────
-let analyticsYear = new Date().getFullYear();
+var analyticsYear = new Date().getFullYear();
 
 function getAnalyticsYears(){
   const years = new Set();
@@ -6299,11 +6849,11 @@ function printBalanceSheet(){
 }
 
 // ─── COMPARE MODE ─────────────────────────────────────────────
-let cmpMode       = "day";  // "day" | "month" | "year" | "years"
-let cmpWeekOffset = 0;
-let cmpSelectedYear = new Date().getFullYear();
-let cmpYearA = new Date().getFullYear();
-let cmpYearB = new Date().getFullYear() - 1;
+var cmpMode       = "day";  // "day" | "month" | "year" | "years"
+var cmpWeekOffset = 0;
+var cmpSelectedYear = new Date().getFullYear();
+var cmpYearA = new Date().getFullYear();
+var cmpYearB = new Date().getFullYear() - 1;
 
 function cmpAllPurchases(){
   const all=[];
@@ -6617,7 +7167,7 @@ function renderCompare(){
 }
 
 // ─── FESTIVALS ────────────────────────────────────────────────
-let festWinners=[],festAnnounced=[];
+var festWinners=[],festAnnounced=[];
 function renderFestivals(sorted){
   const fOpts=FESTIVALS.map(f=>`<option>${f}</option>`).join("");
   const rOpts=REWARDS.map(r=>`<option>${r}</option>`).join("");
@@ -7579,12 +8129,12 @@ function deleteDebtor(id){
 }
 
 // ── Transaction filter/search helpers ─────────────────────────────────────────
-let _crTxCurrentFilter = "all";
+var _crTxCurrentFilter = "all";
 
 // ── Month navigator helpers ───────────────────────────────────────────────────
-const _MONTH_NAMES=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const _MONTH_NAMES_FULL=["January","February","March","April","May","June","July","August","September","October","November","December"];
-const _MONTH_NAMES_FULL_HI=["जनवरी","फ़रवरी","मार्च","अप्रैल","मई","जून","जुलाई","अगस्त","सितंबर","अक्टूबर","नवंबर","दिसंबर"];
+var _MONTH_NAMES=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+var _MONTH_NAMES_FULL=["January","February","March","April","May","June","July","August","September","October","November","December"];
+var _MONTH_NAMES_FULL_HI=["जनवरी","फ़रवरी","मार्च","अप्रैल","मई","जून","जुलाई","अगस्त","सितंबर","अक्टूबर","नवंबर","दिसंबर"];
 function _getMonthName(i){ return currentLang==='hi'?_MONTH_NAMES_FULL_HI[i]:_MONTH_NAMES_FULL[i]; }
 function _currentLabel(){ return currentLang==='hi'?' (वर्तमान)':' (Current)'; }
 
@@ -8650,7 +9200,7 @@ async function crossDeleteTransaction(theirPhone, txId) {
 
 // Listen to transactions that OTHER shops have cross-written into MY ledger
 // Path: users/{myPhone}/linked_ledger/{theirPhone}/transactions
-let _linkedLedgerListeners = {}; // theirPhone -> unsubscribe fn
+var _linkedLedgerListeners = {}; // theirPhone -> unsubscribe fn
 
 function startLinkedLedgerListener(theirPhone, onTx) {
   if (!db || !authPhone || !theirPhone) return;
@@ -8921,7 +9471,7 @@ async function cleanupStaleSentRequests() {
       { method: "DELETE" });
   } catch(e) {}
 }
-let _payReqListener = null;
+var _payReqListener = null;
 function startPaymentRequestListener() {
   // Start cross-write listeners for all linked shops instead
   setTimeout(startAllLinkedLedgerListeners, 500);
@@ -9329,7 +9879,7 @@ function saveDebtorModal(editId){
 }
 
 // ── Debtor Detail (Tally-style ledger) ───────────────────────────────────────
-let _drTxCurrentFilter = "all";
+var _drTxCurrentFilter = "all";
 
 function _drTxApplyMonthNav(debtorId){
   const yr=window._drTxNavYear||new Date().getFullYear();
@@ -10153,9 +10703,9 @@ function renderAlertsTab(){
 // Shows a chronological activity feed for a selectable date
 // (defaults to today). Logs are written by addHistoryLog().
 // ═══════════════════════════════════════════════════════════════
-let historySelectedDate = ""; // "" = today; else "YYYY-MM-DD"
+var historySelectedDate = ""; // "" = today; else "YYYY-MM-DD"
 
-const HIST_TYPE_META = {
+var HIST_TYPE_META = {
   sale:      {icon:"💰", color:"#4ade80", label:"Sale"},
   purchase:  {icon:"📦", color:"#f59e0b", label:"Purchase"},
   inventory: {icon:"📦", color:"#7ab3ff", label:"Inventory"},
@@ -10170,7 +10720,7 @@ const HIST_TYPE_META = {
 // ═══════════════════════════════════════════════════════════════════
 
 // Default permissions for new members (safe defaults: read-only-ish)
-const DEFAULT_MEMBER_PERMISSIONS = {
+var DEFAULT_MEMBER_PERMISSIONS = {
   tabs: { leaderboard:true, customers:true, sales:true, analytics:false, compare:false, inventory:true, creditors:false, debtors:false, messages:true, settings:false, alerts:true, history:true },
   actions: {
     sale_create:true, sale_delete:false,
@@ -10182,7 +10732,7 @@ const DEFAULT_MEMBER_PERMISSIONS = {
   }
 };
 
-const PERM_ACTIONS_META = [
+var PERM_ACTIONS_META = [
   { key:"sale_create",          label:"Create Sale",              group:"Sales" },
   { key:"sale_delete",          label:"Delete Sale",              group:"Sales" },
   { key:"customer_create",      label:"Add Customer",             group:"Customers" },
@@ -10203,7 +10753,7 @@ const PERM_ACTIONS_META = [
   { key:"history_date_filter",  label:"View Past History Dates",  group:"History" }
 ];
 
-const PERM_TABS_META = [
+var PERM_TABS_META = [
   {key:"leaderboard",label:"Leaderboard"},{key:"customers",label:"Customers"},
   {key:"sales",label:"Sales"},{key:"analytics",label:"Analytics"},
   {key:"compare",label:"Compare"},{key:"inventory",label:"Inventory"},
@@ -10212,7 +10762,7 @@ const PERM_TABS_META = [
   {key:"alerts",label:"Alerts"},{key:"history",label:"History"}
 ];
 
-let _teamMembers = [];
+var _teamMembers = [];
 
 async function fetchTeamMembers() {
   if (requireOnline()) return [];
@@ -11106,7 +11656,7 @@ function renderSettings(){
 }
 
 // ── History Management ────────────────────────────────────────
-const HIST_PASS_KEY = 'sc_hist_mgr_pass';
+var HIST_PASS_KEY = 'sc_hist_mgr_pass';
 
 function openHistoryManager(){
   const savedPass = localStorage.getItem(HIST_PASS_KEY);
@@ -12248,8 +12798,8 @@ document.addEventListener("DOMContentLoaded", updateAppHeader);
 // ─── THEME ────────────────────────────────────────────────────
 // appStyle: "pro" (default) or "game"
 // colorMode: "night" or "day" (only used in game style)
-let currentTheme = localStorage.getItem(storageKey("theme")) || "night";
-let currentAppStyle = localStorage.getItem(storageKey("appStyle")) || "pro";
+var currentTheme = localStorage.getItem(storageKey("theme")) || "night";
+var currentAppStyle = localStorage.getItem(storageKey("appStyle")) || "pro";
 
 function applyAppStyle(style) {
   currentAppStyle = style;
@@ -12274,15 +12824,15 @@ function applyAppStyle(style) {
 }
 
 // SVG icons for pro bottom nav
-const BNAV_PRO_ICONS = {
+var BNAV_PRO_ICONS = {
   0: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M5 3h14l-1.5 9H6.5L5 3z"/><path d="M9 12a3 3 0 0 0 6 0"/></svg>`,
   1: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
   2: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
   5: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
 };
-const BNAV_PRO_LABELS = { 0: "Rankings", 1: "Customers", 2: "Add Sale", 5: "Inventory" };
-const BNAV_GAME_ICONS = { 0: "🏆", 1: "👥", 2: "💳", 5: "📦" };
-const BNAV_GAME_LABELS = { 0: "Board", 1: "Customers", 2: "Purchase", 5: "Inventory" };
+var BNAV_PRO_LABELS = { 0: "Rankings", 1: "Customers", 2: "Add Sale", 5: "Inventory" };
+var BNAV_GAME_ICONS = { 0: "🏆", 1: "👥", 2: "💳", 5: "📦" };
+var BNAV_GAME_LABELS = { 0: "Board", 1: "Customers", 2: "Purchase", 5: "Inventory" };
 
 function updateBottomNavIcons() {
   const isPro = currentAppStyle === "pro";
@@ -12317,537 +12867,12 @@ document.addEventListener("DOMContentLoaded", () => {
   updateBottomNavIcons();
 });
 
-// ─── LANGUAGE ─────────────────────────────────────────────────
-const LANGUAGES = {
-  en:  { name:"English",    flag:"🇬🇧" },
-  hi:  { name:"हिंदी",      flag:"🇮🇳" },
-};
-
-// Translation dictionary
-const TRANSLATIONS = {
-  en: {
-    adminPanel:"Admin Panel", leaderboard:"Leaderboard", customers:"Customers",
-    purchase:"Add Sale", analytics:"Analytics", compare:"Compare",
-    inventory:"Inventory", creditors:"Creditors", debtors:"Debtors", alerts:"Alerts", history:"History",
-    messages:"Messages",
-    festivals:"Festival Rewards", settings:"Settings", logout:"Logout",
-    addCustomer:"+ Add Customer", exportCSV:"⬇ Export CSV", addPurchase:"Add Sale →",
-    totalSpend:"Total Spend", points:"Points", rank:"Rank", visits:"visits",
-    lastVisit:"Last Visit", firstVisit:"First Visit", frequency:"Frequency",
-    avgPerVisit:"Avg per Visit", totalVisits:"Total Visits", purchaseHistory:"Purchase History",
-    noCustomers:"No customers found", noPurchases:"No purchases yet",
-    pushDisplay:"⬆ Push to Display", displaySetup:"📺 Display Setup",
-    searchPlaceholder:"🔍 Search by name, phone or ID...",
-    customerProfile:"Customer Profile", back:"← पीछे", edit:"✏️ Edit", next:"Next",
-    addPurchaseBtn:"+ Sale", deleteConfirm:"Delete this customer and all their purchases?",
-    deletePurchaseConfirm:"Delete this purchase? The customer's total spend will decrease.",
-    today:t('alToday'), allTime:"All Time", pickDate:"📆 Pick Date",
-    showFor:"📅 Show For:", yearFilter:"📆 YEAR:",
-    bill:"Bill", date:"Date", notes:"Notes", amount:"Amount (₹)",
-    searchFilter:"🔍 Filter by", filterDate:"📅 Date Range",
-    filterExact:"₹ Exact Amount", filterRange:"📊 Amount Range",
-    clearFilter:"✕ Clear", apply:"Apply",
-    shopName:"Shop Name", shopIcon:"Shop Icon",
-    displaySettings:"Display Settings", databaseStorage:"🔥 Database Storage",
-    syncDisplay:"📺 Sync & Display", customersOnDisplay:"Customers on Display Screen",
-    firebaseConnected:"✅ Firebase Connected", localMode:"📦 Local storage (demo mode)",
-    ready:"Ready", syncing:"Pushing...", synced:"Leaderboard synced",
-    wrongPassword:"Wrong password", loginAdmin:"ADMIN LOGIN",
-    enterPassword:"Enter Password (1234)", login:"Login →",
-    showing:"Showing", of:"of", purchases:"purchases", total:"Total",
-    visitNum:"Visit #", allTimeBracket:"(all-time:", yearRevenue:"Revenue",
-    activeCustomers:"Active Customers", topEarner:"Top Earner",
-    avgSpend:"Avg Spend/Customer", monthlyRevenue:"Monthly Revenue",
-    topCustomers:"Top Customers", monthByMonth:"Month-by-Month",
-    yearlyAnalytics:"📊 Yearly Analytics", selectYear:"SELECT YEAR:",
-    compareTitle:"⚖️ Compare", compareDesc:"Revenue comparison by day · month · year",
-    dayMode:"📅 Day", monthMode:"📆 Month", yearMode:"🗃 Year", yearsMode:"⚖️ Compare Years",
-    festivalRewards:"Festival Rewards", festival:"Festival", reward:"Reward",
-    selectWinners:"Select winners:", announceWinners:"🎉 Announce Winners",
-    pastAnnouncements:"Past Announcements", noOutstandingBorrows:"✅ No outstanding borrows",
-    outstandingBorrows:"📌 Outstanding Borrows", totalOwed:"Total owed:",
-    addBorrow:"Record Borrow →", borrowDetails:"📦 Borrow Details",
-    pending:"PENDING", returned:"RETURNED", overdue:"OVERDUE",
-    markReturned:"✓ Returned", borrowRecord:"Borrow", noPhone:"No phone",
-    whatsapp:"💬 WhatsApp", phone:"Phone Number", customerId:"Customer ID",
-    fullName:"Full Name", optional:"Optional", autoId:"🎲 Auto",
-    saveChanges:"Save Changes", saveName:"✅ Save Name", removeIcon:"🗑 Remove Icon",
-    themeLabel:"Theme", languageLabel:"Language", dayTheme:"☀️ Day", nightTheme:"🌙 Night",
-    // Customers tab extras
-    never:"Never", rankHash:"Rank #", bulk:"👥 Bulk",
-    gstStatus:"🔢 GST Status:", allCustomers:"👥 All",
-    gstRegistered:"✅ GST Registered", notRegistered:"❌ Not Registered",
-    notVisitedSince:"⚠️ Not visited since:", days7:"7 Days", month1:"1 Month", months3:"3 Months",
-    pickDateBtn:"📅 Pick Date",
-    showingInactive:"Showing", inactiveDays:"7+ days", inactiveMonth:"1+ month", inactiveMonths3:"3+ months", inactiveSince:"since",
-    loadMore:"Load More", remaining:"remaining",
-    customersFooter:"customers",
-    selectedCount:"selected", deleteSelected:"🗑️ Delete", cancelSelect:"✕ Cancel",
-    custHeading:"Customers", filtered:"filtered",
-    searchCustPlaceholder:"🔍 Search name, phone, ID...",
-    noCustomersFound:"No customers found",
-    // Sales tab extras
-    salesHeading:"🧾 Sales", addSaleTab:"🧾 Add Sale",
-    inventoryMode:"Inventory Mode", invModeDesc:"Amount auto-calculated from items × price",
-    switchMode:"Switch", standardMode:"Standard Mode", stdModeDesc:"Enter amount manually",
-    searchCustomer:"Search Customer", searchByNamePhone:"Search by name, phone or ID...",
-    purchaseAmount:"Purchase Amount (₹)",
-    itemsSoldInv:"🛒 Items Sold — enter qty & selling price",
-    itemsSoldStd:"Items Sold (optional — deducts from Inventory)",
-    scanBarcode:"📷 Scan Barcode to Add Item",
-    addItemBtn:"➕ Add Item", billNumber:"Bill Number", dateTime:"Date & Time",
-    changeDate:"✏️ Change", closeDate:"❌ Close", currentTime:"🕐 Current Time",
-    notesOptional:"Notes (optional)", notesPlaceholder:"e.g. Diwali purchase...",
-    addSaleBtn:"Add Sale →",
-    recordNewBorrow:"📋 Record a new borrow",
-    itemsBorrowed:"🛒 Items Borrowed",
-    amtBorrowed:"Amount Borrowed (₹)", autoFilledItems:"← auto-filled from items above",
-    dueDateOptional:"Due Date (optional)",
-    recordBorrowBtn:"Record Borrow →",
-    outstandingBorrowsLabel:"📌 Outstanding Borrows",
-    totalOwedLabel:"Total owed:", owesLabel:"Owes",
-    noDescription:"No description",
-    borrowedLabel:"Borrowed:", dueLabel:"Due:", overdueLabel:"⚠️ Overdue",
-    partialLabel:"💛 Partial", leftLabel:"left",
-    returnedBtn:"✓ Returned", slipBtn:"🧾 Slip",
-    detailsBtn:"Details", noOutstandingBorrows:"✅ No outstanding borrows",
-    borrowSubtab:"📦 Borrow",
-    // Analytics
-    anMonths:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
-    statusWell:"Business is doing well", statusSlow:"Sales are a bit slow",
-    statusNoActivity:"No activity this month yet", statusLoss:"Running at a loss this month",
-    statusProfitSub:"Profit this month:", statusProfitableSub:"Profitable at",
-    statusDipped:"— but sales dipped", statusRecordSales:"Record sales to see your business health",
-    statusLossSub:"Loss:", statusExpenses:"— expenses exceed revenue",
-    anSalesVs:"Sales", anVs:"vs",
-    anRevenue:"💸 Revenue", anExpenses:"📦 Expenses", anProfit:"✨ Profit",
-    anYearSales:"🛒 YEAR SALES", anYearProfit:"💰 YEAR PROFIT",
-    anStockValue:"🏪 STOCK VALUE NOW", anNetFlow:"⚖️ NET MONEY FLOW",
-    anTransactions:"transactions", anCustomers:"customers",
-    anItemsTracked:"items tracked", anSuppliers:"suppliers", anDebtors:"debtors",
-    anReceivable:"receivable", anPayable:"payable",
-    anMonthlyTrend:"📈 Monthly Trend", anSalesLegend:"Sales", anCostLegend:"Cost",
-    anBills:"Bills", anAvgCust:"Avg/Cust",
-    anCustSection:"👥 Customers", anTotal:"Total", anActive:"Active",
-    anAvgSpend:"Avg Spend", anTopCust:"Top Customer this Month",
-    anTopItems:"🏆 Top Items", anLossItems:"⚠️ Loss Items",
-    anSellingBelow:"Selling below cost",
-    anMoneyFlow:"Money Flow", anAllTimeBalance:"All-time balances",
-    anYouOwe:"📤 YOU OWE", anOwedToYou:"📥 OWED TO YOU", anNet:"🏦 NET",
-    anCashInHand:"Cash in Hand", anLiveBalance:"live balance",
-    anViewCashLedger:"📜 View Cash Flow Ledger",
-    anViewBalanceSheet:"📊 View Balance Sheet",
-    anLowStock:"Low Stock Alert", anItems:"items",
-    anExportBtn:"⬇ Export", outOfStock:"OUT",
-    // Compare tab
-    cmpTitle:"⚖️ Compare", cmpSubtitle:"Revenue · Expenses · Profit — customers, debtors & creditors combined",
-    cmpDayBtn:"📅 Day", cmpMonthBtn:"📆 Month", cmpYearBtn:"🗃 Year", cmpYearsBtn:"⚖️ Compare Years",
-    cmpDailyBreakdown:"Daily Breakdown", cmpMonthByMonth:"Month-by-Month",
-    cmpYearByYear:"Year-by-Year Comparison", cmpYearOverYear:"Year-over-Year",
-    cmpToday:t('alToday'), cmpNow:"Now", cmpNew:"New", cmpMon:"MON", cmpDiff:"DIFF",
-    cmpTotal:"Total", cmpTotalChange:"Total change:", cmpSalesCount:"sale", cmpSalesCountP:"sales",
-    cmpSelectBase:"📅 Select Base Year (shows that year + all previous)",
-    cmpYearAGold:"📅 Year A (Gold)", cmpYearBBlue:"📅 Year B (Blue)",
-    cmpMonthlyBreakdown:"monthly breakdown", cmpVs:"vs",
-    cmpRevenueLegend:"Revenue", cmpCostLegend:"Cost", cmpProfitLegend:"Profit",
-    cmpAllMonths:"All months of", cmpRevenueByYear:"Revenue by Year (up to",
-    cmpCost:"cost",
-    // Creditors tab
-    crHeading:"🏦 Creditors", crSuppliers:"supplier", crPayable:"Total payable:",
-    crAddManually:"+ Add Manually", crArchived:"📦 Archived",
-    crTotalSuppliers:"Total Suppliers", crTotalPayable:"Total Payable",
-    crPaidMonth:"Paid This Month", crPurchasedMonth:"Purchased This Month",
-    crUnreconciled:"Unreconciled Purchases", crEntries:"entry", crEntriesP:"entries",
-    crWithoutCreditor:"without a creditor. Tap to review.",
-    crSearchPlaceholder:"🔍 Search creditor by name or phone...",
-    crGstStatus:"🔢 GST Status:", crAll:"🏢 All",
-    crGstReg:"✅ GST Registered", crNotReg:"❌ Not Registered",
-    crNoCreditors:"No creditors found", crTotalYouOweLabel:"Total You Owe",
-    crBalance:"Balance:", crLinked:"Linked", crGstin:"GSTIN",
-    crMoveTo:"Move to Creditor", crTarget:"Target Creditor",
-    crSelectAll:"Select All", crTap:"Tap", crDeleting:"Deleting",
-    crPurchaseDr:"Purchase (Dr)", crPaymentCr:"Payment (Cr)", crInvoice:"Invoice",
-    crDate:"DATE", crItem:"ITEM / DESCRIPTION", crReason:"ITEM / REASON",
-    crDebitNote:"DEBIT NOTE / REF", crPayMode:"PAYMENT MODE", crPayment:"PAYMENT",
-    crNotes:"NOTES", crFromDate:"FROM DATE", crToDate:"TO DATE",
-    crTotal:"TOTAL", crPhone:"PHONE", crAddress:"ADDRESS",
-    crInvoiceRef:"INVOICE / REF NO.", crRefUtr:"REF / UTR NO.",
-    crAmount:"Amount", crCancel:"Cancel", crType:"Type",
-    crCredit:"Credit", crDebit:"Debit",
-    crClosingBalance:"Closing Balance:", crTotalYouOwe:"TOTAL YOU OWE",
-    crTxHistory:"Transaction History", crNoCredFound:"No Creditors Found",
-    crNoTxYet:"No transactions yet", crNotFound:"Not found",
-    crNegativeItems:"ITEMS THAT WOULD GO NEGATIVE:",
-    crStockReversed:"STOCK THAT WOULD BE REVERSED:",
-    crNoInvLinked:"No inventory stock linked to this creditor.",
-    crNoUnreconciled:"No unreconciled entries to move.",
-    crStatement:"Creditor Statement", crNoteOptional:"NOTE (optional)",
-    // Debtors tab
-    dbHeading:"📥 Debtors", dbCustomers:"customers", dbReceivable:"Total receivable:",
-    dbDate:"DATE", dbDescription:"DESCRIPTION", dbReceivedVia:"RECEIVED VIA",
-    dbFromDate:"FROM DATE", dbToDate:"TO DATE", dbTotal:"TOTAL",
-    dbPhone:"PHONE", dbAddress:"ADDRESS", dbNotes:"NOTES",
-    dbAmount:"Amount", dbBalance:"Balance:", dbType:"Type", dbCancel:"Cancel",
-    dbDebtor:"Debtor:", dbSale:"Sale", dbSaleDr:"Sale (Dr)",
-    dbReceipt:"Receipt", dbReceiptCr:"Receipt (Cr)", dbTransaction:"Transaction",
-    dbTxHistory:"Transaction History", dbNoTxYet:"No transactions yet",
-    dbNotFound:"Not found", dbCannotUndo:"This cannot be undone.",
-    dbStatement:"Debtor Statement", dbNoDebtors:"No debtors found",
-    dbClosingBalance:"Closing Balance:",
-    // Alerts tab
-    alEverything:"Everything that needs your attention, in one place.",
-    alAddTeam:"Add Team Member", alUsername:"Username", alDisplayName:"Display Name",
-    alPassword:"Password", alConfirmPassword:"Confirm Password", alPermissions:"Permissions",
-    alUsernameReadOnly:"Username (read-only)",
-    alCurrent:"Current:", alOldestUnpaidBill:"Oldest unpaid bill:",
-    alOldestUnpaidSale:"Oldest unpaid sale:",
-    alNoTeamMembers:"No team members yet. Add your first member below.",
-    alNewPassword:"New Password (leave blank to keep current)",
-    // History tab
-    alToday:"Today", alTodayOnly:"Today only",
-    // Settings tab
-    stBoldClassic:"Bold · Classic", stCleanBusiness:"Clean · Business",
-    stGame:"Game", stProfessional:"Professional",
-    stShopName:"Shop Name", stLanguage:"Language", stEnableVoice:"Enable Voice",
-    stTemplate:"Template", stAddPhoto:"Add Photo", stRemovePhoto:"Remove Photo",
-    stCancel:"Cancel", stClose:"Close", stSaveChanges:"Save Changes",
-    stChangesApply:"Changes apply immediately",
-    stProPlan:"Pro Plan Active", stFullAccess:"Full access to all features",
-    stFreePlan:"Free Plan",
-    stUnlimited:"Unlimited customers · All features · Ad-free display",
-    stProFeature:"Pro Feature",
-    stPasteCSV:"Paste CSV/spreadsheet data below, or upload a CSV file.",
-    stExpectedCols:"Expected columns:", stName:"Name", stPhoneOptional:"Phone (optional)",
-    stIdOptional:"ID (optional)", stMax200:"Max 200 rows",
-    stMax50Reached:"Maximum 50 rows reached.",
-    stFillNames:"Fill in names above to add customers.",
-    stNoPurchasesFilter:"No purchases match this filter",
-    stNoPurchasesSearch:"No purchases match your search",
-    stNoCustomers:"No customers", stNoPurchasesYet:"No purchases yet",
-    stNoPhone:"No phone",
-    stNewPassword:"New Password", stConfirmPassword:"Confirm Password",
-    stEnterPassword:"Enter your password to continue.",
-    stChooseTvDisplay:"Choose what appears on your TV leaderboard screen",
-    stCategory:"CATEGORY", stUnit:"UNIT", stMinStock:"MIN STOCK ALERT",
-    stCompanyName:"COMPANY / LEGAL NAME", stPhone:"PHONE",
-    stBillHash:"Bill #", stCustomerId:"Customer ID",
-    stOptional:"Optional", stNotes:"Notes", stDate:"Date",
-    stQty:"Quantity", stTotalAmount:"Total Amount:", stActive:"Active",
-    stIdAuto:"ID (auto if blank)", stUpload:"Upload",
-    stRemoveFromInv:"This will remove it from inventory and all stock logs.",
-    stPurchaseRecords:"Those purchase records will have this item removed.",
-    // Inventory tab
-    invNoInventory:"No inventory yet",
-    invAddFirst:"Add your first product to start tracking stock",
-    invOutOfStock:"Out of Stock", invLowStock:"Low Stock", invTotalStockValue:"Total Stock Value",
-    invName:"Name", invCategory:"Category", invDate:"Date", invQty:"Qty",
-    invRate:"Rate", invAmount:"Amount", invBalance:"Balance", invDescription:"Description",
-    invUnit:"Unit", invField:"Field", invValue:"Value", invSr:"Sr.",
-    invType:"TYPE", invQtyHeader:"QTY",
-    invTaxInvoice:"Tax Invoice", invBill:"BILL", invOriginalRecipient:"ORIGINAL FOR RECIPIENT",
-    invTaxableAmount:"Taxable Amount", invTaxableValue:"Taxable Value",
-    invTotalTax:"Total Tax", invTotalAfterTax:"Total Amount After Tax",
-    invTotalInWords:"Total in Words", invTerms:"Terms and Conditions",
-    invAuthorisedSignatory:"Authorised Signatory", invPlaceOfSupply:"Place of Supply",
-    invInvoiceNo:"Invoice No.", invInvoiceDate:"Invoice Date",
-    invInvoiceDetail:"Invoice Detail", invInvoiceValue:"Invoice Value", invEWayBill:"E-Way Bill",
-    invCancel:"Cancel", invClose:"Close", invPublish:"Publish",
-    invProducts:"Products", invEditInstead:"Edit this instead",
-    invClosingBalance:"Closing Balance", invClosingBalanceColon:"Closing Balance:",
-    invNoTransactions:"No transactions", invNoTxYet:"No transactions yet",
-    invNoSalesYet:"No sales recorded yet.", invNoItemsOnTx:"No items on this transaction",
-    invNoDuplicates:"No duplicates found!",
-    invLedgerNA:"Ledger Not Available", invLoadingLedger:"Loading shared ledger...",
-    invAutoRecorded:"Auto-recorded when you add purchases in Purchase tab",
-    invNoProfileInfo:"No additional profile info shared by this shop.",
-    invNegativeItems:"ITEMS THAT WOULD GO NEGATIVE:", invStockReversed:"STOCK THAT WOULD BE REVERSED:",
-    invNoItemBarcode:"No item found for barcode:",
-    invEnterBarcode:"Or enter barcode manually:", invSearchBarcode:"Or search for the item this barcode belongs to:",
-    invStartCamera:"Starting camera...",
-    invBankDetails:"Bank Details", invAccNumber:"Acc. Number", invBranch:"Branch",
-    invAddBankDetails:"Add bank details in Billing Settings",
-    invOutward:"Outward", invPan:"PAN:", invMs:"M/S", invSupply:"Supply",
-    invTransport:"Transport", invRefInvoice:"Ref / Invoice", invPriceIs:"PRICE IS",
-    invProductService:"Name of Product / Service", invCustomerDetail:"Customer Detail",
-    invExpiryAlerts:"Expiry Alerts", invMinStockWarning:"Min Stock Warning",
-    invPickItem:"Pick the item to", invSharingWith:"You are currently sharing",
-    // Messages tab
-    msgNoShops:"No connected shops yet",
-    msgAddShop:"Add a shop using their SC-XXXXXX ID to start chatting.",
-    msgLoginRequired:"Log in to use Messages.",
-    msgExpiry:"Messages expire after 7 days · Max 50 per conversation",
-  },
-  hi: {
-    // Tab names (TABS_BASE keys)
-    leaderboard:"रैंकिंग", customers:"ग्राहक", sales:"बिक्री",
-    analytics:"विश्लेषण", compare:"तुलना", inventory:"इन्वेंटरी",
-    creditors:"लेनदार", debtors:"देनदार", messages:"संदेश",
-    settings:"सेटिंग्स", alerts:"अलर्ट", history:"इतिहास", team:"टीम",
-    adminPanel:"एडमिन पैनल",
-    festivals:"उत्सव पुरस्कार", settings:"सेटिंग्स", logout:"लॉगआउट",
-    addCustomer:"+ ग्राहक जोड़ें", exportCSV:"⬇ CSV निर्यात", addPurchase:"बिक्री जोड़ें →",
-    totalSpend:"कुल खर्च", points:"अंक", rank:"रैंक", visits:"दौरे",
-    lastVisit:"अंतिम दौरा", firstVisit:"पहला दौरा", frequency:"आवृत्ति",
-    avgPerVisit:"प्रति दौरा औसत", totalVisits:"कुल दौरे", purchaseHistory:"खरीद इतिहास",
-    noCustomers:"कोई ग्राहक नहीं मिला", noPurchases:"अभी तक कोई खरीदारी नहीं",
-    pushDisplay:"⬆ डिस्प्ले पर भेजें", displaySetup:"📺 डिस्प्ले सेटअप",
-    searchPlaceholder:"🔍 नाम, फ़ोन या ID से खोजें...",
-    customerProfile:"ग्राहक प्रोफाइल", back:"← वापस", edit:"✏️ संपादित", next:"अगला",
-    addPurchaseBtn:"+ बिक्री", deleteConfirm:"इस ग्राहक और उनकी सभी खरीदारी हटाएं?",
-    deletePurchaseConfirm:"यह खरीदारी हटाएं? ग्राहक का कुल खर्च कम हो जाएगा।",
-    today:"आज", allTime:"सब समय", pickDate:"📆 दिनांक चुनें",
-    showFor:"📅 दिखाएं:", yearFilter:"📆 वर्ष:",
-    bill:"बिल", date:"दिनांक", notes:"नोट्स", amount:"राशि (₹)",
-    searchFilter:"🔍 फ़िल्टर करें", filterDate:"📅 दिनांक सीमा",
-    filterExact:"₹ सटीक राशि", filterRange:"📊 राशि सीमा",
-    clearFilter:"✕ साफ", apply:"लागू करें",
-    shopName:"दुकान का नाम", shopIcon:"दुकान आइकन",
-    displaySettings:"डिस्प्ले सेटिंग्स", databaseStorage:"🔥 डेटाबेस स्टोरेज",
-    syncDisplay:"📺 सिंक और डिस्प्ले", customersOnDisplay:"डिस्प्ले पर ग्राहक",
-    firebaseConnected:"✅ Firebase जुड़ा हुआ है", localMode:"📦 लोकल स्टोरेज (डेमो)",
-    ready:"तैयार", syncing:"भेजा जा रहा है...", synced:"लीडरबोर्ड सिंक हुआ",
-    wrongPassword:"गलत पासवर्ड", loginAdmin:"एडमिन लॉगिन",
-    enterPassword:"पासवर्ड दर्ज करें (1234)", login:"लॉगिन →",
-    showing:"दिखा रहे हैं", of:"में से", purchases:"खरीदारी", total:"कुल",
-    visitNum:"दौरा #", allTimeBracket:"(सब समय:", yearRevenue:"आय",
-    activeCustomers:"सक्रिय ग्राहक", topEarner:"शीर्ष खर्चकर्ता",
-    avgSpend:"प्रति ग्राहक औसत", monthlyRevenue:"मासिक आय",
-    topCustomers:"शीर्ष ग्राहक", monthByMonth:"माह दर माह",
-    yearlyAnalytics:"📊 वार्षिक विश्लेषण", selectYear:"वर्ष चुनें:",
-    compareTitle:"⚖️ तुलना", compareDesc:"दिन · माह · वर्ष से राजस्व तुलना",
-    dayMode:"📅 दिन", monthMode:"📆 माह", yearMode:"🗃 वर्ष", yearsMode:"⚖️ वर्ष तुलना",
-    festivalRewards:"उत्सव पुरस्कार", festival:"उत्सव", reward:"पुरस्कार",
-    selectWinners:"विजेता चुनें:", announceWinners:"🎉 विजेता घोषित करें",
-    pastAnnouncements:"पिछली घोषणाएं", noOutstandingBorrows:"✅ कोई लंबित उधार नहीं",
-    outstandingBorrows:"📌 लंबित उधार", totalOwed:"कुल बकाया:",
-    addBorrow:"उधार दर्ज करें →", borrowDetails:"📦 उधार विवरण",
-    pending:"लंबित", returned:"वापस किया", overdue:"अतिदेय",
-    markReturned:"✓ वापस किया", borrowRecord:"उधार", noPhone:"फ़ोन नहीं",
-    whatsapp:"💬 व्हाट्सएप", phone:"फ़ोन नंबर", customerId:"ग्राहक ID",
-    fullName:"पूरा नाम", optional:"वैकल्पिक", autoId:"🎲 स्वचालित",
-    saveChanges:"बदलाव सहेजें", saveName:"✅ नाम सहेजें", removeIcon:"🗑 आइकन हटाएं",
-    themeLabel:"थीम", languageLabel:"भाषा", dayTheme:"☀️ दिन", nightTheme:"🌙 रात",
-    // Customers tab extras
-    never:"कभी नहीं", rankHash:"रैंक #", bulk:"👥 थोक",
-    gstStatus:"🔢 GST स्थिति:", allCustomers:"👥 सभी",
-    gstRegistered:"✅ GST पंजीकृत", notRegistered:"❌ पंजीकृत नहीं",
-    notVisitedSince:"⚠️ इतने दिनों से नहीं आए:", days7:"7 दिन", month1:"1 महीना", months3:"3 महीने",
-    pickDateBtn:"📅 दिनांक चुनें",
-    showingInactive:"दिखा रहे हैं", inactiveDays:"7+ दिन", inactiveMonth:"1+ महीना", inactiveMonths3:"3+ महीने", inactiveSince:"से",
-    loadMore:"और लोड करें", remaining:"शेष",
-    customersFooter:"ग्राहक",
-    selectedCount:"चुने गए", deleteSelected:"🗑️ हटाएं", cancelSelect:"✕ रद्द",
-    custHeading:"ग्राहक", filtered:"फ़िल्टर किए",
-    searchCustPlaceholder:"🔍 नाम, फ़ोन, ID खोजें...",
-    noCustomersFound:"कोई ग्राहक नहीं मिला",
-    // Sales tab extras
-    salesHeading:"🧾 बिक्री", addSaleTab:"🧾 बिक्री जोड़ें",
-    inventoryMode:"इन्वेंटरी मोड", invModeDesc:"राशि आइटम × कीमत से स्वतः भरी जाती है",
-    switchMode:"बदलें", standardMode:"सामान्य मोड", stdModeDesc:"राशि मैन्युअल दर्ज करें",
-    searchCustomer:"ग्राहक खोजें", searchByNamePhone:"नाम, फ़ोन या ID से खोजें...",
-    purchaseAmount:"बिक्री राशि (₹)",
-    itemsSoldInv:"🛒 बेचे गए आइटम — मात्रा और कीमत दर्ज करें",
-    itemsSoldStd:"बेचे गए आइटम (वैकल्पिक — इन्वेंटरी से घटाएगा)",
-    scanBarcode:"📷 बारकोड स्कैन करके आइटम जोड़ें",
-    addItemBtn:"➕ आइटम जोड़ें", billNumber:"बिल नंबर", dateTime:"दिनांक और समय",
-    changeDate:"✏️ बदलें", closeDate:"❌ बंद करें", currentTime:"🕐 वर्तमान समय",
-    notesOptional:"नोट्स (वैकल्पिक)", notesPlaceholder:"जैसे दिवाली खरीदारी...",
-    addSaleBtn:"बिक्री जोड़ें →",
-    recordNewBorrow:"📋 नया उधार दर्ज करें",
-    itemsBorrowed:"🛒 उधार लिए आइटम",
-    amtBorrowed:"उधार राशि (₹)", autoFilledItems:"← ऊपर के आइटमों से स्वतः भरा",
-    dueDateOptional:"देय दिनांक (वैकल्पिक)",
-    recordBorrowBtn:"उधार दर्ज करें →",
-    outstandingBorrowsLabel:"📌 लंबित उधार",
-    totalOwedLabel:"कुल बकाया:", owesLabel:"बकाया",
-    noDescription:"कोई विवरण नहीं",
-    borrowedLabel:"उधार:", dueLabel:"देय:", overdueLabel:"⚠️ अतिदेय",
-    partialLabel:"💛 आंशिक", leftLabel:"शेष",
-    returnedBtn:"✓ वापस किया", slipBtn:"🧾 पर्ची",
-    detailsBtn:"विवरण", noOutstandingBorrows:"✅ कोई लंबित उधार नहीं",
-    borrowSubtab:"📦 उधार",
-    // Analytics
-    anMonths:["जन","फर","मार","अप्र","मई","जून","जुल","अग","सित","अक्ट","नव","दिस"],
-    statusWell:"व्यापार अच्छा चल रहा है", statusSlow:"बिक्री थोड़ी धीमी है",
-    statusNoActivity:"इस महीने कोई गतिविधि नहीं", statusLoss:"इस महीने घाटे में चल रहा है",
-    statusProfitSub:"इस महीने मुनाफा:", statusProfitableSub:"मुनाफे में",
-    statusDipped:"— पर बिक्री कम हुई", statusRecordSales:"बिक्री दर्ज करें तो व्यापार की स्थिति दिखेगी",
-    statusLossSub:"नुकसान:", statusExpenses:"— खर्च आमदनी से अधिक",
-    anSalesVs:"बिक्री", anVs:"बनाम",
-    anRevenue:"💸 आमदनी", anExpenses:"📦 खर्च", anProfit:"✨ मुनाफा",
-    anYearSales:"🛒 वार्षिक बिक्री", anYearProfit:"💰 वार्षिक मुनाफा",
-    anStockValue:"🏪 मौजूदा स्टॉक मूल्य", anNetFlow:"⚖️ शुद्ध धन प्रवाह",
-    anTransactions:"लेनदेन", anCustomers:"ग्राहक",
-    anItemsTracked:"आइटम ट्रैक किए", anSuppliers:"आपूर्तिकर्ता", anDebtors:"देनदार",
-    anReceivable:"प्राप्य", anPayable:"देय",
-    anMonthlyTrend:"📈 मासिक रुझान", anSalesLegend:"बिक्री", anCostLegend:"लागत",
-    anBills:"बिल", anAvgCust:"औसत/ग्राहक",
-    anCustSection:"👥 ग्राहक", anTotal:"कुल", anActive:"सक्रिय",
-    anAvgSpend:"औसत खर्च", anTopCust:"इस महीने का शीर्ष ग्राहक",
-    anTopItems:"🏆 शीर्ष आइटम", anLossItems:"⚠️ घाटे के आइटम",
-    anSellingBelow:"लागत से कम पर बेच रहे हैं",
-    anMoneyFlow:"धन प्रवाह", anAllTimeBalance:"सब समय का बैलेंस",
-    anYouOwe:"📤 आप पर बकाया", anOwedToYou:"📥 आपका बकाया", anNet:"🏦 शुद्ध",
-    anCashInHand:"नकद हाथ में", anLiveBalance:"लाइव बैलेंस",
-    anViewCashLedger:"📜 नकद खाता देखें",
-    anViewBalanceSheet:"📊 बैलेंस शीट देखें",
-    anLowStock:"कम स्टॉक अलर्ट", anItems:"आइटम",
-    anExportBtn:"⬇ निर्यात", outOfStock:"खत्म",
-    // Compare tab
-    cmpTitle:"⚖️ तुलना", cmpSubtitle:"आमदनी · खर्च · मुनाफा — ग्राहक, देनदार और लेनदार मिलाकर",
-    cmpDayBtn:"📅 दिन", cmpMonthBtn:"📆 माह", cmpYearBtn:"🗃 वर्ष", cmpYearsBtn:"⚖️ वर्ष तुलना",
-    cmpDailyBreakdown:"दैनिक विवरण", cmpMonthByMonth:"माह दर माह",
-    cmpYearByYear:"वर्ष-दर-वर्ष तुलना", cmpYearOverYear:"वर्ष-दर-वर्ष",
-    cmpToday:"आज", cmpNow:"अभी", cmpNew:"नया", cmpMon:"माह", cmpDiff:"अंतर",
-    cmpTotal:"कुल", cmpTotalChange:"कुल बदलाव:", cmpSalesCount:"बिक्री", cmpSalesCountP:"बिक्री",
-    cmpSelectBase:"📅 आधार वर्ष चुनें (वह वर्ष और सभी पिछले वर्ष दिखाएगा)",
-    cmpYearAGold:"📅 वर्ष A (सुनहरा)", cmpYearBBlue:"📅 वर्ष B (नीला)",
-    cmpMonthlyBreakdown:"मासिक विवरण", cmpVs:"बनाम",
-    cmpRevenueLegend:"आमदनी", cmpCostLegend:"लागत", cmpProfitLegend:"मुनाफा",
-    cmpAllMonths:"सभी महीने", cmpRevenueByYear:"वर्ष के अनुसार आमदनी (तक",
-    cmpCost:"लागत",
-    // Creditors tab
-    crHeading:"🏦 लेनदार", crSuppliers:"आपूर्तिकर्ता", crPayable:"कुल देय:",
-    crAddManually:"+ मैन्युअल जोड़ें", crArchived:"📦 संग्रहीत",
-    crTotalSuppliers:"कुल आपूर्तिकर्ता", crTotalPayable:"कुल देय",
-    crPaidMonth:"इस माह भुगतान", crPurchasedMonth:"इस माह खरीद",
-    crUnreconciled:"अनसुलझी खरीद", crEntries:"प्रविष्टि", crEntriesP:"प्रविष्टियां",
-    crWithoutCreditor:"बिना लेनदार के। टैप करके देखें।",
-    crSearchPlaceholder:"🔍 नाम या फ़ोन से लेनदार खोजें...",
-    crGstStatus:"🔢 GST स्थिति:", crAll:"🏢 सभी",
-    crGstReg:"✅ GST पंजीकृत", crNotReg:"❌ पंजीकृत नहीं",
-    crNoCreditors:"कोई लेनदार नहीं मिला", crTotalYouOwe:"कुल आप पर बकाया",
-    crBalance:"बकाया:", crLinked:"जुड़ा हुआ", crGstin:"GSTIN",
-    crMoveTo:"लेनदार में ले जाएं", crTarget:"लक्ष्य लेनदार",
-    crSelectAll:"सभी चुनें", crTap:"टैप करें", crDeleting:"हटाया जा रहा है",
-    crPurchaseDr:"खरीद (Dr)", crPaymentCr:"भुगतान (Cr)", crInvoice:"चालान",
-    crDate:"दिनांक", crItem:"आइटम / विवरण", crReason:"आइटम / कारण",
-    crDebitNote:"डेबिट नोट / संदर्भ", crPayMode:"भुगतान मोड", crPayment:"भुगतान",
-    crNotes:"नोट्स", crFromDate:"दिनांक से", crToDate:"दिनांक तक",
-    crTotal:"कुल", crPhone:"फ़ोन", crAddress:"पता",
-    crInvoiceRef:"चालान / संदर्भ सं.", crRefUtr:"संदर्भ / UTR सं.",
-    crAmount:"राशि", crCancel:"रद्द करें", crType:"प्रकार",
-    crCredit:"क्रेडिट", crDebit:"डेबिट",
-    crClosingBalance:"समापन बैलेंस:", crTotalYouOweLabel:"कुल आप पर बकाया",
-    crTxHistory:"लेनदेन इतिहास", crNoCredFound:"कोई लेनदार नहीं मिला",
-    crNoTxYet:"अभी तक कोई लेनदेन नहीं", crNotFound:"नहीं मिला",
-    crNegativeItems:"आइटम जो ऋणात्मक हो जाएंगे:", crStockReversed:"स्टॉक जो वापस होगा:",
-    crNoInvLinked:"इस लेनदार से कोई इन्वेंटरी स्टॉक नहीं जुड़ा।",
-    crNoUnreconciled:"ले जाने के लिए कोई अनसुलझी प्रविष्टि नहीं।",
-    crStatement:"लेनदार विवरण", crNoteOptional:"नोट (वैकल्पिक)",
-    // Debtors tab
-    dbHeading:"📥 देनदार", dbCustomers:"ग्राहक", dbReceivable:"कुल प्राप्य:",
-    dbDate:"दिनांक", dbDescription:"विवरण", dbReceivedVia:"प्राप्त माध्यम",
-    dbFromDate:"दिनांक से", dbToDate:"दिनांक तक", dbTotal:"कुल",
-    dbPhone:"फ़ोन", dbAddress:"पता", dbNotes:"नोट्स",
-    dbAmount:"राशि", dbBalance:"बैलेंस:", dbType:"प्रकार", dbCancel:"रद्द करें",
-    dbDebtor:"देनदार:", dbSale:"बिक्री", dbSaleDr:"बिक्री (Dr)",
-    dbReceipt:"रसीद", dbReceiptCr:"रसीद (Cr)", dbTransaction:"लेनदेन",
-    dbTxHistory:"लेनदेन इतिहास", dbNoTxYet:"अभी तक कोई लेनदेन नहीं",
-    dbNotFound:"नहीं मिला", dbCannotUndo:"इसे पूर्ववत नहीं किया जा सकता।",
-    dbStatement:"देनदार विवरण", dbNoDebtors:"कोई देनदार नहीं मिला",
-    dbClosingBalance:"समापन बैलेंस:",
-    // Alerts tab
-    alEverything:"आपका ध्यान चाहिए, सब एक जगह।",
-    alAddTeam:"टीम सदस्य जोड़ें", alUsername:"यूज़रनेम", alDisplayName:"प्रदर्शन नाम",
-    alPassword:"पासवर्ड", alConfirmPassword:"पासवर्ड की पुष्टि", alPermissions:"अनुमतियां",
-    alUsernameReadOnly:"यूज़रनेम (केवल पढ़ने योग्य)",
-    alCurrent:"वर्तमान:", alOldestUnpaidBill:"सबसे पुराना अवैतनिक बिल:",
-    alOldestUnpaidSale:"सबसे पुराना अवैतनिक बिक्री:",
-    alNoTeamMembers:"अभी कोई टीम सदस्य नहीं। पहला सदस्य नीचे जोड़ें।",
-    alNewPassword:"नया पासवर्ड (खाली रखें तो पुराना रहेगा)",
-    // History tab
-    alToday:"आज", alTodayOnly:"केवल आज",
-    // Settings tab
-    stBoldClassic:"बोल्ड · क्लासिक", stCleanBusiness:"साफ · व्यापार",
-    stGame:"गेम", stProfessional:"पेशेवर",
-    stShopName:"दुकान का नाम", stLanguage:"भाषा", stEnableVoice:"आवाज़ सक्षम करें",
-    stTemplate:"टेम्पलेट", stAddPhoto:"फ़ोटो जोड़ें", stRemovePhoto:"फ़ोटो हटाएं",
-    stCancel:"रद्द करें", stClose:"बंद करें", stSaveChanges:"बदलाव सहेजें",
-    stChangesApply:"बदलाव तुरंत लागू होते हैं",
-    stProPlan:"प्रो प्लान सक्रिय", stFullAccess:"सभी सुविधाओं की पूर्ण पहुंच",
-    stFreePlan:"मुफ़्त प्लान",
-    stUnlimited:"असीमित ग्राहक · सभी सुविधाएं · विज्ञापन-मुक्त डिस्प्ले",
-    stProFeature:"प्रो सुविधा",
-    stPasteCSV:"नीचे CSV/स्प्रेडशीट डेटा पेस्ट करें, या CSV फ़ाइल अपलोड करें।",
-    stExpectedCols:"अपेक्षित कॉलम:", stName:"नाम", stPhoneOptional:"फ़ोन (वैकल्पिक)",
-    stIdOptional:"ID (वैकल्पिक)", stMax200:"अधिकतम 200 पंक्तियां",
-    stMax50Reached:"अधिकतम 50 पंक्तियां पहुंच गई।",
-    stFillNames:"नाम भरें तो ग्राहक जोड़े जा सकते हैं।",
-    stNoPurchasesFilter:"इस फ़िल्टर से कोई खरीद मेल नहीं खाती",
-    stNoPurchasesSearch:"आपकी खोज से कोई खरीद मेल नहीं खाती",
-    stNoCustomers:"कोई ग्राहक नहीं", stNoPurchasesYet:"अभी कोई खरीद नहीं",
-    stNoPhone:"फ़ोन नहीं",
-    stNewPassword:"नया पासवर्ड", stConfirmPassword:"पासवर्ड की पुष्टि",
-    stEnterPassword:"जारी रखने के लिए पासवर्ड दर्ज करें।",
-    stChooseTvDisplay:"TV लीडरबोर्ड पर क्या दिखाना है चुनें",
-    stCategory:"श्रेणी", stUnit:"इकाई", stMinStock:"न्यूनतम स्टॉक अलर्ट",
-    stCompanyName:"कंपनी / कानूनी नाम", stPhone:"फ़ोन",
-    stBillHash:"बिल #", stCustomerId:"ग्राहक ID",
-    stOptional:"वैकल्पिक", stNotes:"नोट्स", stDate:"दिनांक",
-    stQty:"मात्रा", stTotalAmount:"कुल राशि:", stActive:"सक्रिय",
-    stIdAuto:"ID (खाली = स्वचालित)", stUpload:"अपलोड",
-    stRemoveFromInv:"यह इन्वेंटरी और सभी स्टॉक लॉग से हट जाएगा।",
-    stPurchaseRecords:"उन खरीद रिकॉर्ड से यह आइटम हटा दिया जाएगा।",
-    // Inventory tab
-    invNoInventory:"अभी कोई इन्वेंटरी नहीं",
-    invAddFirst:"स्टॉक ट्रैक करना शुरू करने के लिए पहला उत्पाद जोड़ें",
-    invOutOfStock:"स्टॉक खत्म", invLowStock:"कम स्टॉक", invTotalStockValue:"कुल स्टॉक मूल्य",
-    invName:"नाम", invCategory:"श्रेणी", invDate:"दिनांक", invQty:"मात्रा",
-    invRate:"दर", invAmount:"राशि", invBalance:"बैलेंस", invDescription:"विवरण",
-    invUnit:"इकाई", invField:"फ़ील्ड", invValue:"मूल्य", invSr:"क्र.",
-    invType:"प्रकार", invQtyHeader:"मात्रा",
-    invTaxInvoice:"कर चालान", invBill:"बिल", invOriginalRecipient:"मूल प्राप्तकर्ता के लिए",
-    invTaxableAmount:"कर योग्य राशि", invTaxableValue:"कर योग्य मूल्य",
-    invTotalTax:"कुल कर", invTotalAfterTax:"कर के बाद कुल राशि",
-    invTotalInWords:"शब्दों में कुल", invTerms:"नियम और शर्तें",
-    invAuthorisedSignatory:"अधिकृत हस्ताक्षरकर्ता", invPlaceOfSupply:"आपूर्ति का स्थान",
-    invInvoiceNo:"चालान सं.", invInvoiceDate:"चालान दिनांक",
-    invInvoiceDetail:"चालान विवरण", invInvoiceValue:"चालान मूल्य", invEWayBill:"ई-वे बिल",
-    invCancel:"रद्द करें", invClose:"बंद करें", invPublish:"प्रकाशित करें",
-    invProducts:"उत्पाद", invEditInstead:"इसे संपादित करें",
-    invClosingBalance:"समापन बैलेंस", invClosingBalanceColon:"समापन बैलेंस:",
-    invNoTransactions:"कोई लेनदेन नहीं", invNoTxYet:"अभी कोई लेनदेन नहीं",
-    invNoSalesYet:"अभी कोई बिक्री दर्ज नहीं।", invNoItemsOnTx:"इस लेनदेन पर कोई आइटम नहीं",
-    invNoDuplicates:"कोई डुप्लीकेट नहीं मिला!",
-    invLedgerNA:"खाता उपलब्ध नहीं", invLoadingLedger:"साझा खाता लोड हो रहा है...",
-    invAutoRecorded:"खरीद टैब में खरीद जोड़ने पर स्वतः दर्ज होता है",
-    invNoProfileInfo:"इस दुकान द्वारा कोई अतिरिक्त प्रोफ़ाइल जानकारी साझा नहीं।",
-    invNegativeItems:"आइटम जो ऋणात्मक हो जाएंगे:", invStockReversed:"स्टॉक जो वापस होगा:",
-    invNoItemBarcode:"इस बारकोड के लिए कोई आइटम नहीं मिला:",
-    invEnterBarcode:"या बारकोड मैन्युअल दर्ज करें:", invSearchBarcode:"या इस बारकोड का आइटम खोजें:",
-    invStartCamera:"कैमरा शुरू हो रहा है...",
-    invBankDetails:"बैंक विवरण", invAccNumber:"खाता सं.", invBranch:"शाखा",
-    invAddBankDetails:"बिलिंग सेटिंग में बैंक विवरण जोड़ें",
-    invOutward:"आउटवर्ड", invPan:"PAN:", invMs:"M/S", invSupply:"आपूर्ति",
-    invTransport:"परिवहन", invRefInvoice:"संदर्भ / चालान", invPriceIs:"कीमत है",
-    invProductService:"उत्पाद / सेवा का नाम", invCustomerDetail:"ग्राहक विवरण",
-    invExpiryAlerts:"समाप्ति अलर्ट", invMinStockWarning:"न्यूनतम स्टॉक चेतावनी",
-    invPickItem:"आइटम चुनें", invSharingWith:"आप वर्तमान में साझा कर रहे हैं",
-    // Messages tab
-    msgNoShops:"अभी कोई जुड़ी दुकान नहीं",
-    msgAddShop:"चैट शुरू करने के लिए SC-XXXXXX ID से दुकान जोड़ें।",
-    msgLoginRequired:"मैसेज उपयोग करने के लिए लॉगिन करें।",
-    msgExpiry:"मैसेज 7 दिन बाद हटते हैं · प्रति बातचीत अधिकतम 50",
-  },
-};
-
-// Fill missing translations from English
-Object.keys(LANGUAGES).forEach(lang => {
-  if (!TRANSLATIONS[lang]) TRANSLATIONS[lang] = {};
-  TRANSLATIONS[lang] = {...TRANSLATIONS.en, ...TRANSLATIONS[lang]};
-});
-
-let currentLang = localStorage.getItem("sc_lang") || localStorage.getItem(storageKey("lang")) || "en";
-
-function t(key) {
-  return (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key]) || TRANSLATIONS.en[key] || key;
-}
+// [LANGUAGE block moved to top]
 
 // ── UI Translation Overlay ────────────────────────────────────────────────────
 // Replaces hardcoded English text in rendered DOM with the current language.
 // This covers all tab content without rewriting every render function.
-const UI_STRINGS = {
+var UI_STRINGS = {
   hi: {
     // Settings
     "Settings": "सेटिंग्स",
@@ -13730,7 +13755,7 @@ function _phShiftMonth(dir){
 
 // Plans: "pro" = full access, "free" = limited
 // FREE_TABS: loaded dynamically from Supabase settings (fallback = leaderboard only)
-let FREE_TABS = [0];
+var FREE_TABS = [0];
 
 async function loadFreeTabs() {
   try {
@@ -13754,9 +13779,9 @@ async function loadFreeTabs() {
 // Poll every 30s so changes in Seller Panel reflect live
 setInterval(loadFreeTabs, 60000); // FIX: was 5000ms — reduced to 60s to avoid Supabase hammering
 
-let licenseStatus = null; // null | "pro" | "free" | "expired"
-let licensePlan   = "free";
-let licenseKey    = null;
+var licenseStatus = null; // null | "pro" | "free" | "expired"
+var licensePlan   = "free";
+var licenseKey    = null;
 
 function loadLicense() {
   try {
@@ -13904,7 +13929,7 @@ function showRenewPrompt() {
 // ══════════════════════════════════════════════
 // PAYMENT MODAL
 // ══════════════════════════════════════════════
-let pmPollTimer = null;
+var pmPollTimer = null;
 
 function openPaymentModal() {
   document.getElementById("payment-modal").style.display = "flex";
@@ -13946,7 +13971,7 @@ function pmGoStep2() {
   pmSetStep(2);
 }
 
-let pmSelectedPlan = "monthly";
+var pmSelectedPlan = "monthly";
 
 function pmSelectPlan(plan) {
   pmSelectedPlan = plan;
@@ -14138,18 +14163,9 @@ function applyLicenseOverlay(i) {
 // ─── INVENTORY SYSTEM ─────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════
 
-// Data: inventoryItems = [{id, name, unit, stock:[{qty, costPerUnit, date, notes}]}]
-// Data: inventorySales = [{date, itemName, qty, custName}]  (auto-logged on ptSubmit)
-
-let inventoryItems = [];
-let invView = "stock"; // "stock" | "add" | "restock" | "log" | "detail" | "category"
-let invRestockSearch = ""; // search query for restock tab
-let invRestockSelected = null; // selected item name for restock
-let invPrefillName = ""; // pre-fill name when Restock button is clicked
-let invSelectedCat = ""; // currently selected category pill
-let invSearchQuery = ""; // search box text
-let invCatPageName = ""; // category being viewed on category page
-let invCatPageSearch = ""; // search within category page
+// [inventoryItems moved to top]
+var invCatPageName = ""; // category being viewed on category page
+var invCatPageSearch = ""; // search within category page
 
 function invKey(k){ return storageKey("inventory_"+k); }
 
@@ -14193,7 +14209,7 @@ function loadInventory(){
 }
 
 // Called after login to pull latest from Firestore and keep in sync
-let invUnsubscribe = null; // Firestore real-time listener for inventory
+var invUnsubscribe = null; // Firestore real-time listener for inventory
 
 function loadInventoryFromFirestore(cb){
   if(!db || !authPhone){ console.warn("[Inv] loadInventoryFromFirestore: db=",!!db,"authPhone=",authPhone); if(cb) cb(); return; }
@@ -15348,23 +15364,15 @@ function _invLogCreditorPurchase(creditorId, itemName, qty, cost, date, notes){
 //       "customer" (sender wants to be added as customer in target)
 // status: "pending" | "accepted" | "declined"
 
-let _shopRequestsCache = []; // cached list of pending requests for this shop
-let _autoAcceptedListener = null; // live listener for auto_accepted docs
+var _shopRequestsCache = []; // cached list of pending requests for this shop
+var _autoAcceptedListener = null; // live listener for auto_accepted docs
 
 // ══════════════════════════════════════════════════════════════════
 // ShopChat — Supabase-backed messaging
 // ══════════════════════════════════════════════════════════════════
-let _scConnections      = [];
-let _scPendingReqs      = [];
-let _scActiveChatPhone  = null;
-let _scMessages         = {};
-let _scUnreadCounts     = {};
-let _scPollTimer        = null;
-let _scConnPollTimer    = null;
-let _scBlockedShopIds   = []; // SC-IDs blocked by this shop (stored in localStorage)
-let _scPeerLedgerCache  = {}; // peerPhone -> { balance, balLabel, name } fetched from peer Firebase
-let _scLedgerUnsub      = null; // active Firestore onSnapshot unsub for open ledger modal
-let _scFcmToken         = null; // FCM push token for this browser/device
+// [_scConnections moved to top]
+var _scLedgerUnsub      = null; // active Firestore onSnapshot unsub for open ledger modal
+var _scFcmToken         = null; // FCM push token for this browser/device
 
 // ── FCM: initialise messaging and save token to Supabase ─────────────────────
 async function scRequestPushPermission() {
@@ -16381,9 +16389,9 @@ function invMergeGroup(gi){
 
 
 
-let _bcStream = null;   // active camera stream
-let _bcRafId  = null;   // requestAnimationFrame id
-let _bcActive = false;  // scan session active
+var _bcStream = null;   // active camera stream
+var _bcRafId  = null;   // requestAnimationFrame id
+var _bcActive = false;  // scan session active
 
 // ── Lookup item by barcode ────────────────────────────────────────────────────
 function findItemByBarcode(code) {
@@ -18193,7 +18201,7 @@ function renderInventoryCategoryPage(catName){
 }
 
 // ─── INVENTORY ITEM DETAIL — who bought this item ─────────────
-let invDetailItem = null; // name of item being viewed
+var invDetailItem = null; // name of item being viewed
 
 function invShowItemDetail(itemName){
   invDetailItem = itemName;
@@ -18536,7 +18544,7 @@ function invCustApply(){
 // ═══════════════════════════════════════════════════════════════
 
 // ─── BILLING SETTINGS (defaults merged into appSettings) ──────
-const BILLING_DEFAULTS = {
+var BILLING_DEFAULTS = {
   billAutoWhatsApp: false,
   billAutoPrint: false,
   billShowGST: false,
@@ -20281,7 +20289,7 @@ history.pushState({sc:true}, '');
 (function(){
 
 // ── Step definitions (icon, tabIndex to highlight, elementId or selector) ──
-const STEPS_EN = [
+var STEPS_EN = [
   {
     icon:"🏆", title:"Rankings (Leaderboard)",
     text:"This is your Leaderboard — it ranks all your customers by their total purchases. The #1 buyer gets a crown 👑. Use this every day to instantly spot your most loyal customers.",
@@ -20354,7 +20362,7 @@ const STEPS_EN = [
   }
 ];
 
-const STEPS_HI = [
+var STEPS_HI = [
   {
     icon:"🏆", title:"लीडरबोर्ड (Leaderboard)",
     text:"यह आपका लीडरबोर्ड है — यहाँ आपके सभी ग्राहक उनकी कुल खरीदारी के हिसाब से रैंक में दिखते हैं। सबसे ऊपर वाले ग्राहक को 👑 ताज मिलता है और वो आपका सबसे वफ़ादार ग्राहक है।",
@@ -20428,11 +20436,11 @@ const STEPS_HI = [
 ];
 
 // ── State ──
-let _guideLang = 'en';
-let _guideStepIdx = 0;
-let _guideSteps = STEPS_EN;
-let _guideActive = false;
-let _speechUtterance = null;
+var _guideLang = 'en';
+var _guideStepIdx = 0;
+var _guideSteps = STEPS_EN;
+var _guideActive = false;
+var _speechUtterance = null;
 
 // ── Public API ──
 window.scGuideInit = function(isNewUser){
