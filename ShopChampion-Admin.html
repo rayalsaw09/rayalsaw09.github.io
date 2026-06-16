@@ -1247,7 +1247,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 </div>
 
 <!-- SUBSCRIPTION EXPIRED BANNER (shown inside app) -->
-<div id="sub-expired-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#3a0a0a,#2a0505);border-top:2px solid #f66;padding:12px 20px;z-index:800;display:none;align-items:center;gap:16px;flex-wrap:wrap;">
+<div id="sub-expired-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#3a0a0a,#2a0505);border-top:2px solid #f66;padding:12px 20px;z-index:800;align-items:center;gap:16px;flex-wrap:wrap;">
   <div style="flex:1;min-width:200px;">
     <div style="color:#f66;font-weight:800;font-size:13px;">⚠️ सब्सक्रिप्शन निष्क्रिय है</div>
     <div style="color:#f88;font-size:12px;">कुछ सुविधाएं लॉक हैं। रिन्यू के लिए अपने विक्रेता से संपर्क करें।</div>
@@ -1485,7 +1485,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       </div>
 
       <input class="input" type="text" id="auth-shop-name" placeholder="🏪 आपकी दुकान का नाम (ज़रूरी)" style="text-align:center;font-size:15px;margin-bottom:10px;font-weight:700;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
-      <input class="input" type="password" id="auth-newpass1" placeholder="पासवर्ड बनाएं (कम से कम 4 अक्षर)" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
+      <input class="input" type="password" id="auth-newpass1" placeholder="पासवर्ड बनाएं (कम से कम 8 अक्षर)" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
       <input class="input" type="password" id="auth-newpass2" placeholder="पासवर्ड दोबारा डालें" style="text-align:center;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')setNewPassword()"/>
       <!-- Security Question Section -->
       <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:12px;text-align:left;">
@@ -1538,7 +1538,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <div style="font-size:32px;margin-bottom:10px;">🔓</div>
       <div style="font-size:14px;font-weight:800;color:#4f4;margin-bottom:6px;">✅ पहचान वेरीफ़ाई हो गई!</div>
       <div style="font-size:12px;color:#7a8aaa;margin-bottom:16px;">+91 <span id="auth-reset-phone"></span> के लिए नया पासवर्ड बनाएं</div>
-      <input class="input" type="password" id="auth-resetpass1" placeholder="नया पासवर्ड (कम से कम 4 अक्षर)" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')submitResetPassword()"/>
+      <input class="input" type="password" id="auth-resetpass1" placeholder="नया पासवर्ड (कम से कम 8 अक्षर)" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')submitResetPassword()"/>
       <input class="input" type="password" id="auth-resetpass2" placeholder="नया पासवर्ड दोबारा डालें" style="text-align:center;font-size:15px;margin-bottom:12px;" onkeydown="if(event.key==='Enter')submitResetPassword()"/>
       <div id="auth-reset-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
       <button class="btn" onclick="submitResetPassword()" id="reset-save-btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:8px;">
@@ -1579,7 +1579,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <span id="lang-label" style="display:none;">EN</span>
       <span id="header-plan-pill" onclick="renderTab(9)" title="View plan details" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;background:#0a1a3a;color:#88aaff;border:1px solid #1a2a5a;">🆓 Free</span>
       <span id="header-member-pill" style="display:none;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800;background:#1a0a3a;color:#a78bfa;border:1px solid #3a1a7a;cursor:pointer;" onclick="if(confirm(currentLang==='hi'?'टीम मेंबर के रूप में लॉगआउट करें?':'Logout as team member?'))doLogout();">👤 <span id="header-member-name"></span></span>
-      <button class="btn" id="push-btn" id="push-sync-btn" onclick="this.textContent='⏳';pushSync().finally(()=>this.textContent=t('pushDisplay'));" title="Send to Display" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:7px 14px;font-size:13px;font-weight:800;">⬆ Send</button>
+      <button class="btn" id="push-btn" onclick="this.textContent='⏳';pushSync().finally(()=>this.textContent=t('pushDisplay'));" title="Send to Display" style="background:linear-gradient(135deg,#1a4a1a,#2a6a2a);color:#4f4;border:1px solid #2a4a2a;padding:7px 14px;font-size:13px;font-weight:800;">⬆ Send</button>
     </div>
   </div>
 
@@ -1751,7 +1751,7 @@ var TRANSLATIONS = {
     anRevenue:"💸 Revenue", anExpenses:"📦 Expenses", anProfit:"✨ Profit",
     expenses:"Expenses", expTitle:"💸 Expenses", expAdd:"+ Add Expense",
     expCategory:"Category", expAmount:"Amount", expNote:"Note (optional)", expDate:"Date",
-    expSave:"Save Expense", expDelete:"Delete", expNoExp:"${t('expNoExpenses')}",
+    expSave:"Save Expense", expDelete:"Delete", expNoExp:"No expenses recorded yet.",
     expTotal:"Total This Month", expYearTotal:"Total This Year",
     expCatRent:"Rent", expCatSalary:"Salary / Staff", expCatElec:"Electricity / Utilities",
     expCatPack:"Packaging", expCatTransport:"Transport / Delivery",
@@ -1958,7 +1958,7 @@ var TRANSLATIONS = {
     expToday:"Today", expThisMonthCard:"This Month",
     expThisYear:"This Year", expDailyAvg:"Daily Avg",
     expPerDay:"per day this month",
-    expFirstMonth:t('expFirstMonth'),
+    expFirstMonth:"First month — no comparison yet",
     expVsLast:"vs last",
     expSmartInsights:"💡 Smart Insights",
     expTrend:"📈 12-Month Expense Trend",
@@ -1976,7 +1976,7 @@ var TRANSLATIONS = {
     expCalendarView:"📅 Calendar View",
     expListView:"📋 List View",
     expNoExpenses:"No expenses recorded yet.",
-    expAddFirst:"${t('expAddFirst')}",
+    expAddFirst:"Add your first expense above to start tracking.",
     expIncreased:"Expenses increased by", expVsLastMonth:"compared to last month.",
     expSaved:"You saved", expLessSpend:"less spending",
     expOfRevenue:"of monthly revenue",
@@ -3013,6 +3013,7 @@ function updateBottomNav(activeIdx) {
 function toggleMoreMenu() {
   const menu = document.getElementById('more-menu');
   const backdrop = document.getElementById('more-menu-backdrop');
+  if (!menu) return;
   const isOpen = menu.classList.contains('open');
   if (isOpen) {
     closeMoreMenu();
@@ -4852,6 +4853,7 @@ function _backBtn(label){
 // ─────────────────────────────────────────────────────────────────────────────
 function renderTab(i){
   const el=document.getElementById("tab-content"),s=getSorted();
+  if(!el) return;
   el.style.position="";el.style.overflow="";
   if(i===0)el.innerHTML=renderLeaderboard(getSortedFiltered());
   else if(i===1){const q=document.getElementById("cust-search")?.value||"";el.innerHTML=renderCustomers(s,q);}
@@ -7546,49 +7548,6 @@ var _cmpCache = {
   curProfit: 0, prevProfit: 0, profitMargin: 0,
   periodLabel: "", prevLabel: ""
 };
-
-function cmpAllPurchases(){
-  const all=[];
-  customers.forEach(c=>(c.purchases||[]).forEach(p=>{
-    all.push({amount:Number(p.amount),date:(p.date||"").slice(0,10),custId:c.id,_src:"customer"});
-  }));
-  getDebtors().forEach(d=>(d.transactions||[]).filter(t=>t.type==="sale").forEach(t=>{
-    all.push({amount:Number(t.amount),date:(t.date||"").slice(0,10),debtorId:d.id,_src:"debtor"});
-  }));
-  return all;
-}
-
-function cmpAllCreditorPurchases(){
-  const all=[];
-  getCreditors().filter(cr=>cr.id!=="CR_UNRECONCILED").forEach(cr=>(cr.transactions||[]).filter(t=>
-    t.type==="purchase" && !t._invItem && !t._fromInventory
-  ).forEach(t=>{
-    all.push({amount:Number(t.amount),date:(t.date||"").slice(0,10),creditorId:cr.id});
-  }));
-  return all;
-}
-
-function cmpCostByDay(dates){
-  const map={};dates.forEach(d=>map[d]=0);
-  cmpAllCreditorPurchases().forEach(p=>{if(map[p.date]!==undefined)map[p.date]+=p.amount;});
-  return dates.map(d=>map[d]);
-}
-function cmpCostByMonth(year){
-  const arr=Array(12).fill(0);
-  cmpAllCreditorPurchases().forEach(p=>{if(p.date.slice(0,4)===String(year))arr[parseInt(p.date.slice(5,7))-1]+=p.amount;});
-  return arr;
-}
-function cmpCostByYear(years){
-  const map={};years.forEach(y=>map[String(y)]=0);
-  cmpAllCreditorPurchases().forEach(p=>{const y=p.date.slice(0,4);if(map[y]!==undefined)map[y]+=p.amount;});
-  return years.map(y=>map[String(y)]);
-}
-
-function cmpMondayOf(d){const t=new Date(d);t.setHours(0,0,0,0);const day=t.getDay()||7;t.setDate(t.getDate()-day+1);return t;}
-function cmpAddDays(d,n){const t=new Date(d);t.setDate(t.getDate()+n);return t;}
-function cmpIso(d){return d.toISOString().slice(0,10);}
-function cmpFmtDay(iso){return new Date(iso+"T00:00:00").toLocaleDateString("en-IN",{weekday:"short"});}
-function cmpFmtDayShort(iso){return new Date(iso+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short"});}
 
 // ── Quarter helpers ───────────────────────────────────────────────────────────
 function cmpQuarterDates(year, q){ // q=0..3
@@ -10462,6 +10421,7 @@ var _linkedLedgerListeners = {}; // theirPhone -> unsubscribe fn
 
 function startLinkedLedgerListener(theirPhone, onTx) {
   if (!db || !authPhone || !theirPhone) return;
+  if (!_linkedLedgerListeners) { _linkedLedgerListeners = {}; }
   if (_linkedLedgerListeners[theirPhone]) return; // already listening
 
   const unsub = db.collection("users").doc(authPhone)
@@ -15199,6 +15159,17 @@ document.addEventListener("DOMContentLoaded", updateAppHeader);
 var currentTheme = localStorage.getItem(storageKey("theme")) || "night";
 var currentAppStyle = localStorage.getItem(storageKey("appStyle")) || "pro";
 
+// SVG icons for pro bottom nav — declared here so applyAppStyle can call updateBottomNavIcons safely
+var BNAV_PRO_ICONS = {
+  0: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M5 3h14l-1.5 9H6.5L5 3z"/><path d="M9 12a3 3 0 0 0 6 0"/></svg>`,
+  1: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  2: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
+  5: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
+};
+var BNAV_PRO_LABELS = { 0: "Rankings", 1: "Customers", 2: "Add Sale", 5: "Inventory" };
+var BNAV_GAME_ICONS = { 0: "🏆", 1: "👥", 2: "💳", 5: "📦" };
+var BNAV_GAME_LABELS = { 0: "Board", 1: "Customers", 2: "Purchase", 5: "Inventory" };
+
 function applyAppStyle(style) {
   currentAppStyle = style;
   document.body.classList.toggle("pro-theme", style === "pro");
@@ -15220,17 +15191,6 @@ function applyAppStyle(style) {
   renderTab(currentTab);
   saveSettingsToCloud();
 }
-
-// SVG icons for pro bottom nav
-var BNAV_PRO_ICONS = {
-  0: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M5 3h14l-1.5 9H6.5L5 3z"/><path d="M9 12a3 3 0 0 0 6 0"/></svg>`,
-  1: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
-  2: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
-  5: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
-};
-var BNAV_PRO_LABELS = { 0: "Rankings", 1: "Customers", 2: "Add Sale", 5: "Inventory" };
-var BNAV_GAME_ICONS = { 0: "🏆", 1: "👥", 2: "💳", 5: "📦" };
-var BNAV_GAME_LABELS = { 0: "Board", 1: "Customers", 2: "Purchase", 5: "Inventory" };
 
 function updateBottomNavIcons() {
   const isPro = currentAppStyle === "pro";
@@ -16432,7 +16392,7 @@ function isTabAllowed(i) {
     return true;
   }
   // Free/expired — only explicitly allowed free tabs
-  return FREE_TABS.includes(i);
+  return Array.isArray(FREE_TABS) && FREE_TABS.includes(i);
 }
 
 // Checks whether a sub-feature is accessible
@@ -19948,7 +19908,7 @@ async function loadShopRequests(){
   _shopRequestsCache = combined.filter(r=>{ if(seen.has(r.id)) return false; seen.add(r.id); return true; })
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   _shopRequestsUnread = _shopRequestsCache.length;
-  renderTabs();
+  if (document.getElementById("tab-bar")) renderTabs();
 }
 
 // ── Live listener for auto_accepted docs (Shop A gets notified when Shop B accepts) ─────────────
