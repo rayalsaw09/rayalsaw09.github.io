@@ -4174,13 +4174,29 @@ function onLoginSuccess(phone) {
 
   if (db && phone) {
     shopId = phone;
-    startFirestoreListener();
-    loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
-    loadShopRequests();
-    setTimeout(startPaymentRequestListener, 2000); // Start payment sync listener
-    setTimeout(sweepAcceptedPaymentSyncRequests, 3000); // Catch any accepted requests missed while offline
-    setTimeout(cleanupStaleSentRequests, 5000);         // Remove stale pending requests sent before role fix
-    setTimeout(checkLowStockAndNotify, 4000);           // Check low stock and notify once per day
+    // ── Ensure Firebase Anonymous Auth before any Firestore read ──
+    // Firestore rules use request.auth != null — must be signed in first.
+    const _afterAuth = () => {
+      startFirestoreListener();
+      loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
+      loadShopRequests();
+      setTimeout(startPaymentRequestListener, 2000);
+      setTimeout(sweepAcceptedPaymentSyncRequests, 3000);
+      setTimeout(cleanupStaleSentRequests, 5000);
+      setTimeout(checkLowStockAndNotify, 4000);
+    };
+    try {
+      const _cu = firebase.auth().currentUser;
+      if (_cu) {
+        _afterAuth();
+      } else {
+        firebase.auth().signInAnonymously()
+          .then(_afterAuth)
+          .catch(e => { console.warn("[SC] anon auth failed, trying anyway:", e); _afterAuth(); });
+      }
+    } catch(e) {
+      _afterAuth(); // Firebase Auth not available — proceed anyway
+    }
     // Check Firestore — if doc doesn't exist but we have local data, push it up (first-time migration)
     loadInventoryFromFirestore((docExists)=>{
       if(!docExists && inventoryItems.length > 0){
@@ -4193,16 +4209,23 @@ function onLoginSuccess(phone) {
     shopId = phone;
     const retrySync = (attempts) => {
       if(db && authPhone){
-        startFirestoreListener();
-        setTimeout(startPaymentRequestListener, 2000);
-        loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
-        loadInventoryFromFirestore((docExists)=>{
-          if(!docExists && inventoryItems.length > 0){
-            console.log("[Inv] Migrating", inventoryItems.length, "items from localStorage to Firestore");
-            saveInventory();
-          }
-          safeRenderTab(currentTab);
-        });
+        const _afterAuth2 = () => {
+          startFirestoreListener();
+          setTimeout(startPaymentRequestListener, 2000);
+          loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
+          loadInventoryFromFirestore((docExists)=>{\
+            if(!docExists && inventoryItems.length > 0){\
+              console.log("[Inv] Migrating", inventoryItems.length, "items from localStorage to Firestore");\
+              saveInventory();\
+            }\
+            safeRenderTab(currentTab);\
+          });\
+        };\
+        try {\
+          const _cu2 = firebase.auth().currentUser;\
+          if (_cu2) { _afterAuth2(); }\
+          else { firebase.auth().signInAnonymously().then(_afterAuth2).catch(()=>_afterAuth2()); }\
+        } catch(e) { _afterAuth2(); }
       } else if(attempts > 0){
         setTimeout(()=>retrySync(attempts-1), 1000);
       } else {
