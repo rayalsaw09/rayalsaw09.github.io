@@ -2662,6 +2662,10 @@ function loadSettingsFromCloud(cb) {
 
 // ── Real-time Firestore listener ──
 function startFirestoreListener() {
+  if (!authPhone) {
+    console.warn("[SC] startFirestoreListener called with no authPhone — skipping");
+    return;
+  }
   if (fbUnsubscribe) fbUnsubscribe();
   fbUnsubscribe = userCol().onSnapshot(snap => {
     customers = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
@@ -6212,28 +6216,132 @@ async function cmpExportPDF(){
     const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+    const c = _cmpCache; // use cached computed values from last renderCompare()
+
+    // Header
+    doc.setFillColor(10, 14, 26);
+    doc.rect(0, 0, 210, 30, 'F');
     doc.setFontSize(18); doc.setTextColor(255,215,0);
-    doc.text('Business Comparison Report', 14, 20);
-    doc.setFontSize(10); doc.setTextColor(120,130,150);
-    doc.text('Generated: '+dateStr, 14, 28);
-    doc.setFontSize(12); doc.setTextColor(200,208,224);
-    let y=38;
-    const line=(label,val,col)=>{
-      doc.setFontSize(10); doc.setTextColor(100,120,150); doc.text(label,14,y);
-      doc.setFontSize(11); doc.setTextColor(...(col||[200,208,224])); doc.text(String(val),100,y); y+=8;
+    doc.text('Business Comparison Report', 14, 14);
+    doc.setFontSize(9); doc.setTextColor(120,130,150);
+    doc.text(appSettings.shopName || 'ShopChampion', 14, 21);
+    doc.text('Generated: ' + dateStr, 140, 21);
+
+    let y = 38;
+    const fmtINR = v => '\u20B9' + Math.round(v).toLocaleString('en-IN');
+    const sep = () => { doc.setDrawColor(30,42,69); doc.line(14,y,196,y); y+=5; };
+    const head = (label) => {
+      doc.setFontSize(11); doc.setTextColor(255,215,0);
+      doc.text(label, 14, y); y+=7; sep();
     };
-    const sep=()=>{doc.setDrawColor(30,42,69);doc.line(14,y,196,y);y+=5;};
-    doc.setFontSize(12);doc.setTextColor(255,215,0);doc.text('Performance Overview',14,y);y+=8;
-    const allPurch2=cmpAllPurchases();
-    const allExp2=getExpenses();
-    const curR=revSeries?revSeries.reduce((s,v)=>s+v,0):0;
+    const row = (label, cur, prev, invertColor) => {
+      const diff = cur - prev;
+      const pct  = prev > 0 ? Math.round(diff/prev*100) : (cur>0?100:0);
+      const good = invertColor ? diff <= 0 : diff >= 0;
+      doc.setFontSize(9); doc.setTextColor(100,120,150); doc.text(label, 14, y);
+      doc.setFontSize(9); doc.setTextColor(200,208,224); doc.text(fmtINR(cur), 105, y);
+      doc.setFontSize(9); doc.setTextColor(160,170,190); doc.text(fmtINR(prev), 145, y);
+      if(prev > 0 || cur > 0){
+        const col = good ? [34,197,94] : [239,68,68];
+        doc.setTextColor(...col); doc.text((diff>=0?'\u25B2 ':'\u25BC ')+Math.abs(pct)+'%', 178, y);
+      }
+      y += 7;
+    };
+
+    // Column headers
+    doc.setFontSize(8); doc.setTextColor(74,90,122);
+    doc.text('METRIC', 14, y);
+    doc.text('CURRENT (' + (c.periodLabel||'-') + ')', 105, y);
+    doc.text('PREVIOUS (' + (c.prevLabel||'-') + ')', 145, y);
+    doc.text('CHANGE', 178, y);
+    y += 5; sep();
+
+    head('Revenue & Expenses');
+    row('Total Revenue',     c.curRev,    c.prevRev);
+    row('Total Expenses',    c.curExp,    c.prevExp,    true);
+    row('Net Profit',        c.curProfit, c.prevProfit);
+    doc.setFontSize(9); doc.setTextColor(100,120,150); doc.text('Profit Margin', 14, y);
+    doc.setFontSize(9); doc.setTextColor(200,208,224); doc.text((c.profitMargin||0) + '%', 105, y);
+    y += 7; sep();
+
+    head('Period Breakdown (' + (c.chartLabels||[]).join(', ') + ')');
+    const revArr = c.revSeries || [];
+    const expArr = c.expSeries || [];
+    revArr.forEach((v, i) => {
+      const lbl = (c.chartLabels||[])[i] || ('Item '+(i+1));
+      doc.setFontSize(8); doc.setTextColor(100,120,150); doc.text(lbl, 14, y);
+      doc.setFontSize(8); doc.setTextColor(200,208,224); doc.text(fmtINR(v), 60, y);
+      doc.setTextColor(150,180,150); doc.text('Exp: '+fmtINR(expArr[i]||0), 100, y);
+      const profit = v - (expArr[i]||0);
+      doc.setTextColor(...(profit>=0?[34,197,94]:[239,68,68])); doc.text('Net: '+fmtINR(profit), 148, y);
+      y += 6;
+      if(y > 270){ doc.addPage(); y = 20; }
+    });
     sep();
-    doc.save('ShopChampion-Compare-'+dateStr.replace(/ /g,'-')+'.pdf');
-    notify('📄 PDF exported!');
+
+    head('Customer Leaderboard (Top 20)');
+    const top20 = getSortedFiltered().slice(0, 20);
+    top20.forEach((cust, i) => {
+      doc.setFontSize(8); doc.setTextColor(200,208,224);
+      doc.text('#' + (i+1) + '  ' + (cust.name||'').slice(0,30), 14, y);
+      doc.setTextColor(100,120,150); doc.text(cust.phone||'', 100, y);
+      doc.setTextColor(200,208,224); doc.text(fmtINR(cust.totalSpend), 148, y);
+      y += 6;
+      if(y > 270){ doc.addPage(); y = 20; }
+    });
+
+    doc.save('ShopChampion-Compare-' + dateStr.replace(/ /g, '-') + '.pdf');
+    notify('\uD83D\uDCC4 PDF exported!');
   } catch(e) {
-    // Fallback: use print
-    window.print();
+    console.error('[cmpExportPDF]', e);
+    notify('\u26A0\uFE0F PDF failed \u2014 opening print dialog', 'error');
+    cmpPrintReport();
   }
+}
+
+function cmpPrintReport(){
+  const c = _cmpCache;
+  const fmtINR = v => '\u20B9' + Math.round(v).toLocaleString('en-IN');
+  const rows = (c.revSeries||[]).map((v,i)=>{
+    const lbl = (c.chartLabels||[])[i] || ('Item '+(i+1));
+    const exp = (c.expSeries||[])[i]||0;
+    const net = v - exp;
+    return `<tr><td>${lbl}</td><td>${fmtINR(v)}</td><td>${fmtINR(exp)}</td><td style="color:${net>=0?'#16a34a':'#dc2626'}">${fmtINR(net)}</td></tr>`;
+  }).join('');
+  const cust20 = getSortedFiltered().slice(0,20).map((cu,i)=>
+    `<tr><td>#${i+1}</td><td>${cu.name||''}</td><td>${cu.phone||''}</td><td>${fmtINR(cu.totalSpend)}</td></tr>`
+  ).join('');
+  const now = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Compare Report — ${appSettings.shopName||'ShopChampion'}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:24px;color:#111;font-size:13px;}
+      h1{font-size:20px;margin:0 0 4px;} .sub{color:#666;font-size:11px;margin-bottom:20px;}
+      h2{font-size:14px;margin:20px 0 8px;border-bottom:2px solid #eee;padding-bottom:4px;}
+      table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+      th{background:#f0f4ff;text-align:left;padding:7px 10px;font-size:11px;font-weight:700;border:1px solid #dde;}
+      td{padding:6px 10px;border:1px solid #eee;font-size:12px;}
+      tr:nth-child(even) td{background:#fafafa;}
+      .kpi{display:inline-block;min-width:140px;padding:10px 16px;border:1px solid #dde;border-radius:8px;margin:4px;vertical-align:top;}
+      .kpi-val{font-size:18px;font-weight:700;} .kpi-lbl{font-size:10px;color:#888;}
+      @media print{button{display:none}}
+    </style></head><body>
+    <h1>\u26D6 Business Comparison Report</h1>
+    <div class="sub">${appSettings.shopName||'ShopChampion'} &bull; Generated: ${now}</div>
+    <div>
+      <div class="kpi"><div class="kpi-lbl">CURRENT (${c.periodLabel||''})</div><div class="kpi-val">${fmtINR(c.curRev)}</div><div class="kpi-lbl">Revenue</div></div>
+      <div class="kpi"><div class="kpi-lbl">PREVIOUS (${c.prevLabel||''})</div><div class="kpi-val">${fmtINR(c.prevRev)}</div><div class="kpi-lbl">Revenue</div></div>
+      <div class="kpi"><div class="kpi-lbl">NET PROFIT</div><div class="kpi-val" style="color:${c.curProfit>=0?'#16a34a':'#dc2626'}">${fmtINR(c.curProfit)}</div><div class="kpi-lbl">Margin: ${c.profitMargin||0}%</div></div>
+      <div class="kpi"><div class="kpi-lbl">EXPENSES</div><div class="kpi-val">${fmtINR(c.curExp)}</div><div class="kpi-lbl">This period</div></div>
+    </div>
+    <h2>Period Breakdown</h2>
+    <table><thead><tr><th>Period</th><th>Revenue</th><th>Expenses</th><th>Net Profit</th></tr></thead><tbody>${rows}</tbody></table>
+    <h2>Top 20 Customers</h2>
+    <table><thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Total Spend</th></tr></thead><tbody>${cust20}</tbody></table>
+    <script>window.print();<\/script></body></html>`;
+  const w = window.open('','_blank','width=800,height=600');
+  if(w){ w.document.write(html); w.document.close(); }
+  else { notify('\u26A0\uFE0F Allow popups to print', 'error'); }
 }
 
 function exportCSV(){
@@ -7155,6 +7263,14 @@ var cmpSelectedQuarter = Math.floor(new Date().getMonth()/3); // 0-3
 var cmpYearA = new Date().getFullYear();
 var cmpYearB = new Date().getFullYear() - 1;
 
+// ── Compare report cache (populated by renderCompare, read by cmpExportPDF/exportYearCSV) ──
+var _cmpCache = {
+  revSeries: [], expSeries: [], profitSeries: [], chartLabels: [],
+  curRev: 0, prevRev: 0, curExp: 0, prevExp: 0,
+  curProfit: 0, prevProfit: 0, profitMargin: 0,
+  periodLabel: "", prevLabel: ""
+};
+
 function cmpAllPurchases(){
   const all=[];
   customers.forEach(c=>(c.purchases||[]).forEach(p=>{
@@ -7576,6 +7692,11 @@ function renderCompare(){
   const curProfit=curRev-curExp,prevProfit=prevRev-prevExp;
   const profitMargin=curRev>0?Math.round((curProfit/curRev)*100):0;
 
+  // ── Cache for export functions ──
+  _cmpCache = { revSeries, expSeries, profitSeries, chartLabels,
+    curRev, prevRev, curExp, prevExp, curProfit, prevProfit,
+    profitMargin, periodLabel, prevLabel };
+
   // Debtor/creditor totals
   const debtPurchases=(d)=>(d.transactions||[]).filter(x=>x.type==="sale").reduce((a,x)=>a+Number(x.amount||0),0);
   const debtReceived=(d)=>(d.transactions||[]).filter(x=>x.type==="payment").reduce((a,x)=>a+Number(x.amount||0),0);
@@ -7944,7 +8065,7 @@ function renderCompare(){
   const exportHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:14px;">
     <div style="font-size:11px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📤 Export Report</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button onclick="window.print()" style="cursor:pointer;padding:8px 14px;border-radius:10px;border:1px solid var(--border-main,#1e2a45);background:var(--bg-row-even,#0a0e1a);color:var(--text-main,#e8eaf0);font-size:12px;font-weight:600;">🖨️ Print</button>
+      <button onclick="cmpPrintReport()" style="cursor:pointer;padding:8px 14px;border-radius:10px;border:1px solid var(--border-main,#1e2a45);background:var(--bg-row-even,#0a0e1a);color:var(--text-main,#e8eaf0);font-size:12px;font-weight:600;">🖨️ Print</button>
       <button onclick="exportYearCSV(${cmpSelectedYear})" style="cursor:pointer;padding:8px 14px;border-radius:10px;border:1px solid #1e3a1e;background:rgba(34,197,94,0.08);color:#22c55e;font-size:12px;font-weight:600;">📊 Export CSV</button>
       <button onclick="cmpExportPDF()" style="cursor:pointer;padding:8px 14px;border-radius:10px;border:1px solid #1e2a45;background:rgba(74,140,255,0.08);color:#4a8cff;font-size:12px;font-weight:600;">📄 Export PDF</button>
     </div>
