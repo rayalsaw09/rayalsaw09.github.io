@@ -4213,18 +4213,18 @@ function onLoginSuccess(phone) {
           startFirestoreListener();
           setTimeout(startPaymentRequestListener, 2000);
           loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
-          loadInventoryFromFirestore((docExists)=>{\
-            if(!docExists && inventoryItems.length > 0){\
-              console.log("[Inv] Migrating", inventoryItems.length, "items from localStorage to Firestore");\
-              saveInventory();\
-            }\
-            safeRenderTab(currentTab);\
-          });\
-        };\
-        try {\
-          const _cu2 = firebase.auth().currentUser;\
-          if (_cu2) { _afterAuth2(); }\
-          else { firebase.auth().signInAnonymously().then(_afterAuth2).catch(()=>_afterAuth2()); }\
+          loadInventoryFromFirestore((docExists)=>{
+            if(!docExists && inventoryItems.length > 0){
+              console.log("[Inv] Migrating", inventoryItems.length, "items from localStorage to Firestore");
+              saveInventory();
+            }
+            safeRenderTab(currentTab);
+          });
+        };
+        try {
+          const _cu2 = firebase.auth().currentUser;
+          if (_cu2) { _afterAuth2(); }
+          else { firebase.auth().signInAnonymously().then(_afterAuth2).catch(()=>_afterAuth2()); }
         } catch(e) { _afterAuth2(); }
       } else if(attempts > 0){
         setTimeout(()=>retrySync(attempts-1), 1000);
