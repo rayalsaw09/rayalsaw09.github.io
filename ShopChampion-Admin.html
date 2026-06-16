@@ -3748,7 +3748,17 @@ async function checkPhone() {
     });
     clearTimeout(timer);
 
-    if (!res.ok) { goNewUser(); resetBtn(); return; }
+    if (!res.ok) {
+      // RPC not deployed yet — fall back to local storage check
+      const localHash = localStorage.getItem("sc_user_" + phone);
+      if (localHash) {
+        document.getElementById("auth-pass-subtitle").textContent = `Enter password for +91 ${phone}`;
+        authShowStep("password");
+      } else {
+        goNewUser();
+      }
+      resetBtn(); return;
+    }
     const result = await res.json();
 
     if (result && result.exists) {
@@ -3763,8 +3773,15 @@ async function checkPhone() {
       goNewUser();
     }
   } catch(e) {
-    // Network error / timeout / Supabase down — treat as new user so login never gets stuck
-    goNewUser();
+    // Network error / timeout / Supabase down — check local storage before treating as new user
+    const localHash = localStorage.getItem("sc_user_" + phone);
+    if (localHash) {
+      // User has a local record — show password screen (they can login with local hash fallback)
+      document.getElementById("auth-pass-subtitle").textContent = `Enter password for +91 ${phone}`;
+      authShowStep("password");
+    } else {
+      goNewUser();
+    }
   } finally {
     resetBtn();
   }
@@ -3868,32 +3885,58 @@ async function verifyPasswordOnline(phone, pass) {
       signal: controller.signal
     });
     clearTimeout(timer);
-    const ok = await res.json();
-    if (ok === true) {
+
+    if (res.ok) {
+      const ok = await res.json();
+      if (ok === true) {
+        resetBfState(phone);
+        localStorage.setItem("sc_auth_phone", phone);
+        localStorage.setItem("sc_user_" + phone, hashed);
+        localStorage.setItem("sc_session_type", "admin");
+        onLoginSuccess(phone);
+        return;
+      } else {
+        // Wrong password on server
+        const bfState = recordFailedAttempt(phone);
+        const attemptsLeft = SC_MAX_ATTEMPTS - (bfState.attempts || 0);
+        if (showLockoutMessage(phone, errEl)) return;
+        errEl.textContent = `❌ Wrong password. ${attemptsLeft > 0 ? attemptsLeft + " attempt(s) left before lockout." : "Try again or use Forgot Password."}`;
+        errEl.style.display = "block";
+        return;
+      }
+    }
+
+    // RPC not available or returned error — fall back to local hash comparison
+    console.warn("check_password RPC failed (status " + res.status + ") — using local hash fallback");
+    const localHash = localStorage.getItem("sc_user_" + phone);
+    if (localHash && localHash === hashed) {
       resetBfState(phone);
       localStorage.setItem("sc_auth_phone", phone);
       localStorage.setItem("sc_user_" + phone, hashed);
       localStorage.setItem("sc_session_type", "admin");
       onLoginSuccess(phone);
-    } else {
-      // Check if blocked
-      const bRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=blocked`, {
-        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
-      });
-      const bRows = await bRes.json();
-      if (bRows && bRows[0] && bRows[0].blocked === true) {
-        errEl.innerHTML = "🚫 Your account has been blocked. Please contact the shop owner.";
-        errEl.style.display = "block";
+      return;
+    }
+    // Local hash mismatch — wrong password
+    const bfState = recordFailedAttempt(phone);
+    const attemptsLeft = SC_MAX_ATTEMPTS - (bfState.attempts || 0);
+    if (showLockoutMessage(phone, errEl)) return;
+    errEl.textContent = `❌ Wrong password. ${attemptsLeft > 0 ? attemptsLeft + " attempt(s) left before lockout." : "Try again or use Forgot Password."}`;
+    errEl.style.display = "block";
+
+  } catch(e) {
+    // Network error / timeout — try local hash as last resort
+    try {
+      const hashed = await scHashPassword(phone, pass);
+      const localHash = localStorage.getItem("sc_user_" + phone);
+      if (localHash && localHash === hashed) {
+        localStorage.setItem("sc_auth_phone", phone);
+        localStorage.setItem("sc_session_type", "admin");
+        onLoginSuccess(phone);
         return;
       }
-      const bfState = recordFailedAttempt(phone);
-      const attemptsLeft = SC_MAX_ATTEMPTS - (bfState.attempts || 0);
-      if (showLockoutMessage(phone, errEl)) return;
-      errEl.textContent = `❌ Wrong password. ${attemptsLeft > 0 ? attemptsLeft + " attempt(s) left before lockout." : "Try again or use Forgot Password."}`;
-      errEl.style.display = "block";
-    }
-  } catch(e) {
-    errEl.textContent = "❌ Error checking password. Try again.";
+    } catch {}
+    errEl.textContent = "❌ Network error. Check your connection and try again.";
     errEl.style.display = "block";
   }
 }
@@ -4108,32 +4151,49 @@ async function setNewPassword() {
   const userNum = Date.now();
 
   try {
-    // Save to Supabase sc_users
+    // Save to Supabase sc_users via RPC (direct INSERT is blocked by RLS)
     if (authMode === "new_user") {
-      await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users`, {
+      const secAHash = secQ ? await scHashPassword(authPhone, secA) : "";
+      const rpcRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/register_user`, {
         method: "POST",
         headers: {
           "apikey": SC_SUPABASE_ANON,
           "Authorization": "Bearer " + SC_SUPABASE_ANON,
-          "Content-Type": "application/json",
-          "Prefer": "return=minimal"
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify({ phone: authPhone, password_hash: hashed, created_at: new Date().toISOString(), user_number: userNum, security_question: secQ, security_answer_hash: secQ ? await scHashPassword(authPhone, secA) : "", shop_name: shopNameReg })
+        body: JSON.stringify({
+          p_phone: authPhone, p_hash: hashed, p_user_number: userNum,
+          p_shop_name: shopNameReg || "", p_security_question: secQ || "",
+          p_security_answer_hash: secAHash
+        })
       });
+      if (!rpcRes.ok) {
+        const errText = await rpcRes.text();
+        console.warn("register_user RPC failed:", errText);
+        // Fallback: try direct insert (works if RLS not yet applied)
+        await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users`, {
+          method: "POST",
+          headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+          body: JSON.stringify({ phone: authPhone, password_hash: hashed, created_at: new Date().toISOString(), user_number: userNum, security_question: secQ, security_answer_hash: secAHash, shop_name: shopNameReg })
+        });
+      }
     } else {
-      // Update existing password
-      await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(authPhone)}`, {
-        method: "PATCH",
-        headers: {
-          "apikey": SC_SUPABASE_ANON,
-          "Authorization": "Bearer " + SC_SUPABASE_ANON,
-          "Content-Type": "application/json",
-          "Prefer": "return=minimal"
-        },
-        body: JSON.stringify({ password_hash: hashed })
+      // Update existing password via RPC
+      const patchRpc = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/update_password`, {
+        method: "POST",
+        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+        body: JSON.stringify({ p_phone: authPhone, p_new_hash: hashed })
       });
+      if (!patchRpc.ok) {
+        // Fallback: direct PATCH
+        await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(authPhone)}`, {
+          method: "PATCH",
+          headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+          body: JSON.stringify({ password_hash: hashed })
+        });
+      }
     }
-  } catch(e) { /* save locally even if Supabase fails */ }
+  } catch(e) { console.warn("Supabase save error (continuing with local):", e.message); }
 
   // Save locally
   localStorage.setItem("sc_user_" + authPhone, hashed);

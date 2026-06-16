@@ -1062,11 +1062,33 @@ async function loadKeys() {
 // ── Load Users ──
 async function loadUsers() {
   try {
-    // forceService=true bypasses RLS so ALL registered users appear, not just pro
+    // Try direct table read with service role key (bypasses RLS)
     allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || [];
+    // If empty and service key is available, try RPC fallback
+    if (!allUsers.length && SB_SERVICE_KEY) {
+      try {
+        const rpcRes = await fetch(`${SB_URL}/rest/v1/rpc/get_all_users`, {
+          method: "POST",
+          headers: { "apikey": SB_SERVICE_KEY, "Authorization": "Bearer " + SB_SERVICE_KEY, "Content-Type": "application/json" },
+          body: "{}"
+        });
+        if (rpcRes.ok) allUsers = await rpcRes.json() || [];
+      } catch {}
+    }
     mergeBuildTable();
   } catch(e) {
     console.error("Users load error:", e);
+    // Try RPC as fallback on error
+    if (SB_SERVICE_KEY) {
+      try {
+        const rpcRes = await fetch(`${SB_URL}/rest/v1/rpc/get_all_users`, {
+          method: "POST",
+          headers: { "apikey": SB_SERVICE_KEY, "Authorization": "Bearer " + SB_SERVICE_KEY, "Content-Type": "application/json" },
+          body: "{}"
+        });
+        if (rpcRes.ok) { allUsers = await rpcRes.json() || []; mergeBuildTable(); }
+      } catch(e2) { console.error("Users RPC fallback also failed:", e2); }
+    }
   }
 }
 
