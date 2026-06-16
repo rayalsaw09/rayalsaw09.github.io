@@ -2196,6 +2196,69 @@ var TRANSLATIONS = {
     invProductService:"उत्पाद / सेवा का नाम", invCustomerDetail:"ग्राहक विवरण",
     invExpiryAlerts:"समाप्ति अलर्ट", invMinStockWarning:"न्यूनतम स्टॉक चेतावनी",
     invPickItem:"आइटम चुनें", invSharingWith:"आप वर्तमान में साझा कर रहे हैं",
+    // Settings tab — plan card & feature comparison (previously hardcoded English)
+    stBasicFeatures:"बुनियादी सुविधाएं — सब कुछ अनलॉक करने के लिए अपग्रेड करें",
+    stFreePlanUsage:"मुफ़्त प्लान उपयोग:",
+    stTrialActive:"प्रो ट्रायल सक्रिय",
+    stTrialUsage:"इस ट्रायल का उपयोग:",
+    stTrialCustomers:"/ ∞ ग्राहक",
+    stTrialItems:"/ ∞ आइटम",
+    stBuyBeforeTrial:"💳 ट्रायल खत्म होने से पहले Pro खरीदें — ₹299/मो",
+    stDaysLeft:"दिन बचे",
+    stKeyLabel:"लाइसेंस कुंजी:",
+    stActiveLabel:"✅ सक्रिय",
+    stYouHave:"🆓 आपके पास है",
+    stProUnlocks:"⭐ Pro अनलॉक करता है",
+    stUpgradeToPro:"⭐ Pro में अपग्रेड करें",
+    stUpgradeDesc:"₹299/माह या ₹3,499/वर्ष · सभी सुविधाएं · विज्ञापन-मुक्त डिस्प्ले",
+    stUpgradeNow:"💳 अभी अपग्रेड करें →",
+    stHaveKey:"पहले से कुंजी है?",
+    stEnterHere:"यहां दर्ज करें →",
+    stShareId:"यह ID सप्लायर और खरीदारों के साथ शेयर करें ताकि वे आपसे जुड़ सकें",
+    stCopyId:"📋 कॉपी करें",
+    stIdCopied:"✅ Shop ID कॉपी हुई!",
+    // Feature names for comparison table
+    ftCustomers:"ग्राहक",
+    ftSalesPurchases:"बिक्री और खरीद जोड़ें",
+    ftLeaderboard:"रैंकिंग लीडरबोर्ड",
+    ftWhatsApp:"WhatsApp संदेश",
+    ftInventory:"इन्वेंटरी",
+    ftDisplay:"डिस्प्ले स्क्रीन",
+    ftCreditorsDebtors:"लेनदार / देनदार",
+    ftMessages:"दुकान-से-दुकान संदेश",
+    ftAnalytics:"एनालिटिक्स टैब",
+    ftCompare:"तुलना टैब",
+    ftExport:"बिक्री इतिहास निर्यात और बिल",
+    ftGst:"GST / GSTIN ऑटो-फिल",
+    ftPush:"पुश नोटिफिकेशन",
+    // Feature values
+    fvUpTo100:"100 तक",
+    fvIncluded:"✅ शामिल",
+    fvProOnly:"🔒 केवल Pro",
+    fvUpTo50:"50 आइटम तक",
+    fvWithAds:"✅ विज्ञापन सहित",
+    fvUpTo10:"10 तक",
+    fvUnlimited:"असीमित",
+    fvFullAccess:"✅ पूरी पहुंच",
+    fvAdFree:"✅ विज्ञापन-मुक्त",
+    // Alerts tab — section headers & empty state
+    alAllClear:"सब ठीक है — कुछ भी ध्यान नहीं चाहिए",
+    alAllClearSub:"आपका स्टॉक, एक्सपायरी और बकाया सब सही दिख रहे हैं।",
+    alAlertsTitle:"⚠️ अलर्ट",
+    alLowStock:"कम स्टॉक",
+    alOutOfStock:"स्टॉक खत्म",
+    alExpiryWarnings:"एक्सपायरी चेतावनी",
+    alCreditorOverdue:"लेनदार बकाया (आप पर देय)",
+    alDebtorOverdue:"देनदार बकाया (आपका देय)",
+    alOutOfStockLabel:"स्टॉक खत्म · 0",
+    alExpired:"एक्सपायर हो चुके",
+    alExpiring7:"7 दिनों में एक्सपायर",
+    alExpiring30:"30 दिनों में एक्सपायर",
+    alExpiry:"एक्सपायरी:",
+    alStock:"स्टॉक:",
+    alDaysAgo:"दिन पहले",
+    alInventoryBtn:"📦 इन्वेंटरी →",
+    alMin:"न्यूनतम:",
     // Messages tab
     msgNoShops:"अभी कोई जुड़ी दुकान नहीं",
     msgAddShop:"चैट शुरू करने के लिए SC-XXXXXX ID से दुकान जोड़ें।",
@@ -12332,20 +12395,20 @@ function renderAlertsTab(){
   if(!hasAnything){
     return `<div style="padding:60px 20px;text-align:center;">
       <div style="font-size:48px;margin-bottom:14px;">✅</div>
-      <div style="font-size:18px;font-weight:800;color:#4ade80;margin-bottom:6px;">All clear — nothing needs attention</div>
-      <div style="font-size:13px;color:#7a8aaa;">Your stock, expiries and dues all look healthy right now.</div>
+      <div style="font-size:18px;font-weight:800;color:#4ade80;margin-bottom:6px;">${t('alAllClear')}</div>
+      <div style="font-size:13px;color:#7a8aaa;">${t('alAllClearSub')}</div>
     </div>`;
   }
 
   const sectionHeader = (icon,title,color)=>`<div style="font-size:14px;font-weight:800;color:${color};margin:18px 0 10px;display:flex;align-items:center;gap:8px;">${icon} ${title}</div>`;
 
   let html = `<div style="padding:16px 14px 80px;max-width:760px;margin:0 auto;">
-    <div style="font-size:18px;font-weight:800;color:#FFD700;margin-bottom:4px;">⚠️ Alerts</div>
+    <div style="font-size:18px;font-weight:800;color:#FFD700;margin-bottom:4px;">${t('alAlertsTitle')}</div>
     <div style="font-size:12px;color:#4a5a7a;margin-bottom:6px;">${t('alEverything')}</div>`;
 
   // Section 1 — Low Stock
   if(lowStockItems.length){
-    html += sectionHeader("📉","Low Stock","#FFD700");
+    html += sectionHeader("📉",t('alLowStock'),"#FFD700");
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     lowStockItems.forEach(item=>{
       const stk = invGetStock(item.name);
@@ -12353,9 +12416,9 @@ function renderAlertsTab(){
       html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(item.name)}</div>
-          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${t('alCurrent')} <span style="color:#FFD700;font-weight:700;">${stk} ${escHtml(item.unit||"unit")}</span> · Min: ${min} ${escHtml(item.unit||"unit")}</div>
+          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${t('alCurrent')} <span style="color:#FFD700;font-weight:700;">${stk} ${escHtml(item.unit||"unit")}</span> · ${t('alMin')} ${min} ${escHtml(item.unit||"unit")}</div>
         </div>
-        <button onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}');switchTab(5)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">📦 Inventory →</button>
+        <button onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}');switchTab(5)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
       </div>`;
     });
     html += `</div>`;
@@ -12363,15 +12426,15 @@ function renderAlertsTab(){
 
   // Section 2 — Out of Stock
   if(outOfStockItems.length){
-    html += sectionHeader("❌","Out of Stock","#f66");
+    html += sectionHeader("❌",t('alOutOfStock'),"#f66");
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     outOfStockItems.forEach(item=>{
       html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(item.name)}</div>
-          <div style="font-size:11px;color:#f66;margin-top:2px;font-weight:700;">OUT OF STOCK · 0 ${escHtml(item.unit||"unit")}</div>
+          <div style="font-size:11px;color:#f66;margin-top:2px;font-weight:700;">${t('alOutOfStockLabel')} ${escHtml(item.unit||"unit")}</div>
         </div>
-        <button onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}');switchTab(5)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">📦 Inventory →</button>
+        <button onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}');switchTab(5)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
       </div>`;
     });
     html += `</div>`;
@@ -12379,7 +12442,7 @@ function renderAlertsTab(){
 
   // Section 3 — Expiry Warnings
   if(expired.length || expiring7.length || expiring30.length){
-    html += sectionHeader("⏳","Expiry Warnings","#ff8c42");
+    html += sectionHeader("⏳",t('alExpiryWarnings'),"#ff8c42");
     const expiryGroup = (title,color,items)=>{
       if(!items.length) return "";
       let out = `<div style="font-size:12px;font-weight:800;color:${color};margin:8px 0 6px;">${title} (${items.length})</div>`;
@@ -12389,28 +12452,28 @@ function renderAlertsTab(){
         out += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
           <div style="flex:1;min-width:0;">
             <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(e.itemName)}</div>
-            <div style="font-size:11px;color:${color};margin-top:2px;">Expiry: ${dt} · Stock: ${e.qty} ${escHtml(e.unit||"unit")}</div>
+            <div style="font-size:11px;color:${color};margin-top:2px;">${t('alExpiry')} ${dt} · ${t('alStock')} ${e.qty} ${escHtml(e.unit||"unit")}</div>
           </div>
-          <button onclick="invShowItemDetail('${e.itemName.replace(/'/g,"\\'")}');switchTab(5)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">📦 Inventory →</button>
+          <button onclick="invShowItemDetail('${e.itemName.replace(/'/g,"\\'")}');switchTab(5)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
         </div>`;
       });
       out += `</div>`;
       return out;
     };
-    html += expiryGroup("Expired","#f66",expired);
-    html += expiryGroup("Expiring within 7 days","#ff8c42",expiring7);
-    html += expiryGroup("Expiring within 30 days","#FFD700",expiring30);
+    html += expiryGroup(t('alExpired'),"#f66",expired);
+    html += expiryGroup(t('alExpiring7'),"#ff8c42",expiring7);
+    html += expiryGroup(t('alExpiring30'),"#FFD700",expiring30);
   }
 
   // Section 4 — Creditor Overdue
   if(creditorOverdue.length){
-    html += sectionHeader("🏦","Creditor Overdue (You Owe)","#fbbf24");
+    html += sectionHeader("🏦",t('alCreditorOverdue'),"#fbbf24");
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     creditorOverdue.forEach(c=>{
       html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="switchTab(6);setTimeout(()=>openCreditorDetail('${c.id}'),50)">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(c.name)}</div>
-          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${t('alOldestUnpaidBill')} <span style="color:#f59e0b;font-weight:700;">${c.days} days ago</span></div>
+          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${t('alOldestUnpaidBill')} <span style="color:#f59e0b;font-weight:700;">${c.days} ${t('alDaysAgo')}</span></div>
         </div>
         <div style="font-size:14px;font-weight:800;color:#fbbf24;flex-shrink:0;">${formatINR(c.amount)}</div>
       </div>`;
@@ -12420,13 +12483,13 @@ function renderAlertsTab(){
 
   // Section 5 — Debtor Overdue
   if(debtorOverdue.length){
-    html += sectionHeader("🧾","Debtor Overdue (They Owe You)","#4ade80");
+    html += sectionHeader("🧾",t('alDebtorOverdue'),"#4ade80");
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     debtorOverdue.forEach(d=>{
       html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="switchTab(7);setTimeout(()=>openDebtorDetail('${d.id}'),50)">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(d.name)}</div>
-          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${t('alOldestUnpaidSale')} <span style="color:#4ade80;font-weight:700;">${d.days} days ago</span></div>
+          <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${t('alOldestUnpaidSale')} <span style="color:#4ade80;font-weight:700;">${d.days} ${t('alDaysAgo')}</span></div>
         </div>
         <div style="font-size:14px;font-weight:800;color:#4ade80;flex-shrink:0;">${formatINR(d.amount)}</div>
       </div>`;
@@ -13161,26 +13224,26 @@ function renderSettings(){
 
   // ── Feature comparison data ──
   const FREE_FEATURES = [
-    ["👥", "Customers", "Up to 100"],
-    ["🛒", "Add Sales & Purchases", "✅ Included"],
-    ["🏆", "Rankings Leaderboard", "✅ Included"],
-    ["📱", "WhatsApp Message", "🔒 Pro only"],
-    ["📦", "Inventory", "Up to 50 items"],
-    ["📺", "Display Screen", "✅ With ads"],
-    ["💳", "Creditors / Debtors", "Up to 10"],
-    ["💬", "Shop-to-Shop Messages", "✅ Included"],
+    ["👥", t('ftCustomers'), t('fvUpTo100')],
+    ["🛒", t('ftSalesPurchases'), t('fvIncluded')],
+    ["🏆", t('ftLeaderboard'), t('fvIncluded')],
+    ["📱", t('ftWhatsApp'), t('fvProOnly')],
+    ["📦", t('ftInventory'), t('fvUpTo50')],
+    ["📺", t('ftDisplay'), t('fvWithAds')],
+    ["💳", t('ftCreditorsDebtors'), t('fvUpTo10')],
+    ["💬", t('ftMessages'), t('fvIncluded')],
   ];
   const PRO_FEATURES = [
-    ["👥", "Customers", "Unlimited"],
-    ["📊", "Analytics Tab", "✅ Full access"],
-    ["📈", "Compare Tab", "✅ Full access"],
-    ["📦", "Inventory", "Unlimited"],
-    ["💳", "Creditors / Debtors", "Unlimited"],
-    ["📱", "WhatsApp Messaging", "✅ Included"],
-    ["🧾", "Sales History Export & Bills", "✅ Included"],
-    ["🏷️", "GST / GSTIN Auto-fill", "✅ Included"],
-    ["🔔", "Push Notifications", "✅ Included"],
-    ["📺", "Display Screen", "✅ Ad-free"],
+    ["👥", t('ftCustomers'), t('fvUnlimited')],
+    ["📊", t('ftAnalytics'), t('fvFullAccess')],
+    ["📈", t('ftCompare'), t('fvFullAccess')],
+    ["📦", t('ftInventory'), t('fvUnlimited')],
+    ["💳", t('ftCreditorsDebtors'), t('fvUnlimited')],
+    ["📱", t('ftWhatsApp'), t('fvIncluded')],
+    ["🧾", t('ftExport'), t('fvIncluded')],
+    ["🏷️", t('ftGst'), t('fvIncluded')],
+    ["🔔", t('ftPush'), t('fvIncluded')],
+    ["📺", t('ftDisplay'), t('fvAdFree')],
   ];
 
   const trialDaysLeft = _trialDaysLeft();
@@ -13206,35 +13269,35 @@ function renderSettings(){
         </div>
         ${licenseKey ? `<div style="margin-top:12px;font-size:11px;color:#2a5a2a;text-align:center;font-family:monospace;">Key: ${licenseKey}</div>` : ""}
       </div>`
-    : isTrial
+    : _trialActive
     ? `<div style="background:linear-gradient(135deg,#0a1430,#0d1a3a);border:2px solid #FFD700;border-radius:18px;padding:18px 20px;margin-bottom:16px;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
           <div style="font-size:32px;">🎁</div>
           <div style="flex:1;">
-            <div style="font-size:18px;font-weight:900;color:#FFD700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">Pro Trial Active</div>
+            <div style="font-size:18px;font-weight:900;color:#FFD700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">${t('stTrialActive')}</div>
             <div style="font-size:12px;color:#5a7aaa;">सभी Pro सुविधाएं ${trialDaysLeft} दिन मुफ्त</div>
           </div>
-          <div style="background:#1a1a00;border:1px solid #FFD700;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:800;color:#FFD700;">${trialDaysLeft}d left</div>
+          <div style="background:#1a1a00;border:1px solid #FFD700;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:800;color:#FFD700;">${trialDaysLeft} ${t('stDaysLeft')}</div>
         </div>
         <div style="background:#0a0f1a;border-radius:10px;padding:10px 14px;margin-bottom:12px;">
-          <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;">Usage this trial:</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;">${t('stTrialUsage')}</div>
           <div style="display:flex;gap:16px;">
-            <div><span style="font-weight:800;color:#88aaff;">${customers.length}</span><span style="font-size:11px;color:#4a5a7a;"> / ∞ customers</span></div>
-            <div><span style="font-weight:800;color:#88aaff;">${inventoryItems.length}</span><span style="font-size:11px;color:#4a5a7a;"> / ∞ items</span></div>
+            <div><span style="font-weight:800;color:#88aaff;">${customers.length}</span><span style="font-size:11px;color:#4a5a7a;"> ${t('stTrialCustomers')}</span></div>
+            <div><span style="font-weight:800;color:#88aaff;">${inventoryItems.length}</span><span style="font-size:11px;color:#4a5a7a;"> ${t('stTrialItems')}</span></div>
           </div>
         </div>
-        <button class="btn" onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:11px;font-size:13px;font-weight:800;">💳 Trial खत्म होने से पहले Pro खरीदें — ₹299/मो</button>
+        <button class="btn" onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:11px;font-size:13px;font-weight:800;">${t('stBuyBeforeTrial')}</button>
       </div>`
     : `<div style="background:linear-gradient(135deg,#0a0e1a,#0d1525);border:2px solid #1e2a45;border-radius:18px;padding:18px 20px;margin-bottom:16px;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
           <div style="font-size:32px;">🆓</div>
           <div style="flex:1;">
             <div style="font-size:18px;font-weight:900;color:#88aaff;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">${t('stFreePlan')}</div>
-            <div style="font-size:12px;color:#4a5a7a;">Basic features — upgrade to unlock everything</div>
+            <div style="font-size:12px;color:#4a5a7a;">${t('stBasicFeatures')}</div>
           </div>
         </div>
         <div style="background:#0a0f1a;border-radius:10px;padding:10px 14px;margin-bottom:12px;">
-          <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;">Free plan usage:</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;">${t('stFreePlanUsage')}</div>
           <div style="display:flex;flex-direction:column;gap:6px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <div style="flex:1;background:#1e2a45;border-radius:4px;height:6px;overflow:hidden;"><div style="background:#5af;height:100%;width:${Math.min(100,Math.round(customers.length/FREE_MAX_CUSTOMERS*100))}%;transition:width .3s;"></div></div>
@@ -13251,7 +13314,7 @@ function renderSettings(){
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
           <!-- Free column -->
           <div style="background:#0a0f1a;border:1px solid #1a2540;border-radius:12px;padding:12px;">
-            <div style="font-size:12px;font-weight:900;color:#88aaff;margin-bottom:10px;text-align:center;">🆓 You Have</div>
+            <div style="font-size:12px;font-weight:900;color:#88aaff;margin-bottom:10px;text-align:center;">${t('stYouHave')}</div>
             ${FREE_FEATURES.map(([icon,label,val])=>`
               <div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:8px;">
                 <span style="font-size:13px;flex-shrink:0;">${icon}</span>
@@ -13263,7 +13326,7 @@ function renderSettings(){
           </div>
           <!-- Pro column -->
           <div style="background:#0a130a;border:1px solid #1a3a1a;border-radius:12px;padding:12px;">
-            <div style="font-size:12px;font-weight:900;color:#4f4;margin-bottom:10px;text-align:center;">⭐ Pro Unlocks</div>
+            <div style="font-size:12px;font-weight:900;color:#4f4;margin-bottom:10px;text-align:center;">${t('stProUnlocks')}</div>
             ${PRO_FEATURES.map(([icon,label,val])=>`
               <div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:8px;">
                 <span style="font-size:13px;flex-shrink:0;">${icon}</span>
@@ -13277,10 +13340,10 @@ function renderSettings(){
 
         <!-- Upgrade CTA -->
         <div style="background:linear-gradient(135deg,#1a0e00,#2a1800);border:1px solid #4a3000;border-radius:12px;padding:14px;text-align:center;">
-          <div style="font-size:13px;font-weight:800;color:#FFD700;margin-bottom:4px;">Upgrade to ⭐ Pro</div>
-          <div style="font-size:12px;color:#7a5a2a;margin-bottom:12px;">₹299/month or ₹3,499/year · All features · Ad-free display</div>
-          <button onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:900;cursor:pointer;width:100%;">💳 Upgrade Now →</button>
-          <div style="font-size:11px;color:#4a3a1a;margin-top:8px;">Already have a key? <span onclick="showRenewPrompt()" style="color:#FFD700;cursor:pointer;font-weight:700;">Enter it here →</span></div>
+          <div style="font-size:13px;font-weight:800;color:#FFD700;margin-bottom:4px;">${t('stUpgradeToPro')}</div>
+          <div style="font-size:12px;color:#7a5a2a;margin-bottom:12px;">${t('stUpgradeDesc')}</div>
+          <button onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:900;cursor:pointer;width:100%;">${t('stUpgradeNow')}</button>
+          <div style="font-size:11px;color:#4a3a1a;margin-top:8px;">${t('stHaveKey')} <span onclick="showRenewPrompt()" style="color:#FFD700;cursor:pointer;font-weight:700;">${t('stEnterHere')}</span></div>
         </div>
       </div>`;
 
@@ -13313,9 +13376,9 @@ function renderSettings(){
       <div style="flex:1;">
         <div style="font-size:10px;color:#7a8aaa;font-weight:800;text-transform:uppercase;letter-spacing:1px;">My ShopChampion ID</div>
         <div style="font-size:24px;font-weight:900;color:#60a5fa;font-family:monospace;letter-spacing:3px;">${myShopId()}</div>
-        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">Share this ID with suppliers & buyers so they can connect with you</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${t('stShareId')}</div>
       </div>
-      <button onclick="navigator.clipboard.writeText('${myShopId()}').then(()=>notify('✅ Shop ID copied!'))" style="background:#1e3a6e;border:none;color:#60a5fa;border-radius:10px;padding:10px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0;">📋 Copy</button>
+      <button onclick="navigator.clipboard.writeText('${myShopId()}').then(()=>notify(t('stIdCopied')))" style="background:#1e3a6e;border:none;color:#60a5fa;border-radius:10px;padding:10px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0;">${t('stCopyId')}</button>
     </div>
 
     ${section("Account",
