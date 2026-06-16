@@ -1182,7 +1182,16 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
     <button class="btn" onclick="checkLicense()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:15px;font-weight:800;margin-bottom:10px;">
       <span id="license-btn-text">✅ सक्रिय करें →</span>
     </button>
-    <button class="btn" onclick="useFreeMode()" style="background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;width:100%;padding:9px;font-size:12px;">फ्री मोड में जारी रखें (सीमित सुविधाएं)</button>
+    <div style="margin:14px 0;display:flex;align-items:center;gap:8px;">
+      <div style="flex:1;height:1px;background:#1e2a45;"></div>
+      <div style="font-size:11px;color:#4a5a7a;">या</div>
+      <div style="flex:1;height:1px;background:#1e2a45;"></div>
+    </div>
+    <button class="btn" onclick="useFreeMode()" style="background:linear-gradient(135deg,#0a1a3a,#0f2040);color:#88aaff;border:1px solid #1e3a6a;width:100%;padding:11px;font-size:13px;font-weight:700;">
+      🎁 14-दिन का Free Trial शुरू करें
+      <div style="font-size:10px;font-weight:500;color:#5a7aaa;margin-top:2px;">बिना कीी — सभी Pro सुविधाएं 14 दिन मुफ्त</div>
+    </button>
+    <button class="btn" onclick="useFreeMode(); _trialEnd=0; _trialActive=false; localStorage.removeItem(storageKey('trial'));" style="background:transparent;color:#4a5a7a;border:none;width:100%;padding:6px;font-size:11px;margin-top:2px;">Free मोड में जारी रखें (100 customers, 50 items)</button>
   </div>
 </div>
 
@@ -1194,6 +1203,16 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
   </div>
   <button class="btn" onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 18px;font-size:12px;font-weight:800;">💳 सब्सक्रिप्शन रिन्यू करें →</button>
   <button class="btn" onclick="showRenewPrompt()" style="background:#3a0a0a;color:#f88;border:1px solid #f44;padding:8px 14px;font-size:11px;">कीी डालें</button>
+</div>
+
+<!-- ── TRIAL COUNTDOWN BANNER ── -->
+<div id="trial-banner" style="display:none;position:fixed;bottom:60px;left:0;right:0;background:linear-gradient(135deg,#0a1a3a,#0f2040);border-top:2px solid #FFD700;padding:8px 16px;z-index:700;display:none;align-items:center;gap:12px;">
+  <div style="flex:1;">
+    <div style="color:#FFD700;font-weight:800;font-size:12px;">⭐ Pro Trial चल रहा है</div>
+    <div id="trial-banner-days" style="color:#88aaff;font-size:11px;"></div>
+  </div>
+  <button class="btn" onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:6px 14px;font-size:11px;font-weight:800;white-space:nowrap;">Pro खरीदें</button>
+  <button onclick="document.getElementById('trial-banner').style.display='none'" style="background:transparent;border:none;color:#4a5a7a;font-size:16px;cursor:pointer;padding:0 4px;">✕</button>
 </div>
 
 <!-- ══════════════════════════════════════════════
@@ -12625,6 +12644,7 @@ function renderSettings(){
     ["📺", "Display Screen", "✅ Ad-free"],
   ];
 
+  const trialDaysLeft = _trialDaysLeft();
   const planCard = isPro
     ? `<div style="background:linear-gradient(135deg,#0a1f0a,#0f2a0f);border:2px solid #2a5a2a;border-radius:18px;padding:18px 20px;margin-bottom:16px;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
@@ -12647,12 +12667,44 @@ function renderSettings(){
         </div>
         ${licenseKey ? `<div style="margin-top:12px;font-size:11px;color:#2a5a2a;text-align:center;font-family:monospace;">Key: ${licenseKey}</div>` : ""}
       </div>`
+    : isTrial
+    ? `<div style="background:linear-gradient(135deg,#0a1430,#0d1a3a);border:2px solid #FFD700;border-radius:18px;padding:18px 20px;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+          <div style="font-size:32px;">🎁</div>
+          <div style="flex:1;">
+            <div style="font-size:18px;font-weight:900;color:#FFD700;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">Pro Trial Active</div>
+            <div style="font-size:12px;color:#5a7aaa;">सभी Pro सुविधाएं ${trialDaysLeft} दिन मुफ्त</div>
+          </div>
+          <div style="background:#1a1a00;border:1px solid #FFD700;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:800;color:#FFD700;">${trialDaysLeft}d left</div>
+        </div>
+        <div style="background:#0a0f1a;border-radius:10px;padding:10px 14px;margin-bottom:12px;">
+          <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;">Usage this trial:</div>
+          <div style="display:flex;gap:16px;">
+            <div><span style="font-weight:800;color:#88aaff;">${customers.length}</span><span style="font-size:11px;color:#4a5a7a;"> / ∞ customers</span></div>
+            <div><span style="font-weight:800;color:#88aaff;">${inventoryItems.length}</span><span style="font-size:11px;color:#4a5a7a;"> / ∞ items</span></div>
+          </div>
+        </div>
+        <button class="btn" onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:11px;font-size:13px;font-weight:800;">💳 Trial खत्म होने से पहले Pro खरीदें — ₹299/मो</button>
+      </div>`
     : `<div style="background:linear-gradient(135deg,#0a0e1a,#0d1525);border:2px solid #1e2a45;border-radius:18px;padding:18px 20px;margin-bottom:16px;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
           <div style="font-size:32px;">🆓</div>
           <div style="flex:1;">
             <div style="font-size:18px;font-weight:900;color:#88aaff;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">${t('stFreePlan')}</div>
             <div style="font-size:12px;color:#4a5a7a;">Basic features — upgrade to unlock everything</div>
+          </div>
+        </div>
+        <div style="background:#0a0f1a;border-radius:10px;padding:10px 14px;margin-bottom:12px;">
+          <div style="font-size:11px;color:#4a5a7a;margin-bottom:6px;">Free plan usage:</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;background:#1e2a45;border-radius:4px;height:6px;overflow:hidden;"><div style="background:#5af;height:100%;width:${Math.min(100,Math.round(customers.length/FREE_MAX_CUSTOMERS*100))}%;transition:width .3s;"></div></div>
+              <span style="font-size:11px;color:#88aaff;font-weight:700;min-width:70px;">👥 ${customers.length}/${FREE_MAX_CUSTOMERS}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;background:#1e2a45;border-radius:4px;height:6px;overflow:hidden;"><div style="background:#f90;height:100%;width:${Math.min(100,Math.round(inventoryItems.length/FREE_MAX_INV_ITEMS*100))}%;transition:width .3s;"></div></div>
+              <span style="font-size:11px;color:#f90;font-weight:700;min-width:70px;">📦 ${inventoryItems.length}/${FREE_MAX_INV_ITEMS}</span>
+            </div>
           </div>
         </div>
 
@@ -13321,6 +13373,11 @@ function handleAddPhoto(inp){
 async function saveNewCustomer(){
   if(requireOnline()) return;
   if(!hasPermission('customer_create')) return notify("🚫 No permission to add customers","error");
+  // Free plan usage cap
+  if (!_hasFullAccess() && customers.length >= FREE_MAX_CUSTOMERS) {
+    _showUpgradePrompt(`Free plan में अधिकतम ${FREE_MAX_CUSTOMERS} customers · Pro पर unlimited`);
+    return;
+  }
   const name = document.getElementById('m-name')?.value.trim()||'';
   if(!name){notify("❌ Name is required","error"); document.getElementById('m-name')?.focus(); return;}
   let rawId=document.getElementById("m-id")?.value.trim();
@@ -13523,7 +13580,7 @@ async function bulkSaveAll() {
   }
 
   // Validate & build customer objects
-  const toAdd = []; const skipped = [];
+  let toAdd = []; const skipped = [];
   entries.forEach(e => {
     const id = e.rawId ? e.rawId.toUpperCase() : autoId();
     if (idExists(id, null) || toAdd.some(c => c.id === id)) {
@@ -13545,6 +13602,19 @@ async function bulkSaveAll() {
   // Show saving state
   const saveBtn = document.querySelector('#modal-container button[onclick="bulkSaveAll()"]');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving...'; }
+
+  // Free plan cap check for bulk import
+  if (!_hasFullAccess()) {
+    const available = FREE_MAX_CUSTOMERS - customers.length;
+    if (available <= 0) {
+      _showUpgradePrompt(`Free plan में अधिकतम ${FREE_MAX_CUSTOMERS} customers · Pro पर unlimited`);
+      return;
+    }
+    if (toAdd.length > available) {
+      toAdd = toAdd.slice(0, available);
+      notify(`⚠️ Free plan limit: only first ${available} customers imported. Upgrade for unlimited.`, 'warn');
+    }
+  }
 
   // Add to local array
   toAdd.forEach(c => customers.push(c));
@@ -15414,6 +15484,69 @@ function _phShiftMonth(dir){
 // FREE_TABS: loaded dynamically from Supabase settings (fallback = leaderboard only)
 var FREE_TABS = [0];
 
+// ── FREE PLAN USAGE CAPS ──────────────────────────────────────
+const FREE_MAX_CUSTOMERS  = 100;
+const FREE_MAX_INV_ITEMS  = 50;
+
+// ── 14-DAY PRO TRIAL ──────────────────────────────────────────
+// Trial starts on first login. trialStatus: "active"|"expired"|"none"
+var _trialEnd    = 0;   // Unix ms
+var _trialActive = false;
+
+function _loadTrial() {
+  try {
+    const raw = localStorage.getItem(storageKey("trial"));
+    if (raw) {
+      const d = JSON.parse(raw);
+      _trialEnd    = d.end || 0;
+      _trialActive = Date.now() < _trialEnd;
+    }
+  } catch {}
+}
+
+function _initTrial() {
+  // Only start a trial if never started and user is on free plan
+  const existing = localStorage.getItem(storageKey("trial"));
+  if (existing) return; // already initialised (active or expired)
+  const end = Date.now() + 14 * 24 * 60 * 60 * 1000; // 14 days
+  _trialEnd    = end;
+  _trialActive = true;
+  localStorage.setItem(storageKey("trial"), JSON.stringify({ end, started: Date.now() }));
+}
+
+function _trialDaysLeft() {
+  if (!_trialActive) return 0;
+  return Math.max(0, Math.ceil((_trialEnd - Date.now()) / 86400000));
+}
+
+// Full Pro access = paid Pro OR active trial
+function _hasFullAccess() {
+  if (licensePlan === "pro" && licenseStatus === "pro") return true;
+  if (_trialActive && Date.now() < _trialEnd) return true;
+  return false;
+}
+
+// Show upgrade prompt with context message
+function _showUpgradePrompt(reason) {
+  const daysLeft = _trialDaysLeft();
+  const trialMsg = _trialActive
+    ? `<div style="background:#1a2a1a;border:1px solid #2a5a2a;border-radius:8px;padding:10px;margin-bottom:14px;font-size:12px;color:#4f4;">
+        ⏳ Trial: <strong>${daysLeft} दिन बाकी</strong> · ${daysLeft} days remaining
+       </div>`
+    : ``;
+  const msg = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;" id="upgrade-overlay" onclick="if(event.target===this)this.remove()">
+    <div style="background:#0f1628;border:1px solid #FFD700;border-radius:20px;padding:28px;width:100%;max-width:380px;animation:pmIn .2s ease;">
+      <div style="font-size:36px;text-align:center;margin-bottom:10px;">⭐</div>
+      <div style="font-size:18px;font-weight:800;color:#FFD700;text-align:center;margin-bottom:6px;">Pro Plan चाहिए</div>
+      <div style="font-size:13px;color:#7a8aaa;text-align:center;margin-bottom:16px;">${reason}</div>
+      ${trialMsg}
+      <button class="btn" onclick="document.getElementById('upgrade-overlay').remove();openPaymentModal();" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;margin-bottom:8px;">💳 Pro खरीदें — ₹299/महीना</button>
+      <button class="btn" onclick="document.getElementById('upgrade-overlay').remove();" style="background:#0a0e1a;color:#7a8aaa;border:1px solid #1e2a45;width:100%;padding:8px;font-size:12px;">बाद में</button>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', msg);
+}
+
 async function loadFreeTabs() {
   try {
     const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_settings?key=eq.free_tabs&select=value`, {
@@ -15441,6 +15574,7 @@ var licensePlan   = "free";
 var licenseKey    = null;
 
 function loadLicense() {
+  _loadTrial(); // load trial state before checking license
   try {
     const saved = localStorage.getItem(storageKey("license"));
     if (saved) {
@@ -15502,6 +15636,21 @@ function updateLicenseUI() {
     pill.style.background = isPro ? "linear-gradient(135deg,#1a3a1a,#0a2a0a)" : "#0a1a3a";
     pill.style.color       = isPro ? "#4f4" : "#88aaff";
     pill.style.border      = isPro ? "1px solid #2a5a2a" : "1px solid #1a2a5a";
+    if (!_hasFullAccess()) pill.title = `Customers: ${customers.length}/${FREE_MAX_CUSTOMERS} · Inventory: ${inventoryItems.length}/${FREE_MAX_INV_ITEMS}`;
+  }
+  // Show trial banner if trial is active and not paid pro
+  const trialBanner = document.getElementById("trial-banner");
+  if (trialBanner) {
+    _loadTrial();
+    const trialIsPaid = licensePlan === "pro" && licenseStatus === "pro";
+    if (_trialActive && !trialIsPaid) {
+      const days = _trialDaysLeft();
+      trialBanner.style.display = "flex";
+      const daysEl = document.getElementById("trial-banner-days");
+      if (daysEl) daysEl.textContent = `${days} दिन बाकी · ${days} days left in your free trial`;
+    } else {
+      trialBanner.style.display = "none";
+    }
   }
   // Re-render current tab to apply lock overlays
   try { renderTabs(); safeRenderTab(currentTab); } catch {}
@@ -15519,11 +15668,11 @@ async function _maybeRevalidateLicense() {
 
 // Checks whether a main tab (0-6) is accessible in current plan
 function isTabAllowed(i) {
-  // Alerts tab (index 11) is always available — avoids collision with sub-feature index 10 (Push to Display)
+  // Alerts tab (index 11) is always available
   if (i === 11) return true;
-  // Pro user — all tabs unlocked (trigger background re-check every 24h)
-  if (licensePlan === "pro" && licenseStatus === "pro") {
-    _maybeRevalidateLicense().catch(() => {});
+  // Full access: paid Pro OR active trial
+  if (_hasFullAccess()) {
+    if (licensePlan === "pro" && licenseStatus === "pro") _maybeRevalidateLicense().catch(() => {});
     return true;
   }
   // Free/expired — only explicitly allowed free tabs
@@ -15531,11 +15680,9 @@ function isTabAllowed(i) {
 }
 
 // Checks whether a sub-feature is accessible
-// Sub-feature indices (separate from tab indices 0-9):
-// 10=Push to Display, 11=Visits, 12=WhatsApp, 13=Last Visit
+// Sub-feature indices: 10=Push to Display, 11=Visits, 12=WhatsApp, 13=Last Visit
 function isSubFeatureAllowed(i) {
-  // Pro users get all sub-features
-  if (licensePlan === "pro" && licenseStatus === "pro") return true;
+  if (_hasFullAccess()) return true;
   return FREE_TABS.includes(i);
 }
 
@@ -15579,6 +15726,7 @@ async function checkLicense() {
 
 function useFreeMode() {
   saveLicense(null, "free", "free");
+  // _initTrial() called in onLoginSuccess after authPhone is set
   document.getElementById("license-screen").style.display = "none";
   const savedPhone = localStorage.getItem("sc_auth_phone");
   if (savedPhone && localStorage.getItem("sc_user_" + savedPhone)) {
@@ -16072,6 +16220,11 @@ function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellin
   let item = inventoryItems.find(x=>x.name===name);
   const isNew = !item;
   if(isNew && !hasPermission('inventory_add')) return notify("🚫 No permission to add inventory items","error");
+  // Free plan inventory cap (only on truly new items, not restocks)
+  if (isNew && !_hasFullAccess() && inventoryItems.length >= FREE_MAX_INV_ITEMS) {
+    _showUpgradePrompt(`Free plan में अधिकतम ${FREE_MAX_INV_ITEMS} inventory items · Pro पर unlimited`);
+    return;
+  }
   if(!isNew && !hasPermission('inventory_restock')) return notify("🚫 No permission to restock inventory","error");
   if(!item){
     item = {id:autoId(), name, unit:unit||"unit", category:category||"General", stock:[], salesLog:[]};
@@ -21396,9 +21549,14 @@ window.addEventListener("load", async () => {
   });
   loadLicense();
   loadFreeTabs(); // load free/pro feature config from Supabase
+  // Start or continue 14-day trial for free users (after authPhone is set)
+  if (licensePlan !== "pro" || licenseStatus !== "pro") _initTrial();
+  _loadTrial();
   if (licenseKey && licenseStatus === "pro") {
     _lastLicenseCheck = Date.now(); // MED-11: mark as just checked on login
     validateLicenseOnline().then(() => updateLicenseUI());
+  } else {
+    updateLicenseUI(); // show trial banner for free/trial users
   }
 });
 </script>

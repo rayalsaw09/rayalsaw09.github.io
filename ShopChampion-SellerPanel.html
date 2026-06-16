@@ -239,10 +239,11 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px;" id="stats-row">
     <div class="stat"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Total Users</div></div>
     <div class="stat"><div class="stat-num" id="stat-active" style="color:#4f4;">—</div><div class="stat-label">Active Pro</div></div>
+    <div class="stat"><div class="stat-num" id="stat-trial" style="color:#FFD700;">—</div><div class="stat-label">On Trial</div></div>
     <div class="stat"><div class="stat-num" id="stat-free" style="color:#88aaff;">—</div><div class="stat-label">Free Tier</div></div>
-    <div class="stat"><div class="stat-num" id="stat-inactive" style="color:#f66;">—</div><div class="stat-label">No License</div></div>
     <div class="stat"><div class="stat-num" id="stat-expired" style="color:#f84;">—</div><div class="stat-label">Expired</div></div>
     <div class="stat"><div class="stat-num" id="stat-pending" style="color:#fa0;">—</div><div class="stat-label">Pending Pay</div></div>
+    <div class="stat"><div class="stat-num" id="stat-mrr" style="color:#4f4;">—</div><div class="stat-label">Est. MRR</div></div>
   </div>
 
   <!-- Freemium Model Overview Card -->
@@ -455,6 +456,38 @@
 <!-- ═══════════════════════════════════════════
        AD CONTROL CENTER (CENTRALIZED)
        ═══════════════════════════════════════════ -->
+  <!-- ── BROADCAST PUSH NOTIFICATION ── -->
+  <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="broadcast-section">
+    <div class="section-title">📢 Broadcast Notification</div>
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:16px;">Send a push notification to all shops, or filter by plan.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div>
+        <div style="font-size:11px;color:#7a8aaa;margin-bottom:5px;">Title</div>
+        <input id="bc-title" class="input" placeholder="e.g. New Feature Added!" maxlength="60" />
+      </div>
+      <div>
+        <div style="font-size:11px;color:#7a8aaa;margin-bottom:5px;">Target</div>
+        <select id="bc-target" class="input">
+          <option value="all">📋 All Users</option>
+          <option value="pro">⭐ Pro Only</option>
+          <option value="trial">🎁 Trial Only</option>
+          <option value="free">🆓 Free Only</option>
+          <option value="expired">⏰ Expired Only</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:#7a8aaa;margin-bottom:5px;">Message Body</div>
+      <textarea id="bc-body" class="input" placeholder="Your message here..." rows="3" maxlength="200" style="resize:vertical;"></textarea>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="btn" onclick="sendBroadcast()" style="background:linear-gradient(135deg,#1a3a6a,#0f2550);color:#88aaff;border:1px solid #2a4a8a;padding:10px 20px;font-size:13px;font-weight:800;">
+        📢 <span id="bc-btn-text">Send Broadcast</span>
+      </button>
+      <div id="bc-status" style="font-size:12px;color:#7a8aaa;"></div>
+    </div>
+  </div>
+
   <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="ads-section">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div class="section-title">📡 Ad Control Center</div>
@@ -1080,24 +1113,37 @@ function getSubStatus(key, now) {
   if (!key) return "nokey";
   if (!key.active) return "disabled";
   if (key.expires_at && new Date(key.expires_at) <= now) return "expired";
-  if (key.plan === "free") return "free";
+  if (key.plan === "free") {
+    // Check if user is on active trial (stored in key.notes as "trial:END_TIMESTAMP")
+    if (key.notes && key.notes.startsWith("trial:")) {
+      const trialEnd = parseInt(key.notes.slice(6));
+      if (trialEnd && Date.now() < trialEnd) return "trial";
+    }
+    return "free";
+  }
   return "active";
 }
 
 function updateStats() {
   const now = new Date();
   const active   = mergedData.filter(r => r.subStatus === "active").length;
+  const trial    = mergedData.filter(r => r.subStatus === "trial").length;
   const free     = mergedData.filter(r => r.subStatus === "free").length;
   const expired  = mergedData.filter(r => r.subStatus === "expired").length;
-  const nokey    = mergedData.filter(r => r.subStatus === "nokey" || r.subStatus === "disabled").length;
   const pending  = allPayments.filter(p => p.status === "pending").length;
+  // Estimate MRR: active pro shops × ₹299
+  const mrrVal   = active * 299;
+  const mrrStr   = mrrVal >= 1000 ? `₹${(mrrVal/1000).toFixed(1)}K` : `₹${mrrVal}`;
   document.getElementById("stat-total").textContent    = mergedData.length;
   document.getElementById("stat-active").textContent   = active;
+  const trialEl = document.getElementById("stat-trial");
+  if (trialEl) trialEl.textContent = trial;
   const freeEl = document.getElementById("stat-free");
   if (freeEl) freeEl.textContent = free;
-  document.getElementById("stat-inactive").textContent = nokey;
   document.getElementById("stat-expired").textContent  = expired;
   document.getElementById("stat-pending").textContent  = pending;
+  const mrrEl = document.getElementById("stat-mrr");
+  if (mrrEl) mrrEl.textContent = mrrStr;
 }
 
 function filterMerged() {
@@ -1132,6 +1178,8 @@ function renderMergedTable(rows) {
     let subPill = "";
     if (r.subStatus === "active") {
       subPill = `<span class="sub-pill sub-active">⭐ Pro</span>`;
+    } else if (r.subStatus === "trial") {
+      subPill = `<span class="sub-pill" style="background:#1a1a00;color:#FFD700;border:1px solid #FFD700;">🎁 Trial</span>`;
     } else if (r.subStatus === "free") {
       subPill = `<span class="sub-pill sub-free">🆓 Free</span>`;
     } else if (r.subStatus === "expired") {
@@ -2785,6 +2833,72 @@ async function confirmPushAd(adId) {
 }
 
 // ── Notify helper ──
+// ══════════════════════════════════════════════
+// BROADCAST PUSH NOTIFICATION
+// ══════════════════════════════════════════════
+async function sendBroadcast() {
+  const title  = (document.getElementById("bc-title")?.value || "").trim();
+  const body   = (document.getElementById("bc-body")?.value  || "").trim();
+  const target = document.getElementById("bc-target")?.value || "all";
+  const statusEl = document.getElementById("bc-status");
+  const btnEl    = document.getElementById("bc-btn-text");
+
+  if (!title) { if (statusEl) statusEl.textContent = "❌ Title is required"; return; }
+  if (!body)  { if (statusEl) statusEl.textContent = "❌ Message body is required"; return; }
+
+  if (!confirm(`Send "${title}" to ${target === "all" ? "ALL users" : target + " users"}?`)) return;
+
+  if (btnEl) btnEl.textContent = "Sending...";
+  if (statusEl) statusEl.textContent = "⏳ Loading recipients...";
+
+  try {
+    // Get all phones from mergedData filtered by target
+    let targets = mergedData;
+    if (target !== "all") targets = mergedData.filter(r => r.subStatus === target);
+    const phones = targets.map(r => r.user?.phone || r.key?.customer_phone).filter(Boolean);
+
+    if (!phones.length) {
+      if (statusEl) statusEl.textContent = "⚠️ No users match this target.";
+      if (btnEl) btnEl.textContent = "Send Broadcast";
+      return;
+    }
+
+    // Get FCM tokens for these phones from sc_push_tokens
+    const chunkSize = 50;
+    let sent = 0, failed = 0;
+    for (let i = 0; i < phones.length; i += chunkSize) {
+      const chunk = phones.slice(i, i + chunkSize);
+      const phoneFilter = chunk.map(p => `phone=eq.${encodeURIComponent(p)}`).join("&or=(");
+      // Fetch tokens for chunk
+      const tokenRes = await sbFetch(`/rest/v1/sc_push_tokens?phone=in.(${chunk.map(p => `"${p}"`).join(",")})&select=phone,fcm_token`);
+      const tokens = Array.isArray(tokenRes) ? tokenRes : [];
+      // Send FCM to each token
+      for (const row of tokens) {
+        if (!row.fcm_token) continue;
+        try {
+          // Use the SCWorker FCM send endpoint (same one used for payment alerts)
+          const workerUrl = (window._scWorkerUrl || "").replace(/\/$/, "");
+          await fetch(workerUrl + "/send-push", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: row.fcm_token, title, body })
+          });
+          sent++;
+        } catch { failed++; }
+      }
+      if (statusEl) statusEl.textContent = `⏳ Sent ${sent}/${phones.length}...`;
+    }
+    if (statusEl) statusEl.textContent = `✅ Done: ${sent} sent, ${failed} failed out of ${phones.length} recipients.`;
+    if (btnEl) btnEl.textContent = "Send Broadcast";
+    // Clear inputs
+    if (document.getElementById("bc-title")) document.getElementById("bc-title").value = "";
+    if (document.getElementById("bc-body"))  document.getElementById("bc-body").value  = "";
+  } catch(e) {
+    if (statusEl) statusEl.textContent = "❌ Error: " + e.message;
+    if (btnEl) btnEl.textContent = "Send Broadcast";
+  }
+}
+
 function spNotify(msg) {
   let el = document.getElementById('sp-notify');
   if (!el) {
