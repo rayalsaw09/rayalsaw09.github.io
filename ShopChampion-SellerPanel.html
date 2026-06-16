@@ -360,7 +360,7 @@
       <div class="section-title" style="margin-bottom:0;">👥 Users & Subscriptions
         <span id="users-count-badge" style="background:#1a2540;color:#7a8aaa;font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px;margin-left:8px;vertical-align:middle;"></span>
       </div>
-      <button class="btn" onclick="loadMergedUsers()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;font-size:12px;padding:7px 14px;margin-left:auto;">🔄 Refresh</button>
+      <button class="btn" onclick="loadUsers();loadKeys();" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;font-size:12px;padding:7px 14px;margin-left:auto;">🔄 Refresh</button>
     </div>
     <div style="font-size:12px;color:#4a5a7a;margin-bottom:14px;">All registered users with their subscription status. Click any user to see their payment history. You can reset their subscription from here.</div>
 
@@ -370,6 +370,8 @@
       <select id="filter-sub-status" class="input" style="max-width:160px;" onchange="filterMerged()">
         <option value="">All Statuses</option>
         <option value="active">✅ Active Pro</option>
+        <option value="trial">🎁 Trial</option>
+        <option value="extrial">⏳ Ex-Trial</option>
         <option value="free">🆓 Free Tier</option>
         <option value="expired">⏰ Expired</option>
         <option value="disabled">⛔ Disabled</option>
@@ -1019,8 +1021,8 @@ function refreshAll() {
 // ── Supabase helpers ──
 async function sbFetch(path, opts = {}) {
   const isWrite = opts.method && opts.method !== "GET";
-  // Use service role key for writes, anon for reads
-  const authKey = (isWrite && SB_SERVICE_KEY) ? SB_SERVICE_KEY : SB_ANON;
+  // Use service role key for writes OR when explicitly requested (e.g. bypassing RLS on reads)
+  const authKey = ((isWrite || opts.forceService) && SB_SERVICE_KEY) ? SB_SERVICE_KEY : SB_ANON;
   const res = await fetch(SB_URL + path, {
     ...opts,
     headers: {
@@ -1060,7 +1062,8 @@ async function loadKeys() {
 // ── Load Users ──
 async function loadUsers() {
   try {
-    allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || [];
+    // forceService=true bypasses RLS so ALL registered users appear, not just pro
+    allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || [];
     mergeBuildTable();
   } catch(e) {
     console.error("Users load error:", e);
@@ -1118,6 +1121,7 @@ function getSubStatus(key, now) {
     if (key.notes && key.notes.startsWith("trial:")) {
       const trialEnd = parseInt(key.notes.slice(6));
       if (trialEnd && Date.now() < trialEnd) return "trial";
+      if (trialEnd) return "extrial"; // trial existed but has ended
     }
     return "free";
   }
@@ -1128,6 +1132,7 @@ function updateStats() {
   const now = new Date();
   const active   = mergedData.filter(r => r.subStatus === "active").length;
   const trial    = mergedData.filter(r => r.subStatus === "trial").length;
+  const extrial  = mergedData.filter(r => r.subStatus === "extrial").length;
   const free     = mergedData.filter(r => r.subStatus === "free").length;
   const expired  = mergedData.filter(r => r.subStatus === "expired").length;
   const pending  = allPayments.filter(p => p.status === "pending").length;
@@ -1180,6 +1185,8 @@ function renderMergedTable(rows) {
       subPill = `<span class="sub-pill sub-active">⭐ Pro</span>`;
     } else if (r.subStatus === "trial") {
       subPill = `<span class="sub-pill" style="background:#1a1a00;color:#FFD700;border:1px solid #FFD700;">🎁 Trial</span>`;
+    } else if (r.subStatus === "extrial") {
+      subPill = `<span class="sub-pill" style="background:#1a0f00;color:#f84;border:1px solid #f84;" title="Trial ended — potential upgrade candidate">⏳ Ex-Trial</span>`;
     } else if (r.subStatus === "free") {
       subPill = `<span class="sub-pill sub-free">🆓 Free</span>`;
     } else if (r.subStatus === "expired") {
@@ -1886,7 +1893,9 @@ async function approvePayment(paymentId) {
     const usedKey = await _doApprove(payment);
     alert(`✅ Approved!\n\nSubscription activated as Pro.\nCustomer's app updates within 15 seconds.`);
     loadPayments();
-    loadKeys();
+    // Refresh both keys AND users so the Pro status shows immediately in the user table
+    allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || [];
+    await loadKeys();
   } catch(e) { alert("❌ Error approving: " + e.message); }
 }
 
@@ -1898,6 +1907,8 @@ async function approvePaymentFromHistory(paymentId) {
     const usedKey = await _doApprove(payment);
     alert(`✅ Approved!\n\nSubscription activated as Pro.\nCustomer's app updates within 15 seconds.`);
     loadPayments();
+    // Refresh both keys AND users so the Pro status shows immediately in the user table
+    allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || [];
     await loadKeys();
     if (currentPhUser) await openPaymentHistory(currentPhUser.phone, currentPhUser.name);
   } catch(e) { alert("❌ Error approving: " + e.message); }

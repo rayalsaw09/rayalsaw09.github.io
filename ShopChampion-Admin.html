@@ -1257,13 +1257,25 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 </div>
 
 <!-- ── TRIAL COUNTDOWN BANNER ── -->
-<div id="trial-banner" style="display:none;position:fixed;bottom:60px;left:0;right:0;background:linear-gradient(135deg,#0a1a3a,#0f2040);border-top:2px solid #FFD700;padding:8px 16px;z-index:700;display:none;align-items:center;gap:12px;">
+<div id="trial-banner" style="display:none;position:fixed;bottom:60px;left:0;right:0;background:linear-gradient(135deg,#0a1a3a,#0f2040);border-top:2px solid #FFD700;padding:8px 16px;z-index:700;align-items:center;gap:12px;">
   <div style="flex:1;">
-    <div style="color:#FFD700;font-weight:800;font-size:12px;">⭐ Pro Trial चल रहा है</div>
+    <div id="trial-banner-title" style="color:#FFD700;font-weight:800;font-size:12px;">⭐ Pro Trial चल रहा है</div>
     <div id="trial-banner-days" style="color:#88aaff;font-size:11px;"></div>
   </div>
   <button class="btn" onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:6px 14px;font-size:11px;font-weight:800;white-space:nowrap;">Pro खरीदें</button>
   <button onclick="document.getElementById('trial-banner').style.display='none'" style="background:transparent;border:none;color:#4a5a7a;font-size:16px;cursor:pointer;padding:0 4px;">✕</button>
+</div>
+
+<!-- ── TRIAL EXPIRED MODAL ── -->
+<div id="trial-expired-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9000;align-items:center;justify-content:center;">
+  <div style="background:linear-gradient(135deg,#0a0e1a,#0f1628);border:1px solid #f84;border-radius:20px;padding:32px 28px;max-width:360px;width:92%;text-align:center;">
+    <div style="font-size:48px;margin-bottom:12px;">⏳</div>
+    <div style="font-size:20px;font-weight:900;color:#f84;margin-bottom:8px;">Trial खत्म हो गया!</div>
+    <div style="font-size:13px;color:#7a8aaa;margin-bottom:6px;">Your 14-day free trial has ended.</div>
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:24px;">आपका सारा data सुरक्षित है। Pro लेकर सभी features वापस पाएं।</div>
+    <button class="btn" onclick="document.getElementById('trial-expired-modal').style.display='none';openPaymentModal();" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:13px;font-size:15px;font-weight:900;margin-bottom:10px;">💳 Pro खरीदें — ₹299/महीना</button>
+    <button class="btn" onclick="document.getElementById('trial-expired-modal').style.display='none';" style="background:transparent;color:#4a5a7a;border:1px solid #1e2a45;width:100%;padding:8px;font-size:12px;">बाद में (Free mode में जारी रखें)</button>
+  </div>
 </div>
 
 <!-- ══════════════════════════════════════════════
@@ -15993,6 +16005,16 @@ function _hasFullAccess() {
   return false;
 }
 
+// Show trial-expired modal once per session (not every page load)
+var _trialExpiredShown = false;
+function _maybeShowTrialExpiredModal() {
+  if (_trialExpiredShown) return;
+  if (licensePlan === "pro" && licenseStatus === "pro") return; // already paid
+  _trialExpiredShown = true;
+  const modal = document.getElementById("trial-expired-modal");
+  if (modal) modal.style.display = "flex";
+}
+
 // Show upgrade prompt with context message
 function _showUpgradePrompt(reason) {
   const daysLeft = _trialDaysLeft();
@@ -16114,7 +16136,33 @@ function updateLicenseUI() {
       const days = _trialDaysLeft();
       trialBanner.style.display = "flex";
       const daysEl = document.getElementById("trial-banner-days");
-      if (daysEl) daysEl.textContent = `${days} दिन बाकी · ${days} days left in your free trial`;
+      const titleEl = document.getElementById("trial-banner-title");
+      if (days <= 1) {
+        // Last day — red urgent
+        trialBanner.style.background = "linear-gradient(135deg,#2a0a0a,#3a0808)";
+        trialBanner.style.borderTopColor = "#f84";
+        if (titleEl) { titleEl.style.color = "#f84"; titleEl.textContent = "🚨 Trial आज खत्म हो रहा है!"; }
+        if (daysEl) daysEl.textContent = "अभी Pro लें — सभी features जारी रखने के लिए · Last day of your trial!";
+        if (daysEl) daysEl.style.color = "#f66";
+      } else if (days <= 3) {
+        // 2-3 days — orange warning
+        trialBanner.style.background = "linear-gradient(135deg,#1a0f00,#2a1a00)";
+        trialBanner.style.borderTopColor = "#f84";
+        if (titleEl) { titleEl.style.color = "#f84"; titleEl.textContent = "⚠️ Trial खत्म होने वाला है!"; }
+        if (daysEl) daysEl.textContent = `सिर्फ ${days} दिन बाकी · Only ${days} days left in your trial`;
+        if (daysEl) daysEl.style.color = "#f84";
+      } else {
+        // Normal — blue/gold
+        trialBanner.style.background = "linear-gradient(135deg,#0a1a3a,#0f2040)";
+        trialBanner.style.borderTopColor = "#FFD700";
+        if (titleEl) { titleEl.style.color = "#FFD700"; titleEl.textContent = "⭐ Pro Trial चल रहा है"; }
+        if (daysEl) daysEl.textContent = `${days} दिन बाकी · ${days} days left in your free trial`;
+        if (daysEl) daysEl.style.color = "#88aaff";
+      }
+    } else if (!trialIsPaid && !_trialActive && _trialEnd > 0) {
+      // Trial just expired — show expiry modal (once per session)
+      trialBanner.style.display = "none";
+      _maybeShowTrialExpiredModal();
     } else {
       trialBanner.style.display = "none";
     }
@@ -16414,6 +16462,8 @@ window.addEventListener("load", () => {
 
 // ── License gate: called after every renderTab ──
 function applyLicenseOverlay(i) {
+  // Settings tab (index 10) is always accessible — needed to enter license key
+  if (i === 10) return;
   if (isTabAllowed(i)) return;
   const el = document.getElementById("tab-content");
   if (!el) return;
