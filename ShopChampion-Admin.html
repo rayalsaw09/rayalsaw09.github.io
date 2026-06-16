@@ -1751,7 +1751,7 @@ var TRANSLATIONS = {
     anRevenue:"💸 Revenue", anExpenses:"📦 Expenses", anProfit:"✨ Profit",
     expenses:"Expenses", expTitle:"💸 Expenses", expAdd:"+ Add Expense",
     expCategory:"Category", expAmount:"Amount", expNote:"Note (optional)", expDate:"Date",
-    expSave:"Save Expense", expDelete:"Delete", expNoExp:"No expenses recorded yet.",
+    expSave:"Save Expense", expDelete:"Delete", expNoExp:"${t('expNoExpenses')}",
     expTotal:"Total This Month", expYearTotal:"Total This Year",
     expCatRent:"Rent", expCatSalary:"Salary / Staff", expCatElec:"Electricity / Utilities",
     expCatPack:"Packaging", expCatTransport:"Transport / Delivery",
@@ -1923,6 +1923,65 @@ var TRANSLATIONS = {
     invPickItem:"Pick the item to", invSharingWith:"You are currently sharing",
     // Messages tab
     msgNoShops:"No connected shops yet",
+    // History modal
+    histWhatAffected:"What this affected",
+    histThisEntry:"this entry",
+    histAffected:"This action affected {n} records:",
+    histNoEffect:"This entry didn't affect any other records.",
+    // Compare tab
+    cmpNoData:"No Comparison Data Yet",
+    cmpNoDataSub:"Start adding sales, expenses and customer records to unlock your business intelligence dashboard.",
+    cmpAddFirstSale:"＋ Add First Sale",
+    cmpRevenue:"Revenue", cmpProfit:"Profit", cmpExpenses:"Expenses",
+    cmpCustomers:"Customers", cmpDebtors:"Debtors", cmpCreditors:"Creditors",
+    cmpHealthScore:"🏥 Business Health Score",
+    cmpProfitAnalysis:"💹 Profit Analysis",
+    cmpNetProfit:"Net Profit", cmpMargin:"Margin:",
+    cmpSalesVsExp:"⚖️ Sales vs Expenses Efficiency",
+    cmpPeriodA:"Period A", cmpPeriodB:"Period B",
+    cmpSales:"💰 Sales", cmpExpBar:"💸 Expenses",
+    cmpEfficiency:"Efficiency:",
+    cmpTripleChart:"Revenue · Expenses · Profit",
+    cmpRevLegend:"■ Revenue", cmpExpLegend:"■ Expenses", cmpProfitLegend:"■ Profit",
+    cmpCustomerInsights:"👥 Customer Insights",
+    cmpNewCust:"New customers", cmpRetCust:"Returning", cmpInactive:"Inactive (60d+)",
+    cmpDebtorSection:"📒 Debtors & Creditors",
+    cmpTotalBilled:"Total Billed", cmpCollected:"Collected", cmpPending:"Pending",
+    cmpTotalPurchased:"Total Purchased", cmpPaid:"Paid", cmpOwed:"Owed",
+    cmpLastUpdated:"Last updated",
+    cmpWeekView:"4-Week View (ending",
+    // Expenses tab
+    expMgmt:"💸 Expenses Management",
+    expSubtitle:"Track, analyze, and manage all business expenses",
+    expLastUpdated:"Last updated",
+    expThisMonth:"This month:",
+    expToday:"Today", expThisMonthCard:"This Month",
+    expThisYear:"This Year", expDailyAvg:"Daily Avg",
+    expPerDay:"per day this month",
+    expFirstMonth:t('expFirstMonth'),
+    expVsLast:"vs last",
+    expSmartInsights:"💡 Smart Insights",
+    expTrend:"📈 12-Month Expense Trend",
+    expCatBreakdown:"🗂 Category Breakdown",
+    expHealthSection:"🏥 Profit & Health",
+    expMonthlyProfit:"Monthly Profit",
+    expMonthSales:"Month Sales",
+    expMonthExp:"Month Expenses",
+    expMonthMargin:"Margin",
+    expProfitHeading:"💰 Profit & Health",
+    expAddExpense:"+ Add Expense",
+    expFilterTitle:"🔍 Filter Expenses",
+    expAllCategories:"All Categories",
+    expSortNewest:"Newest First", expSortOldest:"Oldest First", expSortHighest:"Highest First", expSortLowest:"Lowest First",
+    expCalendarView:"📅 Calendar View",
+    expListView:"📋 List View",
+    expNoExpenses:"No expenses recorded yet.",
+    expAddFirst:"${t('expAddFirst')}",
+    expIncreased:"Expenses increased by", expVsLastMonth:"compared to last month.",
+    expSaved:"You saved", expLessSpend:"less spending",
+    expOfRevenue:"of monthly revenue",
+    expReduceOverhead:"Consider reducing overhead.",
+    expHealthyRatio:"Healthy spending ratio.",
     msgAddShop:"Add a shop using their SC-XXXXXX ID to start chatting.",
     msgLoginRequired:"Log in to use Messages.",
     msgExpiry:"Messages expire after 7 days · Max 50 per conversation",
@@ -2261,6 +2320,65 @@ var TRANSLATIONS = {
     alMin:"न्यूनतम:",
     // Messages tab
     msgNoShops:"अभी कोई जुड़ी दुकान नहीं",
+    // History modal
+    histWhatAffected:"इससे क्या प्रभावित हुआ",
+    histThisEntry:"यह प्रविष्टि",
+    histAffected:"इस कार्य से {n} रिकॉर्ड प्रभावित हुए:",
+    histNoEffect:"इस प्रविष्टि से कोई अन्य रिकॉर्ड प्रभावित नहीं हुआ।",
+    // Compare tab
+    cmpNoData:"अभी तुलना के लिए डेटा नहीं है",
+    cmpNoDataSub:"बिज़नेस इंटेलिजेंस डैशबोर्ड अनलॉक करने के लिए बिक्री, खर्च और ग्राहक रिकॉर्ड जोड़ना शुरू करें।",
+    cmpAddFirstSale:"＋ पहली बिक्री जोड़ें",
+    cmpRevenue:"आमदनी", cmpProfit:"मुनाफा", cmpExpenses:"खर्च",
+    cmpCustomers:"ग्राहक", cmpDebtors:"देनदार", cmpCreditors:"लेनदार",
+    cmpHealthScore:"🏥 व्यापार स्वास्थ्य स्कोर",
+    cmpProfitAnalysis:"💹 मुनाफा विश्लेषण",
+    cmpNetProfit:"शुद्ध मुनाफा", cmpMargin:"मार्जिन:",
+    cmpSalesVsExp:"⚖️ बिक्री बनाम खर्च दक्षता",
+    cmpPeriodA:"अवधि A", cmpPeriodB:"अवधि B",
+    cmpSales:"💰 बिक्री", cmpExpBar:"💸 खर्च",
+    cmpEfficiency:"दक्षता:",
+    cmpTripleChart:"आमदनी · खर्च · मुनाफा",
+    cmpRevLegend:"■ आमदनी", cmpExpLegend:"■ खर्च", cmpProfitLegend:"■ मुनाफा",
+    cmpCustomerInsights:"👥 ग्राहक विश्लेषण",
+    cmpNewCust:"नए ग्राहक", cmpRetCust:"लौटने वाले", cmpInactive:"निष्क्रिय (60+ दिन)",
+    cmpDebtorSection:"📒 देनदार और लेनदार",
+    cmpTotalBilled:"कुल बिल", cmpCollected:"वसूल", cmpPending:"बकाया",
+    cmpTotalPurchased:"कुल खरीद", cmpPaid:"भुगतान", cmpOwed:"देय",
+    cmpLastUpdated:"अंतिम अपडेट",
+    cmpWeekView:"4-सप्ताह दृश्य (समाप्ति",
+    // Expenses tab
+    expMgmt:"💸 खर्च प्रबंधन",
+    expSubtitle:"सभी व्यावसायिक खर्चों को ट्रैक, विश्लेषण और प्रबंधित करें",
+    expLastUpdated:"अंतिम अपडेट",
+    expThisMonth:"इस महीने:",
+    expToday:"आज", expThisMonthCard:"इस महीने",
+    expThisYear:"इस साल", expDailyAvg:"दैनिक औसत",
+    expPerDay:"इस महीने प्रति दिन",
+    expFirstMonth:"पहला महीना",
+    expVsLast:"पिछले से",
+    expSmartInsights:"💡 स्मार्ट विश्लेषण",
+    expTrend:"📈 12-माह खर्च रुझान",
+    expCatBreakdown:"🗂 श्रेणी विवरण",
+    expHealthSection:"🏥 मुनाफा और स्वास्थ्य",
+    expMonthlyProfit:"मासिक मुनाफा",
+    expMonthSales:"माह बिक्री",
+    expMonthExp:"माह खर्च",
+    expMonthMargin:"मार्जिन",
+    expProfitHeading:"💰 मुनाफा और स्वास्थ्य",
+    expAddExpense:"+ खर्च जोड़ें",
+    expFilterTitle:"🔍 खर्च फ़िल्टर करें",
+    expAllCategories:"सभी श्रेणियां",
+    expSortNewest:"नवीनतम पहले", expSortOldest:"पुराना पहले", expSortHighest:"सबसे अधिक पहले", expSortLowest:"सबसे कम पहले",
+    expCalendarView:"📅 कैलेंडर दृश्य",
+    expListView:"📋 सूची दृश्य",
+    expNoExpenses:"अभी तक कोई खर्च दर्ज नहीं।",
+    expAddFirst:"ट्रैकिंग शुरू करने के लिए ऊपर अपना पहला खर्च जोड़ें।",
+    expIncreased:"खर्च में वृद्धि", expVsLastMonth:"पिछले महीने की तुलना में।",
+    expSaved:"आपने बचाए", expLessSpend:"कम खर्च",
+    expOfRevenue:"मासिक राजस्व का",
+    expReduceOverhead:"ओवरहेड कम करने पर विचार करें।",
+    expHealthyRatio:"स्वस्थ व्यय अनुपात।",
     msgAddShop:"चैट शुरू करने के लिए SC-XXXXXX ID से दुकान जोड़ें।",
     msgLoginRequired:"मैसेज उपयोग करने के लिए लॉगिन करें।",
     msgExpiry:"मैसेज 7 दिन बाद हटते हैं · प्रति बातचीत अधिकतम 50",
@@ -7748,9 +7866,9 @@ function renderCompare(){
   const hasData=allPurch.length>0||allExp.length>0;
   if(!hasData){return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:20px;padding:32px 20px;text-align:center;">
     <div style="font-size:72px;filter:drop-shadow(0 0 30px rgba(74,140,255,0.3));">📊</div>
-    <div style="font-size:22px;font-weight:800;color:var(--text-main);font-family:'Rajdhani',sans-serif;">No Comparison Data Yet</div>
-    <div style="font-size:13px;color:var(--text-muted);max-width:300px;line-height:1.7;">Start adding sales, expenses and customer records to unlock your business intelligence dashboard.</div>
-    <button onclick="safeRenderTab(2);" class="btn" style="padding:14px 32px;font-size:14px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:800;border-radius:14px;letter-spacing:0.5px;">＋ Add First Sale</button>
+    <div style="font-size:22px;font-weight:800;color:var(--text-main);font-family:'Rajdhani',sans-serif;">${t('cmpNoData')}</div>
+    <div style="font-size:13px;color:var(--text-muted);max-width:300px;line-height:1.7;">${t('cmpNoDataSub')}</div>
+    <button onclick="safeRenderTab(2);" class="btn" style="padding:14px 32px;font-size:14px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:800;border-radius:14px;letter-spacing:0.5px;">${t('cmpAddFirstSale')}</button>
   </div>`;}
 
   // ── Compute period data ───────────────────────────────────────────────────
@@ -7973,12 +8091,12 @@ function renderCompare(){
 
   // ── Overview Cards ────────────────────────────────────────────────────────
   const cardsHtml=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
-    ${card("💰","Revenue",curRev,prevRev,fmtINR,false,"#4a8cff")}
-    ${card("📈","Profit",curProfit,prevProfit,fmtINR,false,"#22c55e")}
-    ${card("💸","Expenses",curExp,prevExp,fmtINR,true,"#ef4444")}
-    ${card("👥","Customers",curActiveCust.size,prevActiveCust.size,fmtN,false,"#a78bfa")}
-    ${card("📒","Debtors",curActiveDebt.size,prevActiveDebt.size,fmtN,true,"#f59e0b")}
-    ${card("🏦","Creditors",curActiveCred.size,prevActiveCred.size,fmtN,true,"#818cf8")}
+    ${card("💰",t('cmpRevenue'),curRev,prevRev,fmtINR,false,"#4a8cff")}
+    ${card("📈",t('cmpProfit'),curProfit,prevProfit,fmtINR,false,"#22c55e")}
+    ${card("💸",t('cmpExpenses'),curExp,prevExp,fmtINR,true,"#ef4444")}
+    ${card("👥",t('cmpCustomers'),curActiveCust.size,prevActiveCust.size,fmtN,false,"#a78bfa")}
+    ${card("📒",t('cmpDebtors'),curActiveDebt.size,prevActiveDebt.size,fmtN,true,"#f59e0b")}
+    ${card("🏦",t('cmpCreditors'),curActiveCred.size,prevActiveCred.size,fmtN,true,"#818cf8")}
   </div>`;
 
   // ── Health Score ──────────────────────────────────────────────────────────
@@ -7986,7 +8104,7 @@ function renderCompare(){
   const {label:hLabel,color:hColor}=cmpHealthLabel(score);
   const circ=2*Math.PI*38;const dash=circ*(score/100);
   const healthHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:18px;border-top:3px solid ${hColor};">
-    <div style="font-size:10px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">🏥 Business Health Score</div>
+    <div style="font-size:10px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">${t('cmpHealthScore')}</div>
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
       <div style="position:relative;width:90px;height:90px;flex-shrink:0;">
         <svg width="90" height="90" style="transform:rotate(-90deg);">
@@ -8011,7 +8129,7 @@ function renderCompare(){
   const pColor=profitMargin>=50?'#22c55e':profitMargin>=20?'#4a8cff':profitMargin>=0?'#f59e0b':'#ef4444';
   const gCirc=2*Math.PI*30;const gDash=gCirc*(Math.max(0,Math.min(100,profitMargin))/100);
   const profitHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;border-top:3px solid ${pColor};">
-    <div style="font-size:10px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">💹 Profit Analysis</div>
+    <div style="font-size:10px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">${t('cmpProfitAnalysis')}</div>
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
       <div style="position:relative;width:72px;height:72px;flex-shrink:0;">
         <svg width="72" height="72" style="transform:rotate(-90deg);">
@@ -8021,10 +8139,10 @@ function renderCompare(){
         <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="font-size:12px;font-weight:800;color:${pColor};">${profitMargin}%</div></div>
       </div>
       <div style="flex:1;min-width:110px;">
-        <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border-main,#1e2a45);"><span style="color:var(--text-muted,#5a6a8a);">Revenue</span><span style="color:#4a8cff;font-weight:700;">${fmtINR(curRev)}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border-main,#1e2a45);"><span style="color:var(--text-muted,#5a6a8a);">Expenses</span><span style="color:#ef4444;font-weight:700;">−${fmtINR(curExp)}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;"><span style="color:var(--text-main,#e8eaf0);font-weight:700;">Net Profit</span><span style="color:${pColor};font-weight:800;">${curProfit>=0?'':'-'}${fmtINR(Math.abs(curProfit))}</span></div>
-        <div style="font-size:10px;color:var(--text-muted,#5a6a8a);text-align:center;margin-top:4px;">Margin: ${profitMargin}%</div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border-main,#1e2a45);"><span style="color:var(--text-muted,#5a6a8a);">${t('cmpRevenue')}</span><span style="color:#4a8cff;font-weight:700;">${fmtINR(curRev)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border-main,#1e2a45);"><span style="color:var(--text-muted,#5a6a8a);">${t('cmpExpenses')}</span><span style="color:#ef4444;font-weight:700;">−${fmtINR(curExp)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;"><span style="color:var(--text-main,#e8eaf0);font-weight:700;">${t('cmpNetProfit')}</span><span style="color:${pColor};font-weight:800;">${curProfit>=0?'':'-'}${fmtINR(Math.abs(curProfit))}</span></div>
+        <div style="font-size:10px;color:var(--text-muted,#5a6a8a);text-align:center;margin-top:4px;">${t('cmpMargin')} ${profitMargin}%</div>
       </div>
     </div>
   </div>`;
@@ -8051,11 +8169,11 @@ function renderCompare(){
 
   const tripleChartHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-      <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);">Revenue · Expenses · Profit</div>
+      <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);">${t('cmpTripleChart')}</div>
       <div style="display:flex;gap:10px;font-size:10px;">
-        <span style="color:#4a8cff;">■ Revenue</span>
-        <span style="color:#ef4444;">■ Expenses</span>
-        <span style="color:#22c55e;">■ Profit</span>
+        <span style="color:#4a8cff;">${t('cmpRevLegend')}</span>
+        <span style="color:#ef4444;">${t('cmpExpLegend')}</span>
+        <span style="color:#22c55e;">${t('cmpProfitLegend')}</span>
       </div>
     </div>
     <div style="display:flex;gap:1px;align-items:flex-end;overflow-x:auto;padding-bottom:4px;">${tripleBars}</div>
@@ -8065,12 +8183,12 @@ function renderCompare(){
   const sveMax=Math.max(curRev,curExp,prevRev,prevExp,1);
   const sveBar=(val,max,color)=>{const w=Math.round((val/max)*100);return `<div style="background:var(--bg-row-even,#0a0e1a);border-radius:8px;height:28px;position:relative;overflow:hidden;"><div style="position:absolute;left:0;top:0;height:100%;width:${w}%;background:${color};border-radius:8px;transition:width 0.5s;"></div><div style="position:absolute;inset:0;display:flex;align-items:center;padding:0 8px;font-size:11px;font-weight:700;color:#fff;">${fmtINR(val)}</div></div>`;};
   const salesVsExpHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;">
-    <div style="font-size:11px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">⚖️ Sales vs Expenses Efficiency</div>
+    <div style="font-size:11px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">${t('cmpSalesVsExp')}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
       <div>
         <div style="font-size:10px;color:#FFD700;font-weight:700;margin-bottom:8px;text-transform:uppercase;">${periodLabel}</div>
-        <div style="margin-bottom:6px;"><div style="font-size:9px;color:var(--text-muted,#5a6a8a);margin-bottom:3px;">💰 Sales</div>${sveBar(curRev,sveMax,"#4a8cff")}</div>
-        <div><div style="font-size:9px;color:var(--text-muted,#5a6a8a);margin-bottom:3px;">💸 Expenses</div>${sveBar(curExp,sveMax,"#ef4444")}</div>
+        <div style="margin-bottom:6px;"><div style="font-size:9px;color:var(--text-muted,#5a6a8a);margin-bottom:3px;">${t('cmpSales')}</div>${sveBar(curRev,sveMax,"#4a8cff")}</div>
+        <div><div style="font-size:9px;color:var(--text-muted,#5a6a8a);margin-bottom:3px;">${t('cmpExpBar')}</div>${sveBar(curExp,sveMax,"#ef4444")}</div>
         ${curRev>0?`<div style="font-size:10px;color:${curRev>curExp?'#22c55e':'#ef4444'};font-weight:700;margin-top:8px;">Efficiency: ${Math.round((curRev-curExp)/curRev*100)}%</div>`:''}
       </div>
       <div>
@@ -11042,11 +11160,11 @@ function renderExpensesTab(){
 <div style="margin-bottom:18px;">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">
     <div>
-      <div style="font-size:22px;font-weight:900;color:#e2e8f0;letter-spacing:-0.3px;">💸 Expenses Management</div>
-      <div style="font-size:12px;color:#64748b;margin-top:3px;">Track, analyze, and manage all business expenses</div>
+      <div style="font-size:22px;font-weight:900;color:#e2e8f0;letter-spacing:-0.3px;">${t('expMgmt')}</div>
+      <div style="font-size:12px;color:#64748b;margin-top:3px;">${t('expSubtitle')}</div>
     </div>
     <div style="text-align:right;">
-      <div style="font-size:10px;color:#4a5a7a;">Last updated</div>
+      <div style="font-size:10px;color:#4a5a7a;">${t('expLastUpdated')}</div>
       <div style="font-size:12px;font-weight:700;color:#94a3b8;">${now.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div>
       <div style="font-size:11px;color:#f87171;font-weight:700;margin-top:2px;">This month: ${formatINR(monthTotal)}</div>
     </div>
@@ -11056,48 +11174,48 @@ function renderExpensesTab(){
 <!-- ── SUMMARY CARDS ── -->
 <div class="exp-grid-4" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
   <div class="exp-card" style="border-color:#f8717130;">
-    <div class="exp-stat-label">Today</div>
+    <div class="exp-stat-label">${t('expToday')}</div>
     <div class="exp-stat-val" style="color:#f87171;">${formatINR(todayTotal)}</div>
     <div style="font-size:10px;color:#64748b;margin-top:4px;">📅 ${new Date().toLocaleDateString("en-IN",{weekday:"short"})}</div>
   </div>
   <div class="exp-card" style="border-color:#fb923c30;">
-    <div class="exp-stat-label">This Month</div>
+    <div class="exp-stat-label">${t('expThisMonthCard')}</div>
     <div class="exp-stat-val" style="color:#fb923c;">${formatINR(monthTotal)}</div>
-    <div style="font-size:10px;color:#64748b;margin-top:4px;">${pctChange!==null ? `<span style="color:${pctChange>0?"#f87171":"#34d399"};">${pctChange>0?"▲":"▼"} ${Math.abs(pctChange)}% vs last</span>` : "First month"}</div>
+    <div style="font-size:10px;color:#64748b;margin-top:4px;">${pctChange!==null ? `<span style="color:${pctChange>0?"#f87171":"#34d399"};">${pctChange>0?"▲":"▼"} ${Math.abs(pctChange)}% ${t('expVsLast')}</span>` : "First month"}</div>
   </div>
   <div class="exp-card" style="border-color:#a78bfa30;">
-    <div class="exp-stat-label">This Year</div>
+    <div class="exp-stat-label">${t('expThisYear')}</div>
     <div class="exp-stat-val" style="color:#a78bfa;">${formatINR(yearTotal)}</div>
     <div style="font-size:10px;color:#64748b;margin-top:4px;">📆 ${yr}</div>
   </div>
   <div class="exp-card" style="border-color:#38bdf830;">
-    <div class="exp-stat-label">Daily Avg</div>
+    <div class="exp-stat-label">${t('expDailyAvg')}</div>
     <div class="exp-stat-val" style="color:#38bdf8;">${formatINR(dayAvg)}</div>
-    <div style="font-size:10px;color:#64748b;margin-top:4px;">per day this month</div>
+    <div style="font-size:10px;color:#64748b;margin-top:4px;">${t('expPerDay')}</div>
   </div>
 </div>
 
 <!-- ── INSIGHTS ── -->
 ${(topCat||pctChange!==null||prevMonthTotal>0) ? `
 <div class="exp-card" style="margin-bottom:16px;">
-  <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">💡 Smart Insights</div>
+  <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">${t('expSmartInsights')}</div>
   ${topCat ? `<div class="exp-insight" style="background:#1e1a2e;">
     <span>💡</span><span style="color:#c4b5fd;">${expCategoryIcon(topCat[0])} <b>${topCat[0]}</b> accounts for <b>${topCatPct}%</b> of expenses this month (${formatINR(topCat[1])}).</span>
   </div>` : ""}
   ${pctChange!==null && pctChange>0 ? `<div class="exp-insight" style="background:#2a1a1a;">
-    <span>⚠</span><span style="color:#fca5a5;">Expenses <b>increased by ${pctChange}%</b> compared to last month.</span>
+    <span>⚠</span><span style="color:#fca5a5;">${t('expIncreased')} <b>${pctChange}%</b> ${t('expVsLastMonth')}</span>
   </div>` : ""}
   ${pctChange!==null && pctChange<=0 ? `<div class="exp-insight" style="background:#0d2218;">
-    <span>💰</span><span style="color:#6ee7b7;">You <b>saved ${formatINR(prevMonthTotal-monthTotal)}</b> compared to last month (${Math.abs(pctChange)}% less spending).</span>
+    <span>💰</span><span style="color:#6ee7b7;">${t('expSaved')} <b>${formatINR(prevMonthTotal-monthTotal)}</b> ${t('expVsLastMonth')} (${Math.abs(pctChange)}% ${t('expLessSpend')}).</span>
   </div>` : ""}
   ${monthSales>0 && monthTotal>0 ? `<div class="exp-insight" style="background:#0d1a2e;">
-    <span>📊</span><span style="color:#93c5fd;">Expenses are <b>${Math.round(monthTotal/monthSales*100)}% of monthly revenue</b>. ${monthTotal/monthSales>0.5?"Consider reducing overhead.":"Healthy spending ratio."}</span>
+    <span>📊</span><span style="color:#93c5fd;">${t('expOfRevenue')} <b>${Math.round(monthTotal/monthSales*100)}%</b>. ${monthTotal/monthSales>0.5?t('expReduceOverhead'):t('expHealthyRatio')}</span>
   </div>` : ""}
 </div>` : ""}
 
 <!-- ── TREND CHART ── -->
 <div class="exp-card" style="margin-bottom:16px;">
-  <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">📈 12-Month Expense Trend</div>
+  <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">${t('expTrend')}</div>
   <div style="position:relative;height:100px;margin-bottom:4px;">
     <svg viewBox="0 -4 100 ${chartH+8}" preserveAspectRatio="none" style="width:100%;height:90px;overflow:visible;">
       <defs>
@@ -11134,7 +11252,7 @@ ${(topCat||pctChange!==null||prevMonthTotal>0) ? `
 <!-- ── CATEGORY BREAKDOWN ── -->
 ${monthTotal>0 ? `
 <div class="exp-card" style="margin-bottom:16px;">
-  <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">🗂 Category Breakdown — ${calMonthNames[thisMonth]} ${thisYear}</div>
+  <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">${t('expCatBreakdown')} — ${calMonthNames[thisMonth]} ${thisYear}</div>
   ${Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).map(([cat,amt])=>{
     const pct=Math.round(amt/monthTotal*100);
     const clr=expCategoryColor(cat);
@@ -12685,7 +12803,7 @@ async function renderTeamTab(el) {
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <div style="font-size:18px;font-weight:800;color:#a78bfa;">👤 Team Members</div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button onclick="renderTab(12)" class="btn" style="background:#0a0e1a;border:1px solid #1e2a45;color:#7a8aaa;font-size:13px;font-weight:800;padding:9px 12px;" title="Refresh">🔄</button>
+        <button onclick="renderTab(13)" class="btn" style="background:#0a0e1a;border:1px solid #1e2a45;color:#7a8aaa;font-size:13px;font-weight:800;padding:9px 12px;" title="Refresh">🔄</button>
         <button onclick="openAddMemberModal()" class="btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:13px;font-weight:800;padding:9px 16px;">+ Add Member</button>
       </div>
     </div>
@@ -12694,7 +12812,7 @@ async function renderTeamTab(el) {
 
   // Auto-refresh online status every 20s while Team tab is open
   window._teamRefreshTimer = setInterval(async () => {
-    if (currentTab !== 12) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; return; }
+    if (currentTab !== 13) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; return; }
     const fresh = await fetchTeamMembers();
     // Only update the status indicators, not the whole tab (avoids closing modals)
     fresh.forEach(m => {
@@ -12770,7 +12888,7 @@ async function saveNewMember() {
     }
     closeModal();
     notify("✅ Member created");
-    renderTab(12);
+    renderTab(13);
   } catch(e) { errEl.textContent = "Network error."; errEl.style.display="block"; }
 }
 
@@ -12828,7 +12946,7 @@ async function saveEditMember(memberId) {
         body: JSON.stringify({ p_shop_phone:authPhone, p_member_id:memberId, p_display_name:display, p_hash:passwordHash })
       })
     ]);
-    closeModal(); notify("✅ Member updated"); renderTab(12);
+    closeModal(); notify("✅ Member updated"); renderTab(13);
   } catch(e) { errEl.textContent="Network error."; errEl.style.display="block"; }
 }
 
@@ -12848,7 +12966,7 @@ async function _doToggleMemberBlock(memberId, block) {
       method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
       body: JSON.stringify({ p_shop_phone:authPhone, p_member_id:memberId, p_display_name:null, p_hash:null, p_blocked:block })
     });
-    notify(block?"🚫 Member blocked":"✅ Member unblocked"); renderTab(12);
+    notify(block?"🚫 Member blocked":"✅ Member unblocked"); renderTab(13);
   } catch(e) { notify("Network error","error"); }
 }
 
@@ -12875,7 +12993,7 @@ async function _doForceLogoutMember(memberId) {
       body: JSON.stringify({ last_seen_at: null })
     });
     if(!res.ok) { const e = await res.text(); notify("Force logout failed: "+e,"error"); return; }
-    notify("⏏ Member force-logged out"); renderTab(12);
+    notify("⏏ Member force-logged out"); renderTab(13);
   } catch(e) { notify("Network error","error"); }
 }
 
@@ -12895,7 +13013,7 @@ async function _doDeleteMember(memberId) {
       method:"POST", headers:{"apikey":SC_SUPABASE_ANON,"Authorization":"Bearer "+SC_SUPABASE_ANON,"Content-Type":"application/json"},
       body: JSON.stringify({ p_shop_phone:authPhone, p_member_id:memberId })
     });
-    notify("🗑 Member deleted"); renderTab(12);
+    notify("🗑 Member deleted"); renderTab(13);
   } catch(e) { notify("Network error","error"); }
 }
 
@@ -13088,22 +13206,22 @@ function showHistoryGroup(entryId, dayKey){
     const meta = HIST_TYPE_META[e.type] || HIST_TYPE_META.other;
     const timeStr = new Date(e.ts).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
     const isThis = e.id===entryId;
-    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:${isThis?'#0d1a30':'#0a0e1a'};border:1px solid ${isThis?'#2a5aaa':'#1e2a45'};border-radius:10px;margin-top:8px;">
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:${isThis?'var(--bg-hover,#0d1a30)':'var(--bg-card,#0a0e1a)'};border:1px solid ${isThis?'#2a5aaa':'var(--border-main,#1e2a45)'};border-radius:10px;margin-top:8px;">
       <div style="width:32px;height:32px;border-radius:8px;background:${meta.color}22;border:1px solid ${meta.color}55;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${meta.icon}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:12px;font-weight:800;color:#e8eaf0;">${escHtml(e.action)}${isThis?` <span style="font-size:10px;color:#60a5fa;font-weight:700;">(this entry)</span>`:""}</div>
-        ${e.details?`<div style="font-size:11px;color:#7a8aaa;margin-top:2px;line-height:1.4;">${escHtml(e.details)}</div>`:""}
+        <div style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);">${escHtml(e.action)}${isThis?` <span style="font-size:10px;color:#60a5fa;font-weight:700;">(${t('histThisEntry')})</span>`:""}</div>
+        ${e.details?`<div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-top:2px;line-height:1.4;">${escHtml(e.details)}</div>`:""}
       </div>
-      <div style="font-size:10px;color:#4a5a7a;flex-shrink:0;white-space:nowrap;">${timeStr}</div>
+      <div style="font-size:10px;color:var(--text-dim,#4a5a7a);flex-shrink:0;white-space:nowrap;">${timeStr}</div>
     </div>`;
   }).join("");
 
   const headline = related.length>1
-    ? `This action affected ${related.length} record${related.length!==1?"s":""}:`
-    : `This entry didn't affect any other records.`;
+    ? `${t('histAffected').replace('{n}',related.length)}`
+    : t('histNoEffect');
 
-  showWideModal(`${modalHeader("🔗 What this affected")}
-    <div style="font-size:12px;color:#7a8aaa;margin-bottom:4px;">${headline}</div>
+  showWideModal(`${modalHeader("🔗 " + t('histWhatAffected'))}
+    <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:4px;">${headline}</div>
     ${rows}
   `);
 }
