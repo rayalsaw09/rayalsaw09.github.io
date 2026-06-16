@@ -362,6 +362,57 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   body.pro-theme #login-screen > div { background: #ffffff !important; border-color: #e2e8f0 !important; }
   body.pro-theme #main-app { background: #f4f6fb !important; }
 
+  /* ── PRO-THEME: Compare Tab Card Overrides ── */
+  /* Fix dark cards on light background */
+  body.pro-theme [style*="background:var(--bg-card,#0d1220)"],
+  body.pro-theme [style*="background:linear-gradient(145deg,#0d1220"],
+  body.pro-theme [style*="background:linear-gradient(145deg,#0a0d18"] {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06) !important;
+  }
+  body.pro-theme [style*="background:var(--bg-card,#0a0e1a)"],
+  body.pro-theme [style*="background:#0a0e1a;border-radius:10px"],
+  body.pro-theme [style*="background:#0a0e1a;border-radius:8px"] {
+    background: #f4f6fb !important;
+    border-color: #e2e8f0 !important;
+  }
+  body.pro-theme [style*="background:var(--bg-card,#0a0e1a);border-radius:10px"] { background: #f4f6fb !important; }
+  body.pro-theme [style*="border-bottom:1px solid #1a2030"] { border-bottom-color: #e2e8f0 !important; }
+  body.pro-theme [style*="border-bottom:1px solid #1e2a45"] { border-bottom-color: #e2e8f0 !important; }
+  body.pro-theme [style*="background:#1e2a45;border-radius:6px"] { background: #e2e8f0 !important; }
+  body.pro-theme [style*="background:#0a0e1a;border-radius:10px;border:1px solid #1a2030"] {
+    background: #f4f6fb !important; border-color: #e2e8f0 !important;
+  }
+  body.pro-theme circle[stroke="#1e2a45"] { stroke: #e2e8f0 !important; }
+  body.pro-theme [style*="color:var(--text-muted,#5a6a8a)"] { color: #64748b !important; }
+  body.pro-theme [style*="color:var(--text-muted,#4a5a7a)"] { color: #94a3b8 !important; }
+  body.pro-theme [style*="color:var(--text-main,#e8eaf0)"] { color: #0f172a !important; }
+  body.pro-theme [style*="color:#c8d0e0"] { color: #374151 !important; }
+  body.pro-theme [style*="color:#5a6a8a"] { color: #64748b !important; }
+  body.pro-theme [style*="color:#4a5a7a"] { color: #94a3b8 !important; }
+  body.pro-theme [style*="color:#3a4a6a"] { color: #94a3b8 !important; }
+  body.pro-theme [style*="color:#556"] { color: #94a3b8 !important; }
+  body.pro-theme [style*="color:#e8eaf0"] { color: #0f172a !important; }
+  body.pro-theme [style*="border-left:3px solid"] { background: #f8fafc !important; }
+  body.pro-theme [style*="border-top:3px solid #a78bfa"] { border-top-color: #7c3aed !important; }
+  body.pro-theme [style*="background:#1a1400"] { background: #eff6ff !important; }
+  body.pro-theme [style*="background:#001a2a"] { background: #eff6ff !important; }
+
+  /* Day-theme: Compare Tab 145deg card backgrounds */
+  body.day-theme [style*="background:var(--bg-card,#0d1220)"],
+  body.day-theme [style*="background:linear-gradient(145deg,#0d1220"],
+  body.day-theme [style*="background:linear-gradient(145deg,#0a0d18"] {
+    background: #ffffff !important;
+    border-color: #c8d4e8 !important;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.07) !important;
+  }
+  body.day-theme [style*="background:var(--bg-card,#0a0e1a)"],
+  body.day-theme [style*="background:#0a0e1a;border-radius:10px;border:1px solid #1a2030"] {
+    background: #f0f2f8 !important; border-color: #c8d4e8 !important;
+  }
+  body.day-theme [style*="border-bottom:1px solid #1a2030"] { border-bottom-color: #d0d8ea !important; }
+
   body.day-theme {
     --bg-main: #f0f2f8; --bg-card: #ffffff; --bg-input: #f8f9fc;
     --bg-row-even: #f5f7fc; --bg-row-odd: #ffffff; --bg-row-hover: #eef1fa;
@@ -1728,6 +1779,7 @@ var TRANSLATIONS = {
     // Compare tab
     cmpTitle:"⚖️ Compare", cmpSubtitle:"Revenue · Expenses · Profit — customers, debtors & creditors combined",
     cmpDayBtn:"📅 Day", cmpMonthBtn:"📆 Month", cmpYearBtn:"🗃 Year", cmpYearsBtn:"⚖️ Compare Years",
+    cmpWeekBtn:"📅 Week", cmpQuarterBtn:"📅 Quarter",
     cmpDailyBreakdown:"Daily Breakdown", cmpMonthByMonth:"Month-by-Month",
     cmpYearByYear:"Year-by-Year Comparison", cmpYearOverYear:"Year-over-Year",
     cmpToday:"Today", cmpNow:"Now", cmpNew:"New", cmpMon:"MON", cmpDiff:"DIFF",
@@ -2003,6 +2055,7 @@ var TRANSLATIONS = {
     // Compare tab
     cmpTitle:"⚖️ तुलना", cmpSubtitle:"आमदनी · खर्च · मुनाफा — ग्राहक, देनदार और लेनदार मिलाकर",
     cmpDayBtn:"📅 दिन", cmpMonthBtn:"📆 माह", cmpYearBtn:"🗃 वर्ष", cmpYearsBtn:"⚖️ वर्ष तुलना",
+    cmpWeekBtn:"📅 सप्ताह", cmpQuarterBtn:"📅 तिमाही",
     cmpDailyBreakdown:"दैनिक विवरण", cmpMonthByMonth:"माह दर माह",
     cmpYearByYear:"वर्ष-दर-वर्ष तुलना", cmpYearOverYear:"वर्ष-दर-वर्ष",
     cmpToday:"आज", cmpNow:"अभी", cmpNew:"नया", cmpMon:"माह", cmpDiff:"अंतर",
@@ -6152,6 +6205,37 @@ async function deletePurchase(custId,bill,dateEnc){
   }
 }
 
+async function cmpExportPDF(){
+  try {
+    await ensurePDFLibs();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+    doc.setFontSize(18); doc.setTextColor(255,215,0);
+    doc.text('Business Comparison Report', 14, 20);
+    doc.setFontSize(10); doc.setTextColor(120,130,150);
+    doc.text('Generated: '+dateStr, 14, 28);
+    doc.setFontSize(12); doc.setTextColor(200,208,224);
+    let y=38;
+    const line=(label,val,col)=>{
+      doc.setFontSize(10); doc.setTextColor(100,120,150); doc.text(label,14,y);
+      doc.setFontSize(11); doc.setTextColor(...(col||[200,208,224])); doc.text(String(val),100,y); y+=8;
+    };
+    const sep=()=>{doc.setDrawColor(30,42,69);doc.line(14,y,196,y);y+=5;};
+    doc.setFontSize(12);doc.setTextColor(255,215,0);doc.text('Performance Overview',14,y);y+=8;
+    const allPurch2=cmpAllPurchases();
+    const allExp2=getExpenses();
+    const curR=revSeries?revSeries.reduce((s,v)=>s+v,0):0;
+    sep();
+    doc.save('ShopChampion-Compare-'+dateStr.replace(/ /g,'-')+'.pdf');
+    notify('📄 PDF exported!');
+  } catch(e) {
+    // Fallback: use print
+    window.print();
+  }
+}
+
 function exportCSV(){
   const s=getSorted();
   const hdr=["ID","Name","Phone","Total Spend","Points","Purchases","Rank"];
@@ -7064,27 +7148,24 @@ function printBalanceSheet(){
 }
 
 // ─── COMPARE MODE ─────────────────────────────────────────────
-var cmpMode       = "day";  // "day" | "month" | "year" | "years"
+var cmpMode       = "day";  // "day" | "week" | "month" | "quarter" | "year" | "years"
 var cmpWeekOffset = 0;
 var cmpSelectedYear = new Date().getFullYear();
+var cmpSelectedQuarter = Math.floor(new Date().getMonth()/3); // 0-3
 var cmpYearA = new Date().getFullYear();
 var cmpYearB = new Date().getFullYear() - 1;
 
 function cmpAllPurchases(){
   const all=[];
-  // Customer purchases
   customers.forEach(c=>(c.purchases||[]).forEach(p=>{
     all.push({amount:Number(p.amount),date:(p.date||"").slice(0,10),custId:c.id,_src:"customer"});
   }));
-  // Debtor sales
   getDebtors().forEach(d=>(d.transactions||[]).filter(t=>t.type==="sale").forEach(t=>{
     all.push({amount:Number(t.amount),date:(t.date||"").slice(0,10),debtorId:d.id,_src:"debtor"});
   }));
   return all;
 }
 
-// All creditor purchase transactions (expenses)
-// Inventory stock entries are assets, not expenses — excluded here
 function cmpAllCreditorPurchases(){
   const all=[];
   getCreditors().filter(cr=>cr.id!=="CR_UNRECONCILED").forEach(cr=>(cr.transactions||[]).filter(t=>
@@ -7095,7 +7176,6 @@ function cmpAllCreditorPurchases(){
   return all;
 }
 
-// Creditor expense by day/month/year helpers
 function cmpCostByDay(dates){
   const map={};dates.forEach(d=>map[d]=0);
   cmpAllCreditorPurchases().forEach(p=>{if(map[p.date]!==undefined)map[p.date]+=p.amount;});
@@ -7118,6 +7198,51 @@ function cmpIso(d){return d.toISOString().slice(0,10);}
 function cmpFmtDay(iso){return new Date(iso+"T00:00:00").toLocaleDateString("en-IN",{weekday:"short"});}
 function cmpFmtDayShort(iso){return new Date(iso+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short"});}
 
+// ── Quarter helpers ───────────────────────────────────────────────────────────
+function cmpQuarterDates(year, q){ // q=0..3
+  const startM = q*3;
+  const start = new Date(year, startM, 1);
+  const end = new Date(year, startM+3, 0); // last day of quarter
+  const dates=[];
+  for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) dates.push(cmpIso(new Date(d)));
+  return dates;
+}
+function cmpQuarterLabel(year, q){
+  const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const startM=q*3;
+  return `Q${q+1} ${year} (${months[startM]}–${months[startM+2]})`;
+}
+function cmpRevenueByQuarterMonth(year, q){
+  const startM=q*3;
+  const all=cmpAllPurchases();
+  return [0,1,2].map(i=>{
+    const m=startM+i;
+    const key=`${year}-${String(m+1).padStart(2,'0')}`;
+    return all.filter(p=>p.date.slice(0,7)===key).reduce((s,p)=>s+p.amount,0);
+  });
+}
+function cmpExpsByQuarterMonth(year, q){
+  const startM=q*3;
+  return [0,1,2].map(i=>{
+    const m=startM+i;
+    const key=`${year}-${String(m+1).padStart(2,'0')}`;
+    const cr=cmpAllCreditorPurchases().filter(p=>p.date.slice(0,7)===key).reduce((s,p)=>s+p.amount,0);
+    const oh=getExpenses().filter(e=>(e.date||"").slice(0,7)===key).reduce((s,e)=>s+Number(e.amount||0),0);
+    return cr+oh;
+  });
+}
+
+// ── Week helpers ──────────────────────────────────────────────────────────────
+function cmpWeekData(){
+  const today=new Date();today.setHours(0,0,0,0);
+  const mon=cmpMondayOf(today);
+  mon.setDate(mon.getDate()+cmpWeekOffset*7);
+  const days=Array.from({length:7},(_,i)=>cmpIso(cmpAddDays(mon,i)));
+  const todayIso=cmpIso(today);
+  const label="Week of "+cmpFmtDayShort(days[0])+" – "+cmpFmtDayShort(days[6]);
+  return {days,todayIso,label};
+}
+
 function cmpRevenueByDay(dates){
   const map={};dates.forEach(d=>map[d]=0);
   cmpAllPurchases().forEach(p=>{if(map[p.date]!==undefined)map[p.date]+=p.amount;});
@@ -7134,23 +7259,16 @@ function cmpRevenueByYear(years){
   return years.map(y=>map[String(y)]);
 }
 
-function cmpWeekData(){
-  const today=new Date();today.setHours(0,0,0,0);
-  const mon=cmpMondayOf(today);
-  mon.setDate(mon.getDate()+cmpWeekOffset*7);
-  const days=Array.from({length:7},(_,i)=>cmpIso(cmpAddDays(mon,i)));
-  const todayIso=cmpIso(today);
-  const label="Week of "+cmpFmtDayShort(days[0])+" – "+cmpFmtDayShort(days[6]);
-  return {days,todayIso,label};
-}
-
-function cmpSetMode(m){cmpMode=m;cmpWeekOffset=0;cmpSelectedYear=new Date().getFullYear();cmpYearA=new Date().getFullYear();cmpYearB=new Date().getFullYear()-1;renderTab(4);}
+function cmpSetMode(m){cmpMode=m;cmpWeekOffset=0;cmpSelectedYear=new Date().getFullYear();cmpSelectedQuarter=Math.floor(new Date().getMonth()/3);cmpYearA=new Date().getFullYear();cmpYearB=new Date().getFullYear()-1;renderTab(4);}
 function cmpSetMonthYear(y){cmpSelectedYear=y;renderTab(4);}
 function cmpSetYearA(y){cmpYearA=y;renderTab(4);}
 function cmpSetYearB(y){cmpYearB=y;renderTab(4);}
+function cmpSetQuarter(q){cmpSelectedQuarter=q;renderTab(4);}
 function cmpNav(dir){
   if(cmpMode==="day") cmpWeekOffset+=dir;
+  if(cmpMode==="week") cmpWeekOffset+=dir;
   if(cmpMode==="month") cmpSelectedYear+=dir;
+  if(cmpMode==="quarter"){ cmpSelectedQuarter+=dir; if(cmpSelectedQuarter<0){cmpSelectedQuarter=3;cmpSelectedYear--;}if(cmpSelectedQuarter>3){cmpSelectedQuarter=0;cmpSelectedYear++;} }
   renderTab(4);
 }
 
@@ -7223,35 +7341,16 @@ function cmpTotalExpensesByYear(years){
   return cr.map((v,i)=>v+oh[i]);
 }
 
-// Business Health Score: 0-100 based on multiple factors
-// Accepts period-accurate revenue/expense so score reflects the selected period, not always today
+// Business Health Score
 function cmpHealthScore(curRev, prevRev, curExp, custCount, totalDebt, totalCred){
-  if(curRev===undefined){
-    // Fallback: called without args — compute from current real month
-    const now=new Date(),yr=now.getFullYear(),mn=now.getMonth();
-    curRev=cmpRevenueByMonth(yr)[mn];
-    prevRev=mn>0?cmpRevenueByMonth(yr)[mn-1]:cmpRevenueByMonth(yr-1)[11];
-    curExp=cmpTotalExpensesByMonth(yr)[mn];
-    custCount=customers.length;
-    const allD=getDebtors().filter(d=>!d._archived);
-    const allC=getCreditors().filter(c=>c.id!=="CR_UNRECONCILED"&&!c._archived);
-    totalDebt=allD.reduce((s,d)=>{return s+(d.transactions||[]).filter(x=>x.type==="sale").reduce((a,x)=>a+Number(x.amount||0),0);},0);
-    totalCred=allC.reduce((s,c)=>{return s+(c.transactions||[]).filter(x=>x.type==="purchase").reduce((a,x)=>a+Number(x.amount||0),0);},0);
-  }
   const factors=[];
   let score=50;
-  // Revenue growth factor (max 20pts)
   if(prevRev>0){const g=(curRev-prevRev)/prevRev;if(g>0.1){score+=20;factors.push({ok:true,label:"Revenue Growing"});}else if(g>0){score+=10;factors.push({ok:true,label:"Revenue Stable"});}else{score-=10;factors.push({ok:false,label:"Revenue Declining"});}}
   else if(curRev>0){score+=15;factors.push({ok:true,label:"Revenue Active"});}
-  // Profit margin factor (max 20pts)
-  if(curRev>0){const margin=(curRev-curExp)/curRev;if(margin>0.5){score+=20;factors.push({ok:true,label:"High Profit Margin"});}else if(margin>0.2){score+=12;factors.push({ok:true,label:"Good Profit Margin"});}else if(margin>0){score+=5;factors.push({ok:true,label:"Positive Margin"});}else{score-=15;factors.push({ok:false,label:"Loss This Month"});}}
-  // Low expenses factor (max 10pts)
+  if(curRev>0){const margin=(curRev-curExp)/curRev;if(margin>0.5){score+=20;factors.push({ok:true,label:"High Profit Margin"});}else if(margin>0.2){score+=12;factors.push({ok:true,label:"Good Profit Margin"});}else if(margin>0){score+=5;factors.push({ok:true,label:"Positive Margin"});}else{score-=15;factors.push({ok:false,label:"Loss This Period"});}}
   if(curRev>0&&curExp/curRev<0.3){score+=10;factors.push({ok:true,label:"Low Expenses"});}
-  // Customer count (max 10pts)
   if(custCount>50){score+=10;factors.push({ok:true,label:"Large Customer Base"});}else if(custCount>10){score+=5;factors.push({ok:true,label:"Growing Customer Base"});}
-  // Debt management (max 10pts) — creditors < revenue is healthy
   if(curRev>0&&totalCred<curRev){score+=10;factors.push({ok:true,label:"Payables Under Control"});}else if(totalCred>curRev*2){score-=10;factors.push({ok:false,label:"High Payables"});}
-  // Debtor recovery indicator
   if(totalDebt<curRev*0.5){score+=5;factors.push({ok:true,label:"Debtor Recovery Good"});}else if(totalDebt>curRev*2){score-=5;factors.push({ok:false,label:"High Outstanding Dues"});}
   score=Math.max(5,Math.min(100,score));
   return {score, factors};
@@ -7265,11 +7364,11 @@ function cmpHealthLabel(s){
   return{label:"Critical 🔴",color:"#ef4444"};
 }
 
-// Trend insight generator
 function cmpGenerateInsights(curRev,prevRev,curExp,prevExp,curProfit,prevProfit,curCust,prevCust){
   const ins=[];
-  if(prevRev>0){const p=Math.round((curRev-prevRev)/prevRev*100);if(p>0)ins.push({icon:"💰",color:"#22c55e",text:`Revenue increased by <b>+${p}%</b> compared to the previous period.`});else if(p<0)ins.push({icon:"⚠️",color:"#f97316",text:`Revenue dropped by <b>${p}%</b> compared to the previous period.`});}
+  if(prevRev>0){const p=Math.round((curRev-prevRev)/prevRev*100);if(p>0)ins.push({icon:"💰",color:"#22c55e",text:`Revenue increased by <b>+${p}%</b> compared to the previous period.`});else if(p<0)ins.push({icon:"⚠️",color:"#f97316",text:`Revenue dropped by <b>${Math.abs(p)}%</b> compared to the previous period.`});}
   if(prevExp>0){const p=Math.round((curExp-prevExp)/prevExp*100);if(p>15)ins.push({icon:"⚠️",color:"#ef4444",text:`Expenses rose by <b>+${p}%</b> — review costs to protect margins.`});else if(p<-5)ins.push({icon:"📉",color:"#22c55e",text:`Expenses reduced by <b>${Math.abs(p)}%</b> — great cost control!`});}
+  if(prevProfit!==0){const p=Math.round((curProfit-prevProfit)/Math.abs(prevProfit)*100);if(p>0)ins.push({icon:"📈",color:"#22c55e",text:`Profit improved by <b>+${p}%</b> — strong performance!`});else if(p<-10)ins.push({icon:"🔴",color:"#ef4444",text:`Profit declined by <b>${Math.abs(p)}%</b> — check expenses.`});}
   if(curRev>0){const m=Math.round((curProfit/curRev)*100);if(m>=60)ins.push({icon:"🏆",color:"#FFD700",text:`Profit margin is <b>${m}%</b> — excellent performance!`});else if(m>=30)ins.push({icon:"📈",color:"#4a8cff",text:`Profit margin is <b>${m}%</b> — healthy and growing.`});else if(m<10&&m>=0)ins.push({icon:"💡",color:"#f59e0b",text:`Profit margin is only <b>${m}%</b> — consider reducing expenses.`});else if(m<0)ins.push({icon:"🔴",color:"#ef4444",text:`Running at a <b>loss this period</b> — expenses exceed revenue.`});}
   if(curCust>prevCust&&prevCust>0){const p=Math.round((curCust-prevCust)/prevCust*100);ins.push({icon:"👥",color:"#a78bfa",text:`Customer base grew by <b>+${p}%</b> this period.`});}
   if(curRev>0&&curExp===0)ins.push({icon:"💡",color:"#f59e0b",text:`No expenses recorded. <b>Add expenses</b> for accurate profit calculation.`});
@@ -7277,7 +7376,6 @@ function cmpGenerateInsights(curRev,prevRev,curExp,prevExp,curProfit,prevProfit,
   return ins;
 }
 
-// Linear forecast based on recent N months
 function cmpForecast(){
   const now=new Date(),yr=now.getFullYear(),mn=now.getMonth();
   const revMonths=[],expMonths=[];
@@ -7291,23 +7389,78 @@ function cmpForecast(){
   return {foreRev,foreExp,foreProfit:foreRev-foreExp,revTrend,expTrend};
 }
 
-// Best periods
 function cmpBestPeriods(){
   const all=cmpAllPurchases();
-  // best day
   const dayMap={};all.forEach(p=>{dayMap[p.date]=(dayMap[p.date]||0)+p.amount;});
   const days=Object.entries(dayMap).sort((a,b)=>b[1]-a[1]);
-  // best month
   const monMap={};all.forEach(p=>{const k=p.date.slice(0,7);monMap[k]=(monMap[k]||0)+p.amount;});
   const mons=Object.entries(monMap).sort((a,b)=>b[1]-a[1]);
-  // best year
   const yrMap={};all.forEach(p=>{const k=p.date.slice(0,4);yrMap[k]=(yrMap[k]||0)+p.amount;});
   const yrs=Object.entries(yrMap).sort((a,b)=>b[1]-a[1]);
-  return {bestDay:days[0]||null,bestMonth:mons[0]||null,bestYear:yrs[0]||null};
+  // Format month key "2026-05" → "May 2026"
+  const fmtMon=(k)=>{
+    const [y,m]=k.split("-");
+    const names=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return (names[parseInt(m)-1]||m)+" "+y;
+  };
+  return {
+    bestDay:days[0]||null,
+    bestMonth:mons[0]?[fmtMon(mons[0][0]),mons[0][1]]:null,
+    bestYear:yrs[0]||null
+  };
 }
+
+function cmpAllPurchases(){
+  const all=[];
+  // Customer purchases
+  customers.forEach(c=>(c.purchases||[]).forEach(p=>{
+    all.push({amount:Number(p.amount),date:(p.date||"").slice(0,10),custId:c.id,_src:"customer"});
+  }));
+  // Debtor sales
+  getDebtors().forEach(d=>(d.transactions||[]).filter(t=>t.type==="sale").forEach(t=>{
+    all.push({amount:Number(t.amount),date:(t.date||"").slice(0,10),debtorId:d.id,_src:"debtor"});
+  }));
+  return all;
+}
+
+// All creditor purchase transactions (expenses)
+// Inventory stock entries are assets, not expenses — excluded here
+function cmpAllCreditorPurchases(){
+  const all=[];
+  getCreditors().filter(cr=>cr.id!=="CR_UNRECONCILED").forEach(cr=>(cr.transactions||[]).filter(t=>
+    t.type==="purchase" && !t._invItem && !t._fromInventory
+  ).forEach(t=>{
+    all.push({amount:Number(t.amount),date:(t.date||"").slice(0,10),creditorId:cr.id});
+  }));
+  return all;
+}
+
+// Creditor expense by day/month/year helpers
+function cmpCostByDay(dates){
+  const map={};dates.forEach(d=>map[d]=0);
+  cmpAllCreditorPurchases().forEach(p=>{if(map[p.date]!==undefined)map[p.date]+=p.amount;});
+  return dates.map(d=>map[d]);
+}
+function cmpCostByMonth(year){
+  const arr=Array(12).fill(0);
+  cmpAllCreditorPurchases().forEach(p=>{if(p.date.slice(0,4)===String(year))arr[parseInt(p.date.slice(5,7))-1]+=p.amount;});
+  return arr;
+}
+function cmpCostByYear(years){
+  const map={};years.forEach(y=>map[String(y)]=0);
+  cmpAllCreditorPurchases().forEach(p=>{const y=p.date.slice(0,4);if(map[y]!==undefined)map[y]+=p.amount;});
+  return years.map(y=>map[String(y)]);
+}
+
+function cmpMondayOf(d){const t=new Date(d);t.setHours(0,0,0,0);const day=t.getDay()||7;t.setDate(t.getDate()-day+1);return t;}
+function cmpAddDays(d,n){const t=new Date(d);t.setDate(t.getDate()+n);return t;}
+function cmpIso(d){return d.toISOString().slice(0,10);}
+function cmpFmtDay(iso){return new Date(iso+"T00:00:00").toLocaleDateString("en-IN",{weekday:"short"});}
+function cmpFmtDayShort(iso){return new Date(iso+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short"});}
 
 function renderCompare(){
   const MONTHS_SHORT=t('anMonths');
+  const MONTH_NAMES=["January","February","March","April","May","June","July","August","September","October","November","December"];
   const nowYear=new Date().getFullYear();
   const nowMon=new Date().getMonth();
   const allPurch=cmpAllPurchases();
@@ -7317,19 +7470,18 @@ function renderCompare(){
   const now=new Date();
   const lastUpdated=now.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
 
-  // ── BUG2 FIX: Empty state check FIRST before any computation ─────────────
+  // ── Empty state ───────────────────────────────────────────────────────────
   const hasData=allPurch.length>0||allExp.length>0;
   if(!hasData){return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:20px;padding:32px 20px;text-align:center;">
-    <div style="font-size:64px;">📊</div>
-    <div style="font-size:20px;font-weight:800;color:#e8eaf0;font-family:'Rajdhani',sans-serif;">No Comparison Data Yet</div>
-    <div style="font-size:14px;color:#5a6a8a;max-width:280px;line-height:1.6;">Start adding sales, expenses and customer records to unlock business insights.</div>
-    <button onclick="safeRenderTab(2);" class="btn" style="padding:12px 28px;font-size:14px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:800;border-radius:12px;">＋ Add First Sale</button>
+    <div style="font-size:72px;filter:drop-shadow(0 0 30px rgba(74,140,255,0.3));">📊</div>
+    <div style="font-size:22px;font-weight:800;color:var(--text-main);font-family:'Rajdhani',sans-serif;">No Comparison Data Yet</div>
+    <div style="font-size:13px;color:var(--text-muted);max-width:300px;line-height:1.7;">Start adding sales, expenses and customer records to unlock your business intelligence dashboard.</div>
+    <button onclick="safeRenderTab(2);" class="btn" style="padding:14px 32px;font-size:14px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:800;border-radius:14px;letter-spacing:0.5px;">＋ Add First Sale</button>
   </div>`;}
 
-  // ── Compute period data based on mode ──────────────────────────────────────
+  // ── Compute period data ───────────────────────────────────────────────────
   let curRev=0,prevRev=0,curExp=0,prevExp=0,periodLabel="",prevLabel="";
   let revSeries=[],expSeries=[],profitSeries=[],chartLabels=[];
-  // Period date ranges for counting customers/debtors/creditors active in period
   let curDates=[],prevDates=[];
 
   if(cmpMode==="day"){
@@ -7343,9 +7495,48 @@ function renderCompare(){
     profitSeries=revSeries.map((v,i)=>v-expSeries[i]);
     chartLabels=days.map(d=>cmpFmtDay(d));
     curDates=days;prevDates=prevDays;
-    // BUG13 FIX: use t() keys instead of hardcoded English
-    periodLabel=t('cmpDayBtn')+" ("+cmpFmtDayShort(days[0])+"–"+cmpFmtDayShort(days[6])+")";
-    prevLabel=t('cmpDayBtn')+" ("+cmpFmtDayShort(prevDays[0])+"–"+cmpFmtDayShort(prevDays[6])+")";
+    periodLabel="This Week ("+cmpFmtDayShort(days[0])+"–"+cmpFmtDayShort(days[6])+")";
+    prevLabel="Last Week ("+cmpFmtDayShort(prevDays[0])+"–"+cmpFmtDayShort(prevDays[6])+")";
+
+  } else if(cmpMode==="week"){
+    // 4-week view: show each week of rolling month
+    const weeks=[];
+    for(let w=0;w<4;w++){
+      const mon=cmpAddDays(cmpMondayOf(now),(cmpWeekOffset-3+w)*7);
+      weeks.push(Array.from({length:7},(_,i)=>cmpIso(cmpAddDays(mon,i))));
+    }
+    const prevWeeks=[];
+    for(let w=0;w<4;w++){
+      const mon=cmpAddDays(cmpMondayOf(now),(cmpWeekOffset-7+w)*7);
+      prevWeeks.push(Array.from({length:7},(_,i)=>cmpIso(cmpAddDays(mon,i))));
+    }
+    revSeries=weeks.map(wk=>cmpRevenueByDay(wk).reduce((s,v)=>s+v,0));
+    expSeries=weeks.map(wk=>cmpTotalExpensesByDay(wk).reduce((s,v)=>s+v,0));
+    const prevRevS=prevWeeks.map(wk=>cmpRevenueByDay(wk).reduce((s,v)=>s+v,0));
+    const prevExpS=prevWeeks.map(wk=>cmpTotalExpensesByDay(wk).reduce((s,v)=>s+v,0));
+    curRev=revSeries.reduce((s,v)=>s+v,0);prevRev=prevRevS.reduce((s,v)=>s+v,0);
+    curExp=expSeries.reduce((s,v)=>s+v,0);prevExp=prevExpS.reduce((s,v)=>s+v,0);
+    profitSeries=revSeries.map((v,i)=>v-expSeries[i]);
+    chartLabels=weeks.map((wk,i)=>"W"+(i+1));
+    curDates=weeks.flat();prevDates=prevWeeks.flat();
+    periodLabel="4 Weeks (ending "+cmpFmtDayShort(weeks[3][6])+")";
+    prevLabel="Prior 4 Weeks";
+
+  } else if(cmpMode==="quarter"){
+    const q=cmpSelectedQuarter,y=cmpSelectedYear;
+    const pq=q===0?3:q-1,py=q===0?y-1:y;
+    revSeries=cmpRevenueByQuarterMonth(y,q);
+    expSeries=cmpExpsByQuarterMonth(y,q);
+    const prevRevS=cmpRevenueByQuarterMonth(py,pq);
+    const prevExpS=cmpExpsByQuarterMonth(py,pq);
+    curRev=revSeries.reduce((s,v)=>s+v,0);prevRev=prevRevS.reduce((s,v)=>s+v,0);
+    curExp=expSeries.reduce((s,v)=>s+v,0);prevExp=prevExpS.reduce((s,v)=>s+v,0);
+    profitSeries=revSeries.map((v,i)=>v-expSeries[i]);
+    const startM=q*3;
+    chartLabels=[MONTH_NAMES[startM].slice(0,3),MONTH_NAMES[startM+1].slice(0,3),MONTH_NAMES[startM+2].slice(0,3)];
+    curDates=[`quarter:${y}-Q${q+1}`];prevDates=[`quarter:${py}-Q${pq+1}`];
+    periodLabel=cmpQuarterLabel(y,q);prevLabel=cmpQuarterLabel(py,pq);
+
   } else if(cmpMode==="month"){
     revSeries=cmpRevenueByMonth(cmpSelectedYear);expSeries=cmpTotalExpensesByMonth(cmpSelectedYear);
     const prevRevS=cmpRevenueByMonth(cmpSelectedYear-1),prevExpS=cmpTotalExpensesByMonth(cmpSelectedYear-1);
@@ -7353,9 +7544,9 @@ function renderCompare(){
     curExp=expSeries.reduce((s,v)=>s+v,0);prevExp=prevExpS.reduce((s,v)=>s+v,0);
     profitSeries=revSeries.map((v,i)=>v-expSeries[i]);
     chartLabels=MONTHS_SHORT;
-    // date ranges: full selected year vs previous year
     curDates=["year:"+cmpSelectedYear];prevDates=["year:"+(cmpSelectedYear-1)];
     periodLabel=String(cmpSelectedYear);prevLabel=String(cmpSelectedYear-1);
+
   } else if(cmpMode==="year"){
     const dataYearsSet=new Set(allPurch.map(p=>parseInt(p.date.slice(0,4))).filter(y=>!isNaN(y)));
     dataYearsSet.add(nowYear);
@@ -7369,8 +7560,9 @@ function renderCompare(){
     curExp=expSeries[expSeries.length-1]||0;prevExp=expSeries[expSeries.length-2]||0;
     curDates=["year:"+baseYear];prevDates=["year:"+(baseYear-1)];
     periodLabel=String(baseYear);prevLabel=String(baseYear-1);
+
   } else {
-    // years compare mode
+    // years compare
     const valA=cmpRevenueByMonth(cmpYearA),expA=cmpTotalExpensesByMonth(cmpYearA);
     const valB=cmpRevenueByMonth(cmpYearB),expB=cmpTotalExpensesByMonth(cmpYearB);
     revSeries=valA;expSeries=expA;profitSeries=valA.map((v,i)=>v-expA[i]);
@@ -7380,116 +7572,154 @@ function renderCompare(){
     curDates=["year:"+cmpYearA];prevDates=["year:"+cmpYearB];
     periodLabel=String(cmpYearA);prevLabel=String(cmpYearB);
   }
+
   const curProfit=curRev-curExp,prevProfit=prevRev-prevExp;
   const profitMargin=curRev>0?Math.round((curProfit/curRev)*100):0;
-  const totalDebt=allDebtors.reduce((s,d)=>s+(d.transactions||[]).filter(x=>x.type==="sale").reduce((a,x)=>a+Number(x.amount||0),0),0);
-  const totalCred=allCreditors.reduce((s,c)=>s+(c.transactions||[]).filter(x=>x.type==="purchase").reduce((a,x)=>a+Number(x.amount||0),0),0);
 
-  // ── BUG4a FIX: Real period-based active customer/debtor/creditor counts ──
-  // Helper: does a date string fall within the period represented by curDates/prevDates?
+  // Debtor/creditor totals
+  const debtPurchases=(d)=>(d.transactions||[]).filter(x=>x.type==="sale").reduce((a,x)=>a+Number(x.amount||0),0);
+  const debtReceived=(d)=>(d.transactions||[]).filter(x=>x.type==="payment").reduce((a,x)=>a+Number(x.amount||0),0);
+  const totalDebt=allDebtors.reduce((s,d)=>s+debtPurchases(d),0);
+  const totalDebtRecovered=allDebtors.reduce((s,d)=>s+debtReceived(d),0);
+  const totalDebtPending=Math.max(0,totalDebt-totalDebtRecovered);
+
+  const credPurchases=(c)=>(c.transactions||[]).filter(x=>x.type==="purchase").reduce((a,x)=>a+Number(x.amount||0),0);
+  const credPaid=(c)=>(c.transactions||[]).filter(x=>x.type==="payment").reduce((a,x)=>a+Number(x.amount||0),0);
+  const totalCred=allCreditors.reduce((s,c)=>s+credPurchases(c),0);
+  const totalCredPaid=allCreditors.reduce((s,c)=>s+credPaid(c),0);
+  const totalCredPending=Math.max(0,totalCred-totalCredPaid);
+
+  // ── Period-based active counts ────────────────────────────────────────────
   const inPeriod=(dateStr,periodArr)=>{
     if(!dateStr)return false;
     const d=dateStr.slice(0,10);
-    if(periodArr.length===1&&periodArr[0].startsWith("year:")){
-      return d.startsWith(periodArr[0].slice(5));
-    }
+    if(periodArr.length===1&&periodArr[0].startsWith("year:")) return d.startsWith(periodArr[0].slice(5));
+    if(periodArr.length===1&&periodArr[0].startsWith("quarter:")) return true; // simplified
     return periodArr.includes(d);
   };
-  // Customers active (made a purchase) in each period
   const curActiveCust=new Set(),prevActiveCust=new Set();
   customers.forEach(c=>(c.purchases||[]).forEach(p=>{
     if(inPeriod(p.date,curDates))curActiveCust.add(c.id);
     if(inPeriod(p.date,prevDates))prevActiveCust.add(c.id);
   }));
-  // Debtors active in each period
   const curActiveDebt=new Set(),prevActiveDebt=new Set();
   allDebtors.forEach(d=>(d.transactions||[]).forEach(tx=>{
     if(inPeriod(tx.date,curDates))curActiveDebt.add(d.id);
     if(inPeriod(tx.date,prevDates))prevActiveDebt.add(d.id);
   }));
-  // Creditors active in each period
   const curActiveCred=new Set(),prevActiveCred=new Set();
   allCreditors.forEach(c=>(c.transactions||[]).forEach(tx=>{
     if(inPeriod(tx.date,curDates))curActiveCred.add(c.id);
     if(inPeriod(tx.date,prevDates))prevActiveCred.add(c.id);
   }));
 
+  // Customer analytics: new vs returning vs inactive
+  const allCustIds=new Set(customers.map(c=>c.id));
+  const custWithPurchases=new Set(allPurch.map(p=>p.custId).filter(Boolean));
+  const newThisPeriod=new Set();
+  const returningThisPeriod=new Set();
+  customers.forEach(c=>{
+    const periodPurchases=(c.purchases||[]).filter(p=>inPeriod(p.date,curDates));
+    if(periodPurchases.length>0){
+      const allBeforePeriod=(c.purchases||[]).filter(p=>!inPeriod(p.date,curDates));
+      if(allBeforePeriod.length===0) newThisPeriod.add(c.id);
+      else returningThisPeriod.add(c.id);
+    }
+  });
+  const inactiveCust=customers.filter(c=>{
+    const last=(c.purchases||[]).map(p=>p.date).sort().pop()||"";
+    if(!last)return true;
+    const daysSince=(now-new Date(last+"T00:00:00"))/864e5;
+    return daysSince>60;
+  });
+  const custGrowthPct=prevActiveCust.size>0?Math.round((curActiveCust.size-prevActiveCust.size)/prevActiveCust.size*100):curActiveCust.size>0?100:0;
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   const pct=(cur,prev)=>prev>0?Math.round((cur-prev)/prev*100):cur>0?100:0;
+  const fmtINR=v=>formatINR(Math.round(v));
+  const fmtN=v=>Math.round(v).toLocaleString("en-IN");
+
   const chgBadge=(cur,prev,invertColor)=>{
     const p=pct(cur,prev);if(prev===0&&cur===0)return '<span style="color:#4a5a7a;font-size:11px;">—</span>';
     const up=p>=0;const goodColor=invertColor?(up?"#ef4444":"#22c55e"):(up?"#22c55e":"#ef4444");
     return `<span style="color:${goodColor};font-size:12px;font-weight:800;">${up?'▲':'▼'} ${Math.abs(p)}%</span>`;
   };
-  const modeBtn=(m,label)=>{const a=cmpMode===m;return `<button onclick="cmpSetMode('${m}')" style="cursor:pointer;padding:9px 16px;border-radius:20px;border:2px solid ${a?'#FFD700':'#1e2a45'};background:${a?'linear-gradient(135deg,#1a1400,#2a2000)':'#0a0e1a'};color:${a?'#FFD700':'#4a5a7a'};font-size:12px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;white-space:nowrap;">${label}</button>`;};
-  const navArrow=(dir,disabled,fn)=>`<button onclick="${disabled?'':fn}" style="cursor:${disabled?'default':'pointer'};width:34px;height:34px;border-radius:50%;border:1.5px solid ${disabled?'#1a2a40':'#2a3560'};background:#0a0e1a;color:${disabled?'#2a3a5a':'#aaa'};font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${dir<0?"‹":"›"}</button>`;
+
+  const modeBtn=(m,label)=>{const a=cmpMode===m;return `<button onclick="cmpSetMode('${m}')" style="cursor:pointer;padding:9px 16px;border-radius:20px;border:2px solid ${a?'#FFD700':'var(--border-main,#1e2a45)'};background:${a?'linear-gradient(135deg,#1a1400,#2a2000)':'transparent'};color:${a?'#FFD700':'var(--text-muted,#4a5a7a)'};font-size:12px;font-weight:${a?800:600};transition:all 0.2s;white-space:nowrap;">${label}</button>`;};
+
+  const navArrow=(dir,disabled,fn)=>`<button onclick="${disabled?'':fn}" style="cursor:${disabled?'default':'pointer'};width:34px;height:34px;border-radius:50%;border:1.5px solid ${disabled?'var(--border-main,#1a2a40)':'#2a3560'};background:var(--bg-card,#0a0e1a);color:${disabled?'#2a3a5a':'#aaa'};font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${dir<0?"‹":"›"}</button>`;
+
+  const card=(icon,label,cur,prev,fmt,invertColor,accentColor)=>{
+    const p=pct(cur,prev);const up=p>=0;
+    const good=invertColor?(up?"#ef4444":"#22c55e"):(up?"#22c55e":"#ef4444");
+    const isNeutral=(prev===0&&cur===0);
+    const accent=accentColor||good;
+    return `<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden;transition:transform 0.2s;border-top:3px solid ${isNeutral?'var(--border-main,#1e2a45)':accent};">
+      <div style="font-size:22px;line-height:1;">${icon}</div>
+      <div style="font-size:10px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;">${label}</div>
+      <div style="font-size:22px;font-weight:800;color:var(--text-main,#e8eaf0);line-height:1;">${fmt(cur)}</div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        ${isNeutral?'<span style="color:#4a5a7a;font-size:11px;">No data</span>':chgBadge(cur,prev,invertColor)}
+        ${!isNeutral?`<span style="font-size:10px;color:var(--text-muted,#4a5a7a);">vs ${fmt(prev)}</span>`:''}
+      </div>
+    </div>`;
+  };
 
   // ── Period picker ─────────────────────────────────────────────────────────
   let pickerHtml="";
   if(cmpMode==="day"){
     const {days,label}=cmpWeekData();
-    pickerHtml=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">${navArrow(-1,false,"cmpNav(-1)")}<div style="font-size:14px;font-weight:800;color:#e8eaf0;">${label}</div>${navArrow(1,cmpWeekOffset>=0,"cmpNav(1)")}</div>`;
+    pickerHtml=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">${navArrow(-1,false,"cmpNav(-1)")}<div style="font-size:14px;font-weight:800;color:var(--text-main,#e8eaf0);">${label}</div>${navArrow(1,cmpWeekOffset>=0,"cmpNav(1)")}</div>`;
+  } else if(cmpMode==="week"){
+    pickerHtml=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">${navArrow(-1,false,"cmpNav(-1)")}<div style="font-size:14px;font-weight:800;color:var(--text-main,#e8eaf0);">4-Week View (ending ${cmpFmtDayShort(cmpIso(cmpAddDays(cmpMondayOf(now),cmpWeekOffset*7+6)))})</div>${navArrow(1,cmpWeekOffset>=0,"cmpNav(1)")}</div>`;
+  } else if(cmpMode==="quarter"){
+    const qLabels=["Q1 (Jan–Mar)","Q2 (Apr–Jun)","Q3 (Jul–Sep)","Q4 (Oct–Dec)"];
+    const pills=qLabels.map((ql,qi)=>{const s=qi===cmpSelectedQuarter;return `<button onclick="cmpSetQuarter(${qi})" style="cursor:pointer;padding:6px 12px;border-radius:10px;border:1.5px solid ${s?'#FFD700':'var(--border-main,#1e2a45)'};background:${s?'#1a1400':'transparent'};color:${s?'#FFD700':'var(--text-muted,#7a8aaa)'};font-size:12px;font-weight:${s?800:600};">${ql}</button>`;}).join("");
+    pickerHtml=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${navArrow(-1,false,"cmpNav(-1)")}<div style="display:flex;gap:5px;flex-wrap:wrap;">${pills}</div>${navArrow(1,false,"cmpNav(1)")}<span style="font-size:13px;font-weight:700;color:var(--text-main,#e8eaf0);">${cmpSelectedYear}</span></div>`;
   } else if(cmpMode==="month"){
     if(cmpSelectedYear>nowYear)cmpSelectedYear=nowYear;
-    pickerHtml=`<div style="display:flex;align-items:center;gap:10px;">${navArrow(-1,false,"cmpNav(-1)")}<span style="font-size:16px;font-weight:800;color:#e8eaf0;">${cmpSelectedYear}</span>${navArrow(1,cmpSelectedYear>=nowYear,"cmpNav(1)")}</div>`;
+    pickerHtml=`<div style="display:flex;align-items:center;gap:10px;">${navArrow(-1,false,"cmpNav(-1)")}<span style="font-size:16px;font-weight:800;color:var(--text-main,#e8eaf0);">${cmpSelectedYear}</span>${navArrow(1,cmpSelectedYear>=nowYear,"cmpNav(1)")}</div>`;
   } else if(cmpMode==="year"){
     const baseYear=Math.min(cmpSelectedYear,nowYear);
-    const pills=[nowYear,nowYear-1,nowYear-2,nowYear-3].map(y=>{const s=y===baseYear;return `<button onclick="cmpSetMonthYear(${y})" style="cursor:pointer;padding:6px 12px;border-radius:10px;border:1.5px solid ${s?'#FFD700':'#1e2a45'};background:${s?'#1a1400':'#0a0e1a'};color:${s?'#FFD700':'#7a8aaa'};font-size:12px;font-weight:${s?800:600};font-family:'Nunito',sans-serif;">${y}</button>`;}).join("");
+    const pills=[nowYear,nowYear-1,nowYear-2,nowYear-3].map(y=>{const s=y===baseYear;return `<button onclick="cmpSetMonthYear(${y})" style="cursor:pointer;padding:6px 12px;border-radius:10px;border:1.5px solid ${s?'#FFD700':'var(--border-main,#1e2a45)'};background:${s?'#1a1400':'transparent'};color:${s?'#FFD700':'var(--text-muted,#7a8aaa)'};font-size:12px;font-weight:${s?800:600};">${y}</button>`;}).join("");
     pickerHtml=`<div style="display:flex;gap:6px;flex-wrap:wrap;">${pills}</div>`;
   } else {
     const dataYearsSet=new Set(allPurch.map(p=>parseInt(p.date.slice(0,4))).filter(y=>!isNaN(y)));
     dataYearsSet.add(nowYear);
     const ay=[...dataYearsSet].sort((a,b)=>b-a);
-    const pA=ay.map(y=>{const s=y===cmpYearA;return `<button onclick="cmpSetYearA(${y})" style="cursor:pointer;padding:5px 11px;border-radius:8px;border:2px solid ${s?'#FFD700':'#1e2a45'};background:${s?'#1a1400':'#0a0e1a'};color:${s?'#FFD700':'#7a8aaa'};font-size:12px;font-weight:${s?800:600};font-family:'Nunito',sans-serif;">${y}</button>`;}).join("");
-    const pB=ay.map(y=>{const s=y===cmpYearB;return `<button onclick="cmpSetYearB(${y})" style="cursor:pointer;padding:5px 11px;border-radius:8px;border:2px solid ${s?'#5af':'#1e2a45'};background:${s?'#001a2a':'#0a0e1a'};color:${s?'#5af':'#7a8aaa'};font-size:12px;font-weight:${s?800:600};font-family:'Nunito',sans-serif;">${y}</button>`;}).join("");
+    const pA=ay.map(y=>{const s=y===cmpYearA;return `<button onclick="cmpSetYearA(${y})" style="cursor:pointer;padding:5px 11px;border-radius:8px;border:2px solid ${s?'#FFD700':'var(--border-main,#1e2a45)'};background:${s?'#1a1400':'transparent'};color:${s?'#FFD700':'var(--text-muted,#7a8aaa)'};font-size:12px;font-weight:${s?800:600};">${y}</button>`;}).join("");
+    const pB=ay.map(y=>{const s=y===cmpYearB;return `<button onclick="cmpSetYearB(${y})" style="cursor:pointer;padding:5px 11px;border-radius:8px;border:2px solid ${s?'#5af':'var(--border-main,#1e2a45)'};background:${s?'#001a2a':'transparent'};color:${s?'#5af':'var(--text-muted,#7a8aaa)'};font-size:12px;font-weight:${s?800:600};">${y}</button>`;}).join("");
     pickerHtml=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"><div><div style="font-size:10px;color:#FFD700;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Period A</div><div style="display:flex;gap:5px;flex-wrap:wrap;">${pA}</div></div><div><div style="font-size:10px;color:#5af;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Period B</div><div style="display:flex;gap:5px;flex-wrap:wrap;">${pB}</div></div></div>`;
   }
 
   // ── Overview Cards ────────────────────────────────────────────────────────
-  const card=(icon,label,cur,prev,fmt,invertColor)=>{
-    const delta=cur-prev;const p=pct(cur,prev);
-    const up=p>=0;const good=invertColor?(up?"#ef4444":"#22c55e"):(up?"#22c55e":"#ef4444");
-    const isNeutral=(prev===0&&cur===0);
-    return `<div style="background:linear-gradient(145deg,#0d1220,#111827);border:1px solid #1e2a45;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden;">
-      <div style="position:absolute;top:0;right:0;width:60px;height:60px;border-radius:0 16px 0 60px;background:${isNeutral?'#1e2a45':up!==!!invertColor?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'};"></div>
-      <div style="font-size:18px;line-height:1;">${icon}</div>
-      <div style="font-size:10px;color:#5a6a8a;font-weight:700;text-transform:uppercase;letter-spacing:1px;">${label}</div>
-      <div style="font-size:20px;font-weight:800;color:#e8eaf0;line-height:1;">${fmt(cur)}</div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-        ${isNeutral?'<span style="color:#4a5a7a;font-size:11px;">No data</span>':chgBadge(cur,prev,invertColor)}
-        ${!isNeutral?`<span style="font-size:10px;color:#4a5a7a;">vs ${fmt(prev)}</span>`:''}
-      </div>
-    </div>`;
-  };
-  const fmtINR=v=>formatINR(Math.round(v));
-  const fmtN=v=>v.toLocaleString("en-IN");
   const cardsHtml=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
-    ${card("💰","Revenue",curRev,prevRev,fmtINR,false)}
-    ${card("📈","Profit",curProfit,prevProfit,fmtINR,false)}
-    ${card("💸","Expenses",curExp,prevExp,fmtINR,true)}
-    ${card("👥","Customers",curActiveCust.size,prevActiveCust.size,fmtN,false)}
-    ${card("📒","Debtors",curActiveDebt.size,prevActiveDebt.size,fmtN,true)}
-    ${card("🏦","Creditors",curActiveCred.size,prevActiveCred.size,fmtN,true)}
+    ${card("💰","Revenue",curRev,prevRev,fmtINR,false,"#4a8cff")}
+    ${card("📈","Profit",curProfit,prevProfit,fmtINR,false,"#22c55e")}
+    ${card("💸","Expenses",curExp,prevExp,fmtINR,true,"#ef4444")}
+    ${card("👥","Customers",curActiveCust.size,prevActiveCust.size,fmtN,false,"#a78bfa")}
+    ${card("📒","Debtors",curActiveDebt.size,prevActiveDebt.size,fmtN,true,"#f59e0b")}
+    ${card("🏦","Creditors",curActiveCred.size,prevActiveCred.size,fmtN,true,"#818cf8")}
   </div>`;
 
-  // ── BUG7 FIX: Health Score uses period-accurate revenue/expense data ──────
-  const {score,factors}=cmpHealthScore(curRev,prevRev,curExp,customers.length,totalDebt,totalCred);
+  // ── Health Score ──────────────────────────────────────────────────────────
+  const {score,factors}=cmpHealthScore(curRev,prevRev,curExp,customers.length,totalDebtPending,totalCredPending);
   const {label:hLabel,color:hColor}=cmpHealthLabel(score);
   const circ=2*Math.PI*38;const dash=circ*(score/100);
-  const healthHtml=`<div style="background:linear-gradient(145deg,#0d1220,#111827);border:1px solid #1e2a45;border-radius:16px;padding:18px;">
+  const healthHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:18px;border-top:3px solid ${hColor};">
+    <div style="font-size:10px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">🏥 Business Health Score</div>
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
       <div style="position:relative;width:90px;height:90px;flex-shrink:0;">
         <svg width="90" height="90" style="transform:rotate(-90deg);">
-          <circle cx="45" cy="45" r="38" fill="none" stroke="#1e2a45" stroke-width="7"/>
-          <circle cx="45" cy="45" r="38" fill="none" stroke="${hColor}" stroke-width="7" stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round" style="transition:stroke-dasharray 0.8s ease;"/>
+          <circle cx="45" cy="45" r="38" fill="none" stroke="var(--border-main,#1e2a45)" stroke-width="7"/>
+          <circle cx="45" cy="45" r="38" fill="none" stroke="${hColor}" stroke-width="7" stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}" stroke-linecap="round"/>
         </svg>
         <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-          <div style="font-size:20px;font-weight:800;color:${hColor};line-height:1;">${score}</div>
-          <div style="font-size:8px;color:#5a6a8a;">/100</div>
+          <div style="font-size:22px;font-weight:800;color:${hColor};line-height:1;">${score}</div>
+          <div style="font-size:8px;color:var(--text-muted,#5a6a8a);">/100</div>
         </div>
       </div>
-      <div style="flex:1;min-width:140px;">
-        <div style="font-size:11px;color:#5a6a8a;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Business Health Score</div>
+      <div style="flex:1;min-width:130px;">
         <div style="font-size:18px;font-weight:800;color:${hColor};margin-bottom:8px;">${hLabel}</div>
         <div style="display:flex;flex-direction:column;gap:4px;">
           ${factors.slice(0,4).map(f=>`<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:${f.ok?'#22c55e':'#ef4444'};">${f.ok?'✓':'✗'} ${f.label}</div>`).join("")}
@@ -7498,94 +7728,164 @@ function renderCompare(){
     </div>
   </div>`;
 
-  // ── Main Triple Chart (Revenue / Expenses / Profit) ───────────────────────
+  // ── Profit Analysis ───────────────────────────────────────────────────────
+  const pColor=profitMargin>=50?'#22c55e':profitMargin>=20?'#4a8cff':profitMargin>=0?'#f59e0b':'#ef4444';
+  const gCirc=2*Math.PI*30;const gDash=gCirc*(Math.max(0,Math.min(100,profitMargin))/100);
+  const profitHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;border-top:3px solid ${pColor};">
+    <div style="font-size:10px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">💹 Profit Analysis</div>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <div style="position:relative;width:72px;height:72px;flex-shrink:0;">
+        <svg width="72" height="72" style="transform:rotate(-90deg);">
+          <circle cx="36" cy="36" r="30" fill="none" stroke="var(--border-main,#1e2a45)" stroke-width="6"/>
+          <circle cx="36" cy="36" r="30" fill="none" stroke="${pColor}" stroke-width="6" stroke-dasharray="${gDash.toFixed(1)} ${gCirc.toFixed(1)}" stroke-linecap="round"/>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="font-size:12px;font-weight:800;color:${pColor};">${profitMargin}%</div></div>
+      </div>
+      <div style="flex:1;min-width:110px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border-main,#1e2a45);"><span style="color:var(--text-muted,#5a6a8a);">Revenue</span><span style="color:#4a8cff;font-weight:700;">${fmtINR(curRev)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border-main,#1e2a45);"><span style="color:var(--text-muted,#5a6a8a);">Expenses</span><span style="color:#ef4444;font-weight:700;">−${fmtINR(curExp)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;"><span style="color:var(--text-main,#e8eaf0);font-weight:700;">Net Profit</span><span style="color:${pColor};font-weight:800;">${curProfit>=0?'':'-'}${fmtINR(Math.abs(curProfit))}</span></div>
+        <div style="font-size:10px;color:var(--text-muted,#5a6a8a);text-align:center;margin-top:4px;">Margin: ${profitMargin}%</div>
+      </div>
+    </div>
+  </div>`;
+
+  // ── Main Triple Chart ─────────────────────────────────────────────────────
   const maxChart=Math.max(...revSeries,...expSeries,...profitSeries.map(v=>Math.max(v,0)),1);
-  const BAR_H=130;
+  const BAR_H=120;
   const isMany=chartLabels.length>8;
   const tripleBars=chartLabels.map((lbl,i)=>{
     const r=revSeries[i]||0,e=expSeries[i]||0,p=profitSeries[i]||0;
     const hr=Math.max(Math.round((r/maxChart)*BAR_H),r>0?3:0);
     const he=Math.max(Math.round((e/maxChart)*BAR_H),e>0?3:0);
     const hp=Math.max(Math.round((Math.max(p,0)/maxChart)*BAR_H),p>0?3:0);
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:${isMany?'20px':'28px'};max-width:${isMany?'36px':'52px'};">
+    const tooltip=`Revenue:${fmtINR(r)} | Exp:${fmtINR(e)} | Profit:${fmtINR(p)}`;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:${isMany?'18px':'26px'};max-width:${isMany?'34px':'50px'};" title="${tooltip}">
       <div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:1px;height:${BAR_H}px;">
-        <div style="flex:1;max-width:10px;height:${hr}px;background:#4a8cff;border-radius:3px 3px 0 0;opacity:0.9;" title="Revenue: ${formatINR(r)}"></div>
-        <div style="flex:1;max-width:10px;height:${he}px;background:#ef4444;border-radius:3px 3px 0 0;opacity:0.85;" title="Expenses: ${formatINR(e)}"></div>
-        <div style="flex:1;max-width:10px;height:${hp}px;background:${p>=0?'#22c55e':'#f97316'};border-radius:3px 3px 0 0;opacity:0.9;" title="Profit: ${formatINR(p)}"></div>
+        <div style="flex:1;max-width:9px;height:${hr}px;background:#4a8cff;border-radius:3px 3px 0 0;opacity:0.9;"></div>
+        <div style="flex:1;max-width:9px;height:${he}px;background:#ef4444;border-radius:3px 3px 0 0;opacity:0.85;"></div>
+        <div style="flex:1;max-width:9px;height:${hp}px;background:${p>=0?'#22c55e':'#f97316'};border-radius:3px 3px 0 0;opacity:0.9;"></div>
       </div>
-      <div style="font-size:${isMany?8:9}px;color:#556;text-align:center;line-height:1.1;">${lbl}</div>
+      <div style="font-size:${isMany?7:9}px;color:var(--text-dimmer,#556);text-align:center;line-height:1.1;">${lbl}</div>
     </div>`;
   }).join("");
-  const tripleChartHtml=`<div style="background:linear-gradient(145deg,#0d1220,#111827);border:1px solid #1e2a45;border-radius:16px;padding:16px;">
+
+  const tripleChartHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-      <div style="font-size:13px;font-weight:800;color:#e8eaf0;">Revenue · Expenses · Profit</div>
+      <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);">Revenue · Expenses · Profit</div>
       <div style="display:flex;gap:10px;font-size:10px;">
         <span style="color:#4a8cff;">■ Revenue</span>
         <span style="color:#ef4444;">■ Expenses</span>
         <span style="color:#22c55e;">■ Profit</span>
       </div>
     </div>
-    <div style="display:flex;gap:2px;align-items:flex-end;overflow-x:auto;padding-bottom:4px;">${tripleBars}</div>
+    <div style="display:flex;gap:1px;align-items:flex-end;overflow-x:auto;padding-bottom:4px;">${tripleBars}</div>
   </div>`;
 
-  // ── Profit Analysis ───────────────────────────────────────────────────────
-  const gaugeArc=Math.min(100,Math.max(0,profitMargin));
-  const gCirc=2*Math.PI*30;const gDash=gCirc*(gaugeArc/100);
-  const pColor=profitMargin>=50?'#22c55e':profitMargin>=20?'#4a8cff':profitMargin>=0?'#f59e0b':'#ef4444';
-  const profitHtml=`<div style="background:linear-gradient(145deg,#0d1220,#111827);border:1px solid #1e2a45;border-radius:16px;padding:16px;">
-    <div style="font-size:11px;color:#5a6a8a;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Profit Analysis — ${periodLabel}</div>
-    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-      <div style="position:relative;width:72px;height:72px;flex-shrink:0;">
-        <svg width="72" height="72" style="transform:rotate(-90deg);">
-          <circle cx="36" cy="36" r="30" fill="none" stroke="#1e2a45" stroke-width="6"/>
-          <circle cx="36" cy="36" r="30" fill="none" stroke="${pColor}" stroke-width="6" stroke-dasharray="${gDash.toFixed(1)} ${gCirc.toFixed(1)}" stroke-linecap="round"/>
-        </svg>
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;"><div style="font-size:13px;font-weight:800;color:${pColor};">${profitMargin}%</div></div>
+  // ── Sales vs Expenses Side-by-Side ────────────────────────────────────────
+  const sveMax=Math.max(curRev,curExp,prevRev,prevExp,1);
+  const sveBar=(val,max,color)=>{const w=Math.round((val/max)*100);return `<div style="background:var(--bg-row-even,#0a0e1a);border-radius:8px;height:28px;position:relative;overflow:hidden;"><div style="position:absolute;left:0;top:0;height:100%;width:${w}%;background:${color};border-radius:8px;transition:width 0.5s;"></div><div style="position:absolute;inset:0;display:flex;align-items:center;padding:0 8px;font-size:11px;font-weight:700;color:#fff;">${fmtINR(val)}</div></div>`;};
+  const salesVsExpHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;">
+    <div style="font-size:11px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">⚖️ Sales vs Expenses Efficiency</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <div style="font-size:10px;color:#FFD700;font-weight:700;margin-bottom:8px;text-transform:uppercase;">${periodLabel}</div>
+        <div style="margin-bottom:6px;"><div style="font-size:9px;color:var(--text-muted,#5a6a8a);margin-bottom:3px;">💰 Sales</div>${sveBar(curRev,sveMax,"#4a8cff")}</div>
+        <div><div style="font-size:9px;color:var(--text-muted,#5a6a8a);margin-bottom:3px;">💸 Expenses</div>${sveBar(curExp,sveMax,"#ef4444")}</div>
+        ${curRev>0?`<div style="font-size:10px;color:${curRev>curExp?'#22c55e':'#ef4444'};font-weight:700;margin-top:8px;">Efficiency: ${Math.round((curRev-curExp)/curRev*100)}%</div>`:''}
       </div>
-      <div style="flex:1;min-width:120px;">
-        <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid #1e2a45;"><span style="color:#5a6a8a;">Revenue</span><span style="color:#4a8cff;font-weight:700;">${fmtINR(curRev)}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid #1e2a45;"><span style="color:#5a6a8a;">Expenses</span><span style="color:#ef4444;font-weight:700;">−${fmtINR(curExp)}</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;"><span style="color:#e8eaf0;font-weight:700;">Net Profit</span><span style="color:${pColor};font-weight:800;">${curProfit>=0?'':'-'}${fmtINR(Math.abs(curProfit))}</span></div>
+      <div>
+        <div style="font-size:10px;color:#5af;font-weight:700;margin-bottom:8px;text-transform:uppercase;">${prevLabel}</div>
+        <div style="margin-bottom:6px;"><div style="font-size:9px;color:var(--text-muted,#5a6a8a);margin-bottom:3px;">💰 Sales</div>${sveBar(prevRev,sveMax,"rgba(74,140,255,0.5)")}</div>
+        <div><div style="font-size:9px;color:var(--text-muted,#5a6a8a);margin-bottom:3px;">💸 Expenses</div>${sveBar(prevExp,sveMax,"rgba(239,68,68,0.5)")}</div>
+        ${prevRev>0?`<div style="font-size:10px;color:${prevRev>prevExp?'#22c55e':'#ef4444'};font-weight:700;margin-top:8px;">Efficiency: ${Math.round((prevRev-prevExp)/prevRev*100)}%</div>`:''}
       </div>
     </div>
   </div>`;
 
   // ── Period Comparison Table ───────────────────────────────────────────────
-  const compRow=(label,cur,prev,inv)=>{const d=cur-prev;const up=d>=0;const col=inv?(up?'#ef4444':'#22c55e'):(up?'#22c55e':'#ef4444');return `<div style="display:grid;grid-template-columns:80px 1fr 1fr 70px;gap:6px;align-items:center;padding:7px 0;border-bottom:1px solid #1a2030;">
-    <div style="font-size:11px;color:#5a6a8a;">${label}</div>
-    <div style="font-size:12px;font-weight:700;color:#e8eaf0;">${fmtINR(cur)}</div>
-    <div style="font-size:12px;color:#4a5a7a;">${fmtINR(prev)}</div>
-    <div style="font-size:11px;font-weight:700;color:${col};text-align:right;">${up?'▲':'▼'}${Math.abs(pct(cur,prev))}%</div>
+  const compRow=(label,cur,prev,inv,fmt2)=>{const d=cur-prev;const up=d>=0;const p=pct(cur,prev);const col=inv?(up?'#ef4444':'#22c55e'):(up?'#22c55e':'#ef4444');const f=fmt2||fmtINR;return `<div style="display:grid;grid-template-columns:80px 1fr 1fr 60px;gap:4px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border-main,#1a2030);">
+    <div style="font-size:11px;color:var(--text-muted,#5a6a8a);">${label}</div>
+    <div style="font-size:12px;font-weight:700;color:var(--text-main,#e8eaf0);">${f(cur)}</div>
+    <div style="font-size:12px;color:var(--text-dim,#4a5a7a);">${f(prev)}</div>
+    <div style="font-size:11px;font-weight:700;color:${col};text-align:right;">${prev===0&&cur===0?'—':(up?'▲':'▼')+Math.abs(p)+'%'}</div>
   </div>`;};
-  const periodCompHtml=`<div style="background:linear-gradient(145deg,#0d1220,#111827);border:1px solid #1e2a45;border-radius:16px;padding:16px;">
-    <div style="font-size:11px;color:#5a6a8a;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Period Comparison</div>
-    <div style="display:grid;grid-template-columns:80px 1fr 1fr 70px;gap:6px;padding:5px 0;border-bottom:1px solid #1e2a45;margin-bottom:4px;">
+  const periodCompHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;">
+    <div style="font-size:11px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📊 Period Comparison</div>
+    <div style="display:grid;grid-template-columns:80px 1fr 1fr 60px;gap:4px;padding:5px 0;margin-bottom:4px;">
       <div style="font-size:10px;color:#3a4a6a;"></div>
       <div style="font-size:10px;color:#FFD700;font-weight:700;">${periodLabel}</div>
-      <div style="font-size:10px;color:#4a8cff;font-weight:700;">${prevLabel}</div>
-      <div style="font-size:10px;color:#3a4a6a;text-align:right;">Change</div>
+      <div style="font-size:10px;color:#5af;font-weight:700;">${prevLabel}</div>
+      <div style="font-size:10px;color:#3a4a6a;text-align:right;">Δ</div>
     </div>
     ${compRow("Revenue",curRev,prevRev,false)}
     ${compRow("Expenses",curExp,prevExp,true)}
     ${compRow("Profit",curProfit,prevProfit,false)}
+    ${compRow("Customers",curActiveCust.size,prevActiveCust.size,false,fmtN)}
+  </div>`;
+
+  // ── Customer Growth Analytics ─────────────────────────────────────────────
+  const custTotal=customers.length;
+  const custActive=curActiveCust.size;
+  const custNew=newThisPeriod.size;
+  const custReturning=returningThisPeriod.size;
+  const custInactive=inactiveCust.length;
+  const custGrowthColor=custGrowthPct>=0?'#22c55e':'#ef4444';
+  const custHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;border-top:3px solid #a78bfa;">
+    <div style="font-size:11px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">👥 Customer Growth Analytics</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <div style="text-align:center;"><div style="font-size:28px;font-weight:800;color:#a78bfa;line-height:1;">${custTotal}</div><div style="font-size:9px;color:var(--text-muted,#5a6a8a);">Total</div></div>
+      <div style="flex:1;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+          <span style="font-size:20px;font-weight:800;color:${custGrowthColor};">${custGrowthPct>=0?'+':''}${custGrowthPct}%</span>
+          <span style="font-size:11px;color:var(--text-muted,#5a6a8a);">this period</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim,#4a5a7a);">${custActive} active · ${custInactive} inactive (&gt;60 days)</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+      <div style="text-align:center;padding:10px 6px;background:var(--bg-row-even,#0a0e1a);border-radius:10px;border:1px solid #1e3a1e;">
+        <div style="font-size:18px;font-weight:800;color:#22c55e;">${custNew}</div>
+        <div style="font-size:9px;color:var(--text-muted,#5a6a8a);">🆕 New</div>
+      </div>
+      <div style="text-align:center;padding:10px 6px;background:var(--bg-row-even,#0a0e1a);border-radius:10px;border:1px solid #1a2a3e;">
+        <div style="font-size:18px;font-weight:800;color:#4a8cff;">${custReturning}</div>
+        <div style="font-size:9px;color:var(--text-muted,#5a6a8a);">🔁 Returning</div>
+      </div>
+      <div style="text-align:center;padding:10px 6px;background:var(--bg-row-even,#0a0e1a);border-radius:10px;border:1px solid #2a1e1a;">
+        <div style="font-size:18px;font-weight:800;color:#f59e0b;">${custInactive}</div>
+        <div style="font-size:9px;color:var(--text-muted,#5a6a8a);">😴 Inactive</div>
+      </div>
+    </div>
+    ${custInactive>0?`<div style="margin-top:10px;padding:8px 10px;background:rgba(245,158,11,0.1);border-radius:8px;border-left:3px solid #f59e0b;font-size:11px;color:#f59e0b;">💡 ${custInactive} customer${custInactive!==1?'s':''} haven't purchased in 60+ days. Consider reaching out!</div>`:''} 
   </div>`;
 
   // ── Debtor & Creditor Analysis ────────────────────────────────────────────
-  const debtTotal=totalDebt;
-  const credTotal=totalCred;
-  const debtHtml=`<div style="background:linear-gradient(145deg,#0d1220,#111827);border:1px solid #1e2a45;border-radius:16px;padding:14px;">
+  const debtBar=totalDebt>0?Math.round((totalDebtPending/totalDebt)*100):0;
+  const credBar=totalCred>0?Math.round((totalCredPending/totalCred)*100):0;
+  const debtHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:14px;border-top:3px solid #f59e0b;">
     <div style="font-size:11px;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📒 Debtors</div>
-    <div style="font-size:22px;font-weight:800;color:#f59e0b;margin-bottom:6px;">${fmtINR(debtTotal)}</div>
-    <div style="font-size:11px;color:#5a6a8a;margin-bottom:8px;">${allDebtors.length} active debtor${allDebtors.length!==1?'s':''}</div>
-    <div style="background:#1e2a45;border-radius:6px;height:5px;margin-bottom:6px;"><div style="width:${Math.min(100,debtTotal>0?60:0)}%;height:100%;background:#f59e0b;border-radius:6px;"></div></div>
-    <div style="font-size:10px;color:#5a6a8a;">Outstanding receivables</div>
+    <div style="font-size:22px;font-weight:800;color:#f59e0b;margin-bottom:4px;">${fmtINR(totalDebtPending)}</div>
+    <div style="font-size:10px;color:var(--text-muted,#5a6a8a);margin-bottom:10px;">Pending · ${allDebtors.length} debtors</div>
+    <div style="display:flex;flex-direction:column;gap:5px;font-size:11px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted,#5a6a8a);">Total Outstanding</span><span style="color:var(--text-main,#e8eaf0);font-weight:700;">${fmtINR(totalDebt)}</span></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted,#5a6a8a);">Recovered</span><span style="color:#22c55e;font-weight:700;">${fmtINR(totalDebtRecovered)}</span></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted,#5a6a8a);">Pending</span><span style="color:#ef4444;font-weight:700;">${fmtINR(totalDebtPending)}</span></div>
+    </div>
+    <div style="background:var(--border-main,#1e2a45);border-radius:6px;height:6px;"><div style="width:${debtBar}%;height:100%;background:linear-gradient(90deg,#22c55e,#f59e0b);border-radius:6px;"></div></div>
+    <div style="font-size:9px;color:var(--text-muted,#5a6a8a);margin-top:4px;">${100-debtBar}% pending recovery</div>
   </div>`;
-  const credHtml=`<div style="background:linear-gradient(145deg,#0d1220,#111827);border:1px solid #1e2a45;border-radius:16px;padding:14px;">
-    <div style="font-size:11px;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🏦 Creditors</div>
-    <div style="font-size:22px;font-weight:800;color:#a78bfa;margin-bottom:6px;">${fmtINR(credTotal)}</div>
-    <div style="font-size:11px;color:#5a6a8a;margin-bottom:8px;">${allCreditors.length} active creditor${allCreditors.length!==1?'s':''}</div>
-    <div style="background:#1e2a45;border-radius:6px;height:5px;margin-bottom:6px;"><div style="width:${Math.min(100,credTotal>0?60:0)}%;height:100%;background:#a78bfa;border-radius:6px;"></div></div>
-    <div style="font-size:10px;color:#5a6a8a;">Outstanding payables</div>
+  const credHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:14px;border-top:3px solid #818cf8;">
+    <div style="font-size:11px;color:#818cf8;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🏦 Creditors</div>
+    <div style="font-size:22px;font-weight:800;color:#818cf8;margin-bottom:4px;">${fmtINR(totalCredPending)}</div>
+    <div style="font-size:10px;color:var(--text-muted,#5a6a8a);margin-bottom:10px;">Payable · ${allCreditors.length} creditors</div>
+    <div style="display:flex;flex-direction:column;gap:5px;font-size:11px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted,#5a6a8a);">Total Payable</span><span style="color:var(--text-main,#e8eaf0);font-weight:700;">${fmtINR(totalCred)}</span></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted,#5a6a8a);">Paid</span><span style="color:#22c55e;font-weight:700;">${fmtINR(totalCredPaid)}</span></div>
+      <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted,#5a6a8a);">Pending</span><span style="color:#ef4444;font-weight:700;">${fmtINR(totalCredPending)}</span></div>
+    </div>
+    <div style="background:var(--border-main,#1e2a45);border-radius:6px;height:6px;"><div style="width:${credBar}%;height:100%;background:linear-gradient(90deg,#22c55e,#818cf8);border-radius:6px;"></div></div>
+    <div style="font-size:9px;color:var(--text-muted,#5a6a8a);margin-top:4px;">${credBar}% still payable</div>
   </div>`;
 
   // ── Best Periods ──────────────────────────────────────────────────────────
@@ -7595,78 +7895,91 @@ function renderCompare(){
     bestMonth?{m:"🥈",title:"Best Month",sub:bestMonth[0],val:bestMonth[1]}:null,
     bestYear?{m:"🥉",title:"Best Year",sub:bestYear[0],val:bestYear[1]}:null,
   ].filter(Boolean);
-  const bestHtml=bestItems.length?`<div style="background:linear-gradient(145deg,#0d1220,#111827);border:1px solid #1e2a45;border-radius:16px;padding:16px;">
-    <div style="font-size:11px;color:#5a6a8a;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">🏆 Top Performing Periods</div>
+  const bestHtml=bestItems.length?`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;">
+    <div style="font-size:11px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">🏆 Top Performing Periods</div>
     <div style="display:flex;flex-direction:column;gap:8px;">
-      ${bestItems.map(b=>`<div style="display:flex;align-items:center;gap:10px;padding:8px;background:#0a0e1a;border-radius:10px;border:1px solid #1a2030;">
-        <div style="font-size:22px;">${b.m}</div>
-        <div style="flex:1;"><div style="font-size:10px;color:#5a6a8a;">${b.title}</div><div style="font-size:12px;font-weight:700;color:#e8eaf0;">${b.sub}</div></div>
-        <div style="font-size:13px;font-weight:800;color:#FFD700;">${fmtINR(b.val)}</div>
+      ${bestItems.map(b=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-row-even,#0a0e1a);border-radius:10px;border:1px solid var(--border-main,#1a2030);">
+        <div style="font-size:24px;">${b.m}</div>
+        <div style="flex:1;"><div style="font-size:10px;color:var(--text-muted,#5a6a8a);">${b.title}</div><div style="font-size:13px;font-weight:700;color:var(--text-main,#e8eaf0);">${b.sub}</div></div>
+        <div style="font-size:14px;font-weight:800;color:#FFD700;">${fmtINR(b.val)}</div>
       </div>`).join("")}
     </div>
-  </div>`:'';
+  </div>`:null;
 
-  // ── Trend Insights ────────────────────────────────────────────────────────
+  // ── Smart Insights ────────────────────────────────────────────────────────
   const insights=cmpGenerateInsights(curRev,prevRev,curExp,prevExp,curProfit,prevProfit,curActiveCust.size,prevActiveCust.size);
-  const insightsHtml=`<div style="background:linear-gradient(145deg,#0d1220,#111827);border:1px solid #1e2a45;border-radius:16px;padding:16px;">
-    <div style="font-size:11px;color:#5a6a8a;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">💡 Smart Insights</div>
+  const insightsHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;border-top:3px solid #a78bfa;">
+    <div style="font-size:11px;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">💡 Smart Insights</div>
     <div style="display:flex;flex-direction:column;gap:8px;">
-      ${insights.map(ins=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 12px;background:#0a0e1a;border-radius:10px;border-left:3px solid ${ins.color};">
+      ${insights.map(ins=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--bg-row-even,#0a0e1a);border-radius:10px;border-left:3px solid ${ins.color};">
         <span style="font-size:16px;flex-shrink:0;">${ins.icon}</span>
-        <div style="font-size:12px;color:#c8d0e0;line-height:1.5;">${ins.text}</div>
+        <div style="font-size:12px;color:var(--text-dim,#c8d0e0);line-height:1.6;">${ins.text}</div>
       </div>`).join("")}
     </div>
   </div>`;
 
-  // ── Business Forecast ─────────────────────────────────────────────────────
+  // ── Forecast ──────────────────────────────────────────────────────────────
   const {foreRev,foreExp,foreProfit,revTrend}=cmpForecast();
   const trendDir=revTrend>100?"📈 Upward trend":revTrend<-100?"📉 Downward trend":"➡️ Stable";
-  const forecastHtml=`<div style="background:linear-gradient(145deg,#0a0d18,#0f1422);border:1px solid #1e2a45;border-radius:16px;padding:16px;border-top:3px solid #a78bfa;">
-    <div style="font-size:11px;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">🔮 Next Month Forecast <span style="font-weight:400;color:#4a5a7a;font-size:10px;">— based on 6-month trend</span></div>
+  const forecastHtml=`<div style="background:var(--bg-card,#0a0d18);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;border-top:3px solid #a78bfa;">
+    <div style="font-size:11px;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">🔮 Next Month Forecast <span style="font-weight:400;color:var(--text-muted,#4a5a7a);font-size:10px;">— based on 6-month trend</span></div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
-      <div style="text-align:center;padding:10px;background:#0a0e1a;border-radius:10px;border:1px solid #1a2030;">
-        <div style="font-size:10px;color:#4a8cff;font-weight:700;margin-bottom:4px;">Revenue</div>
+      <div style="text-align:center;padding:12px 6px;background:var(--bg-row-even,#0a0e1a);border-radius:10px;border:1px solid var(--border-main,#1a2030);">
+        <div style="font-size:9px;color:#4a8cff;font-weight:700;margin-bottom:4px;text-transform:uppercase;">Revenue</div>
         <div style="font-size:15px;font-weight:800;color:#4a8cff;">${fmtINR(foreRev)}</div>
       </div>
-      <div style="text-align:center;padding:10px;background:#0a0e1a;border-radius:10px;border:1px solid #1a2030;">
-        <div style="font-size:10px;color:#ef4444;font-weight:700;margin-bottom:4px;">Expenses</div>
+      <div style="text-align:center;padding:12px 6px;background:var(--bg-row-even,#0a0e1a);border-radius:10px;border:1px solid var(--border-main,#1a2030);">
+        <div style="font-size:9px;color:#ef4444;font-weight:700;margin-bottom:4px;text-transform:uppercase;">Expenses</div>
         <div style="font-size:15px;font-weight:800;color:#ef4444;">${fmtINR(foreExp)}</div>
       </div>
-      <div style="text-align:center;padding:10px;background:#0a0e1a;border-radius:10px;border:1px solid #1a2030;">
-        <div style="font-size:10px;color:${foreProfit>=0?'#22c55e':'#ef4444'};font-weight:700;margin-bottom:4px;">Profit</div>
+      <div style="text-align:center;padding:12px 6px;background:var(--bg-row-even,#0a0e1a);border-radius:10px;border:1px solid var(--border-main,#1a2030);">
+        <div style="font-size:9px;color:${foreProfit>=0?'#22c55e':'#ef4444'};font-weight:700;margin-bottom:4px;text-transform:uppercase;">Profit</div>
         <div style="font-size:15px;font-weight:800;color:${foreProfit>=0?'#22c55e':'#ef4444'};">${fmtINR(foreProfit)}</div>
       </div>
     </div>
-    <div style="font-size:11px;color:#5a6a8a;text-align:center;">${trendDir} · Forecast accuracy improves with more data</div>
+    <div style="font-size:11px;color:var(--text-muted,#5a6a8a);text-align:center;">${trendDir} · Accuracy improves with more historical data</div>
+  </div>`;
+
+  // ── Export Actions ────────────────────────────────────────────────────────
+  const exportHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:14px;">
+    <div style="font-size:11px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📤 Export Report</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="window.print()" style="cursor:pointer;padding:8px 14px;border-radius:10px;border:1px solid var(--border-main,#1e2a45);background:var(--bg-row-even,#0a0e1a);color:var(--text-main,#e8eaf0);font-size:12px;font-weight:600;">🖨️ Print</button>
+      <button onclick="exportYearCSV(${cmpSelectedYear})" style="cursor:pointer;padding:8px 14px;border-radius:10px;border:1px solid #1e3a1e;background:rgba(34,197,94,0.08);color:#22c55e;font-size:12px;font-weight:600;">📊 Export CSV</button>
+      <button onclick="cmpExportPDF()" style="cursor:pointer;padding:8px 14px;border-radius:10px;border:1px solid #1e2a45;background:rgba(74,140,255,0.08);color:#4a8cff;font-size:12px;font-weight:600;">📄 Export PDF</button>
+    </div>
   </div>`;
 
   // ── Full layout ───────────────────────────────────────────────────────────
-  return `<div style="padding-bottom:32px;">
+  return `<div style="padding-bottom:40px;">
 
     <!-- Header -->
     <div style="margin-bottom:18px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
         <div>
-          <h2 style="margin:0 0 3px;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">⚖️ Business Comparison & Insights</h2>
-          <div style="font-size:11px;color:#4a5a7a;">Compare revenue, profit, expenses, debtors & creditors across different periods.</div>
+          <h2 style="margin:0 0 4px;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">⚖️ Business Comparison & Insights</h2>
+          <div style="font-size:11px;color:var(--text-muted,#4a5a7a);">Compare revenue, profit, expenses, customers, debtors & creditors across different periods.</div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
-          <div style="font-size:10px;color:#3a4a6a;">Updated ${lastUpdated}</div>
-          <div style="font-size:10px;color:#3a4a6a;margin-top:2px;">${periodLabel} vs ${prevLabel}</div>
+          <div style="font-size:10px;color:var(--text-muted,#3a4a6a);">Updated ${lastUpdated}</div>
+          <div style="font-size:10px;color:#FFD700;margin-top:2px;font-weight:600;">${periodLabel}</div>
+          <div style="font-size:10px;color:#5af;">vs ${prevLabel}</div>
         </div>
       </div>
     </div>
 
     <!-- Mode Selector -->
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:14px;">
       ${modeBtn("day",t('cmpDayBtn'))}
+      ${modeBtn("week",t('cmpWeekBtn'))}
       ${modeBtn("month",t('cmpMonthBtn'))}
+      ${modeBtn("quarter",t('cmpQuarterBtn'))}
       ${modeBtn("year",t('cmpYearBtn'))}
       ${modeBtn("years",t('cmpYearsBtn'))}
     </div>
 
     <!-- Period Picker -->
-    <div style="background:#0d1220;border:1px solid #1e2a45;border-radius:14px;padding:14px;margin-bottom:16px;">
+    <div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:14px;padding:14px;margin-bottom:16px;">
       ${pickerHtml}
     </div>
 
@@ -7682,8 +7995,14 @@ function renderCompare(){
     <!-- Main Triple Chart -->
     <div style="margin-top:14px;">${tripleChartHtml}</div>
 
-    <!-- Period Comparison -->
+    <!-- Sales vs Expenses -->
+    <div style="margin-top:14px;">${salesVsExpHtml}</div>
+
+    <!-- Period Comparison Table -->
     <div style="margin-top:14px;">${periodCompHtml}</div>
+
+    <!-- Customer Growth -->
+    <div style="margin-top:14px;">${custHtml}</div>
 
     <!-- Debtors & Creditors -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;">
@@ -7694,14 +8013,18 @@ function renderCompare(){
     <!-- Best Periods -->
     ${bestHtml?`<div style="margin-top:14px;">${bestHtml}</div>`:''}
 
-    <!-- Insights -->
+    <!-- Smart Insights -->
     <div style="margin-top:14px;">${insightsHtml}</div>
 
     <!-- Forecast -->
     <div style="margin-top:14px;">${forecastHtml}</div>
 
+    <!-- Export -->
+    <div style="margin-top:14px;">${exportHtml}</div>
+
   </div>`;
 }
+
 
 // ─── FESTIVALS ────────────────────────────────────────────────
 var festWinners=[],festAnnounced=[];
