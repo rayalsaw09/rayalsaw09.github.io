@@ -1656,11 +1656,13 @@ async function switchPlanFromModal(id, newPlan) {
   if (!confirmed) return;
   try {
     const patch = { plan: newPlan };
+    let expiryIso = null;
     if (newPlan === "pro") {
       const oneYear = new Date();
       oneYear.setFullYear(oneYear.getFullYear() + 1);
       patch.expires_at = oneYear.toISOString();
       patch.active = true;
+      expiryIso = oneYear.toISOString();
     }
     await sbFetch(`/rest/v1/licenses?id=eq.${id}`, {
       method: "PATCH", prefer: "return=minimal",
@@ -1671,6 +1673,21 @@ async function switchPlanFromModal(id, newPlan) {
     const phone = currentPhUser?.phone;
     const key = allKeys.find(k => k.customer_phone === phone) || null;
     renderPhSubCard(key, new Date(), phone);
+
+    // ── REALTIME FIX: Push license change to Firestore so Admin app reflects immediately ──
+    if (phone && saDb) {
+      try {
+        const licObj = newPlan === "pro"
+          ? { key: key?.key || id, plan: "pro", status: "pro", expires_at: expiryIso }
+          : { plan: "free", status: "free" };
+        await saDb.collection("users").doc(String(phone))
+          .collection("settings").doc("prefs")
+          .set({ license: licObj }, { merge: true });
+        console.log("[SP] Plan change pushed to Firestore for", phone);
+      } catch(fbErr) {
+        console.warn("[SP] Firestore plan push failed (non-fatal):", fbErr.message);
+      }
+    }
   } catch(e) { alert("❌ Error: " + e.message); }
 }
 
@@ -1903,6 +1920,21 @@ async function _doApprove(payment) {
     body: JSON.stringify({ status: "approved", license_key: usedKey })
   });
   if (!payRes.ok) throw new Error(await payRes.text());
+
+  // ── REALTIME FIX: Push license to Firestore so Admin app reflects Pro immediately ──
+  // Writes to users/{phone}/settings/prefs — same path Admin's loadSettingsFromCloud reads
+  const fbPhone = matchPhone || phone || null;
+  if (fbPhone && saDb) {
+    try {
+      const licExpiry = expiry.toISOString();
+      await saDb.collection("users").doc(String(fbPhone))
+        .collection("settings").doc("prefs")
+        .set({ license: { key: usedKey, plan: "pro", status: "pro", expires_at: licExpiry } }, { merge: true });
+      console.log("[SP] License pushed to Firestore for", fbPhone);
+    } catch(fbErr) {
+      console.warn("[SP] Firestore license push failed (non-fatal):", fbErr.message);
+    }
+  }
 
   return usedKey;
 }

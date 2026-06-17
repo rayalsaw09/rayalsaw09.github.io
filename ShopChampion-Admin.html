@@ -5498,6 +5498,11 @@ function renderPurchaseTab(sorted){
       </div>
       <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">${t("notesOptional")}</label>
       <input class="input" id="pt-notes" placeholder="${t("notesPlaceholder")}" style="margin-bottom:14px;" />
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">💳 Payment Mode</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;" id="pt-mode-row">
+        ${["Cash","UPI","NEFT","Cheque","Other"].map((m,i)=>`<button type="button" onclick="ptSetMode('${m}')" id="pt-mode-${m}" style="cursor:pointer;flex:1;min-width:56px;padding:9px 6px;border-radius:9px;border:2px solid ${i===0?'#22c55e':'#1e2a45'};background:${i===0?'#0a2a1a':'transparent'};color:${i===0?'#22c55e':'#4a5a7a'};font-size:12px;font-weight:700;transition:all 0.15s;">${m}</button>`).join("")}
+      </div>
+      <input type="hidden" id="pt-mode-val" value="Cash" />
       <button class="btn" id="pt-sub" onclick="ptSubmit()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">${t("addSaleBtn")}</button>
     </div>`;
 
@@ -5748,6 +5753,18 @@ function ptClearCustomer(){
   ptPts();
 }
 function ptPts(){const a=parseFloat(document.getElementById("pt-amt").value)||0,s=document.getElementById("pt-sel").value,b=document.getElementById("pt-pts");if(a&&s){b.style.display="block";b.innerHTML=`Points: <strong style="color:#FFD700;">+${getPoints(a).toLocaleString()}</strong> pts`;}else b.style.display="none";}
+function ptSetMode(mode){
+  document.getElementById("pt-mode-val").value = mode;
+  ["Cash","UPI","NEFT","Cheque","Other"].forEach(m=>{
+    const btn = document.getElementById("pt-mode-"+m);
+    if(!btn) return;
+    const active = m===mode;
+    btn.style.border = "2px solid "+(active?"#22c55e":"#1e2a45");
+    btn.style.background = active?"#0a2a1a":"transparent";
+    btn.style.color = active?"#22c55e":"#4a5a7a";
+  });
+}
+
 async function ptSubmit(){
   const s=document.getElementById("pt-sel").value;
   if(!s){notify("❌ Please select a customer","error");return;}
@@ -5802,9 +5819,11 @@ async function ptSubmit(){
     if(a>10000000){notify("❌ Amount seems too high — please check","error");if(submitBtn)submitBtn.disabled=false;return;}
   }
   if(soldItems.length)invDeductSold(soldItems, s);
-  addPurchase(s,{amount:a,bill:document.getElementById("pt-bill").value,notes:document.getElementById("pt-notes").value,date:document.getElementById("pt-date-val").value||document.getElementById("pt-date").value,soldItems});
+  const ptPayMode = document.getElementById("pt-mode-val")?.value || "Cash";
+  addPurchase(s,{amount:a,bill:document.getElementById("pt-bill").value,notes:document.getElementById("pt-notes").value,date:document.getElementById("pt-date-val").value||document.getElementById("pt-date").value,soldItems,payMode:ptPayMode});
   document.getElementById("pt-amt").value="";
   document.getElementById("pt-notes").value="";
+  ptSetMode("Cash");
   window._ptState.selId="";window._ptState.selName="";window._ptState.selData=null;window._ptState.amt="";window._ptState.notes="";
   ptRestoreLiveBadge();
   const btn=document.getElementById("pt-sub");
@@ -6368,10 +6387,12 @@ async function bwSubmit(){
   setTimeout(()=>{btn.style.background='linear-gradient(135deg,#f84,#e05020)';btn.style.color='#fff';btn.textContent='Record Borrow →';safeRenderTab(0);},2000);
 }
 
-async function bwMarkReturned(custId,borrowId){
+async function bwMarkReturned(custId,borrowId,payMode){
   const c=customers.find(x=>x.id===custId);if(!c)return;
+  payMode = payMode || "Cash";
   const b=(c.borrows||[]).find(x=>x.id===borrowId);
   if(b){
+    const remaining = Math.round((Number(b.amount)-(b.amountPaid||0))*100)/100;
     if(b._syncType==="purchase" && b.status==="pending_payment"){
       // This was a synced purchase borrow — payment received, move to purchase history
       b.status="returned"; b.returnedAt=new Date().toISOString();
@@ -6395,6 +6416,18 @@ async function bwMarkReturned(custId,borrowId){
       const p=(c.purchases||[]).find(x=>x.bill===borrowId);
       if(p){p.borrowStatus="returned";}
       notify(`✅ Marked as returned for ${c.name}`);
+    }
+    // Record any remaining unpaid amount as cash-in when marking fully cleared
+    if(remaining > 0){
+      cashRecordTx({
+        direction: "in",
+        amount: remaining,
+        date: new Date().toISOString().slice(0,10),
+        note: `Borrow cleared by ${c.name}${b.item?" · "+b.item:""}`,
+        source: "borrow_payment",
+        refId: "BW_CLR_"+borrowId+"_"+Date.now(),
+        mode: payMode
+      });
     }
   }
   try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
@@ -6513,17 +6546,42 @@ function showBorrowDetails(custId){
 
 
 // ─── PARTIAL BORROW PAYMENT ───────────────────────────────────────────────────
-async function bwRecordPartialPayment(custId, borrowId, payAmount){
+function bwSetPayMode(mode){
+  document.getElementById("bw-pay-mode-val").value = mode;
+  ["Cash","UPI","NEFT","Cheque","Other"].forEach(m=>{
+    const btn = document.getElementById("bw-pay-mode-"+m);
+    if(!btn) return;
+    const active = m===mode;
+    btn.style.border = "2px solid "+(active?"#22c55e":"#1e2a45");
+    btn.style.background = active?"#0a2a1a":"transparent";
+    btn.style.color = active?"#22c55e":"#4a5a7a";
+  });
+}
+
+async function bwRecordPartialPayment(custId, borrowId, payAmount, payMode){
   const c = customers.find(x=>x.id===custId); if(!c) return;
   const b = (c.borrows||[]).find(x=>x.id===borrowId); if(!b) return;
+  payMode = payMode || "Cash";
 
   if(!b.amountPaid) b.amountPaid = 0;
   if(!b.payments)   b.payments   = [];
 
   b.amountPaid = Math.round((b.amountPaid + payAmount) * 100) / 100;
-  b.payments.push({ amount: payAmount, date: new Date().toISOString().slice(0,10), paidAt: new Date().toISOString() });
+  b.payments.push({ amount: payAmount, date: new Date().toISOString().slice(0,10), paidAt: new Date().toISOString(), mode: payMode });
 
   const remaining = Math.round((Number(b.amount) - b.amountPaid) * 100) / 100;
+  const payRefId = "BW_PAY_" + Date.now() + "_" + Math.random().toString(36).slice(2,5);
+
+  // Record cash/bank movement for this borrow payment received
+  cashRecordTx({
+    direction: "in",
+    amount: payAmount,
+    date: new Date().toISOString().slice(0,10),
+    note: `Borrow payment from ${c.name}${b.item?" · "+b.item:""}`,
+    source: "borrow_payment",
+    refId: payRefId,
+    mode: payMode
+  });
 
   if(remaining <= 0){
     b.status = "returned";
@@ -6590,13 +6648,21 @@ function openPartialPaymentModal(custId, borrowId){
         }).join("")}
       </div>
     </div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:6px;">💳 Payment Mode</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;" id="bw-pay-mode-row">
+        ${["Cash","UPI","NEFT","Cheque","Other"].map((m,i)=>`<button type="button" onclick="bwSetPayMode('${m}')" id="bw-pay-mode-${m}" style="cursor:pointer;flex:1;min-width:56px;padding:8px 4px;border-radius:9px;border:2px solid ${i===0?'#22c55e':'#1e2a45'};background:${i===0?'#0a2a1a':'transparent'};color:${i===0?'#22c55e':'#4a5a7a'};font-size:12px;font-weight:700;transition:all 0.15s;">${m}</button>`).join("")}
+      </div>
+      <input type="hidden" id="bw-pay-mode-val" value="Cash" />
+    </div>
     <div style="display:flex;gap:10px;">
       <button onclick="
         const amt=parseFloat(document.getElementById('partial-pay-amt').value||'0');
         if(!amt||amt<=0){notify('❌ Enter a valid amount','error');return;}
         if(amt>${remaining}+0.01){notify('❌ Cannot pay more than remaining ${formatINR(remaining)}','error');return;}
+        const mode=document.getElementById('bw-pay-mode-val')?.value||'Cash';
         closeModal();
-        bwRecordPartialPayment('${custId}','${borrowId}',amt);
+        bwRecordPartialPayment('${custId}','${borrowId}',amt,mode);
       " class="btn" style="flex:1;background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:13px;font-size:14px;font-weight:800;">
         💰 Record Payment
       </button>
@@ -6716,11 +6782,14 @@ async function deletePurchase(custId,bill,dateEnc){
   const idx=c.purchases.findIndex(p=>p.bill===bill&&p.date===date);
   if(idx>-1){
     const _delAmt=Number(c.purchases[idx].amount);
+    const _delCashRefId=c.purchases[idx]._cashRefId||null;
     c.totalSpend=Math.max(0,c.totalSpend-_delAmt);
     c.purchases.splice(idx,1);
     notify("✅ Purchase deleted");
     try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
     addHistoryLog('sale','Sale deleted',`${c.name} · ${formatINR(_delAmt)}${bill?` · Bill ${bill}`:''}`);
+    // Reverse the cash/bank entry that was created when this sale was recorded
+    cashRecordTx({direction:"out", amount:_delAmt, date:new Date().toISOString().slice(0,10), note:`Sale deleted · ${c.name}${bill?" · Bill "+bill:""}`, source:"sale_delete", refId:(_delCashRefId||"DEL_"+Date.now()), mode:"Cash"});
     if(useLocalOnly)safeRenderTab(currentTab);
   }
 }
@@ -6909,11 +6978,24 @@ function renderAnalytics(sorted){
   // ── Revenue from customer purchases (MED-05: O(1) cache lookups) ──
   function monthSpend(c, mo, ye){
     // Still needed for per-customer filtering (bestCust, activeThisMonth)
+    // Exclude unpaid borrows; partial borrows count only paid amount
     const key = `${ye}-${String(mo+1).padStart(2,'0')}`;
     return (c.purchases||[]).filter(p=>(p.date||'').slice(0,7)===key)
-      .reduce((a,p)=>a+Number(p.amount),0);
+      .reduce((a,p)=>{
+        if(p.type==='borrow'&&p.borrowStatus!=='returned'){
+          return a+(p.borrowStatus==='partial'?Number(p.amountPaid||0):0);
+        }
+        return a+Number(p.amount);
+      },0);
   }
-  function yearSpend(c,y){ return (c.purchases||[]).filter(p=>(p.date||"").slice(0,4)===y).reduce((a,p)=>a+Number(p.amount),0); }
+  function yearSpend(c,y){
+    return (c.purchases||[]).filter(p=>(p.date||"").slice(0,4)===y).reduce((a,p)=>{
+      if(p.type==='borrow'&&p.borrowStatus!=='returned'){
+        return a+(p.borrowStatus==='partial'?Number(p.amountPaid||0):0);
+      }
+      return a+Number(p.amount);
+    },0);
+  }
 
   // Use cache for totals — O(1) instead of O(customers × purchases)
   const custMonthSales     = _cachedMonthSales(thisMonth, thisYear);
@@ -7439,6 +7521,19 @@ function _bsComputeData(){
 
   const payables   = creditors.map(c=>({name:c.name, amount:credBalance(c)})).filter(x=>x.amount>0);
   const receivables= debtors.map(d=>({name:d.name, amount:debtBalance(d)})).filter(x=>x.amount>0);
+
+  // Include outstanding customer borrows as receivables
+  customers.forEach(c=>{
+    const activeBorrows = (c.borrows||[]).filter(b=>b.status==="pending"||b.status==="partial"||b.status==="pending_payment");
+    if(!activeBorrows.length) return;
+    const owed = activeBorrows.reduce((s,b)=>s+Math.max(0,Number(b.amount)-(b.amountPaid||0)),0);
+    if(owed>0){
+      // Merge with existing debtor entry if same customer exists, else add separately
+      const existing = receivables.find(r=>r.name===c.name);
+      if(existing){ existing.amount = Math.round((existing.amount+owed)*100)/100; }
+      else { receivables.push({name:c.name, amount:Math.round(owed*100)/100, _isBorrow:true}); }
+    }
+  });
 
   const totalPayables    = payables.reduce((s,x)=>s+x.amount,0);
   const totalReceivables = receivables.reduce((s,x)=>s+x.amount,0);
@@ -8001,9 +8096,16 @@ function cmpBestPeriods(){
 
 function cmpAllPurchases(){
   const all=[];
-  // Customer purchases
+  // Customer purchases — exclude unpaid borrows; partial borrows count only paid portion
   customers.forEach(c=>(c.purchases||[]).forEach(p=>{
-    all.push({amount:Number(p.amount),date:(p.date||"").slice(0,10),custId:c.id,_src:"customer"});
+    if(p.type==='borrow' && p.borrowStatus!=='returned'){
+      // Partial: count only what's been paid so far
+      if(p.borrowStatus==='partial' && (p.amountPaid||0)>0){
+        all.push({amount:Number(p.amountPaid),date:(p.date||'').slice(0,10),custId:c.id,_src:'customer'});
+      }
+      return; // skip unpaid borrows entirely
+    }
+    all.push({amount:Number(p.amount),date:(p.date||'').slice(0,10),custId:c.id,_src:'customer'});
   }));
   // Debtor sales
   getDebtors().forEach(d=>(d.transactions||[]).filter(t=>t.type==="sale").forEach(t=>{
@@ -10608,6 +10710,10 @@ function saveCrTransaction(){
     const crTxMode = document.getElementById("tx-pay-mode")?.value||"Cash";
     cashRecordTx({direction:"out", amount, date, note:`Paid to ${creditors[idx].name||"creditor"}${note?(" · "+note):""}`, source:"creditor_payment", refId:txId, mode:crTxMode});
   }
+  if(type==="return"){
+    // Supplier credits us back (debit note) — cash comes IN
+    cashRecordTx({direction:"in", amount, date, note:`Return / Dr Note from ${creditors[idx].name||"creditor"}${note?(" · "+note):""}`, source:"creditor_return", refId:txId, mode:"Cash"});
+  }
   closeModal();
   notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return / Dr Note"} of ${formatINR(amount)} recorded${invLinked?" · "+invItemName+(type==="return"?" stock deducted":" stock updated"):""}`);
   setTimeout(()=>openCreditorDetail(creditorId),200);
@@ -11142,28 +11248,34 @@ var _expEditId = null;
 var _expCalMonth = null; // {year, month} for calendar view
 var _expView = "list"; // list|calendar
 
-function addExpense(category, amount, note, date, recurring){
+function addExpense(category, amount, note, date, recurring, payMode){
   const list = getExpenses();
   const entry = {
     id: "EXP_" + Date.now() + "_" + Math.random().toString(36).slice(2,6).toUpperCase(),
     category, amount: Number(amount)||0, note: note||"",
     date: date || new Date().toISOString().slice(0,10),
     recurring: !!recurring,
+    payMode: payMode || "Cash",
     createdAt: Date.now()
   };
   list.unshift(entry);
   saveExpenses(list);
-  addHistoryLog("expense", "Expense added", `${category} — ${formatINR(entry.amount)}${note?" ("+note+")":""}`);
+  addHistoryLog("expense", "Expense added", `${category} — ${formatINR(entry.amount)}${note?" ("+note+")":""}${payMode?" · "+payMode:""}`);
+  // Record cash/bank movement for this expense
+  cashRecordTx({direction:"out", amount:entry.amount, date:entry.date, note:`Expense · ${category}${note?" · "+note:""}`, source:"expense", refId:entry.id, mode:entry.payMode});
   return entry;
 }
 
-function updateExpense(id, category, amount, note, date, recurring){
+function updateExpense(id, category, amount, note, date, recurring, payMode){
   const list = getExpenses();
   const idx = list.findIndex(e=>e.id===id);
   if(idx===-1) return;
-  list[idx] = { ...list[idx], category, amount: Number(amount)||0, note: note||"", date, recurring: !!recurring };
+  list[idx] = { ...list[idx], category, amount: Number(amount)||0, note: note||"", date, recurring: !!recurring, payMode: payMode||list[idx].payMode||"Cash" };
   saveExpenses(list);
-  addHistoryLog("expense", "Expense edited", `${category} — ${formatINR(Number(amount))}`);
+  // Replace the cash ledger entry with updated values
+  cashRemoveByRef(id);
+  cashRecordTx({direction:"out", amount:Number(amount)||0, date, note:`Expense · ${category}${note?" · "+note:""}`, source:"expense", refId:id, mode:list[idx].payMode});
+  addHistoryLog("expense", "Expense edited", `${category} — ${formatINR(Number(amount))}${payMode?" · "+payMode:""}`);
 }
 
 function deleteExpense(id){
@@ -11171,6 +11283,7 @@ function deleteExpense(id){
   const removed = all.find(e=>e.id===id);
   const list = all.filter(e=>e.id!==id);
   saveExpenses(list);
+  if(removed) cashRemoveByRef(removed.id);
   addHistoryLog("expense", "Expense deleted", removed?`${removed.category} — ${formatINR(removed.amount)}`:id);
 }
 
@@ -11215,11 +11328,20 @@ function expGetSalesData(){
   const now = new Date();
   const thisMonth=now.getMonth(), thisYear=now.getFullYear(), yr=String(thisYear);
   let monthSales=0, yearSales=0;
-  // customer retail sales
+  // customer retail sales — exclude unpaid borrows
   try{
     const custs = typeof getSorted==="function" ? getSorted() : [];
     custs.forEach(c=>{
       (c.purchases||[]).forEach(p=>{
+        // Skip unpaid borrows; count partial borrows by amount paid
+        if(p.type==='borrow'&&p.borrowStatus!=='returned'){
+          const paid = p.borrowStatus==='partial'?Number(p.amountPaid||0):0;
+          if(paid<=0) return;
+          const d=new Date(p.date||"");
+          if(d.getMonth()===thisMonth&&d.getFullYear()===thisYear) monthSales+=paid;
+          if(String(d.getFullYear())===yr) yearSales+=paid;
+          return;
+        }
         const d=new Date(p.date||"");
         if(d.getMonth()===thisMonth&&d.getFullYear()===thisYear) monthSales+=Number(p.amount)||0;
         if(String(d.getFullYear())===yr) yearSales+=Number(p.amount)||0;
@@ -11525,6 +11647,13 @@ ${monthTotal>0 ? `
       <label for="exp-recurring" style="font-size:13px;color:#94a3b8;cursor:pointer;">${t('expRecurringMonthly')}</label>
     </div>
   </div>
+  <div style="margin-bottom:14px;">
+    <div style="font-size:11px;color:#64748b;margin-bottom:6px;font-weight:600;">💳 Payment Mode</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;" id="exp-mode-row">
+      ${["Cash","UPI","NEFT","Cheque","Other"].map((m,i)=>`<button type="button" onclick="expSetMode('${m}')" id="exp-mode-${m}" style="cursor:pointer;flex:1;min-width:56px;padding:8px 4px;border-radius:9px;border:2px solid ${(editingExp?editingExp.payMode||'Cash':'Cash')===m?'#6366f1':'#1e2a45'};background:${(editingExp?editingExp.payMode||'Cash':'Cash')===m?'#0f0a2a':'transparent'};color:${(editingExp?editingExp.payMode||'Cash':'Cash')===m?'#818cf8':'#4a5a7a'};font-size:12px;font-weight:700;transition:all 0.15s;">${m}</button>`).join("")}
+    </div>
+    <input type="hidden" id="exp-mode-val" value="${editingExp?editingExp.payMode||'Cash':'Cash'}" />
+  </div>
   <div style="display:flex;gap:10px;">
     <button class="exp-btn" onclick="expSaveFromForm()" style="flex:1;background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;padding:12px;">${editingExp?t('expUpdateBtn'):t('expSaveBtn')}</button>
     ${editingExp ? `<button class="exp-btn" onclick="_expEditId=null;safeRenderTab(currentTab);" style="background:#1e2a45;color:#94a3b8;padding:12px 18px;">${t('invCancel')}</button>` : ""}
@@ -11664,20 +11793,33 @@ ${monthTotal>0 ? `
 </div>`;
 }
 
+function expSetMode(mode){
+  document.getElementById("exp-mode-val").value = mode;
+  ["Cash","UPI","NEFT","Cheque","Other"].forEach(m=>{
+    const btn = document.getElementById("exp-mode-"+m);
+    if(!btn) return;
+    const active = m===mode;
+    btn.style.border = "2px solid "+(active?"#6366f1":"#1e2a45");
+    btn.style.background = active?"#0f0a2a":"transparent";
+    btn.style.color = active?"#818cf8":"#4a5a7a";
+  });
+}
+
 function expSaveFromForm(){
   const cat  = document.getElementById("exp-cat")?.value||"";
   const amt  = parseFloat(document.getElementById("exp-amt")?.value||"0");
   const note = (document.getElementById("exp-note")?.value||"").trim();
   const date = document.getElementById("exp-date")?.value||new Date().toISOString().slice(0,10);
   const recurring = document.getElementById("exp-recurring")?.checked||false;
+  const payMode = document.getElementById("exp-mode-val")?.value||"Cash";
   if(!cat){ notify("Please select a category","error"); return; }
   if(!amt||amt<=0){ notify("Please enter a valid amount","error"); return; }
   if(_expEditId){
-    updateExpense(_expEditId, cat, amt, note, date, recurring);
+    updateExpense(_expEditId, cat, amt, note, date, recurring, payMode);
     _expEditId = null;
     notify("✅ Expense updated!");
   } else {
-    addExpense(cat, amt, note, date, recurring);
+    addExpense(cat, amt, note, date, recurring, payMode);
     notify("✅ Expense saved!");
   }
   safeRenderTab(currentTab);
@@ -12493,6 +12635,10 @@ function saveDebtTransaction(){
   addHistoryLog('debtor',`Debtor ${type==="payment"?"receipt":type==="return"?"return":"sale"} recorded`,`${debtors[idx].name||'Debtor'} · ${formatINR(amtRaw)}`,null,_histGroupId);
   if(type==="payment"){
     cashRecordTx({direction:"in", amount: amtRaw, date, note:`Received from ${debtors[idx].name||"customer"}${note?(" · "+note):""}`, source:"debtor_payment", refId:drTxId, mode});
+  }
+  if(type==="return"){
+    // Customer returns goods, you refund them — cash goes OUT
+    cashRecordTx({direction:"out", amount: amtRaw, date, note:`Refund to ${debtors[idx].name||"customer"}${note?(" · "+note):""}`, source:"debtor_return", refId:drTxId, mode});
   }
   closeModal();
   const typeLabel = type==="payment"?currentLang==='hi'?'रसीद':'Receipt':type==="return"?"Returned / Cr Note":type.charAt(0).toUpperCase()+type.slice(1);
@@ -16929,6 +17075,58 @@ window.addEventListener("load", () => {
   } catch{}
 });
 
+// ── REALTIME FIX: Background license poller ──
+// Runs every 60 seconds. Covers two cases:
+//   1. User was Free, Seller just approved their payment → picks up new Pro status from Supabase
+//   2. Firestore push by Seller Panel landed → loadSettingsFromCloud already handled it, but
+//      this is a safety net for Supabase-only path.
+// Only makes 1 Supabase fetch per 60s — lightweight.
+(function _startBgLicensePoller() {
+  let _bgLastCheck = 0;
+  async function _bgCheckLicense() {
+    // Skip if no key yet AND plan is already pro (will be handled by _maybeRevalidateLicense)
+    // But DO run if plan is free/pending — user may have just been approved
+    const now = Date.now();
+    if (now - _bgLastCheck < 55000) return; // debounce
+    _bgLastCheck = now;
+    // If already pro, use existing revalidator (respects 24h throttle)
+    if (licensePlan === "pro" && licenseStatus === "pro") {
+      // Reset throttle so it re-checks sooner if triggered from Seller Panel
+      _lastLicenseCheck = 0;
+      await _maybeRevalidateLicense().catch(() => {});
+      return;
+    }
+    // For free/expired users: check if they have a pending_payment that got approved
+    // OR if Seller Panel directly granted Pro without a payment flow
+    if (!authPhone) return;
+    try {
+      // Check Firestore first (fastest — Seller Panel writes here on approve)
+      if (db) {
+        const snap = await db.collection("users").doc(authPhone)
+          .collection("settings").doc("prefs").get();
+        if (snap && snap.exists) {
+          const d = snap.data();
+          if (d.license && d.license.plan === "pro" && d.license.status === "pro") {
+            saveLicense(d.license.key || licenseKey || "", "pro", "pro");
+            updateLicenseUI();
+            try { renderTabs(); safeRenderTab(currentTab); } catch {}
+            console.log("[SC] BG poller: Pro license detected from Firestore — activated!");
+            return;
+          }
+        }
+      }
+      // Fallback: poll Supabase directly if licenseKey exists (covers non-Firestore path)
+      if (licenseKey) {
+        await validateLicenseOnline();
+        updateLicenseUI();
+      }
+    } catch(e) { /* silent — network may be offline */ }
+  }
+  // Run once after 10s (catches quick approvals), then every 60s
+  setTimeout(_bgCheckLicense, 10000);
+  setInterval(_bgCheckLicense, 60000);
+})();
+
 // ── License gate: called after every renderTab ──
 function applyLicenseOverlay(i) {
   // Settings tab (index 12) is always accessible — needed to enter license key
@@ -16988,12 +17186,20 @@ var _analyticsCache = null;
 function _buildAnalyticsCache() {
   _analyticsCache = { _years: new Set(), _txnCount: {} };
   customers.forEach(c => (c.purchases || []).forEach(p => {
+    // Exclude borrow entries that haven't been paid yet — only count cash received
+    if (p.type === 'borrow' && p.borrowStatus !== 'returned') return;
     const ds = p.date || '';
     if (!ds) return;
+    // For partially paid borrows, only count what has been paid
+    let amt = Number(p.amount) || 0;
+    if (p.type === 'borrow' && p.borrowStatus === 'partial') {
+      amt = Number(p.amountPaid) || 0;
+    }
+    if (amt <= 0) return;
     const key = ds.slice(0, 7); // 'YYYY-MM'
     const yr  = ds.slice(0, 4);
     if (!_analyticsCache[key]) _analyticsCache[key] = 0;
-    _analyticsCache[key] += Number(p.amount) || 0;
+    _analyticsCache[key] += amt;
     const y = parseInt(yr);
     if (y >= 2000 && y <= 2100) _analyticsCache._years.add(y);
     _analyticsCache._txnCount[yr] = (_analyticsCache._txnCount[yr] || 0) + 1;
@@ -22215,7 +22421,7 @@ function showBillModal(bill) {
 }
 
 // ─── ENHANCED addPurchase with billing ────────────────────────
-async function addPurchase(custId, { amount, bill, date, notes, soldItems }) {
+async function addPurchase(custId, { amount, bill, date, notes, soldItems, payMode }) {
   if(requireOnline()) return;
   if(!hasPermission('sale_create')) return notify("🚫 No permission to create sales","error");
   const amt = parseFloat(amount); if (!amt || amt <= 0) return;
@@ -22223,13 +22429,26 @@ async function addPurchase(custId, { amount, bill, date, notes, soldItems }) {
 
   // Run original logic (totalSpend update, push to c.purchases, notify, voice, save)
   c.totalSpend += amt;
-  c.purchases = [{ bill, amount: amt, date: date || new Date().toISOString(), notes, soldItems: soldItems || [] }, ...(c.purchases || [])];
+  const saleTxId = "SALE_" + Date.now() + "_" + Math.random().toString(36).slice(2,5);
+  c.purchases = [{ bill, amount: amt, date: date || new Date().toISOString(), notes, soldItems: soldItems || [], _cashRefId: saleTxId }, ...(c.purchases || [])];
   notify(`✅ ${formatINR(amt)} added for ${c.name}`);
   const _sortedV = getSorted();
   const _rankedV = _sortedV.find(x => x.id === custId);
   speakPurchaseAnnouncement(c.name, formatINR(amt), _rankedV ? _rankedV.rank : "?");
   try { await saveOneCustomer(c); } catch (e) { notify("⚠️ Firebase error: " + e.message); }
-  addHistoryLog('sale', 'Sale recorded', `${c.name} · ${formatINR(amt)}${bill?` · Bill ${bill}`:''}`);
+  addHistoryLog('sale', 'Sale recorded', `${c.name} · ${formatINR(amt)}${bill?` · Bill ${bill}`:''}${payMode?` · ${payMode}`:''}`);
+
+  // ── Record cash/bank movement for this sale ──────────────────
+  const saleDate = (date || new Date().toISOString()).slice(0,10);
+  cashRecordTx({
+    direction: "in",
+    amount: amt,
+    date: saleDate,
+    note: `Sale to ${c.name}${bill ? " · Bill " + bill : ""}`,
+    source: "sale_payment",
+    refId: saleTxId,
+    mode: payMode || "Cash"
+  });
 
   // ── NEW: Generate & save bill, then show modal ───────────────
   const billObj = createBillObject({ custId, soldItems, amount: amt, billNum: bill, notes, date: date || new Date().toISOString() });
