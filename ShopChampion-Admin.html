@@ -1986,6 +1986,35 @@ var TRANSLATIONS = {
     msgAddShop:"Add a shop using their SC-XXXXXX ID to start chatting.",
     msgLoginRequired:"Log in to use Messages.",
     msgExpiry:"Messages expire after 7 days · Max 50 per conversation",
+    msgTapToChat:"Tap to chat", msgYouPrefix:"You: ", msgViewLedger:"📋 View Ledger",
+    // Debtors tab extra
+    dbAddManually:"+ Add Manually",
+    dbTotalDebtors:"Total Debtors", dbTotalReceivable:"Total Receivable",
+    dbReceivedMonth:"Received This Month", dbSoldMonth:"Sold This Month",
+    dbSearchPlaceholder:"🔍 Search debtor by name or phone...",
+    dbWAReminder:"💬 WhatsApp Reminder",
+    dbTrySearch:"Try a different search",
+    dbFirstDebtor:"Click '+ Add Manually' to add your first debtor",
+    // Inventory tab extra
+    invSearchPlaceholder:"Search categories or items...",
+    invProductsCount:"Products",
+    invNoMatch:"No categories or items match",
+    // Expenses filter
+    expFilterToday:"Today", expFilterWeek:"This Week", expFilterMonth:"Month",
+    expFilterYear:"Year", expFilterRecurring:"🔄 Recurring",
+    expFirstMonthShort:"First month",
+    // Compare tab
+    cmpWeekOfLabel:"Week of", cmpThisWeekLabel:"This Week", cmpVsLastWeekLabel:"vs Last Week",
+    cmpUpdatedLabel:"Updated", cmp4WeekView:"4-Week View (ending",
+    // History tab
+    hisNoActivityToday:"No activity yet today",
+    hisNoActivityDay:"No activity on this day",
+    hisSalesWillAppear:"Sales, purchases, and other actions will appear here as you use the app.",
+    hisTryDate:"Try a different date, or this may be before History tracking started.",
+    hisTrackingStarted:"History tracking started",
+    // Team tab
+    tmLastLogin:"Last login:", tmOnline:"● Online", tmOffline:"○ Offline",
+    tmLastSeen:"○ Last seen", tmAddMember:"+ Add Member",
   },
   hi: {
     // Tab names (TABS_BASE keys)
@@ -2383,6 +2412,35 @@ var TRANSLATIONS = {
     msgAddShop:"चैट शुरू करने के लिए SC-XXXXXX ID से दुकान जोड़ें।",
     msgLoginRequired:"मैसेज उपयोग करने के लिए लॉगिन करें।",
     msgExpiry:"मैसेज 7 दिन बाद हटते हैं · प्रति बातचीत अधिकतम 50",
+    msgTapToChat:"चैट करने के लिए टैप करें", msgYouPrefix:"आप: ", msgViewLedger:"📋 खाता देखें",
+    // Debtors tab extra
+    dbAddManually:"+ मैन्युअल जोड़ें",
+    dbTotalDebtors:"कुल देनदार", dbTotalReceivable:"कुल प्राप्य",
+    dbReceivedMonth:"इस महीने प्राप्त", dbSoldMonth:"इस महीने बेचा",
+    dbSearchPlaceholder:"🔍 नाम या फ़ोन से देनदार खोजें...",
+    dbWAReminder:"💬 WhatsApp रिमाइंडर",
+    dbTrySearch:"अलग खोज आज़माएं",
+    dbFirstDebtor:"पहला देनदार जोड़ने के लिए '+ मैन्युअल जोड़ें' दबाएं",
+    // Inventory tab extra
+    invSearchPlaceholder:"कैटेगरी या आइटम खोजें...",
+    invProductsCount:"उत्पाद",
+    invNoMatch:"कोई कैटेगरी या आइटम नहीं मिला",
+    // Expenses filter
+    expFilterToday:"आज", expFilterWeek:"इस हफ्ते", expFilterMonth:"महीना",
+    expFilterYear:"वर्ष", expFilterRecurring:"🔄 नियमित",
+    expFirstMonthShort:"पहला महीना",
+    // Compare tab
+    cmpWeekOfLabel:"सप्ताह", cmpThisWeekLabel:"इस सप्ताह", cmpVsLastWeekLabel:"पिछले सप्ताह",
+    cmpUpdatedLabel:"अपडेट", cmp4WeekView:"4-सप्ताह दृश्य (समाप्ति",
+    // History tab
+    hisNoActivityToday:"आज अभी तक कोई गतिविधि नहीं",
+    hisNoActivityDay:"इस दिन कोई गतिविधि नहीं",
+    hisSalesWillAppear:"बिक्री, खरीदारी और अन्य कार्य यहाँ दिखेंगे।",
+    hisTryDate:"अलग दिनांक आज़माएं, या यह इतिहास शुरू होने से पहले का हो सकता है।",
+    hisTrackingStarted:"इतिहास ट्रैकिंग शुरू हुई",
+    // Team tab
+    tmLastLogin:"अंतिम लॉगिन:", tmOnline:"● ऑनलाइन", tmOffline:"○ ऑफलाइन",
+    tmLastSeen:"○ अंतिम बार देखा", tmAddMember:"+ सदस्य जोड़ें",
   },
 };
 
@@ -4726,7 +4784,7 @@ function _safeRenderTabImmediate(i) {
             return inventoryItems.some(x => (x.category || 'General') === cat && tallyMatch(x.name, q));
           });
           if (matchedCats.length === 0) {
-            resultsEl.innerHTML = `<div class="card" style="padding:32px;text-align:center;color:#4a5a7a;font-size:14px;"><div style="font-size:32px;margin-bottom:10px;">🔍</div>No categories or items match "<b style="color:#e8eaf0;">${invSearchQuery}</b>"</div>`;
+            resultsEl.innerHTML = `<div class="card" style="padding:32px;text-align:center;color:#4a5a7a;font-size:14px;"><div style="font-size:32px;margin-bottom:10px;">🔍</div>${t('invNoMatch')} "<b style="color:#e8eaf0;">${invSearchQuery}</b>"</div>`;
           } else {
             resultsEl.innerHTML = matchedCats.map(cat => {
               const catItems = inventoryItems.filter(x => (x.category || 'General') === cat);
@@ -7607,7 +7665,7 @@ function cmpWeekData(){
   mon.setDate(mon.getDate()+cmpWeekOffset*7);
   const days=Array.from({length:7},(_,i)=>cmpIso(cmpAddDays(mon,i)));
   const todayIso=cmpIso(today);
-  const label="Week of "+cmpFmtDayShort(days[0])+" – "+cmpFmtDayShort(days[6]);
+  const label=t('cmpWeekOfLabel')+" "+cmpFmtDayShort(days[0])+" – "+cmpFmtDayShort(days[6]);
   return {days,todayIso,label};
 }
 
@@ -7863,8 +7921,8 @@ function renderCompare(){
     profitSeries=revSeries.map((v,i)=>v-expSeries[i]);
     chartLabels=days.map(d=>cmpFmtDay(d));
     curDates=days;prevDates=prevDays;
-    periodLabel="This Week ("+cmpFmtDayShort(days[0])+"–"+cmpFmtDayShort(days[6])+")";
-    prevLabel="Last Week ("+cmpFmtDayShort(prevDays[0])+"–"+cmpFmtDayShort(prevDays[6])+")";
+    periodLabel=t('cmpThisWeekLabel')+" ("+cmpFmtDayShort(days[0])+"–"+cmpFmtDayShort(days[6])+")";
+    prevLabel=t('cmpVsLastWeekLabel')+" ("+cmpFmtDayShort(prevDays[0])+"–"+cmpFmtDayShort(prevDays[6])+")";
 
   } else if(cmpMode==="week"){
     // 4-week view: show each week of rolling month
@@ -8044,7 +8102,7 @@ function renderCompare(){
     const {days,label}=cmpWeekData();
     pickerHtml=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">${navArrow(-1,false,"cmpNav(-1)")}<div style="font-size:14px;font-weight:800;color:var(--text-main,#e8eaf0);">${label}</div>${navArrow(1,cmpWeekOffset>=0,"cmpNav(1)")}</div>`;
   } else if(cmpMode==="week"){
-    pickerHtml=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">${navArrow(-1,false,"cmpNav(-1)")}<div style="font-size:14px;font-weight:800;color:var(--text-main,#e8eaf0);">4-Week View (ending ${cmpFmtDayShort(cmpIso(cmpAddDays(cmpMondayOf(now),cmpWeekOffset*7+6)))})</div>${navArrow(1,cmpWeekOffset>=0,"cmpNav(1)")}</div>`;
+    pickerHtml=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">${navArrow(-1,false,"cmpNav(-1)")}<div style="font-size:14px;font-weight:800;color:var(--text-main,#e8eaf0);">${t('cmp4WeekView')} ${cmpFmtDayShort(cmpIso(cmpAddDays(cmpMondayOf(now),cmpWeekOffset*7+6)))})</div>${navArrow(1,cmpWeekOffset>=0,"cmpNav(1)")}</div>`;
   } else if(cmpMode==="quarter"){
     const qLabels=["Q1 (Jan–Mar)","Q2 (Apr–Jun)","Q3 (Jul–Sep)","Q4 (Oct–Dec)"];
     const pills=qLabels.map((ql,qi)=>{const s=qi===cmpSelectedQuarter;return `<button onclick="cmpSetQuarter(${qi})" style="cursor:pointer;padding:6px 12px;border-radius:10px;border:1.5px solid ${s?'#FFD700':'var(--border-main,#1e2a45)'};background:${s?'#1a1400':'transparent'};color:${s?'#FFD700':'var(--text-muted,#7a8aaa)'};font-size:12px;font-weight:${s?800:600};">${ql}</button>`;}).join("");
@@ -8334,7 +8392,7 @@ function renderCompare(){
           <div style="font-size:11px;color:var(--text-muted,#4a5a7a);">Compare revenue, profit, expenses, customers, debtors & creditors across different periods.</div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
-          <div style="font-size:10px;color:var(--text-muted,#3a4a6a);">Updated ${lastUpdated}</div>
+          <div style="font-size:10px;color:var(--text-muted,#3a4a6a);">${t('cmpUpdatedLabel')} ${lastUpdated}</div>
           <div style="font-size:10px;color:#FFD700;margin-top:2px;font-weight:600;">${periodLabel}</div>
           <div style="font-size:10px;color:#5af;">vs ${prevLabel}</div>
         </div>
@@ -11158,7 +11216,7 @@ function renderExpensesTab(){
   <div class="exp-card" style="border-color:#fb923c30;">
     <div class="exp-stat-label">${t('expThisMonthCard')}</div>
     <div class="exp-stat-val" style="color:#fb923c;">${formatINR(monthTotal)}</div>
-    <div style="font-size:10px;color:#64748b;margin-top:4px;">${pctChange!==null ? `<span style="color:${pctChange>0?"#f87171":"#34d399"};">${pctChange>0?"▲":"▼"} ${Math.abs(pctChange)}% ${t('expVsLast')}</span>` : "First month"}</div>
+    <div style="font-size:10px;color:#64748b;margin-top:4px;">${pctChange!==null ? `<span style="color:${pctChange>0?"#f87171":"#34d399"};">${pctChange>0?"▲":"▼"} ${Math.abs(pctChange)}% ${t('expVsLast')}</span>` : t('expFirstMonthShort')}</div>
   </div>
   <div class="exp-card" style="border-color:#a78bfa30;">
     <div class="exp-stat-label">${t('expThisYear')}</div>
@@ -11325,7 +11383,7 @@ ${monthTotal>0 ? `
   <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
     ${["today","week","month","year","recurring"].map(f=>`
       <button class="exp-quick" onclick="_expFilter='${f}';_expPage=0;safeRenderTab(currentTab);" style="${_expFilter===f?"background:#1e2d4a;border-color:#6366f1;color:#818cf8;":""}">
-        ${{today:"Today",week:"This Week",month:"Month",year:"Year",recurring:"🔄 Recurring"}[f]}
+        ${{today:t('expFilterToday'),week:t('expFilterWeek'),month:t('expFilterMonth'),year:t('expFilterYear'),recurring:t('expFilterRecurring')}[f]}
       </button>`).join("")}
   </div>
 
@@ -11585,21 +11643,21 @@ function renderDebtorsTab(){
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         ${archivedCount>0 ? `<button onclick="window._debtShowArchived=!window._debtShowArchived;renderTab(3)" style="cursor:pointer;border-radius:20px;padding:8px 14px;border:1px solid ${showArchived?'#d97706':'#1e2a45'};background:${showArchived?'#1a0e00':'transparent'};color:${showArchived?'#fbbf24':'#4a5a7a'};font-size:12px;font-weight:700;">📦 Archived (${archivedCount})</button>` : ''}
-        ${!showArchived ? `<button onclick="openAddDebtorModal()" class="btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:10px 20px;font-size:13px;font-weight:800;">+ Add Manually</button>` : ''}
+        ${!showArchived ? `<button onclick="openAddDebtorModal()" class="btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:10px 20px;font-size:13px;font-weight:800;">${t('dbAddManually')}</button>` : ''}
       </div>
     </div>
 
     <!-- Summary cards -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
-      ${_debtSummaryCard("Total Debtors", totalCount, "#a78bfa", "🏢")}
-      ${_debtSummaryCard("Total Receivable", formatINR(totalOwed), "#22c55e", "💰")}
-      ${_debtSummaryCard("Received This Month", formatINR(_debtReceivedThisMonth(debtors)), "#60a5fa", "✅")}
-      ${_debtSummaryCard("Sold This Month", formatINR(_debtSoldThisMonth(debtors)), "#f59e0b", "🛒")}
+      ${_debtSummaryCard(t('dbTotalDebtors'), totalCount, "#a78bfa", "🏢")}
+      ${_debtSummaryCard(t('dbTotalReceivable'), formatINR(totalOwed), "#22c55e", "💰")}
+      ${_debtSummaryCard(t('dbReceivedMonth'), formatINR(_debtReceivedThisMonth(debtors)), "#60a5fa", "✅")}
+      ${_debtSummaryCard(t('dbSoldMonth'), formatINR(_debtSoldThisMonth(debtors)), "#f59e0b", "🛒")}
     </div>
 
     <!-- Search -->
     <div style="margin-bottom:10px;">
-      <input class="input" placeholder="🔍 Search debtor by name or phone..." value="${escHtml(searchVal)}"
+      <input class="input" placeholder="${t('dbSearchPlaceholder')}" value="${escHtml(searchVal)}"
         oninput="window._debtSearch=this.value;renderTab(3)" style="font-size:13px;" />
     </div>
 
@@ -11618,7 +11676,7 @@ function renderDebtorsTab(){
       <div style="text-align:center;padding:60px 20px;color:#4a5a7a;">
         <div style="font-size:48px;margin-bottom:12px;">🧾</div>
         <div style="font-size:16px;font-weight:700;color:#7a8aaa;">${t('dbNoDebtors')}</div>
-        <div style="font-size:13px;margin-top:6px;">${searchVal?"Try a different search":"Click '+ Add Manually' to add your first debtor"}</div>
+        <div style="font-size:13px;margin-top:6px;">${searchVal?t('dbTrySearch'):t('dbFirstDebtor')}</div>
       </div>
     ` : `
       <div style="display:flex;flex-direction:column;gap:12px;">
@@ -11675,7 +11733,7 @@ function _renderDebtorCard(dr){
         </div>
         ${lastTx?`<div style="font-size:11px;color:#4a5a7a;margin-top:3px;">Last: ${debtTxIcon(lastTx.type)} ${escHtml(lastTx.note||lastTx.type)} · ${new Date(lastTx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>`:""}
         ${dr._fromShopConnect?`<div style="margin-top:4px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#16653444;color:#4ade80;border:1px solid #22c55e44;">🔗 Linked Shop</span></div>`:""}
-        ${(!isArchived&&dr.phone&&bal>0)?`<div style="margin-top:6px;"><a href="${_debtWAReminder(dr)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:#4ade80;background:#052a14;border:1px solid #16a34a;border-radius:8px;padding:4px 10px;text-decoration:none;">💬 WhatsApp Reminder</a></div>`:""}
+        ${(!isArchived&&dr.phone&&bal>0)?`<div style="margin-top:6px;"><a href="${_debtWAReminder(dr)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:#4ade80;background:#052a14;border:1px solid #16a34a;border-radius:8px;padding:4px 10px;text-decoration:none;">${t('dbWAReminder')}</a></div>`:""}
       
       </div>
       <!-- Balance / Archive badge -->
@@ -12776,10 +12834,10 @@ async function renderTeamTab(el) {
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
               ${m.blocked ? `<span style="background:#3a0808;color:#f66;border:1px solid #5a1a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🔴 Blocked</span>` : `<span style="background:#0a1a0a;color:#4f4;border:1px solid #1a3a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🟢 Active</span>`}
-              <span id="member-status-${m.id}" style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?"● Online":(m.last_seen_at?"○ Last seen "+_memberTimeAgo(m.last_seen_at):"○ Offline")}</span>
+              <span id="member-status-${m.id}" style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?t('tmOnline'):(m.last_seen_at?t('tmLastSeen')+" "+_memberTimeAgo(m.last_seen_at):t('tmOffline'))}</span>
             </div>
           </div>
-          <div style="font-size:11px;color:#4a5a7a;margin-bottom:10px;">Last login: ${lastLogin}</div>
+          <div style="font-size:11px;color:#4a5a7a;margin-bottom:10px;">${t('tmLastLogin')} ${lastLogin}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             <button onclick="openEditMemberModal('${m.id}')" class="btn" style="flex:1;background:#1a2a4a;border:1px solid #2a3a6a;color:#88aaff;font-size:12px;padding:7px 10px;font-weight:700;">✏️ Edit</button>
             <button onclick="toggleMemberBlock('${m.id}',${!m.blocked})" class="btn" style="flex:1;background:${m.blocked?"#0a1a0a":"#1a0a0a"};border:1px solid ${m.blocked?"#1a3a1a":"#3a1a1a"};color:${m.blocked?"#4f4":"#f66"};font-size:12px;padding:7px 10px;font-weight:700;">${m.blocked?"✅ Unblock":"🚫 Block"}</button>
@@ -12794,7 +12852,7 @@ async function renderTeamTab(el) {
       <div style="font-size:18px;font-weight:800;color:#a78bfa;">👤 Team Members</div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button onclick="renderTab(13)" class="btn" style="background:#0a0e1a;border:1px solid #1e2a45;color:#7a8aaa;font-size:13px;font-weight:800;padding:9px 12px;" title="Refresh">🔄</button>
-        <button onclick="openAddMemberModal()" class="btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:13px;font-weight:800;padding:9px 16px;">+ Add Member</button>
+        <button onclick="openAddMemberModal()" class="btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:13px;font-weight:800;padding:9px 16px;">${t('tmAddMember')}</button>
       </div>
     </div>
     ${memberCards}
@@ -12809,7 +12867,7 @@ async function renderTeamTab(el) {
       const lastSeenMs = m.last_seen_at ? Date.now() - new Date(m.last_seen_at).getTime() : Infinity;
       const isOnline = lastSeenMs < 25 * 1000; // offline after 25s with no heartbeat
       const statusEl = document.getElementById(`member-status-${m.id}`);
-      if (statusEl) statusEl.innerHTML = `<span style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?"● Online":(m.last_seen_at?"○ Last seen "+_memberTimeAgo(m.last_seen_at):"○ Offline")}</span>`;
+      if (statusEl) statusEl.innerHTML = `<span style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?t('tmOnline'):(m.last_seen_at?t('tmLastSeen')+" "+_memberTimeAgo(m.last_seen_at):t('tmOffline'))}</span>`;
     });
   }, 10000); // refresh every 10s for faster online/offline detection
 }
@@ -13271,8 +13329,8 @@ function renderHistoryTab(){
   const entryCards = filtered.length===0
     ? `<div style="text-align:center;padding:50px 20px;color:var(--text-dim);">
         <div style="font-size:48px;margin-bottom:12px;">🕘</div>
-        <div style="font-size:15px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">No activity ${isToday?(currentLang==='hi'?'आज अभी तक':'yet today'):(currentLang==='hi'?'इस दिन':'on this day')}</div>
-        <div style="font-size:12px;">${isToday?"Sales, purchases, and other actions will appear here as you use the app.":"Try a different date, or this may be before History tracking started."}</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">${isToday?t('hisNoActivityToday'):t('hisNoActivityDay')}</div>
+        <div style="font-size:12px;">${isToday?t('hisSalesWillAppear'):t('hisTryDate')}</div>
        </div>`
     : filtered.map(e=>{
         const meta = HIST_TYPE_META[e.type] || HIST_TYPE_META.other;
@@ -13312,9 +13370,8 @@ function renderHistoryTab(){
       ${entryCards}
     </div>
 
-    <div style="font-size:11px;color:var(--text-dimmer);text-align:center;margin-top:14px;">History tracking started ${(()=>{
-      // best-effort: show nothing extra; logging begins from this version onward
-      return "from this version onward.";
+    <div style="font-size:11px;color:var(--text-dimmer);text-align:center;margin-top:14px;">${t('hisTrackingStarted')} ${(()=>{
+      return currentLang==='hi' ? "इस संस्करण से।" : "from this version onward.";
     })()}</div>
   </div>`;
 }
@@ -17586,7 +17643,7 @@ function renderInventoryTab(){
   const summary = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
     <div style="background:#0a1628;border:1px solid #1e2a45;border-radius:12px;padding:14px;text-align:center;">
       <div style="font-size:22px;font-weight:800;color:#4f4;">${totalItems}</div>
-      <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">Products</div>
+      <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${t('invProductsCount')}</div>
     </div>
     <div style="background:#081a08;border:1px solid #1a4a1a;border-radius:12px;padding:14px;text-align:center;">
       <div style="font-size:${totalValue>=100000?'14px':'18px'};font-weight:800;color:#4f4;">${totalValue>0?"₹"+totalValue.toLocaleString("en-IN",{maximumFractionDigits:0}):"—"}</div>
@@ -17782,7 +17839,7 @@ function renderInventoryTab(){
       // ── Category Search bar (always shown) ──
       const searchBarHtml = `<div style="position:relative;margin-bottom:14px;">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none;">🔍</span>
-        <input id="inv-search-box" class="input" placeholder="Search categories or items..." value="${(invSearchQuery||'').replace(/"/g,'&quot;')}"
+        <input id="inv-search-box" class="input" placeholder="${t('invSearchPlaceholder')}" value="${(invSearchQuery||'').replace(/"/g,'&quot;')}"
           oninput="invSearchQuery=this.value;if(window._invSrchTimer)clearTimeout(window._invSrchTimer);window._invSrchTimer=setTimeout(()=>safeRenderTab(currentTab),200);"
           style="padding-left:36px;margin-bottom:0;" />
         ${invSearchQuery ? `<button onclick="invSearchQuery='';safeRenderTab(currentTab)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#7a8aaa;font-size:20px;cursor:pointer;line-height:1;">×</button>` : ""}
@@ -17801,7 +17858,7 @@ function renderInventoryTab(){
         if(matchedCats.length === 0){
           catResultsHtml = `<div class="card" style="padding:32px;text-align:center;color:#4a5a7a;font-size:14px;">
             <div style="font-size:32px;margin-bottom:10px;">🔍</div>
-            No categories or items match "<b style="color:#e8eaf0;">${invSearchQuery}</b>"
+            ${t('invNoMatch')} "<b style="color:#e8eaf0;">${invSearchQuery}</b>"
           </div>`;
         } else {
           catResultsHtml = matchedCats.map(cat => {
@@ -20529,7 +20586,7 @@ function renderMessagesTab(){
         const initials = name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
         const msgs  = _scMessages[peer] || [];
         const lastMsg = msgs.length > 0 ? msgs[msgs.length-1] : null;
-        const lastMsgText = lastMsg ? (lastMsg.from_phone===authPhone?"You: ":"")+lastMsg.body : "Tap to chat";
+        const lastMsgText = lastMsg ? (lastMsg.from_phone===authPhone?t('msgYouPrefix'):"")+lastMsg.body : t('msgTapToChat');
         const lastMsgTime = lastMsg ? new Date(lastMsg.created_at).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}) : "";
         const unread = _scUnreadCounts[peer] || 0;
         // Balance from peer ledger cache (their data shared to me)
@@ -20541,7 +20598,7 @@ function renderMessagesTab(){
           ? `<span style="font-size:10px;color:#22c55e;font-weight:700;margin-left:4px;">🔓 Sharing</span>` : "";
         const ledgerBtn = scLedgerSharedToMe(conn)
           ? `<button onclick="event.stopPropagation();scRenderSharedLedger('${conn.id}')"
-              style="display:inline-block;background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;font-size:10px;font-weight:800;border-radius:6px;padding:2px 8px;cursor:pointer;margin-top:3px;margin-right:4px;">📋 View Ledger</button>` : "";
+              style="display:inline-block;background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;font-size:10px;font-weight:800;border-radius:6px;padding:2px 8px;cursor:pointer;margin-top:3px;margin-right:4px;">${t('msgViewLedger')}</button>` : "";
         return `<div style="display:flex;align-items:center;gap:12px;padding:14px 12px;border-bottom:1px solid #0d1220;">
           <div onclick="scOpenChat('${peer}','${conn.id}')" style="display:flex;align-items:center;gap:12px;flex:1;cursor:pointer;min-width:0;">
             <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#fff;flex-shrink:0;position:relative;">
@@ -20623,7 +20680,7 @@ async function scOpenChatShell(peerPhone, connId) {
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0;">
           ${theyShared ? `<button onclick="scRenderSharedLedger('${connId}')"
-            style="background:#1a1a3a;border:1px solid #3a4a6a;color:#a78bfa;font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">📋 View Ledger</button>` : ""}
+            style="background:#1a1a3a;border:1px solid #3a4a6a;color:#a78bfa;font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">${t('msgViewLedger')}</button>` : ""}
           <button id="sc-share-ledger-btn" onclick="scShowShareLedgerModal('${connId}',${iShare})"
             style="background:${iShare?"#16653433":"#0a0e1a"};border:1px solid ${iShare?"#22c55e":"#2a3560"};color:${iShare?"#22c55e":"#4a5a7a"};font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">
             ${iShare?"🔓 Shared":"🔒 Share Ledger"}
@@ -20671,7 +20728,7 @@ async function scOpenChat(peerPhone, connId) {
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0;">
           ${theyShared ? `<button onclick="scRenderSharedLedger('${connId}')"
-            style="background:#1a1a3a;border:1px solid #3a4a6a;color:#a78bfa;font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">📋 View Ledger</button>` : ""}
+            style="background:#1a1a3a;border:1px solid #3a4a6a;color:#a78bfa;font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">${t('msgViewLedger')}</button>` : ""}
           <button id="sc-share-ledger-btn" onclick="scShowShareLedgerModal('${connId}',${iShare})"
             style="background:${iShare?"#16653433":"#0a0e1a"};border:1px solid ${iShare?"#22c55e":"#2a3560"};color:${iShare?"#22c55e":"#4a5a7a"};font-size:11px;font-weight:800;border-radius:8px;padding:4px 10px;cursor:pointer;">
             ${iShare?"🔓 Shared":"🔒 Share Ledger"}
