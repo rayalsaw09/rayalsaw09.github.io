@@ -3057,7 +3057,15 @@ function loadSettingsFromCloud(cb) {
         }
         if (d.purchase_mode)     { try { localStorage.setItem(storageKey("purchase_mode"), d.purchase_mode); } catch {} }
         if (d.sync_data)         { syncBinId = d.sync_data.binId || ""; syncApiKey = d.sync_data.apiKey || ""; }
-        if (d.license)           { try { localStorage.setItem(storageKey("license"), JSON.stringify(d.license)); } catch {} }
+        if (d.license) {
+          // Apply license to memory variables AND localStorage (not just localStorage)
+          const lic = d.license;
+          if (lic.plan === "pro" && lic.status === "pro") {
+            saveLicense(lic.key || "", "pro", "pro");
+          } else {
+            try { localStorage.setItem(storageKey("license"), JSON.stringify(lic)); } catch {}
+          }
+        }
         // Read GSTIN proxy URL from global settings (set by SellerPanel)
         db.collection("global_settings").doc("gstin_proxy").get()
           .then(gstinDoc => {
@@ -3102,6 +3110,34 @@ function startFirestoreListener() {
     loadShopRequests();
     // Live listener: get notified when other shops accept our connect requests
     startAutoAcceptedListener();
+    // ── REALTIME LICENSE LISTENER: fires instantly when SellerPanel grants Pro ──
+    db.collection("users").doc(authPhone)
+      .collection("settings").doc("prefs")
+      .onSnapshot(snap => {
+        if (!snap || !snap.exists) return;
+        const d = snap.data();
+        if (d && d.license && d.license.plan === "pro" && d.license.status === "pro") {
+          const alreadyPro = (licensePlan === "pro" && licenseStatus === "pro");
+          saveLicense(d.license.key || licenseKey || "", "pro", "pro");
+          if (!alreadyPro) {
+            // Newly granted Pro — update UI immediately
+            updateLicenseUI();
+            try { renderTabs(); safeRenderTab(currentTab); } catch {}
+            // Also activate payment modal if it was waiting
+            try {
+              const pmModal = document.getElementById("payment-modal");
+              if (pmModal && pmModal.style.display === "flex") {
+                document.getElementById("pm-conf-status").innerHTML = '<span style="color:#4f4;">✅ Activated!</span>';
+                document.getElementById("pm-checking-box").style.display = "none";
+                document.getElementById("pm-activated-box").style.display = "block";
+                try { localStorage.removeItem(storageKey("pending_payment")); } catch{}
+                if (pmPollTimer) clearInterval(pmPollTimer);
+              }
+            } catch(_) {}
+            console.log("[SC] Prefs listener: Pro license activated in real-time!");
+          }
+        }
+      }, err => { console.warn("[SC] Prefs listener error:", err.message); });
   }
 }
 
@@ -16783,6 +16819,12 @@ function updateLicenseUI() {
     }
   }
   // Re-render current tab to apply lock overlays
+  // If newly Pro, also switch to Pro app style automatically
+  const _newlyPro = (licensePlan === "pro" && licenseStatus === "pro");
+  if (_newlyPro && currentAppStyle !== "pro") {
+    applyAppStyle("pro");
+    return; // applyAppStyle already calls renderTabs + renderTab
+  }
   try { renderTabs(); safeRenderTab(currentTab); } catch {}
 }
 
