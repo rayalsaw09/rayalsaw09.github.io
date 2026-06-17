@@ -12662,6 +12662,19 @@ var PERM_TABS_META = [
 
 var _teamMembers = [];
 
+function _memberTimeAgo(isoStr) {
+  if (!isoStr) return "never";
+  const ms = Date.now() - new Date(isoStr).getTime();
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return s + "s ago";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m ago";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "h ago";
+  const d = Math.floor(h / 24);
+  return d + "d ago";
+}
+
 async function fetchTeamMembers() {
   if (requireOnline()) return [];
   try {
@@ -12763,7 +12776,7 @@ async function renderTeamTab(el) {
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
               ${m.blocked ? `<span style="background:#3a0808;color:#f66;border:1px solid #5a1a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🔴 Blocked</span>` : `<span style="background:#0a1a0a;color:#4f4;border:1px solid #1a3a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🟢 Active</span>`}
-              <span id="member-status-${m.id}" style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?"● Online":"○ Offline"}</span>
+              <span id="member-status-${m.id}" style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?"● Online":(m.last_seen_at?"○ Last seen "+_memberTimeAgo(m.last_seen_at):"○ Offline")}</span>
             </div>
           </div>
           <div style="font-size:11px;color:#4a5a7a;margin-bottom:10px;">Last login: ${lastLogin}</div>
@@ -12796,7 +12809,7 @@ async function renderTeamTab(el) {
       const lastSeenMs = m.last_seen_at ? Date.now() - new Date(m.last_seen_at).getTime() : Infinity;
       const isOnline = lastSeenMs < 2 * 60 * 1000;
       const statusEl = document.getElementById(`member-status-${m.id}`);
-      if (statusEl) statusEl.innerHTML = `<span style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?"● Online":"○ Offline"}</span>`;
+      if (statusEl) statusEl.innerHTML = `<span style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?"● Online":(m.last_seen_at?"○ Last seen "+_memberTimeAgo(m.last_seen_at):"○ Offline")}</span>`;
     });
   }, 20000);
 }
