@@ -1604,7 +1604,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 
   <!-- Bottom Nav (mobile only) -->
   <nav id="bottom-nav">
-    <button class="bnav-btn" id="bnav-0" onclick="mobileTab(8)">
+    <button class="bnav-btn" id="bnav-0" onclick="mobileTab(0)">
       <span class="bnav-icon" id="bnav-icon-0">🧾</span>
       <span class="bnav-label" id="bnav-label-0">सेल जोड़ें</span>
     </button>
@@ -1612,11 +1612,11 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <span class="bnav-icon" id="bnav-icon-1">👥</span>
       <span class="bnav-label" id="bnav-label-1">कस्टमर</span>
     </button>
-    <button class="bnav-btn" id="bnav-2" onclick="mobileTab(0)">
+    <button class="bnav-btn" id="bnav-2" onclick="mobileTab(2)">
       <span class="bnav-icon" id="bnav-icon-2">🏦</span>
       <span class="bnav-label" id="bnav-label-2">क्रेडिटर</span>
     </button>
-    <button class="bnav-btn" id="bnav-3" onclick="mobileTab(6)">
+    <button class="bnav-btn" id="bnav-3" onclick="mobileTab(3)">
       <span class="bnav-icon" id="bnav-icon-3">📋</span>
       <span class="bnav-label" id="bnav-label-3">डेबटर</span>
     </button>
@@ -3044,7 +3044,7 @@ window.addEventListener('load', () => {
   applyTextSize(); // restore saved text size — uses zoom
   const _origSwitchTab = switchTab;
   switchTab = function(i) {
-    if (i !== 12 && window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
+    if (i !== 13 && window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
     _origSwitchTab(i);
     updateBottomNav(i);
   };
@@ -12765,7 +12765,7 @@ async function renderTeamTab(el) {
     : members.map(m => {
         const lastLogin = m.last_login_at ? new Date(m.last_login_at).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "Never";
         const lastSeenMs = m.last_seen_at ? Date.now() - new Date(m.last_seen_at).getTime() : Infinity;
-        const isOnline = lastSeenMs < 2 * 60 * 1000;
+        const isOnline = lastSeenMs < 25 * 1000; // offline after 25s with no heartbeat
         console.log(`[Team] ${m.username} last_seen_at:`, m.last_seen_at, "| ms ago:", lastSeenMs === Infinity ? "never" : Math.round(lastSeenMs/1000)+"s", "| online:", isOnline);
         return `<div style="background:#0a0e1a;border:1px solid ${m.blocked?"#5a1a1a":"#1e2a45"};border-radius:12px;padding:14px;margin-bottom:10px;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
@@ -12807,11 +12807,11 @@ async function renderTeamTab(el) {
     // Only update the status indicators, not the whole tab (avoids closing modals)
     fresh.forEach(m => {
       const lastSeenMs = m.last_seen_at ? Date.now() - new Date(m.last_seen_at).getTime() : Infinity;
-      const isOnline = lastSeenMs < 2 * 60 * 1000;
+      const isOnline = lastSeenMs < 25 * 1000; // offline after 25s with no heartbeat
       const statusEl = document.getElementById(`member-status-${m.id}`);
       if (statusEl) statusEl.innerHTML = `<span style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?"● Online":(m.last_seen_at?"○ Last seen "+_memberTimeAgo(m.last_seen_at):"○ Offline")}</span>`;
     });
-  }, 20000);
+  }, 10000); // refresh every 10s for faster online/offline detection
 }
 
 function openAddMemberModal() {
@@ -13125,7 +13125,7 @@ function _startMemberHeartbeat() {
   };
 
   _doHeartbeat(); // run immediately on login
-  _memberSessionTimer = setInterval(_doHeartbeat, 20000); // every 20s
+  _memberSessionTimer = setInterval(_doHeartbeat, 10000); // every 10s
 }
 
 // Restore member session on page refresh (if a member, not the owner, was logged in).
