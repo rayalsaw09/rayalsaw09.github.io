@@ -1999,6 +1999,38 @@ var TRANSLATIONS = {
     invSearchPlaceholder:"Search categories or items...",
     invProductsCount:"Products",
     invNoMatch:"No categories or items match",
+    invTabStock:"📦 Stock", invTabAddItem:"➕ Add Item", invTabSalesLog:"📋 Sales Log",
+    invSyncFromCloud:"Sync from cloud", invCheckDuplicatesTitle:"Check for duplicate items",
+    invAddNewBtn:"➕ Add New", invAddFirstItemBtn:"➕ Add First Item",
+    invAddEditHeader:"➕ Add / Edit Item",
+    invAddEditDesc:"Define a product — its name, unit, selling price and GST. To add stock quantities, use the <b style=\"color:#4a8aff;\">Creditor tab → Purchase</b>.",
+    invItemNamePlaceholder:"e.g. Basmati Rice 5kg...",
+    invItemNameLabel:"Item / Product Name *",
+    invCategoryPlaceholder:"e.g. Grocery, Dairy, Snacks...",
+    invUnitPlaceholder:"kg / pcs / litre...",
+    invSellingPriceLabel:"Selling Price (₹)",
+    invMinStockHint:"(alert when stock falls below this)",
+    invMinStockPlaceholder:"Default: 5",
+    invGstSettingsHeader:"🔢 GST Settings", invOptional:"(optional)",
+    invGstRatePercent:"GST RATE (%)", invNoGst:"0% — No GST", invCustomPercent:"Custom %",
+    invPriceIsExclusive:"Exclusive (+ GST on sale)", invPriceIsInclusive:"Inclusive (GST inside price)",
+    invHsnSacCode:"HSN / SAC CODE", invWhatsMyRate:"🔍 What's my rate?",
+    invHsnPlaceholder:"e.g. 3305 (Shampoo), 0401 (Milk)",
+    invBarcodeHeader:"📦 Barcode",
+    invBarcodeDesc:"Add a barcode now so staff can scan this item instead of searching by name. You can also add or change this later from Edit Item.",
+    invBarcodePlaceholder:"e.g. 8901234567890 or custom code like 1001",
+    invScanBtn:"📷 Scan",
+    invBarcodeTip:"💡 Custom code tip: assign short codes like 1001=Rice, 1002=Dal for easy scanning",
+    invOpeningStockHeader:"📦 Opening Stock",
+    invOpeningStockSkipHint:"(optional — skip if adding stock via Creditor tab)",
+    invOpeningStockDesc:"Enter qty if you already have this item in stock. Gets added directly to inventory.",
+    invCostPerUnit:"COST / UNIT (₹)",
+    invSaveItemBtn:"💾 Save Item →",
+    invItemWord:"item", invItemsWord:"items",
+    invLowWord:"low", invOutWord:"out", invMoreWord:"more",
+    invBatchWord:"batch", invBatchesWord:"batches",
+    invExpiredAgo:"Expired {n}d ago", invExpiresToday:"Expires today", invExpiresIn:"Expires in {n}d",
+    invSalesDeductionLog:"📋 Sales Deduction Log",
     // Expenses filter
     expFilterToday:"Today", expFilterWeek:"This Week", expFilterMonth:"Month",
     expFilterYear:"Year", expFilterRecurring:"🔄 Recurring",
@@ -2006,6 +2038,43 @@ var TRANSLATIONS = {
     // Compare tab
     cmpWeekOfLabel:"Week of", cmpThisWeekLabel:"This Week", cmpVsLastWeekLabel:"vs Last Week",
     cmpUpdatedLabel:"Updated", cmp4WeekView:"4-Week View (ending",
+    cmpRowRevenue:"Revenue", cmpRowExpenses:"Expenses", cmpRowProfit:"Profit", cmpRowCustomers:"Customers",
+    cmp4WeeksPeriod:"4 Weeks (ending", cmpPrior4Weeks:"Prior 4 Weeks",
+    cmpBestMonth:"Best Month", cmpBestYear:"Best Year", cmpBestWeek:"Best Week", cmpBestDay:"Best Day",
+    cmpPending:"Pending", cmpPayable:"Payable",
+    cmpDebtorsLabel:"Debtors", cmpCreditorsLabel:"Creditors",
+    // Balance sheet
+    bsCashInHand:"Cash in Hand", bsBankBalance:"Bank Balance",
+    bsReceivables:"Receivables (Debtors owe you)", bsReceivablesShort:"Receivables (Debtors)",
+    bsTotalAssets:"Total Assets", bsTotalAssetsLong:"TOTAL ASSETS",
+    bsPayables:"Payables (You owe creditors)", bsPayablesShort:"Payables (Creditors)",
+    bsOverheadExp:"Overhead Expenses (Total)", bsOverheadExpShort:"Overhead Expenses",
+    bsTotalLiab:"Total Liabilities", bsTotalLiabLong:"TOTAL LIABILITIES",
+    bsNetWorth:"Net Worth (Assets − Liabilities)", bsNetWorthLong:"NET WORTH (Assets − Liabilities)",
+    bsPayablesBreakdown:"Payables Breakdown", bsReceivablesBreakdown:"Receivables Breakdown",
+    bsPayablesBreakdownH:"📤 Payables Breakdown", bsReceivablesBreakdownH:"📥 Receivables Breakdown",
+    bsNoTxYet:"No transactions yet.",
+    // Expenses insights
+    expNoExpRecorded:"No expenses recorded.",
+    expProfitImpactHeader:"📊 Profit Impact — This Month",
+    expStatSales:"Sales", expStatExpenses:"Expenses", expStatProfit:"Profit", expStatMargin:"Margin",
+    expEditExpenseTitle:"✏️ Edit Expense", expAddExpenseTitle:"➕ Add Expense",
+    expAmountWithSymbol:"Amount (₹)",
+    expRecurringMonthly:"Recurring Monthly",
+    expUpdateBtn:"💾 Update Expense", expSaveBtn:"💾 Save Expense",
+    expHistoryHeader:"📋 Expense History",
+    expBtnList:"📋 List", expBtnCalendar:"📅 Calendar",
+    expPrevBtn:"‹ Prev", expNextBtn:"Next ›",
+    expTrackingDesc:"Start tracking your business expenses to gain financial insights.",
+    expAddFirstBtn:"+ Add First Expense",
+    expColCatDesc:"Category / Description", expColTags:"Tags", expColActions:"Actions",
+    expEditBtn:"✏️ Edit", expCopyBtn:"📋 Copy",
+    expShowingRange:"Showing {a}–{b} of {c}",
+    expExportCsvBtn:"📊 Export CSV", expPrintReportBtn:"🖨 Print Report",
+    expAccountsFor:"accounts for", expOfExpensesThisMonth:"of expenses this month",
+    // Creditor/ledger
+    crNoTxMatch:"No transactions match your search/filter.",
+    dbNoTxMatch:"No transactions match your search/filter.",
     // History tab
     hisNoActivityToday:"No activity yet today",
     hisNoActivityDay:"No activity on this day",
@@ -2425,6 +2494,38 @@ var TRANSLATIONS = {
     invSearchPlaceholder:"कैटेगरी या आइटम खोजें...",
     invProductsCount:"उत्पाद",
     invNoMatch:"कोई कैटेगरी या आइटम नहीं मिला",
+    invTabStock:"📦 स्टॉक", invTabAddItem:"➕ आइटम जोड़ें", invTabSalesLog:"📋 बिक्री लॉग",
+    invSyncFromCloud:"क्लाउड से सिंक करें", invCheckDuplicatesTitle:"डुप्लीकेट आइटम जांचें",
+    invAddNewBtn:"➕ नया जोड़ें", invAddFirstItemBtn:"➕ पहला आइटम जोड़ें",
+    invAddEditHeader:"➕ आइटम जोड़ें / संपादित करें",
+    invAddEditDesc:"उत्पाद परिभाषित करें — इसका नाम, इकाई, बिक्री मूल्य और GST। स्टॉक मात्रा जोड़ने के लिए, <b style=\"color:#4a8aff;\">लेनदार टैब → खरीद</b> का उपयोग करें।",
+    invItemNamePlaceholder:"जैसे बासमती चावल 5kg...",
+    invItemNameLabel:"आइटम / उत्पाद का नाम *",
+    invCategoryPlaceholder:"जैसे किराना, डेयरी, स्नैक्स...",
+    invUnitPlaceholder:"kg / pcs / litre...",
+    invSellingPriceLabel:"बिक्री मूल्य (₹)",
+    invMinStockHint:"(स्टॉक इससे कम होने पर अलर्ट मिलेगा)",
+    invMinStockPlaceholder:"डिफ़ॉल्ट: 5",
+    invGstSettingsHeader:"🔢 GST सेटिंग्स", invOptional:"(वैकल्पिक)",
+    invGstRatePercent:"GST दर (%)", invNoGst:"0% — कोई GST नहीं", invCustomPercent:"कस्टम %",
+    invPriceIsExclusive:"एक्सक्लूसिव (बिक्री पर + GST)", invPriceIsInclusive:"इनक्लूसिव (मूल्य में GST शामिल)",
+    invHsnSacCode:"HSN / SAC कोड", invWhatsMyRate:"🔍 मेरी दर क्या है?",
+    invHsnPlaceholder:"जैसे 3305 (शैम्पू), 0401 (दूध)",
+    invBarcodeHeader:"📦 बारकोड",
+    invBarcodeDesc:"अभी बारकोड जोड़ें ताकि स्टाफ नाम से खोजने के बजाय इस आइटम को स्कैन कर सके। आप इसे बाद में Edit Item से भी जोड़ या बदल सकते हैं।",
+    invBarcodePlaceholder:"जैसे 8901234567890 या कस्टम कोड जैसे 1001",
+    invScanBtn:"📷 स्कैन करें",
+    invBarcodeTip:"💡 कस्टम कोड टिप: आसान स्कैनिंग के लिए छोटे कोड दें जैसे 1001=चावल, 1002=दाल",
+    invOpeningStockHeader:"📦 शुरुआती स्टॉक",
+    invOpeningStockSkipHint:"(वैकल्पिक — यदि लेनदार टैब से स्टॉक जोड़ रहे हैं तो छोड़ दें)",
+    invOpeningStockDesc:"यदि यह आइटम पहले से स्टॉक में है तो मात्रा दर्ज करें। यह सीधे इन्वेंटरी में जुड़ जाएगा।",
+    invCostPerUnit:"लागत / इकाई (₹)",
+    invSaveItemBtn:"💾 आइटम सहेजें →",
+    invItemWord:"आइटम", invItemsWord:"आइटम",
+    invLowWord:"कम", invOutWord:"खत्म", invMoreWord:"और",
+    invBatchWord:"बैच", invBatchesWord:"बैच",
+    invExpiredAgo:"{n} दिन पहले समाप्त", invExpiresToday:"आज समाप्त हो रहा है", invExpiresIn:"{n} दिन में समाप्त होगा",
+    invSalesDeductionLog:"📋 बिक्री कटौती लॉग",
     // Expenses filter
     expFilterToday:"आज", expFilterWeek:"इस हफ्ते", expFilterMonth:"महीना",
     expFilterYear:"वर्ष", expFilterRecurring:"🔄 नियमित",
@@ -2432,6 +2533,43 @@ var TRANSLATIONS = {
     // Compare tab
     cmpWeekOfLabel:"सप्ताह", cmpThisWeekLabel:"इस सप्ताह", cmpVsLastWeekLabel:"पिछले सप्ताह",
     cmpUpdatedLabel:"अपडेट", cmp4WeekView:"4-सप्ताह दृश्य (समाप्ति",
+    cmpRowRevenue:"आमदनी", cmpRowExpenses:"खर्च", cmpRowProfit:"मुनाफा", cmpRowCustomers:"ग्राहक",
+    cmp4WeeksPeriod:"4 सप्ताह (समाप्ति", cmpPrior4Weeks:"पिछले 4 सप्ताह",
+    cmpBestMonth:"सर्वश्रेष्ठ माह", cmpBestYear:"सर्वश्रेष्ठ वर्ष", cmpBestWeek:"सर्वश्रेष्ठ सप्ताह", cmpBestDay:"सर्वश्रेष्ठ दिन",
+    cmpPending:"लंबित", cmpPayable:"देय",
+    cmpDebtorsLabel:"देनदार", cmpCreditorsLabel:"लेनदार",
+    // Balance sheet
+    bsCashInHand:"नकद राशि", bsBankBalance:"बैंक बैलेंस",
+    bsReceivables:"प्राप्य (देनदारों से)", bsReceivablesShort:"प्राप्य (देनदार)",
+    bsTotalAssets:"कुल संपत्ति", bsTotalAssetsLong:"कुल संपत्ति",
+    bsPayables:"देय (लेनदारों को)", bsPayablesShort:"देय (लेनदार)",
+    bsOverheadExp:"ओवरहेड खर्च (कुल)", bsOverheadExpShort:"ओवरहेड खर्च",
+    bsTotalLiab:"कुल देनदारियां", bsTotalLiabLong:"कुल देनदारियां",
+    bsNetWorth:"नेट वर्थ (संपत्ति − देनदारियां)", bsNetWorthLong:"नेट वर्थ (संपत्ति − देनदारियां)",
+    bsPayablesBreakdown:"देय विवरण", bsReceivablesBreakdown:"प्राप्य विवरण",
+    bsPayablesBreakdownH:"📤 देय विवरण", bsReceivablesBreakdownH:"📥 प्राप्य विवरण",
+    bsNoTxYet:"अभी तक कोई लेनदेन नहीं।",
+    // Expenses insights
+    expNoExpRecorded:"कोई खर्च दर्ज नहीं।",
+    expProfitImpactHeader:"📊 मुनाफा प्रभाव — इस महीने",
+    expStatSales:"बिक्री", expStatExpenses:"खर्च", expStatProfit:"मुनाफा", expStatMargin:"मार्जिन",
+    expEditExpenseTitle:"✏️ खर्च संपादित करें", expAddExpenseTitle:"➕ खर्च जोड़ें",
+    expAmountWithSymbol:"राशि (₹)",
+    expRecurringMonthly:"मासिक आवर्ती",
+    expUpdateBtn:"💾 खर्च अपडेट करें", expSaveBtn:"💾 खर्च सेव करें",
+    expHistoryHeader:"📋 खर्च इतिहास",
+    expBtnList:"📋 सूची", expBtnCalendar:"📅 कैलेंडर",
+    expPrevBtn:"‹ पिछला", expNextBtn:"आगे ›",
+    expTrackingDesc:"वित्तीय जानकारी पाने के लिए अपने व्यवसाय के खर्चों को ट्रैक करना शुरू करें।",
+    expAddFirstBtn:"+ पहला खर्च जोड़ें",
+    expColCatDesc:"श्रेणी / विवरण", expColTags:"टैग", expColActions:"कार्य",
+    expEditBtn:"✏️ संपादित करें", expCopyBtn:"📋 कॉपी करें",
+    expShowingRange:"{c} में से {a}–{b} दिख रहे हैं",
+    expExportCsvBtn:"📊 CSV निर्यात करें", expPrintReportBtn:"🖨 रिपोर्ट प्रिंट करें",
+    expAccountsFor:"का हिस्सा है", expOfExpensesThisMonth:"इस महीने के खर्चों में",
+    // Creditor/ledger
+    crNoTxMatch:"कोई लेनदेन नहीं मिला।",
+    dbNoTxMatch:"कोई लेनदेन नहीं मिला।",
     // History tab
     hisNoActivityToday:"आज अभी तक कोई गतिविधि नहीं",
     hisNoActivityDay:"इस दिन कोई गतिविधि नहीं",
@@ -2441,6 +2579,31 @@ var TRANSLATIONS = {
     // Team tab
     tmLastLogin:"अंतिम लॉगिन:", tmOnline:"● ऑनलाइन", tmOffline:"○ ऑफलाइन",
     tmLastSeen:"○ अंतिम बार देखा", tmAddMember:"+ सदस्य जोड़ें",
+     // Add/Edit Customer modal
+     modalAddNewCustomer:"नया ग्राहक जोड़ें", modalEditCustomer:"ग्राहक संपादित करें",
+     modalAddPhoto:"📷 फ़ोटो जोड़ें", modalOptional:"वैकल्पिक",
+     modalFullName:"पूरा नाम", modalPhoneNumber:"फ़ोन नंबर",
+     modalCustomerId:"ग्राहक ID", modalLeaveBlank:"खाली छोड़ें अगर नहीं है",
+     modalAutoFilled:"ऑटो-भरा या मैन्युअल दर्ज करें",
+     modalCompanyName:"कंपनी / कानूनी नाम", modalGstAddress:"GST पता",
+     modalAddCustomerBtn:"ग्राहक जोड़ें →",
+     // Creditor/Debtor ledger table headers
+     txNotFound:"नहीं मिला", txDate:"दिनांक", txDescription:"विवरण",
+     txDebit:"डेबिट", txCredit:"क्रेडिट", txBalance:"बैलेंस",
+     txType:"प्रकार", txAmount:"राशि", txInvoice:"चालान",
+     txPurchase:"खरीद", txPayment:"भुगतान", txSale:"बिक्री", txReceipt:"रसीद",
+     txClearFilters:"फ़िल्टर साफ़ करें", txNoMatch:"आपकी खोज/फ़िल्टर से कोई लेनदेन नहीं मिला।",
+     // Inventory category page & item detail
+     invTotalIn:"कुल आया", invSold:"बेचा", invAvgCost:"औसत लागत",
+     invSellPrice:"बिक्री कीमत", invStockVal:"स्टॉक मूल्य", invTotalValue:"कुल मूल्य",
+     invLowStockTitle:"कम स्टॉक", invRestocked:"पुनः स्टॉक",
+     // Inventory edit modal
+     invEditUnit:"इकाई", invEditCategory:"श्रेणी",
+     invEditGstRate:"GST दर", invEditGstType:"GST प्रकार",
+     invEditHsnCode:"HSN / SAC कोड", invEditMinStock:"न्यूनतम स्टॉक अलर्ट",
+     invEditSaveChanges:"✅ बदलाव सहेजें", invEditCancel:"रद्द करें",
+     invGstInclusive:"Inclusive (GST कीमत में शामिल)",
+     invGstExclusive:"Exclusive (बिक्री पर + GST)",
   },
 };
 
@@ -4841,14 +5004,14 @@ function _safeRenderTabImmediate(i) {
                       <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk <= 0 ? 'OUT' : stk} ${item.unit || 'unit'}</div>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
-                      <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:13px;font-weight:800;color:#4f4;">+${totalIn}</div><div style="font-size:9px;color:#4a5a7a;">Total In</div></div>
+                      <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:13px;font-weight:800;color:#4f4;">+${totalIn}</div><div style="font-size:9px;color:#4a5a7a;">${t("invTotalIn")}</div></div>
                       <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:13px;font-weight:800;color:#f66;">-${totalOut}</div><div style="font-size:9px;color:#4a5a7a;">Sold</div></div>
-                      <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:12px;font-weight:800;color:#7ab3ff;">${avgCost > 0 ? '₹' + avgCost : '—'}</div><div style="font-size:9px;color:#4a5a7a;">Avg Cost</div></div>
-                      <div style="background:#081a08;border:1px solid #FFD70030;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:11px;font-weight:800;color:#FFD700;">${item.sellingPrice>0?'₹'+Number(item.sellingPrice).toFixed(2):'—'}</div><div style="font-size:9px;color:#4a5a7a;">Sell Price</div></div>
-                      <div style="background:#081a08;border:1px solid #1a4a1a20;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:11px;font-weight:800;color:#4f4;">${stockValue > 0 ? '₹' + stockValue.toLocaleString('en-IN', {maximumFractionDigits:0}) : '—'}</div><div style="font-size:9px;color:#4a5a7a;">Stock Val</div></div>
+                      <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:12px;font-weight:800;color:#7ab3ff;">${avgCost > 0 ? '₹' + avgCost : '—'}</div><div style="font-size:9px;color:#4a5a7a;">${t("invAvgCost")}</div></div>
+                      <div style="background:#081a08;border:1px solid #FFD70030;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:11px;font-weight:800;color:#FFD700;">${item.sellingPrice>0?'₹'+Number(item.sellingPrice).toFixed(2):'—'}</div><div style="font-size:9px;color:#4a5a7a;">${t("invSellPrice")}</div></div>
+                      <div style="background:#081a08;border:1px solid #1a4a1a20;border-radius:8px;padding:7px;text-align:center;"><div style="font-size:11px;font-weight:800;color:#4f4;">${stockValue > 0 ? '₹' + stockValue.toLocaleString('en-IN', {maximumFractionDigits:0}) : '—'}</div><div style="font-size:9px;color:#4a5a7a;">${t("invStockVal")}</div></div>
                     </div>
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px;flex-wrap:wrap;gap:6px;">
-                      <div style="font-size:11px;color:#4a5a7a;">Restocked: ${lastAdded} · <span style="color:#4a8aff;">Tap for buyers →</span></div>
+                      <div style="font-size:11px;color:#4a5a7a;">${t('invRestocked')}: ${lastAdded} · <span style="color:#4a8aff;">Tap for buyers →</span></div>
                     </div>
                   </div>
                 </div>
@@ -7390,22 +7553,22 @@ function openBalanceSheet(){
       <div style="background:#08101e;border:1px solid #1e2a45;border-radius:12px;padding:14px;">
         <div style="font-size:13px;font-weight:800;color:#4ade80;margin-bottom:6px;">📈 ASSETS</div>
         ${trackingMode==="separate"
-          ? row("Cash in Hand", _bsGetAccountBalance("cash"), {indent:true}) + row("Bank Balance", _bsGetAccountBalance("bank"), {indent:true})
-          : row("Cash in Hand", d.cash, {indent:true})}
-        ${row("Inventory (Stock Value)", d.totalInventoryValue, {indent:true})}
-        ${row("Receivables (Debtors owe you)", d.totalReceivables, {indent:true})}
-        ${row("TOTAL ASSETS", d.totalAssets, {bold:true, border:true, color:"#4ade80"})}
+          ? row(t('bsCashInHand'), _bsGetAccountBalance("cash"), {indent:true}) + row(t('bsBankBalance'), _bsGetAccountBalance("bank"), {indent:true})
+          : row(t('bsCashInHand'), d.cash, {indent:true})}
+        ${row(t('invTotalStockValue'), d.totalInventoryValue, {indent:true})}
+        ${row(t('bsReceivables'), d.totalReceivables, {indent:true})}
+        ${row(t('bsTotalAssetsLong'), d.totalAssets, {bold:true, border:true, color:"#4ade80"})}
       </div>
 
       <div style="background:#08101e;border:1px solid #1e2a45;border-radius:12px;padding:14px;">
         <div style="font-size:13px;font-weight:800;color:#f87171;margin-bottom:6px;">📉 LIABILITIES</div>
-        ${row("Payables (You owe creditors)", d.totalPayables, {indent:true})}
-        ${row("Overhead Expenses (Total)", d.totalExpenses, {indent:true, color:"#fb923c"})}
-        ${row("TOTAL LIABILITIES", d.totalLiabilities, {bold:true, border:true, color:"#f87171"})}
+        ${row(t('bsPayables'), d.totalPayables, {indent:true})}
+        ${row(t('bsOverheadExp'), d.totalExpenses, {indent:true, color:"#fb923c"})}
+        ${row(t('bsTotalLiabLong'), d.totalLiabilities, {bold:true, border:true, color:"#f87171"})}
       </div>
 
       <div style="background:${d.netWorth>=0?'#081a08':'#1a0808'};border:1px solid ${d.netWorth>=0?'#1a5a1a':'#5a1a1a'};border-radius:12px;padding:14px;">
-        ${row("NET WORTH (Assets − Liabilities)", d.netWorth, {bold:true, color: d.netWorth>=0?'#22c55e':'#ef4444'})}
+        ${row(t('bsNetWorthLong'), d.netWorth, {bold:true, color: d.netWorth>=0?'#22c55e':'#ef4444'})}
       </div>
 
       ${d.inventoryRows.length>0 ? `
@@ -7416,13 +7579,13 @@ function openBalanceSheet(){
 
       ${d.payables.length>0 ? `
       <div style="background:#08101e;border:1px solid #1e2a45;border-radius:12px;padding:14px;">
-        <div style="font-size:12px;font-weight:800;color:#fca5a5;margin-bottom:8px;">📤 Payables Breakdown</div>
+        <div style="font-size:12px;font-weight:800;color:#fca5a5;margin-bottom:8px;">${t('bsPayablesBreakdownH')}</div>
         ${d.payables.map(x=>row(escHtml(x.name), x.amount, {indent:true, color:"#f87171"})).join("")}
       </div>` : ""}
 
       ${d.receivables.length>0 ? `
       <div style="background:#08101e;border:1px solid #1e2a45;border-radius:12px;padding:14px;">
-        <div style="font-size:12px;font-weight:800;color:#86efac;margin-bottom:8px;">📥 Receivables Breakdown</div>
+        <div style="font-size:12px;font-weight:800;color:#86efac;margin-bottom:8px;">${t('bsReceivablesBreakdownH')}</div>
         ${d.receivables.map(x=>row(escHtml(x.name), x.amount, {indent:true, color:"#4ade80"})).join("")}
       </div>` : ""}
 
@@ -7557,29 +7720,29 @@ function printBalanceSheet(){
   </div>
 
   <div class="section">
-    <table><thead><tr><th>Assets</th><th style="text-align:right;">Amount</th></tr></thead>
+    <table><thead><tr><th>${t('bsTotalAssets')}</th><th style="text-align:right;">${t('invAmount')}</th></tr></thead>
     <tbody>
       ${getCashTrackingMode()==="separate"
-        ? row("Cash in Hand", _bsGetAccountBalance("cash"), {indent:true}) + row("Bank Balance", _bsGetAccountBalance("bank"), {indent:true})
-        : row("Cash in Hand", d.cash, {indent:true})}
-      ${row("Inventory (Stock Value)", d.totalInventoryValue, {indent:true})}
-      ${row("Receivables (Debtors)", d.totalReceivables, {indent:true})}
-      ${row("Total Assets", d.totalAssets, {bold:true, border:true})}
+        ? row(t('bsCashInHand'), _bsGetAccountBalance("cash"), {indent:true}) + row(t('bsBankBalance'), _bsGetAccountBalance("bank"), {indent:true})
+        : row(t('bsCashInHand'), d.cash, {indent:true})}
+      ${row(t('invTotalStockValue'), d.totalInventoryValue, {indent:true})}
+      ${row(t('bsReceivablesShort'), d.totalReceivables, {indent:true})}
+      ${row(t('bsTotalAssets'), d.totalAssets, {bold:true, border:true})}
     </tbody></table>
   </div>
 
   <div class="section">
-    <table><thead><tr><th>Liabilities</th><th style="text-align:right;">Amount</th></tr></thead>
+    <table><thead><tr><th>${t('bsTotalLiab')}</th><th style="text-align:right;">${t('invAmount')}</th></tr></thead>
     <tbody>
-      ${row("Payables (Creditors)", d.totalPayables, {indent:true})}
-      ${row("Overhead Expenses", d.totalExpenses, {indent:true})}
-      ${row("Total Liabilities", d.totalLiabilities, {bold:true, border:true})}
+      ${row(t('bsPayablesShort'), d.totalPayables, {indent:true})}
+      ${row(t('bsOverheadExpShort'), d.totalExpenses, {indent:true})}
+      ${row(t('bsTotalLiab'), d.totalLiabilities, {bold:true, border:true})}
     </tbody></table>
   </div>
 
   <div class="section">
     <table><tbody>
-      ${row("Net Worth (Assets − Liabilities)", d.netWorth, {bold:true, color: d.netWorth>=0?"#16a34a":"#dc2626", border:true})}
+      ${row(t('bsNetWorth'), d.netWorth, {bold:true, color: d.netWorth>=0?"#16a34a":"#dc2626", border:true})}
     </tbody></table>
   </div>
 
@@ -7591,13 +7754,13 @@ function printBalanceSheet(){
 
   ${d.payables.length>0 ? `
   <div class="section">
-    <table><thead><tr><th>Payables Breakdown</th><th style="text-align:right;">Amount</th></tr></thead>
+    <table><thead><tr><th>${t('bsPayablesBreakdown')}</th><th style="text-align:right;">${t('invAmount')}</th></tr></thead>
     <tbody>${d.payables.map(x=>row(escHtml(x.name), x.amount)).join("")}</tbody></table>
   </div>` : ""}
 
   ${d.receivables.length>0 ? `
   <div class="section">
-    <table><thead><tr><th>Receivables Breakdown</th><th style="text-align:right;">Amount</th></tr></thead>
+    <table><thead><tr><th>${t('bsReceivablesBreakdown')}</th><th style="text-align:right;">${t('invAmount')}</th></tr></thead>
     <tbody>${d.receivables.map(x=>row(escHtml(x.name), x.amount)).join("")}</tbody></table>
   </div>` : ""}
 
@@ -7945,8 +8108,8 @@ function renderCompare(){
     profitSeries=revSeries.map((v,i)=>v-expSeries[i]);
     chartLabels=weeks.map((wk,i)=>"W"+(i+1));
     curDates=weeks.flat();prevDates=prevWeeks.flat();
-    periodLabel="4 Weeks (ending "+cmpFmtDayShort(weeks[3][6])+")";
-    prevLabel="Prior 4 Weeks";
+    periodLabel=t('cmp4WeeksPeriod')+" "+cmpFmtDayShort(weeks[3][6])+")";
+    prevLabel=t('cmpPrior4Weeks');
 
   } else if(cmpMode==="quarter"){
     const q=cmpSelectedQuarter,y=cmpSelectedYear;
@@ -8249,10 +8412,10 @@ function renderCompare(){
       <div style="font-size:10px;color:#5af;font-weight:700;">${prevLabel}</div>
       <div style="font-size:10px;color:#3a4a6a;text-align:right;">Δ</div>
     </div>
-    ${compRow("Revenue",curRev,prevRev,false)}
-    ${compRow("Expenses",curExp,prevExp,true)}
-    ${compRow("Profit",curProfit,prevProfit,false)}
-    ${compRow("Customers",curActiveCust.size,prevActiveCust.size,false,fmtN)}
+    ${compRow(t('cmpRowRevenue'),curRev,prevRev,false)}
+    ${compRow(t('cmpRowExpenses'),curExp,prevExp,true)}
+    ${compRow(t('cmpRowProfit'),curProfit,prevProfit,false)}
+    ${compRow(t('cmpRowCustomers'),curActiveCust.size,prevActiveCust.size,false,fmtN)}
   </div>`;
 
   // ── Customer Growth Analytics ─────────────────────────────────────────────
@@ -8295,9 +8458,9 @@ function renderCompare(){
   const debtBar=totalDebt>0?Math.round((totalDebtPending/totalDebt)*100):0;
   const credBar=totalCred>0?Math.round((totalCredPending/totalCred)*100):0;
   const debtHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:14px;border-top:3px solid #f59e0b;">
-    <div style="font-size:11px;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📒 Debtors</div>
+    <div style="font-size:11px;color:#f59e0b;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📒 ${t('cmpDebtorsLabel')}</div>
     <div style="font-size:22px;font-weight:800;color:#f59e0b;margin-bottom:4px;">${fmtINR(totalDebtPending)}</div>
-    <div style="font-size:10px;color:var(--text-muted,#5a6a8a);margin-bottom:10px;">Pending · ${allDebtors.length} debtors</div>
+    <div style="font-size:10px;color:var(--text-muted,#5a6a8a);margin-bottom:10px;">${t('cmpPending')} · ${allDebtors.length} ${t('cmpDebtorsLabel').toLowerCase()}</div>
     <div style="display:flex;flex-direction:column;gap:5px;font-size:11px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted,#5a6a8a);">Total Outstanding</span><span style="color:var(--text-main,#e8eaf0);font-weight:700;">${fmtINR(totalDebt)}</span></div>
       <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted,#5a6a8a);">Recovered</span><span style="color:#22c55e;font-weight:700;">${fmtINR(totalDebtRecovered)}</span></div>
@@ -8307,9 +8470,9 @@ function renderCompare(){
     <div style="font-size:9px;color:var(--text-muted,#5a6a8a);margin-top:4px;">${100-debtBar}% pending recovery</div>
   </div>`;
   const credHtml=`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:14px;border-top:3px solid #818cf8;">
-    <div style="font-size:11px;color:#818cf8;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🏦 Creditors</div>
+    <div style="font-size:11px;color:#818cf8;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🏦 ${t('cmpCreditorsLabel')}</div>
     <div style="font-size:22px;font-weight:800;color:#818cf8;margin-bottom:4px;">${fmtINR(totalCredPending)}</div>
-    <div style="font-size:10px;color:var(--text-muted,#5a6a8a);margin-bottom:10px;">Payable · ${allCreditors.length} creditors</div>
+    <div style="font-size:10px;color:var(--text-muted,#5a6a8a);margin-bottom:10px;">${t('cmpPayable')} · ${allCreditors.length} ${t('cmpCreditorsLabel').toLowerCase()}</div>
     <div style="display:flex;flex-direction:column;gap:5px;font-size:11px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted,#5a6a8a);">Total Payable</span><span style="color:var(--text-main,#e8eaf0);font-weight:700;">${fmtINR(totalCred)}</span></div>
       <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-muted,#5a6a8a);">Paid</span><span style="color:#22c55e;font-weight:700;">${fmtINR(totalCredPaid)}</span></div>
@@ -8322,9 +8485,9 @@ function renderCompare(){
   // ── Best Periods ──────────────────────────────────────────────────────────
   const {bestDay,bestMonth,bestYear}=cmpBestPeriods();
   const bestItems=[
-    bestDay?{m:"🥇",title:"Best Day",sub:new Date(bestDay[0]+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}),val:bestDay[1]}:null,
-    bestMonth?{m:"🥈",title:"Best Month",sub:bestMonth[0],val:bestMonth[1]}:null,
-    bestYear?{m:"🥉",title:"Best Year",sub:bestYear[0],val:bestYear[1]}:null,
+    bestDay?{m:"🥇",title:t('cmpBestDay')||"Best Day",sub:new Date(bestDay[0]+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}),val:bestDay[1]}:null,
+    bestMonth?{m:"🥈",title:t('cmpBestMonth'),sub:bestMonth[0],val:bestMonth[1]}:null,
+    bestYear?{m:"🥉",title:t('cmpBestYear'),sub:bestYear[0],val:bestYear[1]}:null,
   ].filter(Boolean);
   const bestHtml=bestItems.length?`<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:16px;padding:16px;">
     <div style="font-size:11px;color:var(--text-muted,#5a6a8a);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">🏆 Top Performing Periods</div>
@@ -8356,15 +8519,15 @@ function renderCompare(){
     <div style="font-size:11px;color:#a78bfa;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">🔮 Next Month Forecast <span style="font-weight:400;color:var(--text-muted,#4a5a7a);font-size:10px;">— based on 6-month trend</span></div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
       <div style="text-align:center;padding:12px 6px;background:var(--bg-row-even,#0a0e1a);border-radius:10px;border:1px solid var(--border-main,#1a2030);">
-        <div style="font-size:9px;color:#4a8cff;font-weight:700;margin-bottom:4px;text-transform:uppercase;">Revenue</div>
+        <div style="font-size:9px;color:#4a8cff;font-weight:700;margin-bottom:4px;text-transform:uppercase;">${t('cmpRowRevenue')}</div>
         <div style="font-size:15px;font-weight:800;color:#4a8cff;">${fmtINR(foreRev)}</div>
       </div>
       <div style="text-align:center;padding:12px 6px;background:var(--bg-row-even,#0a0e1a);border-radius:10px;border:1px solid var(--border-main,#1a2030);">
-        <div style="font-size:9px;color:#ef4444;font-weight:700;margin-bottom:4px;text-transform:uppercase;">Expenses</div>
+        <div style="font-size:9px;color:#ef4444;font-weight:700;margin-bottom:4px;text-transform:uppercase;">${t('cmpRowExpenses')}</div>
         <div style="font-size:15px;font-weight:800;color:#ef4444;">${fmtINR(foreExp)}</div>
       </div>
       <div style="text-align:center;padding:12px 6px;background:var(--bg-row-even,#0a0e1a);border-radius:10px;border:1px solid var(--border-main,#1a2030);">
-        <div style="font-size:9px;color:${foreProfit>=0?'#22c55e':'#ef4444'};font-weight:700;margin-bottom:4px;text-transform:uppercase;">Profit</div>
+        <div style="font-size:9px;color:${foreProfit>=0?'#22c55e':'#ef4444'};font-weight:700;margin-bottom:4px;text-transform:uppercase;">${t('cmpRowProfit')}</div>
         <div style="font-size:15px;font-weight:800;color:${foreProfit>=0?'#22c55e':'#ef4444'};">${fmtINR(foreProfit)}</div>
       </div>
     </div>
@@ -9639,7 +9802,7 @@ function _crTxRender(creditorId){
   const summaryEl=document.getElementById("cr-tx-summary");
   if(!listEl) return;
   const cr=getCreditors().find(c=>c.id===creditorId);
-  if(!cr){listEl.innerHTML='<div style="text-align:center;padding:30px;color:#4a5a7a;">Not found</div>';return;}
+  if(!cr){listEl.innerHTML='<div style="text-align:center;padding:30px;color:#4a5a7a;">'+t('txNotFound')+'</div>';return;}
 
   const allTxs=(cr.transactions||[]).slice().reverse();
   const search=(document.getElementById("cr-tx-search")?.value||"").trim().toLowerCase();
@@ -9670,7 +9833,7 @@ function _crTxRender(creditorId){
   if(filtered.length===0){
     listEl.innerHTML=`<div style="text-align:center;padding:30px;color:#4a5a7a;">
       <div style="font-size:28px;margin-bottom:8px;">🔍</div>
-      No transactions match your search/filter.
+      ${t("txNoMatch")}
       <br><button onclick="_crTxSetFilter('`+creditorId+`','all');var _s=document.getElementById('cr-tx-search');if(_s)_s.value='';window._crTxIsCustom=false;var _cb=document.getElementById('cr-tx-custom-btn');var _cr=document.getElementById('cr-tx-custom-range');if(_cb){_cb.style.color='#7a8aaa';_cb.style.border='1px solid #1e2a45';}if(_cr)_cr.style.display='none';var _now=new Date();window._crTxNavYear=_now.getFullYear();window._crTxNavMonth=_now.getMonth();_crTxApplyMonthNav('`+creditorId+`');"
         style="margin-top:10px;cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#60a5fa;font-size:12px;font-weight:700;padding:7px 14px;">
         Clear Filters
@@ -9709,9 +9872,9 @@ function _crTxRender(creditorId){
   });
 
   const typeCfg={
-    purchase:{label:"Purchase", debit:true,  bg:"#92400e22",col:"#fbbf24",icon:"📦"},
-    payment: {label:"Payment",  debit:false, bg:"#14532d22",col:"#4ade80",icon:"💰"},
-    return:  {label:"Return / Dr Note",   debit:false, bg:"#2e106522",col:"#c4b5fd",icon:"↩️"},
+    purchase:{label:t("txPurchase"), debit:true,  bg:"#92400e22",col:"#fbbf24",icon:"📦"},
+    payment: {label:t("txPayment"),  debit:false, bg:"#14532d22",col:"#4ade80",icon:"💰"},
+    return:  {label:t("txReturn")||"Return / Dr Note",   debit:false, bg:"#2e106522",col:"#c4b5fd",icon:"↩️"},
   };
 
   // Tally-style compact ledger table
@@ -9747,10 +9910,10 @@ function _crTxRender(creditorId){
       </div>
       <div id="${detailId}" style="display:none;background:#060d1a;border-bottom:1px solid #0d1525;padding:10px 14px;font-size:12px;">
         <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
-          <div><span style="color:#4a5a7a;">Date</span><br><span style="color:#e8eaf0;font-weight:700;">${new Date(tx.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span></div>
-          <div><span style="color:#4a5a7a;">Type</span><br><span style="font-size:11px;padding:2px 8px;border-radius:5px;background:${cfg.bg};color:${cfg.col};font-weight:700;">${cfg.icon} ${cfg.label}</span></div>
-          <div><span style="color:#4a5a7a;">Amount</span><br><span style="color:${cfg.col};font-weight:800;">${formatINR(tx.amount)}</span></div>
-          ${tx.invoiceNo?`<div><span style="color:#4a5a7a;">Invoice</span><br><span style="color:#e8eaf0;font-weight:700;">🧾 ${escHtml(tx.invoiceNo)}</span></div>`:""}
+          <div><span style="color:#4a5a7a;">${t("txDate")}</span><br><span style="color:#e8eaf0;font-weight:700;">${new Date(tx.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span></div>
+          <div><span style="color:#4a5a7a;">${t("txType")}<br><span style="font-size:11px;padding:2px 8px;border-radius:5px;background:${cfg.bg};color:${cfg.col};font-weight:700;">${cfg.icon} ${cfg.label}</span></div>
+          <div><span style="color:#4a5a7a;">${t("txAmount")}</span><br><span style="color:${cfg.col};font-weight:800;">${formatINR(tx.amount)}</span></div>
+          ${tx.invoiceNo?`<div><span style="color:#4a5a7a;">${t("txInvoice")}<br><span style="color:#e8eaf0;font-weight:700;">🧾 ${escHtml(tx.invoiceNo)}</span></div>`:""}
           ${tx._invItem?`<div><span style="color:#4a5a7a;">इन्वेंट्री</span><br><span style="color:#60a5fa;font-weight:700;">📦 ${escHtml(tx._invItem)} × ${tx._invQty}</span></div>`:""}
         </div>
         ${tx.note?`<div style="color:#7a8aaa;margin-bottom:8px;">📝 ${escHtml(tx.note)}</div>`:""}
@@ -9766,11 +9929,11 @@ function _crTxRender(creditorId){
 
   // Column header + totals footer
   const colHeader=`<div style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;gap:4px;padding:5px 10px 5px;border-bottom:2px solid #1e2a45;">
-    <div style="font-size:9px;font-weight:800;color:#4a5a7a;text-transform:uppercase;">Date</div>
-    <div style="font-size:9px;font-weight:800;color:#4a5a7a;text-transform:uppercase;">Description</div>
-    <div style="font-size:9px;font-weight:800;color:#fbbf24;text-align:right;text-transform:uppercase;">Debit</div>
-    <div style="font-size:9px;font-weight:800;color:#4ade80;text-align:right;text-transform:uppercase;">Credit</div>
-    <div style="font-size:9px;font-weight:800;color:#a0b0d0;text-align:right;text-transform:uppercase;">Balance</div>
+    <div style="font-size:9px;font-weight:800;color:#4a5a7a;text-transform:uppercase;">${t("txDate")}</div>
+    <div style="font-size:9px;font-weight:800;color:#4a5a7a;text-transform:uppercase;">${t("txDescription")}</div>
+    <div style="font-size:9px;font-weight:800;color:#fbbf24;text-align:right;text-transform:uppercase;">${t("txDebit")}</div>
+    <div style="font-size:9px;font-weight:800;color:#4ade80;text-align:right;text-transform:uppercase;">${t("txCredit")}</div>
+    <div style="font-size:9px;font-weight:800;color:#a0b0d0;text-align:right;text-transform:uppercase;">${t("txBalance")}</div>
     <div></div>
   </div>`;
   const finalBal=runMap[filtered[0]?.id]||0;
@@ -11201,7 +11364,7 @@ function renderExpensesTab(){
     <div style="text-align:right;">
       <div style="font-size:10px;color:#4a5a7a;">${t('expLastUpdated')}</div>
       <div style="font-size:12px;font-weight:700;color:#94a3b8;">${now.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div>
-      <div style="font-size:11px;color:#f87171;font-weight:700;margin-top:2px;">This month: ${formatINR(monthTotal)}</div>
+      <div style="font-size:11px;color:#f87171;font-weight:700;margin-top:2px;">${t('expThisMonth')} ${formatINR(monthTotal)}</div>
     </div>
   </div>
 </div>
@@ -11235,7 +11398,7 @@ ${(topCat||pctChange!==null||prevMonthTotal>0) ? `
 <div class="exp-card" style="margin-bottom:16px;">
   <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">${t('expSmartInsights')}</div>
   ${topCat ? `<div class="exp-insight" style="background:#1e1a2e;">
-    <span>💡</span><span style="color:#c4b5fd;">${expCategoryIcon(topCat[0])} <b>${topCat[0]}</b> accounts for <b>${topCatPct}%</b> of expenses this month (${formatINR(topCat[1])}).</span>
+    <span>💡</span><span style="color:#c4b5fd;">${expCategoryIcon(topCat[0])} <b>${topCat[0]}</b> ${t('expAccountsFor')} <b>${topCatPct}%</b> ${t('expOfExpensesThisMonth')} (${formatINR(topCat[1])}).</span>
   </div>` : ""}
   ${pctChange!==null && pctChange>0 ? `<div class="exp-insight" style="background:#2a1a1a;">
     <span>⚠</span><span style="color:#fca5a5;">${t('expIncreased')} <b>${pctChange}%</b> ${t('expVsLastMonth')}</span>
@@ -11306,22 +11469,22 @@ ${monthTotal>0 ? `
 
 <!-- ── PROFIT IMPACT ── -->
 <div class="exp-card" style="margin-bottom:16px;border-color:#22d3ee30;">
-  <div style="font-size:11px;font-weight:800;color:#22d3ee;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">📊 Profit Impact — This Month</div>
+  <div style="font-size:11px;font-weight:800;color:#22d3ee;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">${t('expProfitImpactHeader')}</div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
     <div style="text-align:center;">
-      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Sales</div>
+      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">${t('expStatSales')}</div>
       <div style="font-size:17px;font-weight:800;color:#34d399;">${formatINR(monthSales)}</div>
     </div>
     <div style="text-align:center;">
-      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Expenses</div>
+      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">${t('expStatExpenses')}</div>
       <div style="font-size:17px;font-weight:800;color:#f87171;">${formatINR(monthTotal+monthCost)}</div>
     </div>
     <div style="text-align:center;">
-      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Profit</div>
+      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">${t('expStatProfit')}</div>
       <div style="font-size:17px;font-weight:800;color:${monthProfit>=0?"#22d3ee":"#f87171"};">${formatINR(monthProfit)}</div>
     </div>
     <div style="text-align:center;">
-      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">Margin</div>
+      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">${t('expStatMargin')}</div>
       <div style="font-size:17px;font-weight:800;color:${monthMargin>=0?"#a78bfa":"#f87171"};">${monthSales>0?monthMargin+"%":"—"}</div>
     </div>
   </div>
@@ -11329,7 +11492,7 @@ ${monthTotal>0 ? `
 
 <!-- ── ADD / EDIT EXPENSE ── -->
 <div class="exp-card" style="margin-bottom:16px;border-color:#6366f130;" id="exp-form-card">
-  <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:14px;">${editingExp?"✏️ Edit Expense":"➕ Add Expense"}</div>
+  <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:14px;">${editingExp?t('expEditExpenseTitle'):t('expAddExpenseTitle')}</div>
 
   <!-- Quick add buttons -->
   ${!editingExp ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
@@ -11340,42 +11503,42 @@ ${monthTotal>0 ? `
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
     <div>
-      <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">Category</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">${t('expCategory')}</div>
       ${sel("exp-cat", EXP_CATS.map(c=>({v:c.key,l:c.icon+" "+c.key})), editingExp?editingExp.category:"")}
     </div>
     <div>
-      <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">Amount (₹)</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">${t('expAmountWithSymbol')}</div>
       ${inp("exp-amt","number","e.g. 5000",editingExp?editingExp.amount:"",'min="0" step="1"')}
     </div>
   </div>
   <div style="margin-bottom:10px;">
-    <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">Description</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">${t('invDescription')}</div>
     <textarea id="exp-note" placeholder="e.g. Monthly shop rent payment" style="width:100%;box-sizing:border-box;background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:10px 12px;font-size:13px;outline:none;resize:vertical;min-height:60px;transition:border 0.2s;font-family:inherit;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#1e2a45'">${editingExp?escHtml(editingExp.note||""):""}</textarea>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
     <div>
-      <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">Date</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">${t('expDate')}</div>
       ${inp("exp-date","date","",editingExp?editingExp.date:todayStr)}
     </div>
     <div style="display:flex;align-items:center;gap:8px;padding-top:22px;">
       <input type="checkbox" id="exp-recurring" ${editingExp&&editingExp.recurring?"checked":""} style="width:16px;height:16px;accent-color:#6366f1;cursor:pointer;"/>
-      <label for="exp-recurring" style="font-size:13px;color:#94a3b8;cursor:pointer;">Recurring Monthly</label>
+      <label for="exp-recurring" style="font-size:13px;color:#94a3b8;cursor:pointer;">${t('expRecurringMonthly')}</label>
     </div>
   </div>
   <div style="display:flex;gap:10px;">
-    <button class="exp-btn" onclick="expSaveFromForm()" style="flex:1;background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;padding:12px;">${editingExp?"💾 Update Expense":"💾 Save Expense"}</button>
-    ${editingExp ? `<button class="exp-btn" onclick="_expEditId=null;safeRenderTab(currentTab);" style="background:#1e2a45;color:#94a3b8;padding:12px 18px;">Cancel</button>` : ""}
+    <button class="exp-btn" onclick="expSaveFromForm()" style="flex:1;background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;padding:12px;">${editingExp?t('expUpdateBtn'):t('expSaveBtn')}</button>
+    ${editingExp ? `<button class="exp-btn" onclick="_expEditId=null;safeRenderTab(currentTab);" style="background:#1e2a45;color:#94a3b8;padding:12px 18px;">${t('invCancel')}</button>` : ""}
   </div>
 </div>
 
 <!-- ── HISTORY ── -->
 <div class="exp-card" style="margin-bottom:16px;">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-    <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;">📋 Expense History</div>
+    <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;">${t('expHistoryHeader')}</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
       <!-- View toggle -->
-      <button class="exp-quick" onclick="_expView='list';safeRenderTab(currentTab);" style="${_expView==="list"?"background:#1e2d4a;border-color:#6366f1;color:#818cf8;":""}">📋 List</button>
-      <button class="exp-quick" onclick="_expView='calendar';safeRenderTab(currentTab);" style="${_expView==="calendar"?"background:#1e2d4a;border-color:#6366f1;color:#818cf8;":""}">📅 Calendar</button>
+      <button class="exp-quick" onclick="_expView='list';safeRenderTab(currentTab);" style="${_expView==="list"?"background:#1e2d4a;border-color:#6366f1;color:#818cf8;":""}">${t('expBtnList')}</button>
+      <button class="exp-quick" onclick="_expView='calendar';safeRenderTab(currentTab);" style="${_expView==="calendar"?"background:#1e2d4a;border-color:#6366f1;color:#818cf8;":""}">${t('expBtnCalendar')}</button>
     </div>
   </div>
 
@@ -11394,7 +11557,7 @@ ${monthTotal>0 ? `
       style="background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;width:100%;"/>
     <select onchange="_expCatFilter=this.value;_expPage=0;safeRenderTab(currentTab);"
       style="background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;width:100%;">
-      <option value="">All Categories</option>
+      <option value="">${t('expAllCategories')}</option>
       ${EXP_CATS.map(c=>`<option value="${c.key}" ${_expCatFilter===c.key?"selected":""}>${c.icon} ${c.key}</option>`).join("")}
     </select>
   </div>
@@ -11403,9 +11566,9 @@ ${monthTotal>0 ? `
   <!-- ── CALENDAR VIEW ── -->
   <div style="margin-bottom:10px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-      <button class="exp-quick" onclick="_expCalMonth={year:${calPrev.year},month:${calPrev.month}};safeRenderTab(currentTab);">‹ Prev</button>
+      <button class="exp-quick" onclick="_expCalMonth={year:${calPrev.year},month:${calPrev.month}};safeRenderTab(currentTab);">${t('expPrevBtn')}</button>
       <div style="font-weight:700;color:#e2e8f0;">${calMonthNames[calMonth]} ${calYear}</div>
-      <button class="exp-quick" onclick="_expCalMonth={year:${calNext.year},month:${calNext.month}};safeRenderTab(currentTab);">Next ›</button>
+      <button class="exp-quick" onclick="_expCalMonth={year:${calNext.year},month:${calNext.month}};safeRenderTab(currentTab);">${t('expNextBtn')}</button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px;">
       ${["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-size:10px;font-weight:700;color:#4a5a7a;padding:4px;">${d}</div>`).join("")}
@@ -11433,13 +11596,13 @@ ${monthTotal>0 ? `
   ${filtered.length===0 ? `
     <div style="text-align:center;padding:50px 20px;">
       <div style="font-size:48px;margin-bottom:12px;">💸</div>
-      <div style="font-size:16px;font-weight:700;color:#e2e8f0;margin-bottom:6px;">No expenses recorded yet.</div>
-      <div style="font-size:13px;color:#64748b;margin-bottom:16px;">Start tracking your business expenses to gain financial insights.</div>
-      <button class="exp-btn" onclick="document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;padding:11px 24px;">+ Add First Expense</button>
+      <div style="font-size:16px;font-weight:700;color:#e2e8f0;margin-bottom:6px;">${t('expNoExpenses')}</div>
+      <div style="font-size:13px;color:#64748b;margin-bottom:16px;">${t('expTrackingDesc')}</div>
+      <button class="exp-btn" onclick="document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;padding:11px 24px;">${t('expAddFirstBtn')}</button>
     </div>` : `
     <!-- Desktop table -->
     <div class="exp-table-hdr">
-      <div>Category / Description</div><div>Amount</div><div>Date</div><div>Tags</div><div>Actions</div>
+      <div>${t('expColCatDesc')}</div><div>${t('expAmount')}</div><div>${t('expDate')}</div><div>${t('expColTags')}</div><div>${t('expColActions')}</div>
     </div>
     ${pageItems.map(e=>`
     <div class="exp-table-row">
@@ -11449,7 +11612,7 @@ ${monthTotal>0 ? `
       </div>
       <div style="font-size:14px;font-weight:800;color:${expCategoryColor(e.category)};">${formatINR(e.amount)}</div>
       <div style="font-size:12px;color:#94a3b8;">${new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>
-      <div>${e.recurring?`<span class="exp-badge" style="background:#1a1e3a;color:#818cf8;">🔄 Recurring</span>`:"<span style='color:#4a5a7a;font-size:11px;'>—</span>"}</div>
+      <div>${e.recurring?`<span class="exp-badge" style="background:#1a1e3a;color:#818cf8;">${t('expFilterRecurring')}</span>`:"<span style='color:#4a5a7a;font-size:11px;'>—</span>"}</div>
       <div style="display:flex;gap:5px;">
         <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#1e2a45;border:none;border-radius:6px;color:#818cf8;font-size:11px;padding:5px 8px;cursor:pointer;" title="Edit">✏️</button>
         <button onclick="duplicateExpense('${e.id}')" style="background:#1e2a45;border:none;border-radius:6px;color:#34d399;font-size:11px;padding:5px 8px;cursor:pointer;" title="Duplicate">📋</button>
@@ -11472,8 +11635,8 @@ ${monthTotal>0 ? `
           ${e.recurring?`<span class="exp-badge" style="background:#1a1e3a;color:#818cf8;font-size:10px;">🔄</span>`:""}
         </div>
         <div style="display:flex;gap:5px;margin-top:6px;">
-          <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#1e2a45;border:none;border-radius:6px;color:#818cf8;font-size:11px;padding:5px 8px;cursor:pointer;">✏️ Edit</button>
-          <button onclick="duplicateExpense('${e.id}')" style="background:#1e2a45;border:none;border-radius:6px;color:#34d399;font-size:11px;padding:5px 8px;cursor:pointer;">📋 Copy</button>
+          <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#1e2a45;border:none;border-radius:6px;color:#818cf8;font-size:11px;padding:5px 8px;cursor:pointer;">${t('expEditBtn')}</button>
+          <button onclick="duplicateExpense('${e.id}')" style="background:#1e2a45;border:none;border-radius:6px;color:#34d399;font-size:11px;padding:5px 8px;cursor:pointer;">${t('expCopyBtn')}</button>
           <button onclick="expDeleteEntry('${e.id}')" style="background:#2a0808;border:1px solid #4a1515;border-radius:6px;color:#f87171;font-size:11px;padding:5px 8px;cursor:pointer;">🗑</button>
         </div>
       </div>
@@ -11482,10 +11645,10 @@ ${monthTotal>0 ? `
     <!-- Pagination -->
     ${totalPages>1 ? `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid #1e2a45;">
-      <div style="font-size:12px;color:#64748b;">Showing ${_expPage*_expPageSize+1}–${Math.min((_expPage+1)*_expPageSize,filtered.length)} of ${filtered.length}</div>
+      <div style="font-size:12px;color:#64748b;">${t('expShowingRange').replace('{a}',_expPage*_expPageSize+1).replace('{b}',Math.min((_expPage+1)*_expPageSize,filtered.length)).replace('{c}',filtered.length)}</div>
       <div style="display:flex;gap:6px;">
-        ${_expPage>0?`<button class="exp-quick" onclick="_expPage=${_expPage-1};safeRenderTab(currentTab);">‹ Prev</button>`:""}
-        ${_expPage<totalPages-1?`<button class="exp-quick" onclick="_expPage=${_expPage+1};safeRenderTab(currentTab);">Next ›</button>`:""}
+        ${_expPage>0?`<button class="exp-quick" onclick="_expPage=${_expPage-1};safeRenderTab(currentTab);">${t('expPrevBtn')}</button>`:""}
+        ${_expPage<totalPages-1?`<button class="exp-quick" onclick="_expPage=${_expPage+1};safeRenderTab(currentTab);">${t('expNextBtn')}</button>`:""}
       </div>
     </div>` : ""}
   `}
@@ -11493,8 +11656,8 @@ ${monthTotal>0 ? `
 
   <!-- Export row -->
   <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:12px;border-top:1px solid #1a2235;margin-top:4px;">
-    <button class="exp-btn" onclick="expExportCSV()" style="background:#1e2a45;color:#94a3b8;padding:8px 14px;font-size:12px;">📊 Export CSV</button>
-    <button class="exp-btn" onclick="expPrintReport()" style="background:#1e2a45;color:#94a3b8;padding:8px 14px;font-size:12px;">🖨 Print Report</button>
+    <button class="exp-btn" onclick="expExportCSV()" style="background:#1e2a45;color:#94a3b8;padding:8px 14px;font-size:12px;">${t('expExportCsvBtn')}</button>
+    <button class="exp-btn" onclick="expPrintReport()" style="background:#1e2a45;color:#94a3b8;padding:8px 14px;font-size:12px;">${t('expPrintReportBtn')}</button>
   </div>
 </div>
 
@@ -12033,7 +12196,7 @@ function _drTxRender(debtorId){
   const summaryEl=document.getElementById("dr-tx-summary");
   if(!listEl) return;
   const dr=getDebtors().find(d=>d.id===debtorId);
-  if(!dr){listEl.innerHTML='<div style="text-align:center;padding:30px;color:#4a5a7a;">Not found</div>';return;}
+  if(!dr){listEl.innerHTML='<div style="text-align:center;padding:30px;color:#4a5a7a;">'+t('txNotFound')+'</div>';return;}
 
   const allTxs=(dr.transactions||[]).slice().reverse();
   const search=(document.getElementById("dr-tx-search")?.value||"").trim().toLowerCase();
@@ -12063,10 +12226,9 @@ function _drTxRender(debtorId){
   if(filtered.length===0){
     listEl.innerHTML=`<div style="text-align:center;padding:30px;color:#4a5a7a;">
       <div style="font-size:28px;margin-bottom:8px;">🔍</div>
-      No transactions match your search/filter.
+      ${t("txNoMatch")}
       <br><button onclick="_drTxSetFilter('`+debtorId+`','all');var _s=document.getElementById('dr-tx-search');if(_s)_s.value='';window._drTxIsCustom=false;var _cb=document.getElementById('dr-tx-custom-btn');var _cr=document.getElementById('dr-tx-custom-range');if(_cb){_cb.style.color='#7a8aaa';_cb.style.border='1px solid #1e2a45';}if(_cr)_cr.style.display='none';var _now=new Date();window._drTxNavYear=_now.getFullYear();window._drTxNavMonth=_now.getMonth();_drTxApplyMonthNav('`+debtorId+`');"
-        style="margin-top:10px;cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#22c55e;font-size:12px;font-weight:700;padding:7px 14px;">
-        Clear Filters
+        style="margin-top:10px;cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#22c55e;font-size:12px;font-weight:700;padding:7px 14px;">${t("txClearFilters")}
       </button>
     </div>`;
     return;
@@ -12092,9 +12254,9 @@ function _drTxRender(debtorId){
   });
 
   const typeCfg={
-    sale:    {label:currentLang==='hi'?'बिक्री':'Sale',    debit:true,  bg:"#14532d22",col:"#4ade80",icon:"🛒"},
-    payment: {label:currentLang==='hi'?'रसीद':'Receipt', debit:false, bg:"#1e3a6e22",col:"#60a5fa",icon:"💰"},
-    return:  {label:"Returned / Cr Note",  debit:false, bg:"#2e106522",col:"#c4b5fd",icon:"↩️"},
+    sale:    {label:t('txSale'),    debit:true,  bg:"#14532d22",col:"#4ade80",icon:"🛒"},
+    payment: {label:t('txReceipt'), debit:false, bg:"#1e3a6e22",col:"#60a5fa",icon:"💰"},
+    return:  {label:t('txReturn')||"Returned / Cr Note",  debit:false, bg:"#2e106522",col:"#c4b5fd",icon:"↩️"},
   };
 
   const rows=filtered.map(tx=>{
@@ -12143,11 +12305,11 @@ function _drTxRender(debtorId){
   const totalSale2=filtered.filter(t=>t.type==="sale").reduce((s,t)=>s+t.amount,0);
   const totalIn2=filtered.filter(t=>t.type==="payment"||t.type==="return").reduce((s,t)=>s+t.amount,0);
   const colHeader=`<div style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;gap:4px;padding:5px 10px;border-bottom:2px solid #1e2a45;">
-    <div style="font-size:9px;font-weight:800;color:#4a5a7a;text-transform:uppercase;">Date</div>
-    <div style="font-size:9px;font-weight:800;color:#4a5a7a;text-transform:uppercase;">Description</div>
-    <div style="font-size:9px;font-weight:800;color:#4ade80;text-align:right;text-transform:uppercase;">Sale</div>
-    <div style="font-size:9px;font-weight:800;color:#60a5fa;text-align:right;text-transform:uppercase;">Receipt</div>
-    <div style="font-size:9px;font-weight:800;color:#a0b0d0;text-align:right;text-transform:uppercase;">Balance</div>
+    <div style="font-size:9px;font-weight:800;color:#4a5a7a;text-transform:uppercase;">${t("txDate")}</div>
+    <div style="font-size:9px;font-weight:800;color:#4a5a7a;text-transform:uppercase;">${t("txDescription")}</div>
+    <div style="font-size:9px;font-weight:800;color:#4ade80;text-align:right;text-transform:uppercase;">${t("txSale")}</div>
+    <div style="font-size:9px;font-weight:800;color:#60a5fa;text-align:right;text-transform:uppercase;">${t("txReceipt")}</div>
+    <div style="font-size:9px;font-weight:800;color:#a0b0d0;text-align:right;text-transform:uppercase;">${t("txBalance")}</div>
     <div></div>
   </div>`;
   const finalBal=runMap[filtered[0]?.id]||0;
@@ -14066,24 +14228,24 @@ function showConfirmModal(title, message, onConfirmJs, confirmLabel, danger){
 // ─── ADD / EDIT CUSTOMER ──────────────────────────────────────
 function openAddModal(){
   tempPhoto="";
-  showWideModal(`${modalHeader("Add New Customer")}
+  showWideModal(`${modalHeader(t("modalAddNewCustomer"))}
     <div style="display:flex;justify-content:center;margin-bottom:20px;">
       <div>
         <div class="photo-upload-box" id="add-photo-box" style="width:84px;height:84px;" onclick="document.getElementById('add-photo-file').click()">
-          <div class="upload-hint" id="add-photo-hint" style="padding:10px;">📷<br>Add Photo</div>
+          <div class="upload-hint" id="add-photo-hint" style="padding:10px;">📷<br>${t("modalAddPhoto")}</div>
         </div>
         <input type="file" id="add-photo-file" accept="image/*" style="display:none;" onchange="handleAddPhoto(this)" />
-        <div style="text-align:center;font-size:11px;color:#4a5a7a;margin-top:5px;">Optional</div>
+        <div style="text-align:center;font-size:11px;color:#4a5a7a;margin-top:5px;">${t("modalOptional")}</div>
       </div>
     </div>
 
-    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Full Name <span style="color:#f66;">*</span></label>
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">${t("modalFullName")} <span style="color:#f66;">*</span></label>
     <input class="input" id="m-name" placeholder="e.g. Rahul Sharma" style="margin-bottom:14px;" />
 
-    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Phone Number <span style="color:#556;font-weight:400;">(optional)</span></label>
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">${t("modalPhoneNumber")} <span style="color:#556;font-weight:400;">(${t("modalOptional")})</span></label>
     <input class="input" id="m-phone" placeholder="e.g. 9876543210" maxlength="10" inputmode="numeric" pattern="[0-9]*" style="margin-bottom:14px;" />
 
-    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Customer ID</label>
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">${t("modalCustomerId")}</label>
     <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:4px;">
       <input class="input" id="m-id" placeholder="Custom ID, or leave blank for auto" style="font-family:monospace;" />
       <button class="btn" onclick="document.getElementById('m-id').value=autoId()" style="background:#1a2540;color:#7ab3ff;border:1px solid #2a3560;padding:10px 14px;font-size:12px;white-space:nowrap;">🎲 Auto</button>
@@ -14109,17 +14271,17 @@ function openAddModal(){
         </div>
         <div id="m-gst-status" style="font-size:11px;margin-bottom:8px;display:none;"></div>
         <div style="margin-bottom:8px;">
-          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">COMPANY / LEGAL NAME</label>
-          <input class="input" id="m-gst-company" placeholder="Auto-filled or enter manually" style="margin-bottom:0;" />
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t("modalCompanyName")}</label>
+          <input class="input" id="m-gst-company" placeholder="${t('modalAutoFilled')}" style="margin-bottom:0;" />
         </div>
         <div>
-          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST ADDRESS</label>
-          <textarea class="input" id="m-gst-address" placeholder="Auto-filled or enter manually" rows="2" style="margin-bottom:0;resize:vertical;"></textarea>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t("modalGstAddress")}</label>
+          <textarea class="input" id="m-gst-address" placeholder="${t('modalAutoFilled')}" rows="2" style="margin-bottom:0;resize:vertical;"></textarea>
         </div>
       </div>
     </div>
 
-    <button class="btn" onclick="saveNewCustomer()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-weight:800;">Add Customer →</button>`);
+    <button class="btn" onclick="saveNewCustomer()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-weight:800;">${t("modalAddCustomerBtn")}</button>`);
 }
 
 function handleAddPhoto(inp){
@@ -14820,7 +14982,7 @@ function openEditModal(id){
   const c=customers.find(x=>x.id===id);if(!c)return;
   tempPhoto=c.photo||"";
   const hasGst = !!(c.gstin);
-  showWideModal(`${modalHeader("Edit Customer")}
+  showWideModal(`${modalHeader(t("modalEditCustomer"))}
     <div style="display:flex;justify-content:center;margin-bottom:20px;">
       <div>
         <div class="photo-upload-box" id="edit-photo-box" style="width:84px;height:84px;" onclick="document.getElementById('edit-photo-file').click()">
@@ -14830,11 +14992,11 @@ function openEditModal(id){
         ${tempPhoto?`<div style="text-align:center;"><button onclick="tempPhoto='';document.getElementById('edit-photo-box').innerHTML='<div class=\\'upload-hint\\' style=\\'padding:10px;\\'>📷<br>Add Photo</div><input type=\\'file\\' id=\\'edit-photo-file\\' accept=\\'image/*\\' style=\\'display:none;\\' onchange=\\'handleEditPhoto(this)\\' />';" style="background:none;border:none;color:#f66;font-size:11px;cursor:pointer;margin-top:4px;">✕ Remove</button></div>`:""}
       </div>
     </div>
-    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Full Name <span style="color:#f66;">*</span></label>
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">${t("modalFullName")} <span style="color:#f66;">*</span></label>
     <input class="input" id="m-name" value="${c.name}" style="margin-bottom:14px;" />
-    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Phone Number <span style="color:#556;font-weight:400;">(optional)</span></label>
-    <input class="input" id="m-phone" value="${c.phone||""}" placeholder="Leave blank if none" style="margin-bottom:14px;" />
-    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Customer ID</label>
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">${t("modalPhoneNumber")} <span style="color:#556;font-weight:400;">(${t("modalOptional")})</span></label>
+    <input class="input" id="m-phone" value="${c.phone||""}" placeholder="${t('modalLeaveBlank')}" style="margin-bottom:14px;" />
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">${t("modalCustomerId")}</label>
     <input class="input" id="m-id" value="${c.id}" style="margin-bottom:4px;font-family:monospace;" />
     <div style="font-size:11px;color:#4a5a7a;margin-bottom:16px;">Only change the ID if needed — it must be unique.</div>
 
@@ -14857,17 +15019,17 @@ function openEditModal(id){
         </div>
         <div id="m-gst-status" style="font-size:11px;margin-bottom:8px;display:none;"></div>
         <div style="margin-bottom:8px;">
-          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">COMPANY / LEGAL NAME</label>
-          <input class="input" id="m-gst-company" placeholder="Auto-filled or enter manually" value="${escHtml(c.gstName||"")}" style="margin-bottom:0;" />
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t("modalCompanyName")}</label>
+          <input class="input" id="m-gst-company" placeholder="${t('modalAutoFilled')}" value="${escHtml(c.gstName||"")}" style="margin-bottom:0;" />
         </div>
         <div>
-          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST ADDRESS</label>
-          <textarea class="input" id="m-gst-address" placeholder="Auto-filled or enter manually" rows="2" style="margin-bottom:0;resize:vertical;">${escHtml(c.gstAddress||"")}</textarea>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t("modalGstAddress")}</label>
+          <textarea class="input" id="m-gst-address" placeholder="${t('modalAutoFilled')}" rows="2" style="margin-bottom:0;resize:vertical;">${escHtml(c.gstAddress||"")}</textarea>
         </div>
       </div>
     </div>
 
-    <button class="btn" onclick="saveEditCustomer('${id}')" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-weight:800;">Save Changes</button>`);
+    <button class="btn" onclick="saveEditCustomer('${id}')" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-weight:800;">${t("saveChanges")}</button>`);
 }
 function handleEditPhoto(inp){
   const f=inp.files[0];if(!f)return;
@@ -17181,13 +17343,13 @@ function openInvEditModal(name){
             placeholder="0.00" style="margin-bottom:0;" oninput="invEditGstPreview()" />
         </div>
         <div>
-          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">UNIT</label>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t("invEditUnit")}</label>
           <input class="input" id="iei-unit" type="text" placeholder="kg, pcs, litre"
             value="${escHtml(item.unit||"unit")}" style="margin-bottom:0;" />
         </div>
       </div>
       <div>
-        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">CATEGORY</label>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t("invEditCategory")}</label>
         <input class="input" id="iei-category" type="text" placeholder="General"
           value="${escHtml(item.category||"General")}" style="margin-bottom:0;" />
       </div>
@@ -17195,7 +17357,7 @@ function openInvEditModal(name){
         <div style="font-size:12px;color:#a78bfa;font-weight:800;margin-bottom:10px;">\ud83e\uddfe GST Settings</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
           <div>
-            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST RATE</label>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t("invEditGstRate")}</label>
             <div style="display:flex;gap:6px;align-items:center;">
               <select class="input" id="iei-gst-rate" style="margin-bottom:0;flex:1;" onchange="(function(){if(this.value==='custom'){document.getElementById('iei-gst-custom').style.display='block';document.getElementById('iei-gst-custom').focus();}else{document.getElementById('iei-gst-custom').style.display='none';}invEditGstPreview();}).call(this)">
                 ${[0,5,12,18,28].map(r=>`<option value="${r}" ${Number(gstRate)===r?"selected":""}>${r}% GST</option>`).join("")}
@@ -17208,16 +17370,16 @@ function openInvEditModal(name){
             </div>
           </div>
           <div>
-            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST TYPE</label>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t("invEditGstType")}</label>
             <select class="input" id="iei-gst-included" style="margin-bottom:0;" onchange="invEditGstPreview()">
-              <option value="inclusive" ${gstIncluded==="inclusive"?"selected":""}>Inclusive (GST inside price)</option>
-              <option value="exclusive" ${gstIncluded==="exclusive"?"selected":""}>Exclusive (+ GST on sale)</option>
+              <option value="inclusive" ${gstIncluded==="inclusive"?"selected":""}>${t("invGstInclusive")}</option>
+              <option value="exclusive" ${gstIncluded==="exclusive"?"selected":""}>${t("invGstExclusive")}</option>
             </select>
           </div>
         </div>
         <div id="iei-gst-preview" style="font-size:12px;color:#a78bfa;background:#0d0820;border-radius:8px;padding:8px 10px;display:none;margin-bottom:10px;"></div>
         <div>
-          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">HSN / SAC CODE</label>
+          <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t("invEditHsnCode")}</label>
           <input class="input" id="iei-hsn" type="text" maxlength="8"
             placeholder="e.g. 3305 (Shampoo), 0401 (Milk)"
             value="${escHtml(hsnCode)}"
@@ -17226,7 +17388,7 @@ function openInvEditModal(name){
         </div>
       </div>
       <div>
-        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">MIN STOCK ALERT</label>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t("invEditMinStock")}</label>
         <input class="input" id="iei-min-stock" type="number" min="0" step="1"
           placeholder="0 = no alert"
           value="${item.minStock !== undefined ? item.minStock : ""}"
@@ -17246,7 +17408,7 @@ function openInvEditModal(name){
       <div style="display:flex;gap:10px;margin-top:4px;">
         <button onclick="invEditModalSave(this.dataset.name)" data-name="${escHtml(name)}"
           style="flex:1;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-size:14px;font-weight:800;cursor:pointer;">
-          \u2705 Save Changes
+          ${t("invEditSaveChanges")}
         </button>
         <button onclick="closeModal()"
           style="padding:12px 18px;border-radius:10px;border:1px solid #1e2a45;background:transparent;color:#7a8aaa;font-size:14px;cursor:pointer;">
@@ -17634,9 +17796,9 @@ function renderInventoryTab(){
   };
 
   const nav = `<div style="display:flex;gap:6px;margin-bottom:16px;">
-    ${tabBtn("stock","📦 Stock","#4f4")}
-    ${tabBtn("add","➕ Add Item","#FFD700")}
-    ${tabBtn("log","📋 Sales Log","#b47aff")}
+    ${tabBtn("stock",t('invTabStock'),"#4f4")}
+    ${tabBtn("add",t('invTabAddItem'),"#FFD700")}
+    ${tabBtn("log",t('invTabSalesLog'),"#b47aff")}
   </div>`;
 
   // Summary cards
@@ -17664,13 +17826,13 @@ function renderInventoryTab(){
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
       <span style="font-size:16px;">⏳</span>
       <span style="font-size:13px;font-weight:800;color:#ff8c42;">${t('invExpiryAlerts')}</span>
-      <span style="font-size:10px;color:#ff8c42;margin-left:auto;background:#0a0500;border-radius:20px;padding:2px 8px;font-weight:700;">${expiringEntries.length} ${expiringEntries.length===1?'batch':'batches'}</span>
+      <span style="font-size:10px;color:#ff8c42;margin-left:auto;background:#0a0500;border-radius:20px;padding:2px 8px;font-weight:700;">${expiringEntries.length} ${expiringEntries.length===1?t('invBatchWord'):t('invBatchesWord')}</span>
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;">
       ${expiringEntries.slice(0,6).map(e=>{
         const isExpired = e.status==="expired";
         const color = isExpired?"#f66":(e.daysLeft<=7?"#f66":"#FFD700");
-        const label = isExpired ? `Expired ${Math.abs(e.daysLeft)}d ago` : (e.daysLeft===0?"Expires today":`Expires in ${e.daysLeft}d`);
+        const label = isExpired ? t('invExpiredAgo').replace('{n}',Math.abs(e.daysLeft)) : (e.daysLeft===0?t('invExpiresToday'):t('invExpiresIn').replace('{n}',e.daysLeft));
         return `<div style="background:#0a0500;border:1px solid ${isExpired?'#5a1010':'#3a2a10'};border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <div style="min-width:0;">
             <div style="font-weight:700;color:#fbbf24;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(e.itemName)}</div>
@@ -17679,7 +17841,7 @@ function renderInventoryTab(){
           <div style="font-size:11px;font-weight:800;color:${color};white-space:nowrap;flex-shrink:0;">${label}</div>
         </div>`;
       }).join("")}
-      ${expiringEntries.length>6?`<div style="text-align:center;font-size:11px;color:#7a8aaa;margin-top:2px;">+${expiringEntries.length-6} more</div>`:""}
+      ${expiringEntries.length>6?`<div style="text-align:center;font-size:11px;color:#7a8aaa;margin-top:2px;">+${expiringEntries.length-6} ${t('invMoreWord')}</div>`:""}
     </div>
   </div>` : ``}`;
 
@@ -17689,54 +17851,54 @@ function renderInventoryTab(){
     const existingCats = [...new Set(inventoryItems.map(x=>x.category||"General"))].sort();
     const prefillItem = invPrefillName ? inventoryItems.find(x=>x.name===invPrefillName) : null;
     body = `<div class="card" style="padding:22px;">
-      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:6px;">➕ Add / Edit Item</div>
-      <div style="font-size:12px;color:#4a5a7a;margin-bottom:14px;padding:10px 12px;background:#0d1220;border-radius:8px;border:1px solid #1e2a45;">Define a product — its name, unit, selling price and GST. To add stock quantities, use the <b style="color:#4a8aff;">Creditor tab → Purchase</b>.</div>
+      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:6px;">${t('invAddEditHeader')}</div>
+      <div style="font-size:12px;color:#4a5a7a;margin-bottom:14px;padding:10px 12px;background:#0d1220;border-radius:8px;border:1px solid #1e2a45;">${t('invAddEditDesc')}</div>
 
-      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Item / Product Name *</label>
-      <input class="input" id="inv-name" placeholder="e.g. Basmati Rice 5kg..."
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">${t('invItemNameLabel')}</label>
+      <input class="input" id="inv-name" placeholder="${t('invItemNamePlaceholder')}"
         oninput="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var sellEl=document.getElementById('inv-sell-price');var minEl=document.getElementById('inv-min-stock');var gstEl=document.getElementById('inv-gst-rate');var hsnEl=document.getElementById('inv-hsn-add');var bcEl=document.getElementById('inv-barcode-add');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(sellEl&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);if(minEl&&ex.minStock>0)minEl.value=ex.minStock;if(gstEl)gstEl.value=String(ex.gstRate||0);if(hsnEl&&ex.hsnCode)hsnEl.value=ex.hsnCode;if(bcEl&&ex.barcode)bcEl.value=ex.barcode;}invCheckDuplicateName(n);})(this)"
         value="${invPrefillName ? invPrefillName : ''}"
         style="margin-bottom:6px;" />
       <div id="inv-dup-warning-add" style="font-size:11px;min-height:0;margin-bottom:8px;"></div>
 
-      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Category</label>
-      <input class="input" id="inv-category" list="inv-category-list" placeholder="e.g. Grocery, Dairy, Snacks..."
+      <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">${t('invCategory')}</label>
+      <input class="input" id="inv-category" list="inv-category-list" placeholder="${t('invCategoryPlaceholder')}"
         value="${prefillItem ? prefillItem.category||'General' : ''}" style="margin-bottom:12px;" />
       <datalist id="inv-category-list">${existingCats.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">`).join("")}</datalist>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div>
-          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Unit</label>
-          <input class="input" id="inv-unit" list="inv-units" placeholder="kg / pcs / litre..."
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">${t('invUnit')}</label>
+          <input class="input" id="inv-unit" list="inv-units" placeholder="${t('invUnitPlaceholder')}"
             value="${prefillItem ? prefillItem.unit||'' : ''}" />
           <datalist id="inv-units"><option value="kg"><option value="pcs"><option value="litre"><option value="box"><option value="dozen"><option value="packet"><option value="bottle"><option value="bag"></datalist>
         </div>
         <div>
-          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">Selling Price (₹) <span style="color:#4f4;font-size:10px;">★</span></label>
+          <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">${t('invSellingPriceLabel')} <span style="color:#4f4;font-size:10px;">★</span></label>
           <input class="input" type="number" id="inv-sell-price" min="0" step="0.01" placeholder="0.00"
             value="${prefillItem&&prefillItem.sellingPrice>0 ? Number(prefillItem.sellingPrice).toFixed(2) : ''}" style="color:#FFD700;" />
         </div>
       </div>
 
       <div style="margin-bottom:12px;">
-        <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">${t('invMinStockWarning')} <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(alert when stock falls below this)</span></label>
-        <input class="input" type="number" id="inv-min-stock" min="0" step="1" placeholder="Default: 5"
+        <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:5px;">${t('invMinStockWarning')} <span style="font-size:10px;color:#4a5a7a;font-weight:400;">${t('invMinStockHint')}</span></label>
+        <input class="input" type="number" id="inv-min-stock" min="0" step="1" placeholder="${t('invMinStockPlaceholder')}"
           value="${prefillItem&&prefillItem.minStock>0 ? prefillItem.minStock : ''}" style="text-align:center;" />
       </div>
 
       <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:18px;">
-        <div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:10px;">🔢 GST Settings <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional)</span></div>
+        <div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:10px;">${t('invGstSettingsHeader')} <span style="font-size:10px;color:#4a5a7a;font-weight:400;">${t('invOptional')}</span></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
           <div>
-            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">GST RATE (%)</label>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t('invGstRatePercent')}</label>
             <div style="display:flex;gap:6px;align-items:center;">
               <select class="input" id="inv-gst-rate" style="margin-bottom:0;flex:1;" onchange="(function(){var v=this.value;if(v==='custom'){document.getElementById('inv-gst-custom').style.display='block';document.getElementById('inv-gst-custom').focus();}else{document.getElementById('inv-gst-custom').style.display='none';}invUpdateGstPreview('add');}).call(this)">
-                <option value="0" ${!prefillItem||![5,12,18,28].includes(Number(prefillItem.gstRate))?'selected':''}>0% — No GST</option>
+                <option value="0" ${!prefillItem||![5,12,18,28].includes(Number(prefillItem.gstRate))?'selected':''}>${t('invNoGst')}</option>
                 <option value="5" ${prefillItem&&prefillItem.gstRate===5?'selected':''}>5%</option>
                 <option value="12" ${prefillItem&&prefillItem.gstRate===12?'selected':''}>12%</option>
                 <option value="18" ${prefillItem&&prefillItem.gstRate===18?'selected':''}>18%</option>
                 <option value="28" ${prefillItem&&prefillItem.gstRate===28?'selected':''}>28%</option>
-                <option value="custom">Custom %</option>
+                <option value="custom">${t('invCustomPercent')}</option>
               </select>
               <input type="number" id="inv-gst-custom" min="0" max="100" step="0.5" placeholder="e.g. 3"
                 style="display:none;width:70px;padding:9px 8px;border-radius:8px;border:1px solid #2a3a5a;background:#0d1220;color:#fff;font-size:13px;"
@@ -17744,20 +17906,20 @@ function renderInventoryTab(){
             </div>
           </div>
           <div>
-            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">PRICE IS</label>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t('invPriceIs')}</label>
             <select class="input" id="inv-gst-included" style="margin-bottom:0;" onchange="invUpdateGstPreview('add')">
-              <option value="exclusive" ${prefillItem&&prefillItem.gstIncluded==='exclusive'?'selected':''}>Exclusive (+ GST on sale)</option>
-              <option value="inclusive" ${!prefillItem||prefillItem.gstIncluded!=='exclusive'?'selected':''}>Inclusive (GST inside price)</option>
+              <option value="exclusive" ${prefillItem&&prefillItem.gstIncluded==='exclusive'?'selected':''}>${t('invPriceIsExclusive')}</option>
+              <option value="inclusive" ${!prefillItem||prefillItem.gstIncluded!=='exclusive'?'selected':''}>${t('invPriceIsInclusive')}</option>
             </select>
           </div>
         </div>
         <div id="inv-gst-preview-add" style="font-size:12px;color:#a78bfa;background:#0d0820;border-radius:8px;padding:8px 10px;display:none;"></div>
         <div style="margin-top:10px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-            <label style="font-size:11px;color:#7a8aaa;font-weight:700;">HSN / SAC CODE <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional)</span></label>
-            <button type="button" onclick="buildCheatSheet('add')" style="font-size:10px;background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;border-radius:6px;padding:2px 8px;cursor:pointer;">🔍 What's my rate?</button>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;">${t('invHsnSacCode')} <span style="font-size:10px;color:#4a5a7a;font-weight:400;">${t('invOptional')}</span></label>
+            <button type="button" onclick="buildCheatSheet('add')" style="font-size:10px;background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;border-radius:6px;padding:2px 8px;cursor:pointer;">${t('invWhatsMyRate')}</button>
           </div>
-          <input class="input" type="text" id="inv-hsn-add" placeholder="e.g. 3305 (Shampoo), 0401 (Milk)" maxlength="8"
+          <input class="input" type="text" id="inv-hsn-add" placeholder="${t('invHsnPlaceholder')}" maxlength="8"
             oninput="hsnOnInput('add')"
             value="${prefillItem&&prefillItem.hsnCode ? prefillItem.hsnCode : ''}"
             style="margin-bottom:4px;" />
@@ -17767,33 +17929,33 @@ function renderInventoryTab(){
       </div>
 
       <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px;margin-bottom:18px;">
-        <div style="font-size:12px;font-weight:800;color:#FFD700;margin-bottom:8px;">📦 Barcode <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional)</span></div>
-        <div style="font-size:11px;color:#7a8aaa;margin-bottom:8px;line-height:1.5;">Add a barcode now so staff can scan this item instead of searching by name. You can also add or change this later from Edit Item.</div>
+        <div style="font-size:12px;font-weight:800;color:#FFD700;margin-bottom:8px;">${t('invBarcodeHeader')} <span style="font-size:10px;color:#4a5a7a;font-weight:400;">${t('invOptional')}</span></div>
+        <div style="font-size:11px;color:#7a8aaa;margin-bottom:8px;line-height:1.5;">${t('invBarcodeDesc')}</div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <input class="input" id="inv-barcode-add" type="text" placeholder="e.g. 8901234567890 or custom code like 1001"
+          <input class="input" id="inv-barcode-add" type="text" placeholder="${t('invBarcodePlaceholder')}"
             value="${prefillItem ? escHtml(prefillItem.barcode||"") : ''}"
             style="margin-bottom:0;font-family:monospace;flex:1;" />
-          <button type="button" onclick="startBarcodeScanIntoField('inv-barcode-add')" style="cursor:pointer;background:#1a3a1a;border:1px solid #22c55e;border-radius:8px;color:#22c55e;font-size:12px;font-weight:700;padding:9px 12px;white-space:nowrap;">📷 Scan</button>
+          <button type="button" onclick="startBarcodeScanIntoField('inv-barcode-add')" style="cursor:pointer;background:#1a3a1a;border:1px solid #22c55e;border-radius:8px;color:#22c55e;font-size:12px;font-weight:700;padding:9px 12px;white-space:nowrap;">${t('invScanBtn')}</button>
         </div>
-        <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">💡 Custom code tip: assign short codes like 1001=Rice, 1002=Dal for easy scanning</div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:6px;">${t('invBarcodeTip')}</div>
       </div>
 
       <div style="background:#0a1628;border:1px solid #1a3a5a;border-radius:10px;padding:14px;margin-bottom:18px;" ${prefillItem ? 'style="display:none;"' : ''}>
-        <div style="font-size:12px;font-weight:800;color:#4f4;margin-bottom:4px;">📦 Opening Stock <span style="font-size:10px;color:#4a5a7a;font-weight:400;">(optional — skip if adding stock via Creditor tab)</span></div>
-        <div style="font-size:11px;color:#4a6a4a;margin-bottom:10px;">Enter qty if you already have this item in stock. Gets added directly to inventory.</div>
+        <div style="font-size:12px;font-weight:800;color:#4f4;margin-bottom:4px;">${t('invOpeningStockHeader')} <span style="font-size:10px;color:#4a5a7a;font-weight:400;">${t('invOpeningStockSkipHint')}</span></div>
+        <div style="font-size:11px;color:#4a6a4a;margin-bottom:10px;">${t('invOpeningStockDesc')}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div>
-            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">QTY</label>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t('invQtyHeader')}</label>
             <input class="input" type="number" id="inv-opening-qty" min="0" step="any" placeholder="0" style="margin-bottom:0;color:#4f4;font-weight:700;" />
           </div>
           <div>
-            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">COST / UNIT (₹)</label>
+            <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t('invCostPerUnit')}</label>
             <input class="input" type="number" id="inv-opening-cost" min="0" step="any" placeholder="0.00" style="margin-bottom:0;" />
           </div>
         </div>
       </div>
 
-      <button class="btn" onclick="invSubmitAdd()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">💾 Save Item →</button>
+      <button class="btn" onclick="invSubmitAdd()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:14px;font-size:15px;font-weight:800;">${t('invSaveItemBtn')}</button>
     </div>`;
   }
   else if(invView==="log"){
@@ -17806,7 +17968,7 @@ function renderInventoryTab(){
     allSales.sort((a,b)=>new Date(b.date)-new Date(a.date));
     body = `<div class="card" style="padding:0;overflow:hidden;">
       <div style="padding:16px 18px;border-bottom:1px solid #1e2a45;">
-        <div style="font-size:14px;font-weight:800;color:#4a8aff;">📋 Sales Deduction Log</div>
+        <div style="font-size:14px;font-weight:800;color:#4a8aff;">${t('invSalesDeductionLog')}</div>
         <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${t('invAutoRecorded')}</div>
       </div>
       ${!allSales.length
@@ -17832,7 +17994,7 @@ function renderInventoryTab(){
         <div style="font-size:40px;margin-bottom:12px;">📦</div>
         <div style="font-size:15px;font-weight:700;color:#e8eaf0;margin-bottom:8px;">${t('invNoInventory')}</div>
         <div style="font-size:13px;color:#7a8aaa;margin-bottom:20px;">${t('invAddFirst')}</div>
-        <button class="btn" onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:12px 28px;font-weight:800;">➕ Add First Item</button>
+        <button class="btn" onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:12px 28px;font-weight:800;">${t('invAddFirstItemBtn')}</button>
       </div>`;
     } else {
 
@@ -17871,15 +18033,15 @@ function renderInventoryTab(){
               <div>
                 <div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
                 <div style="font-size:12px;color:#7a8aaa;margin-top:4px;">
-                  ${catItems.length} item${catItems.length!==1?"s":""}
-                  ${catLow>0 ? `&nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} low</span>` : ""}
-                  ${catOOS>0 ? `&nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} out</span>` : ""}
+                  ${catItems.length} ${catItems.length!==1?t('invItemsWord'):t('invItemWord')}
+                  ${catLow>0 ? `&nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} ${t('invLowWord')}</span>` : ""}
+                  ${catOOS>0 ? `&nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} ${t('invOutWord')}</span>` : ""}
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:12px;">
                 ${catVal>0 ? `<div style="text-align:right;">
                   <div style="font-size:15px;font-weight:800;color:#4f4;">₹${catVal>=100000?(catVal/100000).toFixed(1)+"L":catVal>=1000?(catVal/1000).toFixed(1)+"k":catVal.toFixed(0)}</div>
-                  <div style="font-size:10px;color:#4a5a7a;">Value</div>
+                  <div style="font-size:10px;color:#4a5a7a;">${t('invValue')}</div>
                 </div>` : ""}
                 <span style="color:#7ab3ff;font-size:22px;font-weight:300;">›</span>
               </div>
@@ -17900,15 +18062,15 @@ function renderInventoryTab(){
             <div>
               <div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
               <div style="font-size:12px;color:#7a8aaa;margin-top:4px;">
-                ${catItems.length} item${catItems.length!==1?"s":""}
-                ${catLow>0?`&nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} low</span>`:""}
-                ${catOOS>0?`&nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} out</span>`:""}
+                ${catItems.length} ${catItems.length!==1?t('invItemsWord'):t('invItemWord')}
+                ${catLow>0?`&nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} ${t('invLowWord')}</span>`:""}
+                ${catOOS>0?`&nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} ${t('invOutWord')}</span>`:""}
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:12px;">
               ${catVal>0?`<div style="text-align:right;">
                 <div style="font-size:15px;font-weight:800;color:#4f4;">₹${catVal>=100000?(catVal/100000).toFixed(1)+"L":catVal>=1000?(catVal/1000).toFixed(1)+"k":catVal.toFixed(0)}</div>
-                <div style="font-size:10px;color:#4a5a7a;">Value</div>
+                <div style="font-size:10px;color:#4a5a7a;">${t('invValue')}</div>
               </div>`:""}
               <span style="color:#7ab3ff;font-size:22px;font-weight:300;">›</span>
             </div>
@@ -17922,11 +18084,11 @@ function renderInventoryTab(){
 
   return `<div style="padding:16px 14px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <div style="font-size:18px;font-weight:800;color:#FFD700;">📦 Inventory</div>
+      <div style="font-size:18px;font-weight:800;color:#FFD700;">📦 ${t('inventory')}</div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button onclick="if(db&&authPhone){if(invUnsubscribe){try{invUnsubscribe();}catch(e){}}invUnsubscribe=null;notify('🔄 Syncing from cloud...');loadInventoryFromFirestore(()=>{safeRenderTab(currentTab);notify('✅ Inventory synced');});}else{notify('☁️ Cloud sync not set up — data saved locally','info');}" title="Sync from cloud" style="background:#0a1628;border:1px solid #1e3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 10px;font-size:14px;">🔄</button>
-        ${invView==="stock"?`<button onclick="openInventoryHealthCheck()" title="Check for duplicate items" style="background:#0a1628;border:1px solid #1e3a5a;border-radius:8px;color:#FFD700;cursor:pointer;padding:7px 10px;font-size:14px;">🩺</button>`:""}
-        ${invView==="stock"?`<button onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;">➕ Add New</button>`:""}
+        <button onclick="if(db&&authPhone){if(invUnsubscribe){try{invUnsubscribe();}catch(e){}}invUnsubscribe=null;notify('🔄 Syncing from cloud...');loadInventoryFromFirestore(()=>{safeRenderTab(currentTab);notify('✅ Inventory synced');});}else{notify('☁️ Cloud sync not set up — data saved locally','info');}" title="${t('invSyncFromCloud')}" style="background:#0a1628;border:1px solid #1e3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 10px;font-size:14px;">🔄</button>
+        ${invView==="stock"?`<button onclick="openInventoryHealthCheck()" title="${t('invCheckDuplicatesTitle')}" style="background:#0a1628;border:1px solid #1e3a5a;border-radius:8px;color:#FFD700;cursor:pointer;padding:7px 10px;font-size:14px;">🩺</button>`:""}
+        ${invView==="stock"?`<button onclick="invView='add';safeRenderTab(currentTab)" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:800;cursor:pointer;">${t('invAddNewBtn')}</button>`:""}
       </div>
     </div>
     ${nav}
@@ -20901,7 +21063,7 @@ function renderInventoryCategoryPage(catName){
             <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
             <div style="flex:1;min-width:0;">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-                <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${item.name}${stk<=(item.minStock||5)?' <span title="Low stock" style="font-size:12px;">⚠️</span>':''}</div>
+                <div style="font-weight:800;font-size:14px;color:#e8eaf0;">${item.name}${stk<=(item.minStock||5)?' <span title="'+t('invLowStockTitle')+'" style="font-size:12px;">⚠️</span>':''}</div>
                 <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk<=0?"OUT":stk} ${item.unit||"unit"}</div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
@@ -20911,7 +21073,7 @@ function renderInventoryCategoryPage(catName){
                 </div>
                 <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;">
                   <div style="font-size:13px;font-weight:800;color:#f66;">-${totalOut}</div>
-                  <div style="font-size:9px;color:#4a5a7a;">Sold</div>
+                  <div style="font-size:9px;color:#4a5a7a;">${t("invSold")}</div>
                 </div>
                 <div style="background:#0a0e1a;border-radius:8px;padding:7px;text-align:center;">
                   <div style="font-size:12px;font-weight:800;color:#7ab3ff;">${avgCost>0?"₹"+avgCost:"—"}</div>
@@ -20976,7 +21138,7 @@ function invShowItemDetail(itemName){
 
 function renderInventoryItemDetail(itemName){
   const item = inventoryItems.find(x=>x.name===itemName);
-  if(!item) return `<div style="padding:32px;text-align:center;color:#4a5a7a;">Item not found</div>`;
+  if(!item) return `<div style="padding:32px;text-align:center;color:#4a5a7a;">${t("txNotFound")}</div>`;
 
   const custMap = {};
   customers.forEach(c=>{
@@ -21040,7 +21202,7 @@ function renderInventoryItemDetail(itemName){
         ${modeBtn('invHistSetMode','qty','📦 Qty Range',window._invHistMode==='qty')}
       </div>
       <div id="inv-hist-filter-date" style="display:${window._invHistMode==='date'?'flex':'none'};gap:8px;margin-bottom:6px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:130px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">From</div><input type="datetime-local" id="inv-hist-from" class="input" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invHistApply()"/></div>
+        <div style="flex:1;min-width:130px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">${t("txDate")||"From"}</div><input type="datetime-local" id="inv-hist-from" class="input" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invHistApply()"/></div>
         <div style="flex:1;min-width:130px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">To</div><input type="datetime-local" id="inv-hist-to" class="input" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invHistApply()"/></div>
       </div>
       <div id="inv-hist-filter-type" style="display:${window._invHistMode==='type'?'flex':'none'};gap:6px;margin-bottom:6px;">
@@ -21049,8 +21211,8 @@ function renderInventoryItemDetail(itemName){
         <button onclick="window._invHistType='sale';invHistApply()" style="padding:5px 12px;font-size:11px;font-weight:700;border-radius:7px;cursor:pointer;border:1px solid ${window._invHistType==='sale'?'#f66':'#1e2a45'};background:${window._invHistType==='sale'?'#1a0a0a':'#0a0e1a'};color:${window._invHistType==='sale'?'#f66':'#7a8aaa'};">🛒 Sale</button>
       </div>
       <div id="inv-hist-filter-qty" style="display:${window._invHistMode==='qty'?'flex':'none'};gap:8px;margin-bottom:6px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:100px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">Min Qty</div><input type="number" id="inv-hist-qty-min" class="input" min="0" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invHistApply()"/></div>
-        <div style="flex:1;min-width:100px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">Max Qty</div><input type="number" id="inv-hist-qty-max" class="input" min="0" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invHistApply()"/></div>
+        <div style="flex:1;min-width:100px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">${t("invQty")||"Min Qty"}</div><input type="number" id="inv-hist-qty-min" class="input" min="0" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invHistApply()"/></div>
+        <div style="flex:1;min-width:100px;"><div style="font-size:10px;color:#4a5a7a;margin-bottom:3px;">${t("invQty")||"Max Qty"}</div><input type="number" id="inv-hist-qty-max" class="input" min="0" style="font-size:12px;padding:7px 8px;width:100%;color:#e8eaf0;background:#0a0e1a;" oninput="invHistApply()"/></div>
       </div>
       <div id="inv-hist-info" style="font-size:11px;color:#4a5a7a;margin-bottom:6px;display:none;"></div>
     </div>
@@ -21089,15 +21251,15 @@ function renderInventoryItemDetail(itemName){
       </div>
       <div style="background:#0a1a0a;border:1px solid #1e3a1e;border-radius:10px;padding:9px 4px;text-align:center;">
         <div style="font-size:15px;font-weight:800;color:#4f4;">${restockCount}</div>
-        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Restocked</div>
+        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">${t("invRestocked")}</div>
       </div>
       <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:9px 4px;text-align:center;">
         <div style="font-size:15px;font-weight:800;color:#f66;">${totalSold}</div>
-        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Sold</div>
+        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">${t("invSold")}</div>
       </div>
       <div style="background:#081a08;border:1px solid #FFD70030;border-radius:10px;padding:9px 4px;text-align:center;cursor:pointer;" onclick="invEditSellPrice('${itemName.replace(/'/g,"\\'")}');safeRenderTab(currentTab)">
         <div style="font-size:12px;font-weight:800;color:#FFD700;">${item.sellingPrice>0?"₹"+Number(item.sellingPrice).toFixed(2):"Set ✏️"}</div>
-        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">Price</div>
+        <div style="font-size:9px;color:#4a5a7a;margin-top:1px;">${t("invSellPrice")}</div>
       </div>
     </div>
     <div style="display:flex;gap:4px;background:#050810;border-radius:12px;padding:4px;margin-bottom:14px;">
