@@ -17069,6 +17069,10 @@ window.addEventListener("load", () => {
       openPaymentModal();
       document.getElementById("pm-conf-utr").textContent = pending.utr;
       document.getElementById("pm-conf-utr-small").textContent = pending.utr;
+      document.getElementById("pm-conf-status").innerHTML = '<span style="color:#f84;">⏳ अप्रूवल बाकी है</span>';
+      // Always reset to "checking" state — never show activated prematurely
+      document.getElementById("pm-checking-box").style.display = "block";
+      document.getElementById("pm-activated-box").style.display = "none";
       pmSetStep(3);
       pmStartPolling(pending.utr);
     }
@@ -17115,7 +17119,36 @@ window.addEventListener("load", () => {
           }
         }
       }
-      // Fallback: poll Supabase directly if licenseKey exists (covers non-Firestore path)
+      // Fallback: poll Supabase by phone — catches assignProKey path (no UTR, no Firestore push)
+      // This covers the case where Seller assigns Pro directly without a payment request
+      const res = await fetch(
+        `${SC_SUPABASE_URL}/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(authPhone)}&select=key,plan,active,expires_at&order=created_at.desc&limit=1`,
+        { headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON } }
+      );
+      if (res.ok) {
+        const rows = await res.json();
+        if (rows && rows.length > 0) {
+          const row = rows[0];
+          if (row.active && row.plan === "pro" && (!row.expires_at || new Date(row.expires_at) > new Date())) {
+            saveLicense(row.key, "pro", "pro");
+            updateLicenseUI();
+            // Also close payment modal if it was open in pending state
+            try {
+              const pmModal = document.getElementById("payment-modal");
+              if (pmModal && pmModal.style.display === "flex") {
+                document.getElementById("pm-conf-status").innerHTML = '<span style="color:#4f4;">✅ Activated!</span>';
+                document.getElementById("pm-checking-box").style.display = "none";
+                document.getElementById("pm-activated-box").style.display = "block";
+                try { localStorage.removeItem(storageKey("pending_payment")); } catch{}
+                if (pmPollTimer) clearInterval(pmPollTimer);
+              }
+            } catch(_) {}
+            console.log("[SC] BG poller: Pro license detected from Supabase (phone match) — activated!");
+            return;
+          }
+        }
+      }
+      // Final fallback: if we have a key already, revalidate it
       if (licenseKey) {
         await validateLicenseOnline();
         updateLicenseUI();

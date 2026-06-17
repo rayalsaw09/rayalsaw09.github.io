@@ -1423,6 +1423,17 @@ async function assignProKey(phone, name) {
         notes: "Auto-assigned Pro (1 year)"
       })
     });
+    // ── Push license to Firestore so Admin app reflects Pro immediately ──
+    if (phone && saDb) {
+      try {
+        await saDb.collection("users").doc(String(phone))
+          .collection("settings").doc("prefs")
+          .set({ license: { key, plan: "pro", status: "pro", expires_at: oneYear.toISOString() } }, { merge: true });
+        console.log("[SP] assignProKey: License pushed to Firestore for", phone);
+      } catch(fbErr) {
+        console.warn("[SP] assignProKey: Firestore push failed (non-fatal):", fbErr.message);
+      }
+    }
     spNotify(`✅ Pro assigned to ${name || phone}! Key: ${key}. Expires in 1 year.`);
     loadKeys();
   } catch(e) { alert("❌ Error: " + e.message); }
