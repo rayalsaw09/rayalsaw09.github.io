@@ -1254,6 +1254,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
   </div>
   <button class="btn" onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 18px;font-size:12px;font-weight:800;">💳 सब्सक्रिप्शन रिन्यू करें →</button>
   <button class="btn" onclick="showRenewPrompt()" style="background:#3a0a0a;color:#f88;border:1px solid #f44;padding:8px 14px;font-size:11px;">कीी डालें</button>
+  <button onclick="document.getElementById('sub-expired-banner').style.display='none'" style="background:transparent;border:none;color:#f66;font-size:20px;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0;" title="Close">✕</button>
 </div>
 
 <!-- ── TRIAL COUNTDOWN BANNER ── -->
@@ -1603,21 +1604,21 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 
   <!-- Bottom Nav (mobile only) -->
   <nav id="bottom-nav">
-    <button class="bnav-btn" id="bnav-0" onclick="mobileTab(0)">
-      <span class="bnav-icon" id="bnav-icon-0">🏆</span>
-      <span class="bnav-label" id="bnav-label-0">बोर्ड</span>
+    <button class="bnav-btn" id="bnav-0" onclick="mobileTab(8)">
+      <span class="bnav-icon" id="bnav-icon-0">🧾</span>
+      <span class="bnav-label" id="bnav-label-0">सेल जोड़ें</span>
     </button>
     <button class="bnav-btn" id="bnav-1" onclick="mobileTab(1)">
       <span class="bnav-icon" id="bnav-icon-1">👥</span>
       <span class="bnav-label" id="bnav-label-1">कस्टमर</span>
     </button>
-    <button class="bnav-btn" id="bnav-2" onclick="mobileTab(2)">
-      <span class="bnav-icon" id="bnav-icon-2">💳</span>
-      <span class="bnav-label" id="bnav-label-2">सेल जोड़ें</span>
+    <button class="bnav-btn" id="bnav-2" onclick="mobileTab(0)">
+      <span class="bnav-icon" id="bnav-icon-2">🏦</span>
+      <span class="bnav-label" id="bnav-label-2">क्रेडिटर</span>
     </button>
-    <button class="bnav-btn" id="bnav-5" onclick="mobileTab(5)">
-      <span class="bnav-icon" id="bnav-icon-5">📦</span>
-      <span class="bnav-label" id="bnav-label-5">इन्वेंट्री</span>
+    <button class="bnav-btn" id="bnav-3" onclick="mobileTab(6)">
+      <span class="bnav-icon" id="bnav-icon-3">📋</span>
+      <span class="bnav-label" id="bnav-label-3">डेबटर</span>
     </button>
     <button class="bnav-btn" id="bnav-more" onclick="toggleMoreMenu()">
       <span class="bnav-icon">⋯</span>
@@ -2432,9 +2433,9 @@ async function scHashPassword(phone, password) {
 // ─── CONSTANTS ───────────────────────────────────────────────
 var FESTIVALS = ["Diwali 🪔","Holi 🎨","Eid 🌙","New Year 🎆","Navratri 🎉"];
 var REWARDS   = ["Gift Hamper","10% Discount Coupon","₹500 Cashback","Free Product","VIP Pass"];
-var TABS_BASE = ["leaderboard","customers","sales","analytics","compare","inventory","creditors","debtors","expenses","messages","settings","alerts","history","team"];
-var TABS_ICON = ["🏆","👥","🧾","📊","⚖️","📦","🏦","🧾","✉️","⚙️","⚠️","🕘","👤"];
-var TABS_LABEL_PRO = ["Rankings","Customers","Add Sale","Analytics","Compare","Inventory","Creditors","Debtors","Expenses","Messages","Settings","Alerts","History","Team"];
+var TABS_BASE = ["sales","customers","creditors","debtors","inventory","expenses","analytics","compare","leaderboard","messages","history","alerts","settings","team"];
+var TABS_ICON = ["🧾","👥","🏦","📋","📦","💸","📊","⚖️","🏆","💬","🕘","⚠️","⚙️","👤"];
+var TABS_LABEL_PRO = ["Add Sale","Customers","Creditors","Debtors","Inventory","Expenses","Analytics","Compare","Rankings","Messages","History","Alerts","Settings","Team"];
 var _shopRequestsUnread = 0; // badge count for messages tab
 function getTabs(){
   const isPro = currentAppStyle === "pro";
@@ -2992,8 +2993,8 @@ window.addEventListener('appinstalled', () => {
 })();
 
 // ── Mobile Bottom Nav ──────────────────────────────────────────
-var MOBILE_MAIN_TABS = [0, 1, 2, 5]; // leaderboard, customers, purchase, inventory
-var MOBILE_MORE_TABS = [3, 4, 6, 7, 8, 9, 10, 11, 12];    // analytics, compare, creditors, debtors, messages, settings, alerts, history, team
+var MOBILE_MAIN_TABS = [0, 1, 2, 3]; // sales, customers, creditors, debtors
+var MOBILE_MORE_TABS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]; // inventory, expenses, analytics, compare, leaderboard, messages, history, alerts, settings, team
 
 function mobileTab(i) {
   closeMoreMenu();
@@ -3198,7 +3199,7 @@ function _loadVoices() {
 if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => {
     _voiceCache = window.speechSynthesis.getVoices();
-    if (currentTab === 6) safeRenderTab(6); // refresh dropdown
+    if (currentTab === 2) safeRenderTab(2); // refresh dropdown
   };
   // Try immediate load (Chrome sometimes has them ready)
   _loadVoices();
@@ -3830,7 +3831,7 @@ function addHistoryLog(type, action, details, extra, groupId){
         .set({ list, updatedAt: now }, {merge:true}).catch(()=>{});
     }
     // Live-refresh history tab if currently open
-    if(currentTab===12) safeRenderTab(12);
+    if(currentTab===10) safeRenderTab(10);
     return entry.id;
   } catch(e){ /* never break the app over logging */ }
 }
@@ -3847,7 +3848,7 @@ function loadHistoryFromCloud(dayKey){
         const data = doc.data();
         if(data.list){
           try{ localStorage.setItem(historyLogKey(dayKey), JSON.stringify(data.list)); }catch{}
-          if(currentTab===12) safeRenderTab(12);
+          if(currentTab===10) safeRenderTab(10);
         }
       }
     }).catch(()=>{});
@@ -4432,7 +4433,16 @@ function onLoginSuccess(phone) {
     // Firestore rules use request.auth != null — must be signed in first.
     const _afterAuth = () => {
       startFirestoreListener();
-      loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
+      loadSettingsFromCloud(()=>{
+        // For members: redirect to their first allowed tab
+        if (currentMember) {
+          const firstAllowed = getTabs();
+          if (firstAllowed.length > 0 && !isTabVisible(TABS_BASE[currentTab])) {
+            currentTab = firstAllowed[0].index;
+          }
+        }
+        safeRenderTab(currentTab);
+      });
       loadShopRequests();
       setTimeout(startPaymentRequestListener, 2000);
       setTimeout(sweepAcceptedPaymentSyncRequests, 3000);
@@ -4804,7 +4814,7 @@ function _safeRenderTabImmediate(i) {
     const savedFields = _tab2SaveFields();
 
     ptSaveState();
-    renderTab(2);
+    renderTab(0);
     ptRestoreState();
 
     // Restore every field that had a value
@@ -4822,8 +4832,15 @@ function _safeRenderTabImmediate(i) {
   }
 }
 // ─── TABS ─────────────────────────────────────────────────────
-function renderTabs(){const TABS=getTabs();document.getElementById("tab-bar").innerHTML=TABS.map((tab)=>`<button class="tab-btn${currentTab===tab.index?" active":""}" onclick="switchTab(${tab.index})">${tab.label}</button>`).join("");}
-function switchTab(i){if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}if(i!==6&&i!==7)invPrefillName="";window._pageStack=[];window._scDetailPage=null;currentTab=i;renderTabs();renderTab(i);}
+function renderTabs(){const TABS=getTabs();document.getElementById("tab-bar").innerHTML=TABS.map((tab)=>`<button class="tab-btn${currentTab===tab.index?" active":""}" onclick="switchTab(${tab.index})">${tab.label}</button>`).join("");; updateBottomNavVisibility(); }
+function switchTab(i){
+  // Guard: members cannot switch to tabs they don't have access to
+  if(currentMember && TABS_BASE[i] && !isTabVisible(TABS_BASE[i])) return;
+  if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}
+  if(i!==2&&i!==3)invPrefillName="";
+  window._pageStack=[];window._scDetailPage=null;
+  currentTab=i;renderTabs();renderTab(i);
+}
 
 // ─── PAGE HISTORY ENGINE ──────────────────────────────────────────────────────
 // Enables full-screen detail pages with proper back navigation.
@@ -4855,17 +4872,17 @@ function renderTab(i){
   const el=document.getElementById("tab-content"),s=getSorted();
   if(!el) return;
   el.style.position="";el.style.overflow="";
-  if(i===0)el.innerHTML=renderLeaderboard(getSortedFiltered());
-  else if(i===1){const q=document.getElementById("cust-search")?.value||"";el.innerHTML=renderCustomers(s,q);}
-  else if(i===2){el.innerHTML=renderPurchaseTab(s);if(getPurchaseMode()==="inventory"){const list=document.getElementById("pt-items-list");if(list&&list.children.length===0)ptAddItemRow();}
+  if(i===0){el.innerHTML=renderPurchaseTab(s);if(getPurchaseMode()==="inventory"){const list=document.getElementById("pt-items-list");if(list&&list.children.length===0)ptAddItemRow();}
     setTimeout(scRenderPurchaseBanners, 0);
   }
-  else if(i===3)el.innerHTML=renderAnalytics(s);
-  else if(i===4)el.innerHTML=renderCompare();
-  else if(i===5)el.innerHTML=renderInventoryTab();
-  else if(i===6)el.innerHTML=renderCreditorsTab();
-  else if(i===7)el.innerHTML=renderDebtorsTab();
-  else if(i===8)el.innerHTML=renderExpensesTab();
+  else if(i===1){const q=document.getElementById("cust-search")?.value||"";el.innerHTML=renderCustomers(s,q);}
+  else if(i===2)el.innerHTML=renderCreditorsTab();
+  else if(i===3)el.innerHTML=renderDebtorsTab();
+  else if(i===4)el.innerHTML=renderInventoryTab();
+  else if(i===5)el.innerHTML=renderExpensesTab();
+  else if(i===6)el.innerHTML=renderAnalytics(s);
+  else if(i===7)el.innerHTML=renderCompare();
+  else if(i===8)el.innerHTML=renderLeaderboard(getSortedFiltered());
   else if(i===9){
     // If a chat is open, re-render the full chat shell first (DOM was wiped by tab switch)
     if (_scActiveChatPhone) {
@@ -4891,9 +4908,9 @@ function renderTab(i){
       return Promise.all(loads);
     }).then(()=>{ el.innerHTML = renderMessagesTab(); });
   }
-  else if(i===10)el.innerHTML=renderSettings();
+  else if(i===10)el.innerHTML=renderHistoryTab();
   else if(i===11)el.innerHTML=renderAlertsTab();
-  else if(i===12)el.innerHTML=renderHistoryTab();
+  else if(i===12)el.innerHTML=renderSettings();
   else if(i===13)renderTeamTab(el);
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
 }
@@ -4912,7 +4929,7 @@ function lbFilterLabel() {
 function setLbFilter(mode) {
   lbFilter.mode = mode;
   lbPage = 0;
-  if (mode !== "custom") renderTab(0);
+  if (mode !== "custom") renderTab(8);
   else {
     // Show date picker inline
     const el = document.getElementById("lb-custom-date-row");
@@ -4920,14 +4937,14 @@ function setLbFilter(mode) {
   }
 }
 
-function setLbYear(y) { lbFilter.mode = "year"; lbFilter.year = y; lbPage = 0; renderTab(0); }
-function lbGoPage(p) { lbPage = p; renderTab(0); document.getElementById("tab-content").scrollTop = 0; }
+function setLbYear(y) { lbFilter.mode = "year"; lbFilter.year = y; lbPage = 0; renderTab(8); }
+function lbGoPage(p) { lbPage = p; renderTab(8); document.getElementById("tab-content").scrollTop = 0; }
 
 function applyCustomDate() {
   const v = document.getElementById("lb-date-pick")?.value;
   if (!v) return;
   lbFilter.customDate = v;
-  renderTab(0);
+  renderTab(8);
 }
 
 function renderLeaderboard(sorted){
@@ -5211,7 +5228,7 @@ function renderPurchaseTab(sorted){
 
   const tabBtn = (v,label,color)=>{
     const a=ptView===v;
-    return `<button onclick="ptView='${v}';renderTab(2)" style="cursor:pointer;flex:1;padding:11px;border-radius:12px;border:2px solid ${a?color:'#1e2a45'};background:${a?'#0a0e1a':'transparent'};color:${a?color:'#4a5a7a'};font-size:14px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;">${label}</button>`;
+    return `<button onclick="ptView='${v}';renderTab(0)" style="cursor:pointer;flex:1;padding:11px;border-radius:12px;border:2px solid ${a?color:'#1e2a45'};background:${a?'#0a0e1a':'transparent'};color:${a?color:'#4a5a7a'};font-size:14px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;">${label}</button>`;
   };
 
   const invMode = getPurchaseMode()==="inventory";
@@ -6127,7 +6144,7 @@ async function bwSubmit(){
   bwClearCustomer();
   const btn=document.getElementById('bw-sub');
   btn.style.background='linear-gradient(135deg,#1a5a2a,#2a8a3a)';btn.style.color='#4f4';btn.textContent='✅ Recorded!';
-  setTimeout(()=>{btn.style.background='linear-gradient(135deg,#f84,#e05020)';btn.style.color='#fff';btn.textContent='Record Borrow →';safeRenderTab(2);},2000);
+  setTimeout(()=>{btn.style.background='linear-gradient(135deg,#f84,#e05020)';btn.style.color='#fff';btn.textContent='Record Borrow →';safeRenderTab(0);},2000);
 }
 
 async function bwMarkReturned(custId,borrowId){
@@ -6654,7 +6671,7 @@ function getAnalyticsYears(){
   return years;
 }
 
-function setAnalyticsYear(y){ analyticsYear=y; renderTab(3); }
+function setAnalyticsYear(y){ analyticsYear=y; renderTab(6); }
 
 function renderAnalytics(sorted){
   const now       = new Date();
@@ -7610,17 +7627,17 @@ function cmpRevenueByYear(years){
   return years.map(y=>map[String(y)]);
 }
 
-function cmpSetMode(m){cmpMode=m;cmpWeekOffset=0;cmpSelectedYear=new Date().getFullYear();cmpSelectedQuarter=Math.floor(new Date().getMonth()/3);cmpYearA=new Date().getFullYear();cmpYearB=new Date().getFullYear()-1;renderTab(4);}
-function cmpSetMonthYear(y){cmpSelectedYear=y;renderTab(4);}
-function cmpSetYearA(y){cmpYearA=y;renderTab(4);}
-function cmpSetYearB(y){cmpYearB=y;renderTab(4);}
-function cmpSetQuarter(q){cmpSelectedQuarter=q;renderTab(4);}
+function cmpSetMode(m){cmpMode=m;cmpWeekOffset=0;cmpSelectedYear=new Date().getFullYear();cmpSelectedQuarter=Math.floor(new Date().getMonth()/3);cmpYearA=new Date().getFullYear();cmpYearB=new Date().getFullYear()-1;renderTab(7);}
+function cmpSetMonthYear(y){cmpSelectedYear=y;renderTab(7);}
+function cmpSetYearA(y){cmpYearA=y;renderTab(7);}
+function cmpSetYearB(y){cmpYearB=y;renderTab(7);}
+function cmpSetQuarter(q){cmpSelectedQuarter=q;renderTab(7);}
 function cmpNav(dir){
   if(cmpMode==="day") cmpWeekOffset+=dir;
   if(cmpMode==="week") cmpWeekOffset+=dir;
   if(cmpMode==="month") cmpSelectedYear+=dir;
   if(cmpMode==="quarter"){ cmpSelectedQuarter+=dir; if(cmpSelectedQuarter<0){cmpSelectedQuarter=3;cmpSelectedYear--;}if(cmpSelectedQuarter>3){cmpSelectedQuarter=0;cmpSelectedYear++;} }
-  renderTab(4);
+  renderTab(7);
 }
 
 function cmpBuildChart(labels,values,periodLabel,highlightIdx,isFutureArr,subLabelFn){
@@ -7827,7 +7844,7 @@ function renderCompare(){
     <div style="font-size:72px;filter:drop-shadow(0 0 30px rgba(74,140,255,0.3));">📊</div>
     <div style="font-size:22px;font-weight:800;color:var(--text-main);font-family:'Rajdhani',sans-serif;">${t('cmpNoData')}</div>
     <div style="font-size:13px;color:var(--text-muted);max-width:300px;line-height:1.7;">${t('cmpNoDataSub')}</div>
-    <button onclick="safeRenderTab(2);" class="btn" style="padding:14px 32px;font-size:14px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:800;border-radius:14px;letter-spacing:0.5px;">${t('cmpAddFirstSale')}</button>
+    <button onclick="safeRenderTab(0);" class="btn" style="padding:14px 32px;font-size:14px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:800;border-radius:14px;letter-spacing:0.5px;">${t('cmpAddFirstSale')}</button>
   </div>`;}
 
   // ── Compute period data ───────────────────────────────────────────────────
@@ -8878,7 +8895,7 @@ function renderCreditorsTab(){
         <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${totalCount} ${t('crSuppliers')} · ${t('crPayable')} <span style="color:#f59e0b;font-weight:800;">${formatINR(totalOwed)}</span></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        ${archivedCount>0 ? `<button onclick="window._credShowArchived=!window._credShowArchived;renderTab(6)" style="cursor:pointer;border-radius:20px;padding:8px 14px;border:1px solid ${showArchived?'#d97706':'#1e2a45'};background:${showArchived?'#1a0e00':'transparent'};color:${showArchived?'#fbbf24':'#4a5a7a'};font-size:12px;font-weight:700;">📦 ${t('crArchived')} (${archivedCount})</button>` : ''}
+        ${archivedCount>0 ? `<button onclick="window._credShowArchived=!window._credShowArchived;renderTab(2)" style="cursor:pointer;border-radius:20px;padding:8px 14px;border:1px solid ${showArchived?'#d97706':'#1e2a45'};background:${showArchived?'#1a0e00':'transparent'};color:${showArchived?'#fbbf24':'#4a5a7a'};font-size:12px;font-weight:700;">📦 ${t('crArchived')} (${archivedCount})</button>` : ''}
         ${!showArchived ? `<button onclick="openAddCreditorModal()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:10px 20px;font-size:13px;font-weight:800;">${t('crAddManually')}</button>` : ''}
       </div>
     </div>
@@ -8902,7 +8919,7 @@ function renderCreditorsTab(){
     <!-- Search -->
     <div style="margin-bottom:10px;">
       <input class="input" placeholder="${t('crSearchPlaceholder')}" value="${escHtml(searchVal)}"
-        oninput="window._credSearch=this.value;renderTab(6)" style="font-size:13px;" />
+        oninput="window._credSearch=this.value;renderTab(2)" style="font-size:13px;" />
     </div>
 
     <!-- GST filter pills -->
@@ -8910,7 +8927,7 @@ function renderCreditorsTab(){
       <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">${t('crGstStatus')}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${[['all',t('crAll')],['gst',t('crGstReg')],['nogst',t('crNotReg')]].map(([k,l])=>`
-          <button onclick="window._credGstFilter='${k}';renderTab(6)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${gstFilter===k?'#a78bfa':'#1e2a45'};background:${gstFilter===k?'#1a0a30':'transparent'};color:${gstFilter===k?'#a78bfa':'#4a5a7a'};font-size:12px;font-weight:${gstFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
+          <button onclick="window._credGstFilter='${k}';renderTab(2)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${gstFilter===k?'#a78bfa':'#1e2a45'};background:${gstFilter===k?'#1a0a30':'transparent'};color:${gstFilter===k?'#a78bfa':'#4a5a7a'};font-size:12px;font-weight:${gstFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
         `).join('')}
       </div>
     </div>
@@ -9105,7 +9122,7 @@ function saveCreditorModal(editId){
   addHistoryLog('creditor', editId?'Creditor updated':'Creditor added', name);
   closeModal();
   notify(editId?"✅ Creditor updated":"✅ Creditor added");
-  renderTab(6);
+  renderTab(2);
 }
 
 // ── Archive helper ────────────────────────────────────────────────────────────
@@ -9119,7 +9136,7 @@ function archiveCreditor(id){
   addHistoryLog('creditor','Creditor archived',cr.name);
   closeModal();
   notify("📦 " + cr.name + " archived");
-  renderTab(6);
+  renderTab(2);
 }
 
 function archiveDebtor(id){
@@ -9132,7 +9149,7 @@ function archiveDebtor(id){
   addHistoryLog('debtor','Debtor archived',dr.name);
   closeModal();
   notify("📦 " + dr.name + " archived");
-  renderTab(7);
+  renderTab(3);
 }
 
 function unarchiveCreditor(id){
@@ -9144,7 +9161,7 @@ function unarchiveCreditor(id){
   saveCreditors(creditors);
   addHistoryLog('creditor','Creditor restored',cr.name);
   notify("✅ " + cr.name + " restored");
-  renderTab(6);
+  renderTab(2);
 }
 
 function unarchiveDebtor(id){
@@ -9156,7 +9173,7 @@ function unarchiveDebtor(id){
   saveDebtors(debtors);
   addHistoryLog('debtor','Debtor restored',dr.name);
   notify("✅ " + dr.name + " restored");
-  renderTab(7);
+  renderTab(3);
 }
 
 function _doSimpleDeleteCreditor(id){
@@ -9167,7 +9184,7 @@ function _doSimpleDeleteCreditor(id){
   addHistoryLog('creditor','Creditor deleted', cr?cr.name:"Supplier");
   closeModal();
   notify("🗑 " + (cr?cr.name:"Supplier") + " deleted");
-  renderTab(6);
+  renderTab(2);
 }
 
 // ── Smart delete: analyse impact, show appropriate modal ──────────────────────
@@ -9305,7 +9322,7 @@ function confirmHardDeleteCreditor(id){
   addHistoryLog('creditor','Creditor deleted (with stock reversal)', cr.name);
   closeModal();
   notify("🗑 " + cr.name + " deleted and stock reversed");
-  renderTab(6);
+  renderTab(2);
 }
 
 // ── Debtor delete ─────────────────────────────────────────────────────────────
@@ -9322,7 +9339,7 @@ function deleteDebtor(id){
     addHistoryLog('debtor','Debtor deleted', dr.name);
     closeModal();
     notify("🗑 " + dr.name + " deleted");
-    renderTab(7);
+    renderTab(3);
     return;
   }
 
@@ -11567,7 +11584,7 @@ function renderDebtorsTab(){
         <div style="font-size:12px;color:#7a8aaa;margin-top:2px;">${totalCount} ${currentLang==='hi'?'देनदार':'debtor'}${totalCount!==1&&currentLang!=='hi'?"s":""} · ${currentLang==='hi'?'कुल प्राप्य:':'Total receivable:'} <span style="color:#22c55e;font-weight:800;">${formatINR(totalOwed)}</span></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        ${archivedCount>0 ? `<button onclick="window._debtShowArchived=!window._debtShowArchived;renderTab(7)" style="cursor:pointer;border-radius:20px;padding:8px 14px;border:1px solid ${showArchived?'#d97706':'#1e2a45'};background:${showArchived?'#1a0e00':'transparent'};color:${showArchived?'#fbbf24':'#4a5a7a'};font-size:12px;font-weight:700;">📦 Archived (${archivedCount})</button>` : ''}
+        ${archivedCount>0 ? `<button onclick="window._debtShowArchived=!window._debtShowArchived;renderTab(3)" style="cursor:pointer;border-radius:20px;padding:8px 14px;border:1px solid ${showArchived?'#d97706':'#1e2a45'};background:${showArchived?'#1a0e00':'transparent'};color:${showArchived?'#fbbf24':'#4a5a7a'};font-size:12px;font-weight:700;">📦 Archived (${archivedCount})</button>` : ''}
         ${!showArchived ? `<button onclick="openAddDebtorModal()" class="btn" style="background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff;padding:10px 20px;font-size:13px;font-weight:800;">+ Add Manually</button>` : ''}
       </div>
     </div>
@@ -11583,7 +11600,7 @@ function renderDebtorsTab(){
     <!-- Search -->
     <div style="margin-bottom:10px;">
       <input class="input" placeholder="🔍 Search debtor by name or phone..." value="${escHtml(searchVal)}"
-        oninput="window._debtSearch=this.value;renderTab(7)" style="font-size:13px;" />
+        oninput="window._debtSearch=this.value;renderTab(3)" style="font-size:13px;" />
     </div>
 
     <!-- GST filter pills — only show if at least one debtor has GSTIN -->
@@ -11591,7 +11608,7 @@ function renderDebtorsTab(){
       <div style="font-size:11px;color:#4a5a7a;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">🔢 GST Status:</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${[['all','🏢 All'],['gst','✅ GST Registered'],['nogst','❌ Not Registered']].map(([k,l])=>`
-          <button onclick="window._debtGstFilter='${k}';renderTab(7)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${gstFilter===k?'#22c55e':'#1e2a45'};background:${gstFilter===k?'#022c1a':'transparent'};color:${gstFilter===k?'#22c55e':'#4a5a7a'};font-size:12px;font-weight:${gstFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
+          <button onclick="window._debtGstFilter='${k}';renderTab(3)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${gstFilter===k?'#22c55e':'#1e2a45'};background:${gstFilter===k?'#022c1a':'transparent'};color:${gstFilter===k?'#22c55e':'#4a5a7a'};font-size:12px;font-weight:${gstFilter===k?'800':'600'};font-family:'Nunito',sans-serif;white-space:nowrap;">${l}</button>
         `).join('')}
       </div>
     </div>` : ''}
@@ -11758,7 +11775,7 @@ function saveDebtorModal(editId){
   addHistoryLog('debtor', editId?'Debtor updated':'Debtor added', name);
   closeModal();
   notify(editId?"✅ Debtor updated":"✅ Debtor added");
-  renderTab(7);
+  renderTab(3);
 }
 
 // ── Debtor Detail (Tally-style ledger) ───────────────────────────────────────
@@ -12414,7 +12431,7 @@ function checkLowStockAndNotify() {
     // 1) In-app banner (always shown)
     const banner = document.createElement("div");
     banner.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a0e00;border:2px solid #f59e0b;border-radius:14px;padding:12px 18px;font-size:13px;font-weight:700;z-index:99999;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px #0008;white-space:nowrap;cursor:pointer;max-width:90vw;";
-    banner.innerHTML = `<span>${msg}</span><span onclick="switchTab(10);this.parentElement.remove();" style="background:#f59e0b;color:#1a0e00;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:800;flex-shrink:0;">View →</span><span onclick="this.parentElement.remove();" style="color:#7a8aaa;font-size:16px;cursor:pointer;flex-shrink:0;">✕</span>`;
+    banner.innerHTML = `<span>${msg}</span><span onclick="switchTab(12);this.parentElement.remove();" style="background:#f59e0b;color:#1a0e00;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:800;flex-shrink:0;">View →</span><span onclick="this.parentElement.remove();" style="color:#7a8aaa;font-size:16px;cursor:pointer;flex-shrink:0;">✕</span>`;
     document.body.appendChild(banner);
     setTimeout(() => { if (banner.parentElement) banner.remove(); }, 8000);
 
@@ -12425,7 +12442,7 @@ function checkLowStockAndNotify() {
         icon: "/favicon.ico",
         tag: "stock-alert"
       });
-      n.onclick = () => { window.focus(); switchTab(10); n.close(); };
+      n.onclick = () => { window.focus(); switchTab(12); n.close(); };
     }
   } catch(e) { /* silent */ }
 }
@@ -12496,7 +12513,7 @@ function renderAlertsTab(){
           <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(item.name)}</div>
           <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${t('alCurrent')} <span style="color:#FFD700;font-weight:700;">${stk} ${escHtml(item.unit||"unit")}</span> · ${t('alMin')} ${min} ${escHtml(item.unit||"unit")}</div>
         </div>
-        <button onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}');switchTab(5)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+        <button onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}');switchTab(4)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
       </div>`;
     });
     html += `</div>`;
@@ -12512,7 +12529,7 @@ function renderAlertsTab(){
           <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(item.name)}</div>
           <div style="font-size:11px;color:#f66;margin-top:2px;font-weight:700;">${t('alOutOfStockLabel')} ${escHtml(item.unit||"unit")}</div>
         </div>
-        <button onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}');switchTab(5)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+        <button onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}');switchTab(4)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
       </div>`;
     });
     html += `</div>`;
@@ -12532,7 +12549,7 @@ function renderAlertsTab(){
             <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(e.itemName)}</div>
             <div style="font-size:11px;color:${color};margin-top:2px;">${t('alExpiry')} ${dt} · ${t('alStock')} ${e.qty} ${escHtml(e.unit||"unit")}</div>
           </div>
-          <button onclick="invShowItemDetail('${e.itemName.replace(/'/g,"\\'")}');switchTab(5)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+          <button onclick="invShowItemDetail('${e.itemName.replace(/'/g,"\\'")}');switchTab(4)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
         </div>`;
       });
       out += `</div>`;
@@ -12548,7 +12565,7 @@ function renderAlertsTab(){
     html += sectionHeader("🏦",t('alCreditorOverdue'),"#fbbf24");
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     creditorOverdue.forEach(c=>{
-      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="switchTab(6);setTimeout(()=>openCreditorDetail('${c.id}'),50)">
+      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="switchTab(2);setTimeout(()=>openCreditorDetail('${c.id}'),50)">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(c.name)}</div>
           <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${t('alOldestUnpaidBill')} <span style="color:#f59e0b;font-weight:700;">${c.days} ${t('alDaysAgo')}</span></div>
@@ -12564,7 +12581,7 @@ function renderAlertsTab(){
     html += sectionHeader("🧾",t('alDebtorOverdue'),"#4ade80");
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     debtorOverdue.forEach(d=>{
-      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="switchTab(7);setTimeout(()=>openDebtorDetail('${d.id}'),50)">
+      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="switchTab(3);setTimeout(()=>openDebtorDetail('${d.id}'),50)">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:#e8eaf0;">${escHtml(d.name)}</div>
           <div style="font-size:11px;color:#7a8aaa;margin-top:2px;">${t('alOldestUnpaidSale')} <span style="color:#4ade80;font-weight:700;">${d.days} ${t('alDaysAgo')}</span></div>
@@ -13047,6 +13064,8 @@ async function memberLogin() {
     const pillName = document.getElementById("header-member-name");
     if(pill) { pill.style.display = "inline-flex"; }
     if(pillName) { pillName.textContent = data.display_name; }
+    // Update bottom nav immediately to hide tabs this member can't access
+    updateBottomNavVisibility();
 
     // Start heartbeat
     _startMemberHeartbeat();
@@ -13146,6 +13165,8 @@ async function _tryRestoreMemberSession(phone) {
     if(pillName) pillName.textContent = m.display_name;
 
     _startMemberHeartbeat();
+    // Update bottom nav to hide tabs this member can't access
+    updateBottomNavVisibility();
   } catch(e) { console.error("[MemberRestore] error:", e); }
 }
 
@@ -13924,7 +13945,7 @@ function applyVoicePreset(i){
 }
 
 
-function setDisplayCount(n){displaySettings.showCount=n;saveDisplaySettings();renderTab(6);notify("✅ Count updated");}
+function setDisplayCount(n){displaySettings.showCount=n;saveDisplaySettings();renderTab(2);notify("✅ Count updated");}
 
 function saveShopName(){
   const val=document.getElementById("shop-name-input")?.value.trim();
@@ -13942,7 +13963,7 @@ function handleIconUpload(inp){
     appSettings.appIcon=e.target.result;
     saveAppSettings();
     updateAppHeader();
-    renderTab(6);
+    renderTab(2);
     notify("✅ App icon updated!");
   };
   r.readAsDataURL(f);
@@ -13952,7 +13973,7 @@ function removeAppIcon(){
   appSettings.appIcon="";
   saveAppSettings();
   updateAppHeader();
-  renderTab(6);
+  renderTab(2);
   notify("🗑 Icon removed");
 }
 
@@ -15161,14 +15182,14 @@ var currentAppStyle = localStorage.getItem(storageKey("appStyle")) || "pro";
 
 // SVG icons for pro bottom nav — declared here so applyAppStyle can call updateBottomNavIcons safely
 var BNAV_PRO_ICONS = {
-  0: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M5 3h14l-1.5 9H6.5L5 3z"/><path d="M9 12a3 3 0 0 0 6 0"/></svg>`,
+  0: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
   1: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
-  2: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
-  5: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>`,
+  2: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+  3: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
 };
-var BNAV_PRO_LABELS = { 0: "Rankings", 1: "Customers", 2: "Add Sale", 5: "Inventory" };
-var BNAV_GAME_ICONS = { 0: "🏆", 1: "👥", 2: "💳", 5: "📦" };
-var BNAV_GAME_LABELS = { 0: "Board", 1: "Customers", 2: "Purchase", 5: "Inventory" };
+var BNAV_PRO_LABELS = { 0: "Add Sale", 1: "Customers", 2: "Creditors", 3: "Debtors" };
+var BNAV_GAME_ICONS = { 0: "🧾", 1: "👥", 2: "🏦", 3: "📋" };
+var BNAV_GAME_LABELS = { 0: "Sale", 1: "Customers", 2: "Creditors", 3: "Debtors" };
 
 function applyAppStyle(style) {
   currentAppStyle = style;
@@ -15194,12 +15215,26 @@ function applyAppStyle(style) {
 
 function updateBottomNavIcons() {
   const isPro = currentAppStyle === "pro";
-  [0,1,2,5].forEach(i => {
+  [0,1,2,3].forEach(i => {
     const iconEl = document.getElementById("bnav-icon-" + i);
     const labelEl = document.getElementById("bnav-label-" + i);
     if (iconEl) iconEl.innerHTML = isPro ? BNAV_PRO_ICONS[i] : BNAV_GAME_ICONS[i];
     if (iconEl) iconEl.style.fontSize = isPro ? "0" : "22px"; // SVG sized internally
     if (labelEl) labelEl.textContent = isPro ? BNAV_PRO_LABELS[i] : BNAV_GAME_LABELS[i];
+  });
+  updateBottomNavVisibility();
+}
+
+// Show/hide bottom nav buttons based on member tab permissions
+// Tab index → tab key mapping for the 4 fixed bottom nav slots
+var BNAV_TAB_KEYS = { 0: "sales", 1: "customers", 2: "creditors", 3: "debtors" };
+function updateBottomNavVisibility() {
+  [0,1,2,3].forEach(i => {
+    const btn = document.getElementById("bnav-" + i);
+    if (!btn) return;
+    const tabKey = BNAV_TAB_KEYS[i];
+    const visible = isTabVisible(tabKey);
+    btn.style.display = visible ? "" : "none";
   });
 }
 
@@ -16162,7 +16197,7 @@ function _phShiftMonth(dir){
 
 // Plans: "pro" = full access, "free" = limited
 // FREE_TABS: loaded dynamically from Supabase settings (fallback = leaderboard only)
-var FREE_TABS = [0];
+var FREE_TABS = [0, 8]; // sales (0) and leaderboard/rankings (8) free by default
 
 // ── FREE PLAN USAGE CAPS ──────────────────────────────────────
 const FREE_MAX_CUSTOMERS  = 100;
@@ -16313,7 +16348,8 @@ function revokeAccess(reason) {
 
 function updateLicenseUI() {
   const banner = document.getElementById("sub-expired-banner");
-  if (licenseStatus === "expired") {
+  // Only show subscription banner to the shop owner, not to team members
+  if (licenseStatus === "expired" && !currentMember) {
     if (banner) banner.style.display = "flex";
   } else {
     if (banner) banner.style.display = "none";
@@ -16663,8 +16699,8 @@ window.addEventListener("load", () => {
 
 // ── License gate: called after every renderTab ──
 function applyLicenseOverlay(i) {
-  // Settings tab (index 10) is always accessible — needed to enter license key
-  if (i === 10) return;
+  // Settings tab (index 12) is always accessible — needed to enter license key
+  if (i === 12) return;
   if (isTabAllowed(i)) return;
   const el = document.getElementById("tab-content");
   if (!el) return;
@@ -17998,7 +18034,7 @@ async function scRequestPushPermission() {
     await scInitFCM();
     if (_scFcmToken) {
       notify("✅ Push notifications enabled on this device!");
-      safeRenderTab(10); // refresh settings to show active state
+      safeRenderTab(12); // refresh settings to show active state
     } else {
       notify("❌ Failed to get push token. Check console for details.","error");
     }
@@ -19968,8 +20004,8 @@ async function _applyAutoAcceptedReq(doc){
   if(applied){
     doc.ref.update({status:"consumed"}).catch(()=>{});
     if(currentTab===1) renderTab(1);
-    if(currentTab===6) renderTab(6);
-    if(currentTab===7) renderTab(7);
+    if(currentTab===2) renderTab(2);
+    if(currentTab===3) renderTab(3);
   } else {
     // Even if already in local list, mark consumed and refresh UI
     // because the direct Firestore write (Step 2 in acceptShopRequest) may have
@@ -20413,7 +20449,7 @@ async function acceptShopRequest(req){
   _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==req.id);
   _shopRequestsUnread = _shopRequestsCache.length;
   renderTabs();
-  if(currentTab===7) renderTab(7);
+  if(currentTab===3) renderTab(3);
 }
 
 // ── Decline a request ─────────────────────────────────────────────────────────
@@ -20431,7 +20467,7 @@ async function declineShopRequest(req){
   _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==req.id);
   _shopRequestsUnread = _shopRequestsCache.length;
   renderTabs();
-  if(currentTab===7) renderTab(7);
+  if(currentTab===3) renderTab(3);
   notify("🚫 Request declined");
 }
 
