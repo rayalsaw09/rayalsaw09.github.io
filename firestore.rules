@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Ownership helpers ──────────────────────────────────────────────────
+    // Primary check: shop_profiles/{phone}.uid matches Firebase Auth UID.
+    // This is set on every login via _savePublicShopProfile().
+    function isOwner(phone) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/shop_profiles/$(phone))
+        && get(/databases/$(database)/documents/shop_profiles/$(phone)).data.uid == request.auth.uid;
+    }
+
+    // Fallback: allow if authenticated AND the phone doc exists but has no uid yet
+    // (covers first-login race where listener starts before profile is written)
+    function isAuthenticatedForPhone(phone) {
+      return request.auth != null && (
+        isOwner(phone)
+        || (
+          exists(/databases/$(database)/documents/shop_profiles/$(phone)) == false
+        )
+        || (
+          exists(/databases/$(database)/documents/shop_profiles/$(phone))
+          && !('uid' in get(/databases/$(database)/documents/shop_profiles/$(phone)).data)
+        )
+      );
+    }
+
+    // ── User data (customers, settings, display, inventory, etc.) ──────────
+    match /users/{phone}/{document=**} {
+      allow read, write: if isOwner(phone) || isAuthenticatedForPhone(phone);
+    }
+
+    // Linked Ledger — partner shop can write into your ledger subtree
+    match /users/{phone}/linked_ledger/{partnerPhone}/transactions/{txId} {
+      allow read: if isOwner(phone) || isAuthenticatedForPhone(phone);
+      allow write: if isOwner(phone) || isOwner(partnerPhone)
+                   || isAuthenticatedForPhone(phone) || isAuthenticatedForPhone(partnerPhone);
+    }
+
+    // ── Shop profiles (public readable) ───────────────────────────────────
+    match /shop_profiles/{phone} {
+      allow read: if true;
+      // Allow write if owner OR if authenticated and writing your own phone doc
+      // (handles first-time profile creation before uid is stored)
+      allow write: if isOwner(phone)
+        || (request.auth != null && request.resource.data.phone == phone);
+    }
+
+    // ── SC Shops ──────────────────────────────────────────────────────────
+    match /sc_shops/{phone}/{document=**} {
+      allow read: if true;
+      allow write: if isOwner(phone) || isAuthenticatedForPhone(phone);
+    }
+
+    // ── Shop requests (messages inbox) ────────────────────────────────────
+    match /shop_requests/{phone}/requests/{reqId} {
+      allow read: if isOwner(phone) || isAuthenticatedForPhone(phone);
+      allow create: if request.auth != null;
+      allow update, delete: if isOwner(phone) || isAuthenticatedForPhone(phone)
+        || (request.auth != null && isOwner(resource.data.fromPhone));
+    }
+
+    // ── Shop connect requests ─────────────────────────────────────────────
+    match /shop_connect_requests/{reqId} {
+      allow read: if request.auth != null
+        && (isOwner(resource.data.toPhone) || isOwner(resource.data.fromPhone)
+            || isAuthenticatedForPhone(resource.data.toPhone)
+            || isAuthenticatedForPhone(resource.data.fromPhone));
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null
+        && (isOwner(resource.data.toPhone) || isOwner(resource.data.fromPhone)
+            || isAuthenticatedForPhone(resource.data.toPhone)
+            || isAuthenticatedForPhone(resource.data.fromPhone));
+    }
+
+    // ── Payment sync requests ─────────────────────────────────────────────
+    match /payment_sync_requests/{reqId} {
+      allow read: if request.auth != null
+        && (isOwner(resource.data.fromPhone) || isOwner(resource.data.toPhone)
+            || isAuthenticatedForPhone(resource.data.fromPhone)
+            || isAuthenticatedForPhone(resource.data.toPhone));
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null
+        && (isOwner(resource.data.fromPhone) || isOwner(resource.data.toPhone)
+            || isAuthenticatedForPhone(resource.data.fromPhone)
+            || isAuthenticatedForPhone(resource.data.toPhone));
+    }
+
+    // ── Ad impressions ────────────────────────────────────────────────────
+    match /ad_impressions/{adOwner}/shops/{shopId}/ads/{adId} {
+      allow read: if isOwner(adOwner) || isAuthenticatedForPhone(adOwner);
+      allow write: if true;
+    }
+
+    // ── Global settings (read-only) ───────────────────────────────────────
+    match /global_settings/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

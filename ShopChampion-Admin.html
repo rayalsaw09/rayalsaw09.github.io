@@ -65,9 +65,8 @@ const SC_FIREBASE_CONFIG = {
   measurementId:     "G-YCX9WJ4DP5"
 };
 const SC_SUPABASE_URL  = "https://dgmzfqwglnafghpfnqau.supabase.co";
-// ⚠️ REPLACE THIS: Use the Legacy JWT anon key (eyJ...) from Supabase → Project Settings → API → "Legacy anon, service_role API keys" tab
-// The sb_publishable_ key does NOT work with direct REST API calls
-const SC_SUPABASE_ANON = "sb_publishable_yxPk_18wrBIPebrJkYn9FQ_91lhKmjE"; // ← REPLACE WITH eyJ... key
+// Legacy JWT anon key — Supabase → Project Settings → API → "Legacy anon, service_role API keys" tab
+const SC_SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnbXpmcXdnbG5hZmdocGZucWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NDA3NzcsImV4cCI6MjA5NTAxNjc3N30.9yVo-xggH3zDIIG6wsTXKa1GgCZ_KZA3FV2GB0t-lHQ";
 // FCM VAPID key — get from Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
 // Replace the string below with your actual VAPID key after enabling Cloud Messaging in Firebase Console
 const SC_FCM_VAPID_KEY = "BEKJDBufmyfEAGYMrd05gtDMOAPbzvUaF6gCPFXtvGvc16HPLT7eWYBpppxnZ8Hfmr8HX76gVIRkjGXvRdal4js";
