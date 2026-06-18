@@ -1927,7 +1927,7 @@ async function _doApprove(payment) {
   }
 
   // Ensure we have fresh user + key data before matching
-  if (!allUsers.length) allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || [];
+  if (!allUsers.length) allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || [];
   if (!allKeys.length)  { const k = await sbFetch("/rest/v1/licenses?select=*&order=created_at.desc"); if(k) allKeys = k; }
 
   // --- Find existing license: user_number first, then phone, then name ---
@@ -2021,7 +2021,7 @@ async function approvePayment(paymentId) {
     alert(`✅ Approved!\n\nSubscription activated as Pro.\nCustomer's app updates within 15 seconds.`);
     loadPayments();
     // Refresh both keys AND users so the Pro status shows immediately in the user table
-    allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || [];
+    allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || [];
     await loadKeys();
   } catch(e) { alert("❌ Error approving: " + e.message); }
 }
@@ -2035,7 +2035,7 @@ async function approvePaymentFromHistory(paymentId) {
     alert(`✅ Approved!\n\nSubscription activated as Pro.\nCustomer's app updates within 15 seconds.`);
     loadPayments();
     // Refresh both keys AND users so the Pro status shows immediately in the user table
-    allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || [];
+    allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || [];
     await loadKeys();
     if (currentPhUser) await openPaymentHistory(currentPhUser.phone, currentPhUser.name);
   } catch(e) { alert("❌ Error approving: " + e.message); }
@@ -3008,7 +3008,7 @@ async function sendBroadcast() {
       const chunk = phones.slice(i, i + chunkSize);
       const phoneFilter = chunk.map(p => `phone=eq.${encodeURIComponent(p)}`).join("&or=(");
       // Fetch tokens for chunk
-      const tokenRes = await sbFetch(`/rest/v1/sc_push_tokens?phone=in.(${chunk.map(p => `"${p}"`).join(",")})&select=phone,fcm_token`);
+      const tokenRes = await sbFetch(`/rest/v1/sc_push_tokens?phone=in.(${chunk.map(p => `"${p}"`).join(",")})&select=phone,fcm_token`, { forceService: true });
       const tokens = Array.isArray(tokenRes) ? tokenRes : [];
       // Send FCM to each token
       for (const row of tokens) {
@@ -3884,7 +3884,7 @@ async function scPushCentralAdToShops(ad) {
   if (!saDb) { spNotify('⚠️ Firebase not initialized — ad saved locally but not pushed to apps.'); return; }
 
   if (typeof allUsers === 'undefined' || !allUsers.length) {
-    try { allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || []; } catch(_) { allUsers = []; }
+    try { allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || []; } catch(_) { allUsers = []; }
   }
   const phones = allUsers.filter(u => u.phone).map(u => u.phone);
   if (!phones.length) { spNotify('⚠️ No shops found to push ad to.'); return; }
@@ -3926,7 +3926,7 @@ async function scRemoveCentralAdFromShops(adId) {
   saInitFirebase();
   if (!saDb) return;
   if (typeof allUsers === 'undefined' || !allUsers.length) {
-    try { allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || []; } catch(_) { allUsers = []; }
+    try { allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || []; } catch(_) { allUsers = []; }
   }
   const phones = allUsers.filter(u => u.phone).map(u => u.phone);
   await Promise.all(phones.map(async phone => {
@@ -3948,7 +3948,7 @@ async function scCleanupOrphanAds() {
   if (!saDb) { spNotify('❌ Firebase not initialized.'); return; }
 
   if (typeof allUsers === 'undefined' || !allUsers.length) {
-    try { allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc") || []; } catch(_) { allUsers = []; }
+    try { allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || []; } catch(_) { allUsers = []; }
   }
   const phones = allUsers.filter(u => u.phone).map(u => u.phone);
   const validIds = new Set(scCentralAds.map(a => a.id));
