@@ -6455,6 +6455,10 @@ async function bwMarkReturned(custId,borrowId,payMode){
       b.status="returned"; b.returnedAt=new Date().toISOString();
       b.amountPaid=Number(b.amount); // fully paid
       if(!c.purchases) c.purchases=[];
+      // Only generate a _cashRefId when there is outstanding cash being recorded.
+      // If remaining===0 (fully paid via partials), no new cash entry is made,
+      // so _cashRefId must be null — otherwise deletePurchase would add a ghost reversal.
+      const _bwPayRefId = remaining > 0 ? "BW_SYNC_PAY_"+borrowId+"_"+Date.now() : null;
       c.purchases.push({
         id:       "PAY"+Date.now(),
         amount:   Number(b.amount),
@@ -6464,7 +6468,20 @@ async function bwMarkReturned(custId,borrowId,payMode){
         createdAt:Date.now(),
         _fromBorrowId: borrowId,
         _syncSource:   b._syncSource,
+        ...(_bwPayRefId ? { _cashRefId: _bwPayRefId } : {}),
       });
+      // Record cash-in for any remaining unpaid amount (partials already recorded separately)
+      if(remaining > 0 && _bwPayRefId){
+        cashRecordTx({
+          direction: "in",
+          amount: remaining,
+          date: new Date().toISOString().slice(0,10),
+          note: `Synced borrow payment received · ${c.name}${b.item?" · "+b.item:""}`,
+          source: "borrow_payment",
+          refId: _bwPayRefId,
+          mode: payMode
+        });
+      }
       c.totalSpend=(c.purchases||[]).reduce((s,p)=>s+(p.amount||0),0);
       notify(`✅ Payment received — moved to purchase history for ${c.name}`);
     } else {
@@ -6477,7 +6494,8 @@ async function bwMarkReturned(custId,borrowId,payMode){
     const _bwClrRefId = "BW_CLR_"+borrowId+"_"+Date.now(); b._clrCashRefId = _bwClrRefId;
 
     // Record any remaining unpaid amount as cash-in when marking fully cleared
-    if(remaining > 0){
+    // (Skipped for _syncType==="purchase" path — that path records its own cashRecordTx above)
+    if(remaining > 0 && !(b._syncType==="purchase")){
       cashRecordTx({
         direction: "in",
         amount: remaining,
@@ -6843,10 +6861,34 @@ async function deletePurchase(custId,bill,dateEnc){
   const date=decodeURIComponent(dateEnc);
   const idx=c.purchases.findIndex(p=>p.bill===bill&&p.date===date);
   if(idx>-1){
-    const _delAmt=Number(c.purchases[idx].amount);
-    const _delCashRefId=c.purchases[idx]._cashRefId||null;
+    const _delPurchase=c.purchases[idx];
+    const _delAmt=Number(_delPurchase.amount);
+    const _delCashRefId=_delPurchase._cashRefId||null;
+    const _delSoldItems=_delPurchase.soldItems||[];
     c.totalSpend=Math.max(0,c.totalSpend-_delAmt);
     c.purchases.splice(idx,1);
+    // If this was a borrow-type purchase, also remove the matching borrows[] entry
+    // (prevents orphaned borrow records after purchase card is deleted)
+    if(_delPurchase.type === "borrow" && c.borrows){
+      c.borrows = c.borrows.filter(b => b.id !== bill);
+    }
+    // Restore inventory: remove each item's salesLog entry so stock goes back up
+    if(_delSoldItems.length){
+      _delSoldItems.forEach(si=>{
+        const invItem=inventoryItems.find(x=>x.name===si.name);
+        if(!invItem||!invItem.salesLog) return;
+        // Remove the most recent matching salesLog entry — prefer custId+qty match to avoid wrong entry
+        let logIdx=invItem.salesLog.map((e,i)=>({e,i})).reverse()
+          .findIndex(({e})=>Number(e.qty)===Number(si.qty)&&(e.custId===custId||!e.custId));
+        if(logIdx===-1) logIdx=invItem.salesLog.map((e,i)=>({e,i})).reverse()
+          .findIndex(({e})=>Number(e.qty)===Number(si.qty));
+        if(logIdx>-1){
+          const realIdx=invItem.salesLog.length-1-logIdx;
+          invItem.salesLog.splice(realIdx,1);
+        }
+      });
+      saveInventory();
+    }
     notify("✅ Purchase deleted");
     try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
     addHistoryLog('sale','Sale deleted',`${c.name} · ${formatINR(_delAmt)}${bill?` · Bill ${bill}`:''}`);
@@ -6863,8 +6905,11 @@ async function deletePurchase(custId,bill,dateEnc){
         cashRecordTx({direction:"in", amount:_delAmt, date:new Date().toISOString().slice(0,10), note:`Sale deleted (reversal) · ${c.name}${bill?" · Bill "+bill:""}`, source:"sale_delete", refId:"REV_"+_delCashRefId, mode:"Cash"});
       }
     } else {
-      // No refId stored (old sale) — add an "in" reversal as best-effort
-      cashRecordTx({direction:"in", amount:_delAmt, date:new Date().toISOString().slice(0,10), note:`Sale deleted (reversal) · ${c.name}${bill?" · Bill "+bill:""}`, source:"sale_delete", refId:"REV_DEL_"+Date.now(), mode:"Cash"});
+      // No refId stored — add an "in" reversal as best-effort.
+      // Exception: borrow-type purchases never had cash recorded, so skip reversal.
+      if(_delPurchase.type !== "borrow"){
+        cashRecordTx({direction:"in", amount:_delAmt, date:new Date().toISOString().slice(0,10), note:`Sale deleted (reversal) · ${c.name}${bill?" · Bill "+bill:""}`, source:"sale_delete", refId:"REV_DEL_"+Date.now(), mode:"Cash"});
+      }
     }
     if(useLocalOnly)safeRenderTab(currentTab);
   }
@@ -9701,23 +9746,17 @@ function confirmHardDeleteCreditor(id){
   if(!cr) return;
 
   // Reverse any inventory stock linked to this creditor's purchase transactions
+  // Uses the shared helper that handles both single-item and multi-item transactions
   const txs = cr.transactions || [];
-  txs.filter(t=>t.type==="purchase"&&t._invItem&&t._invQty).forEach(t=>{
-    const item = inventoryItems.find(x=>x.name===t._invItem);
-    if(!item) return;
-    // Remove the matching stock entry (match by amount+date+qty heuristic or _fromInventory flag)
-    const qtyToRemove = Number(t._invQty);
-    // Remove from stock entries — find closest match
-    let remaining = qtyToRemove;
-    item.stock = (item.stock||[]).filter(e=>{
-      if(remaining > 0 && Number(e.qty) <= remaining){
-        remaining -= Number(e.qty);
-        return false; // remove this entry
-      }
-      return true;
-    });
+  txs.filter(t=>t.type==="purchase").forEach(t=>{ _invRestoreCreditorPurchaseTx(t); });
+  // Also reverse creditor returns that deducted stock (via salesLog)
+  txs.filter(t=>t.type==="return"&&t._invItem&&t._invQty).forEach(t=>{
+    const invItem = inventoryItems.find(x=>x.name===t._invItem);
+    if(invItem && invItem.salesLog){
+      const sIdx = invItem.salesLog.map((e,i)=>({e,i})).reverse().findIndex(({e})=>Number(e.qty)===Number(t._invQty));
+      if(sIdx>-1){ invItem.salesLog.splice(invItem.salesLog.length-1-sIdx,1); saveInventory(); }
+    }
   });
-  saveInventory();
 
   // Remove all cash ledger entries linked to this creditor's transactions
   if(cr && cr.transactions){ cr.transactions.forEach(t=>{ if(t.id) cashRemoveByRef(t.id); }); }
@@ -11143,6 +11182,16 @@ function deleteCrTx(creditorId, origIdx){
   creditors[idx].transactions = (creditors[idx].transactions || []).filter((_,i) => i !== origIdx);
   saveCreditors(creditors);
   if(removedTx && removedTx.id) cashRemoveByRef(removedTx.id);
+  // Restore inventory: handles both single-item and multi-item purchase transactions
+  if(removedTx) _invRestoreCreditorPurchaseTx(removedTx);
+  // Restore inventory if this was a creditor return that deducted stock (via invDeductSold → salesLog)
+  if(removedTx && removedTx.type==="return" && removedTx._invItem && removedTx._invQty){
+    const invItem = inventoryItems.find(x=>x.name===removedTx._invItem);
+    if(invItem && invItem.salesLog){
+      const sIdx = invItem.salesLog.map((e,i)=>({e,i})).reverse().findIndex(({e})=>Number(e.qty)===Number(removedTx._invQty));
+      if(sIdx>-1){ invItem.salesLog.splice(invItem.salesLog.length-1-sIdx,1); saveInventory(); }
+    }
+  }
   notify("🗑 Transaction deleted");
   setTimeout(() => openCreditorDetail(creditorId), 200);
 }
@@ -11158,6 +11207,16 @@ async function deleteCrTransaction(creditorId, txId) {
   saveCreditors(creditors);
   addHistoryLog('creditor','Creditor transaction deleted',`${cr.name||'Creditor'}${_delTx?` · ${formatINR(_delTx.amount)}`:''}`);
   cashRemoveByRef(txId);
+  // Restore inventory: handles both single-item and multi-item purchase transactions
+  if(_delTx) _invRestoreCreditorPurchaseTx(_delTx);
+  // Restore inventory if this was a creditor return that deducted stock
+  if(_delTx && _delTx.type==="return" && _delTx._invItem && _delTx._invQty){
+    const invItem = inventoryItems.find(x=>x.name===_delTx._invItem);
+    if(invItem && invItem.salesLog){
+      const sIdx = invItem.salesLog.map((e,i)=>({e,i})).reverse().findIndex(({e})=>Number(e.qty)===Number(_delTx._invQty));
+      if(sIdx>-1){ invItem.salesLog.splice(invItem.salesLog.length-1-sIdx,1); saveInventory(); }
+    }
+  }
   // Cross-delete from their side if linked
   if (cr._fromShopConnect && cr.phone) {
     await crossDeleteTransaction(cr.phone, txId);
@@ -12755,10 +12814,42 @@ function deleteDebtTx(debtorId, origIdx){
       </div>
       <div style="display:flex;gap:10px;">
         <button onclick="closeModal()" class="btn" style="flex:1;background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;">Cancel</button>
-        <button onclick="(function(){closeModal();const debtors=getDebtors();const idx=debtors.findIndex(d=>d.id==='${debtorId}');if(idx<0)return;const removedTx=(debtors[idx].transactions||[])[${origIdx}];debtors[idx].transactions=(debtors[idx].transactions||[]).filter((_,i)=>i!==${origIdx});saveDebtors(debtors);if(removedTx&&removedTx.id)cashRemoveByRef(removedTx.id);addHistoryLog('debtor','Debtor transaction deleted',(debtors[idx].name||'Debtor')+(removedTx?(' · '+formatINR(removedTx.amount)):''));notify('🗑 Transaction deleted');setTimeout(()=>openDebtorDetail('${debtorId}'),200);})()" class="btn" style="flex:1;background:#3a0808;border:1px solid #5a1a1a;color:#f66;font-weight:800;">🗑 Delete</button>
+        <button onclick="confirmDeleteDebtTx('${debtorId}',${origIdx})" class="btn" style="flex:1;background:#3a0808;border:1px solid #5a1a1a;color:#f66;font-weight:800;">🗑 Delete</button>
       </div>
     </div>
   `);
+}
+
+function confirmDeleteDebtTx(debtorId, origIdx){
+  closeModal();
+  const debtors=getDebtors();
+  const idx=debtors.findIndex(d=>d.id===debtorId);
+  if(idx<0) return;
+  const removedTx=(debtors[idx].transactions||[])[origIdx];
+  debtors[idx].transactions=(debtors[idx].transactions||[]).filter((_,i)=>i!==origIdx);
+  saveDebtors(debtors);
+  if(removedTx && removedTx.id) cashRemoveByRef(removedTx.id);
+  // Restore inventory stock for debtor sale transactions (goods were not dispatched — reverse the deduction)
+  if(removedTx && removedTx.type==="sale" && removedTx._invItem && removedTx._invQty){
+    const invItem=inventoryItems.find(x=>x.name===removedTx._invItem);
+    if(invItem){
+      if(!invItem.salesLog) invItem.salesLog=[];
+      // Remove the most recent matching salesLog entry to restore stock
+      const sIdx=invItem.salesLog.map((e,i)=>({e,i})).reverse().findIndex(({e})=>Number(e.qty)===Number(removedTx._invQty));
+      if(sIdx>-1){ invItem.salesLog.splice(invItem.salesLog.length-1-sIdx,1); saveInventory(); }
+    }
+  }
+  // Restore for debtor return (return added stock back via invAddStock — remove that stock entry)
+  if(removedTx && removedTx.type==="return" && removedTx._invItem && removedTx._invQty){
+    const invItem=inventoryItems.find(x=>x.name===removedTx._invItem);
+    if(invItem && invItem.stock){
+      const sIdx=invItem.stock.map((e,i)=>({e,i})).reverse().findIndex(({e})=>Number(e.qty)===Number(removedTx._invQty));
+      if(sIdx>-1){ invItem.stock.splice(invItem.stock.length-1-sIdx,1); saveInventory(); }
+    }
+  }
+  addHistoryLog('debtor','Debtor transaction deleted',(debtors[idx].name||'Debtor')+(removedTx?(' · '+formatINR(removedTx.amount)):''));
+  notify('🗑 Transaction deleted');
+  setTimeout(()=>openDebtorDetail(debtorId),200);
 }
 
 function printDebtorStatement(id){
@@ -14237,6 +14328,7 @@ async function _hmDeleteSelected(){
   sel.forEach(id=>{
     const c=customers.find(x=>x.id===id);
     if(c){ (c.purchases||[]).forEach(p=>{ if(p._cashRefId) cashRemoveByRef(p._cashRefId); }); }
+    if(c && c.purchases) _invRestoreSalesLogForPurchases(c.purchases, c.id);
     if(c){ records+=(c.purchases||[]).length; c.purchases=[]; c.totalSpend=0; cleared++; }
   });
   await saveCustomers();
@@ -14249,6 +14341,7 @@ async function _hmDeleteAll(){
   const total=customers.reduce((s,c)=>s+(c.purchases||[]).length,0);
   if(!confirm(`⚠️ Delete ALL purchase history for ALL ${customers.length} customers?\n\n${total} records will be permanently erased.\n\nCustomers stay. History goes.\n\nThis CANNOT be undone.`)) return;
   customers.forEach(c=>{ (c.purchases||[]).forEach(p=>{ if(p._cashRefId) cashRemoveByRef(p._cashRefId); }); });
+  customers.forEach(c=>{ if(c.purchases) _invRestoreSalesLogForPurchases(c.purchases, c.id); });
   customers.forEach(c=>{ c.purchases=[]; c.totalSpend=0; });
   await saveCustomers();
   notify(`🔥 All purchase history deleted (${total} records)`);
@@ -15368,6 +15461,8 @@ async function deleteCustomer(id){
   }
   // Remove cash ledger entries for borrow payments
   if(_c && _c.borrows){ _c.borrows.forEach(b=>{ (b.payments||[]).forEach(p=>{ if(p._cashRefId) cashRemoveByRef(p._cashRefId); }); if(b._clrCashRefId) cashRemoveByRef(b._clrCashRefId); }); }
+  // Restore inventory salesLog entries for all this customer's inventory-mode purchases
+  if(_c && _c.purchases) _invRestoreSalesLogForPurchases(_c.purchases, _c.id);
 
   try{await deleteOneCustomer(id);notify("🗑 Customer deleted");}
   catch(e){notify("⚠️ Delete error: "+e.message);}
@@ -15406,6 +15501,7 @@ async function deleteSelectedCustomers(){
     const _bc=customers.find(x=>x.id===id);
     if(_bc && _bc.purchases){ _bc.purchases.forEach(p=>{ if(p._cashRefId) cashRemoveByRef(p._cashRefId); }); }
     if(_bc && _bc.borrows){ _bc.borrows.forEach(b=>{ (b.payments||[]).forEach(p=>{ if(p._cashRefId) cashRemoveByRef(p._cashRefId); }); if(b._clrCashRefId) cashRemoveByRef(b._clrCashRefId); }); }
+    if(_bc && _bc.purchases) _invRestoreSalesLogForPurchases(_bc.purchases, _bc.id);
 
     try{await deleteOneCustomer(id);}
     catch(e){errors++;}
@@ -15428,13 +15524,28 @@ function openPurchaseModal(id){
       <div><label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Bill #</label><input class="input" id="m-bill" value="${bill}" /></div>
       <div><label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Date</label><input class="input" type="datetime-local" id="m-date" value="${now}" /></div>
     </div>
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Payment Mode</label>
+    <div style="display:flex;gap:8px;margin-bottom:14px;" id="m-paymode-btns">
+      ${["Cash","UPI","Bank","Cheque","Other"].map(m=>`<button type="button" onclick="pmSelectMode('${m}')" id="m-pm-${m}" style="flex:1;padding:7px 0;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:2px solid ${m==='Cash'?'#22c55e':'#1e2a45'};background:${m==='Cash'?'#0a2a1a':'transparent'};color:${m==='Cash'?'#22c55e':'#4a5a7a'};">${m}</button>`).join("")}
+    </div>
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Notes</label>
     <input class="input" id="m-notes" placeholder="Optional..." style="margin-bottom:14px;" />
     <div id="m-pts" style="display:none;background:#0a1628;border-radius:8px;padding:10px;margin-bottom:14px;font-size:13px;color:#aaa;"></div>
     <button class="btn" onclick="savePurchaseModal('${id}')" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-weight:800;">Add Sale →</button>`);
+  window._mPayMode = "Cash";
+}
+function pmSelectMode(m){
+  window._mPayMode = m;
+  ["Cash","UPI","Bank","Cheque","Other"].forEach(x=>{
+    const btn=document.getElementById("m-pm-"+x);if(!btn)return;
+    const active=x===m;
+    btn.style.border="2px solid "+(active?"#22c55e":"#1e2a45");
+    btn.style.background=active?"#0a2a1a":"transparent";
+    btn.style.color=active?"#22c55e":"#4a5a7a";
+  });
 }
 function pmPts(){const a=parseFloat(document.getElementById("m-amt").value)||0,b=document.getElementById("m-pts");if(a){b.style.display="block";b.innerHTML=`Points: <strong style="color:#FFD700;">+${getPoints(a).toLocaleString()}</strong>`;}else b.style.display="none";}
-function savePurchaseModal(id){const a=parseFloat(document.getElementById("m-amt").value||"0");if(!a||a<=0){notify("❌ Amount must be greater than ₹0","error");return;}addPurchase(id,{amount:a,bill:document.getElementById("m-bill").value,notes:document.getElementById("m-notes").value,date:document.getElementById("m-date").value});}
+function savePurchaseModal(id){const a=parseFloat(document.getElementById("m-amt").value||"0");if(!a||a<=0){notify("❌ Amount must be greater than ₹0","error");return;}addPurchase(id,{amount:a,bill:document.getElementById("m-bill").value,notes:document.getElementById("m-notes").value,date:document.getElementById("m-date").value,payMode:window._mPayMode||"Cash"});}
 
 // ─── BULK PURCHASE MODAL ─────────────────────────────────────────────────────
 function openBulkPurchaseModal(id) {
@@ -15468,6 +15579,15 @@ function openBulkPurchaseModal(id) {
         <input class="input" id="bp-notes" placeholder="e.g. Notebook import" />
       </div>
     </div>
+
+    <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:6px;">Payment Mode</label>
+    <select id="bp-paymode" class="input" style="margin-bottom:14px;">
+      <option value="Cash">Cash</option>
+      <option value="UPI">UPI</option>
+      <option value="Bank">Bank / NEFT</option>
+      <option value="Cheque">Cheque</option>
+      <option value="Other">Other</option>
+    </select>
 
     <div style="display:flex;gap:10px;margin-top:4px;">
       <button onclick="closeModal()" style="flex:1;background:#1a2540;color:#7a8aaa;border:1px solid #2a3560;border-radius:10px;padding:12px;cursor:pointer;font-size:14px;">Cancel</button>
@@ -15510,12 +15630,15 @@ async function saveBulkPurchase(custId) {
   }
   const date  = document.getElementById("bp-date")?.value  || new Date().toISOString().slice(0, 10);
   const notes = document.getElementById("bp-notes")?.value || "";
+  const payMode = document.getElementById("bp-paymode")?.value || "Cash";
   const c = customers.find(x => x.id === custId); if (!c) return;
 
   amounts.forEach(amt => {
     const bill = "B" + String(Date.now() + Math.random()).replace(".", "").slice(-6);
-    c.purchases = [{ bill, amount: amt, date, notes: notes || "Bulk entry" }, ...(c.purchases || [])];
+    const saleTxId = "SALE_" + Date.now() + "_" + Math.random().toString(36).slice(2,5);
+    c.purchases = [{ bill, amount: amt, date, notes: notes || "Bulk entry", _cashRefId: saleTxId }, ...(c.purchases || [])];
     c.totalSpend += amt;
+    cashRecordTx({ direction: "in", amount: amt, date, note: `Sale to ${c.name} · Bill ${bill}${notes ? " · " + notes : " (bulk entry)"}`, source: "sale_payment", refId: saleTxId, mode: payMode });
   });
 
   const total = amounts.reduce((a, b) => a + b, 0);
@@ -17508,6 +17631,67 @@ function invGetExpiringEntries(thresholdDays){
 }
 
 // Called from ptSubmit — deduct sold items, log customer
+
+// ── Inventory helper: remove salesLog entries for a list of soldItems ──────────
+// Called when a purchase record is wiped (customer delete / history clear).
+// For each item in soldItems[], removes the most recent matching salesLog entry
+// so stock goes back up correctly.
+function _invRestoreSalesLogForPurchases(purchases, custId){
+  if(!purchases || !purchases.length) return;
+  let changed = false;
+  purchases.forEach(p=>{
+    const _custId = custId || p._custId || null;
+    const soldItems = p.soldItems || [];
+    soldItems.forEach(si=>{
+      const invItem = inventoryItems.find(x=>x.name===si.name);
+      if(!invItem || !invItem.salesLog) return;
+      // Prefer matching by qty + custId to avoid removing the wrong customer's entry
+      let sIdx = _custId
+        ? invItem.salesLog.map((e,i)=>({e,i})).reverse()
+            .findIndex(({e})=>Number(e.qty)===Number(si.qty) && (e.custId===_custId||!e.custId))
+        : -1;
+      // Fall back to qty-only if no custId match found
+      if(sIdx===-1){
+        sIdx = invItem.salesLog.map((e,i)=>({e,i})).reverse()
+          .findIndex(({e})=>Number(e.qty)===Number(si.qty));
+      }
+      if(sIdx>-1){
+        invItem.salesLog.splice(invItem.salesLog.length-1-sIdx,1);
+        changed = true;
+      }
+    });
+  });
+  if(changed) saveInventory();
+}
+
+// ── Inventory helper: restore stock for creditor multi-item purchase tx ────────
+// Handles both single-item (_invItem/_invQty) and multi-item (tx.items[]) cases.
+function _invRestoreCreditorPurchaseTx(tx){
+  if(!tx || tx.type!=="purchase") return;
+  // Multi-item case — tx.items[] has each item with name+qty
+  if(Array.isArray(tx.items) && tx.items.length>0){
+    tx.items.forEach(it=>{
+      const invItem = inventoryItems.find(x=>x.name===it.name);
+      if(!invItem || !invItem.stock) return;
+      const qty = Number(it.qty);
+      const sIdx = invItem.stock.map((e,i)=>({e,i})).reverse()
+        .findIndex(({e})=>Number(e.qty)===qty);
+      if(sIdx>-1) invItem.stock.splice(invItem.stock.length-1-sIdx,1);
+    });
+    saveInventory();
+    return;
+  }
+  // Single-item legacy case
+  if(tx._invItem && tx._invQty){
+    const invItem = inventoryItems.find(x=>x.name===tx._invItem);
+    if(invItem && invItem.stock){
+      const qty = Number(tx._invQty);
+      const sIdx = invItem.stock.map((e,i)=>({e,i})).reverse()
+        .findIndex(({e})=>Number(e.qty)===qty);
+      if(sIdx>-1){ invItem.stock.splice(invItem.stock.length-1-sIdx,1); saveInventory(); }
+    }
+  }
+}
 function invDeductSold(soldItems, custId){
   const now = new Date().toISOString();
   const cust = custId ? customers.find(x=>x.id===custId) : null;
