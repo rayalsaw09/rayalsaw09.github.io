@@ -4127,6 +4127,14 @@ function requireOnline(){
   return false; // ok to proceed
 }
 
+// ─── ACTOR NAME ─────────────────────────────────────────────────
+// Returns who is currently performing actions in the app: the shop
+// owner ("Owner") or, if a team member is logged in, their display name.
+// Used to stamp every sale/purchase/transaction entry with "who did it".
+function getActorName(){
+  return currentMember ? (currentMember.display_name || "Team Member") : "Owner";
+}
+
 // type: 'sale'|'purchase'|'inventory'|'creditor'|'debtor'|'customer'|'other'
 // action: short verb phrase e.g. "Sale recorded", "Item deleted"
 // details: free text description
@@ -4138,7 +4146,7 @@ function addHistoryLog(type, action, details, extra, groupId){
     const dayKey = _histDayKey(now);
     const key = historyLogKey(dayKey);
     const list = JSON.parse(localStorage.getItem(key)||"[]");
-    const actorName = currentMember ? currentMember.display_name : "Owner";
+    const actorName = getActorName();
     const entry = {
       id: "H"+now+Math.random().toString(36).slice(2,6),
       ts: now,
@@ -6006,7 +6014,7 @@ async function bptSubmit(){
 
   amounts.forEach(amt=>{
     const bill="B"+String(Date.now()+Math.random()).replace(".","").slice(-6);
-    c.purchases=[{bill,amount:amt,date,notes},...(c.purchases||[])];
+    c.purchases=[{bill,amount:amt,date,notes,actor:getActorName()},...(c.purchases||[])];
     c.totalSpend+=amt;
   });
 
@@ -7882,34 +7890,82 @@ function bsSaveBank(){
 }
 
 // ─── CASH FLOW LEDGER MODAL ───────────────────────────────────────────────────
-function openCashLedger(account){
+// ── Cash / Bank Ledger date-filter state ──────────────────────────────────
+window._clDateFilter = window._clDateFilter || { preset: "all", from: "", to: "" };
+
+function _clApplyDateFilter(entries, preset, from, to) {
+  if (preset === "all") return entries;
+  const today = new Date(); today.setHours(0,0,0,0);
+  let fromD, toD;
+  if (preset === "today") {
+    fromD = new Date(today); toD = new Date(today);
+  } else if (preset === "yesterday") {
+    fromD = new Date(today); fromD.setDate(fromD.getDate()-1);
+    toD   = new Date(fromD);
+  } else if (preset === "week") {
+    fromD = new Date(today); fromD.setDate(fromD.getDate() - fromD.getDay());
+    toD   = new Date(today);
+  } else if (preset === "month") {
+    fromD = new Date(today.getFullYear(), today.getMonth(), 1);
+    toD   = new Date(today);
+  } else if (preset === "custom") {
+    if (!from || !to) return entries;
+    fromD = new Date(from); toD = new Date(to);
+  } else {
+    return entries;
+  }
+  fromD.setHours(0,0,0,0); toD.setHours(23,59,59,999);
+  return entries.filter(e => {
+    const d = new Date(e.date); return d >= fromD && d <= toD;
+  });
+}
+
+function openCashLedger(account, datePreset, dateFrom, dateTo){
   const trackingMode = getCashTrackingMode();
-  // account: "cash" | "bank" | undefined (undefined => "cash" in mixed mode, or "all" in separate mode)
   if(trackingMode!=="separate") account = "cash";
   if(!account) account = "all";
+
+  // Persist filter state across account tab switches
+  if(datePreset !== undefined) window._clDateFilter.preset = datePreset;
+  if(dateFrom  !== undefined) window._clDateFilter.from   = dateFrom;
+  if(dateTo    !== undefined) window._clDateFilter.to     = dateTo;
+  const { preset, from, to } = window._clDateFilter;
 
   const fullLedger = _bsGetCashLedger();
   const opening = account==="bank" ? _bsGetOpeningBalance("bank")
                 : account==="cash" ? _bsGetOpeningBalance("cash")
                 : _bsGetOpeningBalance("cash") + _bsGetOpeningBalance("bank");
 
-  const filtered = account==="all" ? fullLedger : fullLedger.filter(e=>(e.account||"cash")===account);
-  const ledger = [...filtered].sort((a,b)=>{
-    const da = new Date(a.date), db_ = new Date(b.date);
+  const acctFiltered = account==="all" ? fullLedger : fullLedger.filter(e=>(e.account||"cash")===account);
+  const allSorted = [...acctFiltered].sort((a,b)=>{
+    const da=new Date(a.date), db_=new Date(b.date);
     if(da-db_!==0) return da-db_;
     return (a.createdAt||0)-(b.createdAt||0);
   });
 
+  // Running balance always computed over full (unfiltered) ledger
   let running = opening;
-  const rows = ledger.map(e=>{
+  const withBal = allSorted.map(e => {
     const openBal = running;
     running += (e.direction==="in" ? e.amount : -e.amount);
-    const closeBal = running;
-    const sign = e.direction==="in" ? "+" : "−";
+    return { ...e, openBal, closeBal: running };
+  });
+  const finalBalance = running;
+
+  // Apply date filter AFTER computing running balances
+  const ledger = _clApplyDateFilter(withBal, preset, from, to).reverse(); // most recent first
+
+  // Period summary
+  const periodIn  = ledger.filter(e=>e.direction==="in" ).reduce((s,e)=>s+e.amount,0);
+  const periodOut = ledger.filter(e=>e.direction==="out").reduce((s,e)=>s+e.amount,0);
+  const net = periodIn - periodOut;
+
+  const rows = ledger.map(e=>{
+    const sign  = e.direction==="in" ? "+" : "−";
     const color = e.direction==="in" ? "#4ade80" : "#f87171";
-    const icon = e.direction==="in" ? "📥" : "📤";
+    const icon  = e.direction==="in" ? "📥" : "📤";
     const modeTag = e.mode ? `<span style="font-size:9px;color:#60a5fa;background:var(--bg-card,#0a1628);border:1px solid #1e3a6e;border-radius:6px;padding:1px 6px;margin-left:6px;font-weight:700;">${escHtml(e.mode)}</span>` : "";
-    return `<div style="background:#08101e;border:1px solid var(--border-main,#1e2a45);border-radius:10px;padding:10px 12px;margin-bottom:6px;">
+    return `<div style="background:var(--bg-row-even,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:10px;padding:10px 12px;margin-bottom:6px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
         <div style="flex:1;min-width:0;">
           <div style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);">${icon} ${escHtml(e.note||e.source||"Transaction")}${modeTag}</div>
@@ -7918,17 +7974,41 @@ function openCashLedger(account){
         <div style="font-size:14px;font-weight:900;color:${color};white-space:nowrap;">${sign}${formatINR(e.amount)}</div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:10px;color:#a0b0d0;margin-top:6px;border-top:1px solid var(--border-main,#1e2a45);padding-top:6px;">
-        <span>Opening: ${formatINR(openBal)}</span>
-        <span>Closing: ${formatINR(closeBal)}</span>
+        <span>Opening: ${formatINR(e.openBal)}</span>
+        <span>Closing: ${formatINR(e.closeBal)}</span>
       </div>
     </div>`;
-  }).reverse().join("");
+  }).join("");
 
-  const finalBalance = running;
-
-  // Tabs (only shown in separate tracking mode)
-  const tabBtn = (acc, label) => `<button onclick="openCashLedger('${acc}')" style="cursor:pointer;flex:1;padding:8px;border-radius:8px;border:1px solid ${account===acc?'#60a5fa':'#1e2a45'};background:${account===acc?'#001a2a':'#0a0e1a'};color:${account===acc?'#60a5fa':'#4a5a7a'};font-size:12px;font-weight:700;">${label}</button>`;
+  // Account tabs
+  const tabBtn = (acc, label) => `<button onclick="openCashLedger('${acc}')" style="cursor:pointer;flex:1;padding:8px;border-radius:8px;border:1px solid ${account===acc?'#60a5fa':'var(--border-main,#1e2a45)'};background:${account===acc?'#001a2a':'transparent'};color:${account===acc?'#60a5fa':'var(--text-muted,#7a8aaa)'};font-size:12px;font-weight:700;">${label}</button>`;
   const tabs = trackingMode==="separate" ? `<div style="display:flex;gap:6px;">${tabBtn("cash","💵 Cash")}${tabBtn("bank","🏦 Bank")}${tabBtn("all","📊 All")}</div>` : "";
+
+  // Date filter presets
+  const pBtn = (p, label) => `<button onclick="openCashLedger('${account}','${p}')" style="cursor:pointer;padding:6px 11px;border-radius:20px;border:2px solid ${preset===p?'#FFD700':'var(--border-main,#1e2a45)'};background:${preset===p?'#1a1400':'transparent'};color:${preset===p?'#FFD700':'var(--text-muted,#7a8aaa)'};font-size:11px;font-weight:${preset===p?800:600};white-space:nowrap;">${label}</button>`;
+
+  const customInputs = preset==="custom" ? `
+    <div style="display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+      <input type="date" id="cl-from" value="${from}" max="${new Date().toISOString().slice(0,10)}"
+        style="flex:1;min-width:120px;padding:7px 10px;border-radius:8px;border:1px solid var(--border-input,#2a3560);background:var(--bg-input,#0f1628);color:var(--text-main,#e8eaf0);font-size:12px;font-family:'Nunito',sans-serif;">
+      <span style="color:var(--text-dim,#4a5a7a);font-size:11px;">to</span>
+      <input type="date" id="cl-to" value="${to}" max="${new Date().toISOString().slice(0,10)}"
+        style="flex:1;min-width:120px;padding:7px 10px;border-radius:8px;border:1px solid var(--border-input,#2a3560);background:var(--bg-input,#0f1628);color:var(--text-main,#e8eaf0);font-size:12px;font-family:'Nunito',sans-serif;">
+      <button onclick="openCashLedger('${account}','custom',document.getElementById('cl-from').value,document.getElementById('cl-to').value)"
+        style="cursor:pointer;padding:7px 14px;border-radius:8px;border:none;background:#FFD700;color:#000;font-size:12px;font-weight:800;">Go</button>
+    </div>` : "";
+
+  const periodLabel = preset==="today" ? "Today" : preset==="yesterday" ? "Yesterday" : preset==="week" ? "This Week" : preset==="month" ? "This Month" : preset==="custom" && from && to ? `${from} → ${to}` : null;
+
+  const periodSummary = periodLabel ? `
+    <div style="background:var(--bg-card,#0a1628);border:1px solid #1e3a6e;border-radius:10px;padding:10px 14px;">
+      <div style="font-size:10px;color:#60a5fa;font-weight:800;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">📅 ${escHtml(periodLabel)} — Summary</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+        <div><div style="font-size:14px;font-weight:900;color:#4ade80;">+${formatINR(periodIn)}</div><div style="font-size:9px;color:var(--text-dim,#4a5a7a);">IN</div></div>
+        <div><div style="font-size:14px;font-weight:900;color:#f87171;">−${formatINR(periodOut)}</div><div style="font-size:9px;color:var(--text-dim,#4a5a7a);">OUT</div></div>
+        <div><div style="font-size:14px;font-weight:900;color:${net>=0?'#4ade80':'#f87171'};">${net>=0?'+':'−'}${formatINR(Math.abs(net))}</div><div style="font-size:9px;color:var(--text-dim,#4a5a7a);">NET</div></div>
+      </div>
+    </div>` : "";
 
   const title = account==="cash" ? "📜 Cash Ledger" : account==="bank" ? "📜 Bank Ledger" : "📜 Cash Flow Ledger";
 
@@ -7936,6 +8016,7 @@ function openCashLedger(account){
     ${modalHeader(title)}
     <div style="display:flex;flex-direction:column;gap:10px;">
       ${tabs}
+
       <div style="background:var(--bg-card,#0a1628);border:1px solid #1e3a6e;border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;">
         <div>
           <div style="font-size:11px;color:#60a5fa;font-weight:800;">OPENING BALANCE</div>
@@ -7947,8 +8028,23 @@ function openCashLedger(account){
         </div>
       </div>
 
-      ${ledger.length===0 ? `<div style="text-align:center;padding:30px;color:var(--text-dim,#4a5a7a);font-size:13px;">No transactions yet.<br/>Creditor payments and debtor receipts will appear here automatically.</div>` : `
-      <div style="font-size:11px;color:var(--text-dim,#4a5a7a);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:4px;">Transactions (most recent first)</div>
+      <div>
+        <div style="font-size:10px;color:var(--text-dim,#4a5a7a);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">🗓 Filter by Date</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+          ${pBtn("all","All")}
+          ${pBtn("today","Today")}
+          ${pBtn("yesterday","Yesterday")}
+          ${pBtn("week","This Week")}
+          ${pBtn("month","This Month")}
+          ${pBtn("custom","Custom 📅")}
+        </div>
+        ${customInputs}
+      </div>
+
+      ${periodSummary}
+
+      ${ledger.length===0 ? `<div style="text-align:center;padding:24px;color:var(--text-dim,#4a5a7a);font-size:13px;">${preset==="all"?"No transactions yet.<br/>Creditor payments and debtor receipts will appear here automatically.":"No transactions for this period."}</div>` : `
+      <div style="font-size:11px;color:var(--text-dim,#4a5a7a);font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">${ledger.length} transaction${ledger.length!==1?"s":""} — most recent first</div>
       ${rows}`}
 
       <button onclick="closeModal();setTimeout(openBalanceSheet,150)" class="btn" style="background:#1a2540;color:var(--text-muted,#7a8aaa);border:1px solid var(--border-input,#2a3560);padding:12px;">
@@ -10186,6 +10282,7 @@ function _crTxRender(creditorId){
           <div><span style="color:var(--text-dim,#4a5a7a);">${t("txAmount")}</span><br><span style="color:${cfg.col};font-weight:800;">${formatINR(tx.amount)}</span></div>
           ${tx.invoiceNo?`<div><span style="color:var(--text-dim,#4a5a7a);">${t("txInvoice")}<br><span style="color:var(--text-main,#e8eaf0);font-weight:700;">🧾 ${escHtml(tx.invoiceNo)}</span></div>`:""}
           ${tx._invItem?`<div><span style="color:var(--text-dim,#4a5a7a);">इन्वेंट्री</span><br><span style="color:#60a5fa;font-weight:700;">📦 ${escHtml(tx._invItem)} × ${tx._invQty}</span></div>`:""}
+          ${tx.actor?`<div><span style="color:var(--text-dim,#4a5a7a);">Entry By</span><br><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:${tx.actor==='Owner'?'#FFD70022':'#a78bfa22'};color:${tx.actor==='Owner'?'#FFD700':'#a78bfa'};border:1px solid ${tx.actor==='Owner'?'#FFD70044':'#a78bfa44'};font-weight:700;">👤 ${escHtml(tx.actor)}</span></div>`:""}
         </div>
         ${tx.note?`<div style="color:var(--text-muted,#7a8aaa);margin-bottom:8px;">📝 ${escHtml(tx.note)}</div>`:""}
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -10881,6 +10978,7 @@ function saveCrTransaction(){
     id:txId, type, amount, note, date, invoiceNo,
     ...(multiItems.length>0 ? { items: multiItems } : {}),
     ...(invLinked ? { _invItem: invItemName, _invQty: invQtyLinked } : {}),
+    actor: getActorName(),
     createdAt:Date.now(), syncStatus:"local"
   });
   saveCreditors(creditors);
@@ -12629,6 +12727,7 @@ function _drTxRender(debtorId){
           <div><span style="color:var(--text-dim,#4a5a7a);">Type</span><br><span style="font-size:11px;padding:2px 8px;border-radius:5px;background:${cfg.bg};color:${cfg.col};font-weight:700;">${cfg.icon} ${cfg.label}</span></div>
           <div><span style="color:var(--text-dim,#4a5a7a);">Amount</span><br><span style="color:${cfg.col};font-weight:800;">${formatINR(tx.amount)}</span></div>
           ${tx._invItem?`<div><span style="color:var(--text-dim,#4a5a7a);">इन्वेंट्री</span><br><span style="color:#60a5fa;font-weight:700;">📦 ${escHtml(tx._invItem)} × ${tx._invQty}</span></div>`:""}
+          ${tx.actor?`<div><span style="color:var(--text-dim,#4a5a7a);">Entry By</span><br><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:${tx.actor==='Owner'?'#FFD70022':'#a78bfa22'};color:${tx.actor==='Owner'?'#FFD700':'#a78bfa'};border:1px solid ${tx.actor==='Owner'?'#FFD70044':'#a78bfa44'};font-weight:700;">👤 ${escHtml(tx.actor)}</span></div>`:""}
         </div>
         ${tx.note?`<div style="color:var(--text-muted,#7a8aaa);margin-bottom:8px;">📝 ${escHtml(tx.note)}</div>`:""}
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -12825,6 +12924,7 @@ function saveDebtTransaction(){
     date,
     ...((type==="payment"||type==="return") ? { mode } : {}),
     ...(invLinked ? { _invItem: invItemName, _invQty: invQty } : {}),
+    actor: getActorName(),
     createdAt: Date.now(),
   });
   saveDebtors(debtors);
@@ -13196,6 +13296,8 @@ function renderAlertsTab(){
 // (defaults to today). Logs are written by addHistoryLog().
 // ═══════════════════════════════════════════════════════════════
 var historySelectedDate = ""; // "" = today; else "YYYY-MM-DD"
+var _histMemberFilter = "all"; // "all" or actor name string
+var _histTextSearch = ""; // free-text search
 
 var HIST_TYPE_META = {
   sale:      {icon:"💰", color:"#4ade80", label:"Sale"},
@@ -13846,16 +13948,36 @@ function renderHistoryTab(){
   const dateObj = new Date(dayKey+"T00:00:00");
   const dateLabel = dateObj.toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric"});
 
-  // Type filter
-  const activeFilter = window._histTypeFilter || "all";
-  const filtered = activeFilter==="all" ? topLevelEntries : topLevelEntries.filter(e=>e.type===activeFilter);
+  // ── Member filter (owner-only: can filter by any actor) ──
+  const activeMember = (!currentMember) ? (_histMemberFilter || "all") : "all";
+  const allActors = [...new Set(topLevelEntries.map(e => e.actor || "Owner"))].sort();
 
-  // Summary counts by type (for filter pills)
+  // ── Text search ──
+  const searchTerm = (_histTextSearch || "").trim().toLowerCase();
+
+  // Apply member filter then text search on top
+  let afterMemberFilter = activeMember === "all"
+    ? topLevelEntries
+    : topLevelEntries.filter(e => (e.actor || "Owner") === activeMember);
+
+  const afterSearch = searchTerm
+    ? afterMemberFilter.filter(e =>
+        (e.action || "").toLowerCase().includes(searchTerm) ||
+        (e.details || "").toLowerCase().includes(searchTerm) ||
+        (e.actor || "Owner").toLowerCase().includes(searchTerm)
+      )
+    : afterMemberFilter;
+
+  // Type filter on top of member+search
+  const activeFilter = window._histTypeFilter || "all";
+  const filtered = activeFilter === "all" ? afterSearch : afterSearch.filter(e => e.type === activeFilter);
+
+  // Summary counts by type (based on member-filtered+search set for accuracy)
   const counts = {};
-  topLevelEntries.forEach(e=>{ counts[e.type] = (counts[e.type]||0)+1; });
+  afterSearch.forEach(e => { counts[e.type] = (counts[e.type] || 0) + 1; });
 
   const filterPills = ["all",...Object.keys(HIST_TYPE_META)].map(k=>{
-    const cnt = k==="all" ? topLevelEntries.length : (counts[k]||0);
+    const cnt = k==="all" ? afterSearch.length : (counts[k]||0);
     if(k!=="all" && cnt===0) return "";
     const meta = k==="all" ? {icon:"🕘",color:"#60a5fa",label:currentLang==='hi'?'सभी':'All'} : {...HIST_TYPE_META[k], label: k==='sale'?(currentLang==='hi'?'बिक्री':'Sale'):HIST_TYPE_META[k].label};
     const active = activeFilter===k;
@@ -13864,9 +13986,17 @@ function renderHistoryTab(){
 
   const entryCards = filtered.length===0
     ? `<div style="text-align:center;padding:50px 20px;color:var(--text-dim);">
-        <div style="font-size:48px;margin-bottom:12px;">🕘</div>
-        <div style="font-size:15px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">${isToday?t('hisNoActivityToday'):t('hisNoActivityDay')}</div>
-        <div style="font-size:12px;">${isToday?t('hisSalesWillAppear'):t('hisTryDate')}</div>
+        <div style="font-size:48px;margin-bottom:12px;">${searchTerm || activeMember!=="all" ? "🔍" : "🕘"}</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">${
+          searchTerm ? (currentLang==='hi'?'कोई परिणाम नहीं मिला':'No results found')
+          : activeMember!=="all" ? (currentLang==='hi'?`${activeMember} की कोई गतिविधि नहीं`:`No activity by ${activeMember}`)
+          : isToday?t('hisNoActivityToday'):t('hisNoActivityDay')
+        }</div>
+        <div style="font-size:12px;">${
+          searchTerm ? (currentLang==='hi'?'कोई और शब्द आज़माएं':'Try a different search term')
+          : activeMember!=="all" ? (currentLang==='hi'?'किसी और तारीख को जाँचें':'Try a different date')
+          : isToday?t('hisSalesWillAppear'):t('hisTryDate')
+        }</div>
        </div>`
     : filtered.map(e=>{
         const meta = HIST_TYPE_META[e.type] || HIST_TYPE_META.other;
@@ -13888,19 +14018,47 @@ function renderHistoryTab(){
         </div>`;
       }).join("");
 
+  // Member filter dropdown (owner only, only when there are multiple actors)
+  const memberDropdown = (!currentMember && allActors.length > 1) ? `
+    <select onchange="window._histMemberFilter=this.value;window._histTypeFilter='all';renderTab(11)"
+      style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:10px;padding:7px 10px;color:var(--text-main);font-size:12px;font-weight:700;cursor:pointer;">
+      <option value="all" ${activeMember==="all"?"selected":""}>👥 ${currentLang==='hi'?'सभी सदस्य':'All Members'}</option>
+      ${allActors.map(a=>`<option value="${escHtml(a)}" ${activeMember===a?"selected":""}>${a==="Owner"?"👑 Owner":"👤 "+escHtml(a)}</option>`).join("")}
+    </select>` : "";
+
+  const totalShown = filtered.length;
+  const totalInDay = topLevelEntries.length;
+
   return `<div style="padding:16px 14px 80px;max-width:760px;margin:0 auto;">
+    <!-- Header row -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px;">
-      <div style="font-size:18px;font-weight:800;color:#60a5fa;">🕘 History</div>
-      <div style="display:flex;align-items:center;gap:8px;">
+      <div style="font-size:18px;font-weight:800;color:#60a5fa;">🕘 ${currentLang==='hi'?'इतिहास':'History'}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        ${memberDropdown}
         ${(!currentMember || hasPermission('history_date_filter')) ? `<input type="date" id="hist-date-picker" value="${dayKey}" max="${todayKey}"
-          onchange="historySelectedDate=this.value===('${todayKey}')?'':this.value;window._histTypeFilter='all';renderTab(11)"
+          onchange="historySelectedDate=this.value===('${todayKey}')?'':this.value;window._histTypeFilter='all';window._histMemberFilter='all';window._histTextSearch='';renderTab(11)"
           style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:10px;padding:8px 12px;color:var(--text-main);font-size:13px;" />
-        ${!isToday?`<button onclick="historySelectedDate='';window._histTypeFilter='all';renderTab(11)" class="btn" style="background:#1e3a6e;border:1px solid #2a5aaa;color:#60a5fa;font-size:12px;font-weight:800;padding:8px 12px;">${t('alToday')}</button>`:""}` : `<span style="font-size:12px;color:var(--text-dim);">${t('alTodayOnly')}</span>`}
+        ${!isToday?`<button onclick="historySelectedDate='';window._histTypeFilter='all';window._histMemberFilter='all';window._histTextSearch='';renderTab(11)" class="btn" style="background:#1e3a6e;border:1px solid #2a5aaa;color:#60a5fa;font-size:12px;font-weight:800;padding:8px 12px;">${t('alToday')}</button>`:""}` : `<span style="font-size:12px;color:var(--text-dim);">${t('alTodayOnly')}</span>`}
       </div>
     </div>
-    <div style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">${dateLabel}${isToday?" (" + t('alToday') + ")":""} · ${topLevelEntries.length} event${topLevelEntries.length!==1?"s":""}</div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">${dateLabel}${isToday?" (" + t('alToday') + ")":""} · ${totalInDay} event${totalInDay!==1?"s":""}${activeMember!=="all"?` · 👤 ${activeMember}`:""}</div>
+
+    <!-- Search bar -->
+    <div style="position:relative;margin-bottom:12px;">
+      <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;">🔍</span>
+      <input type="text" id="hist-search-box"
+        placeholder="${currentLang==='hi'?'गतिविधि खोजें…':'Search activity…'}"
+        value="${escHtml(_histTextSearch)}"
+        oninput="window._histTextSearch=this.value;window._histTypeFilter='all';renderTab(11)"
+        style="width:100%;box-sizing:border-box;padding:9px 12px 9px 36px;background:var(--bg-card);border:1px solid var(--border-main);border-radius:10px;color:var(--text-main);font-size:13px;outline:none;"
+      />
+      ${searchTerm ? `<button onclick="window._histTextSearch='';document.getElementById('hist-search-box')&&(document.getElementById('hist-search-box').value='');renderTab(11)"
+        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-dim);font-size:16px;cursor:pointer;padding:0;">✕</button>` : ""}
+    </div>
 
     <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">${filterPills}</div>
+
+    ${(searchTerm || activeMember!=="all") && totalShown !== totalInDay ? `<div style="font-size:12px;color:#f59e0b;margin-bottom:10px;font-weight:700;">⚡ ${totalShown} result${totalShown!==1?"s":""} shown</div>` : ""}
 
     <div style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:14px;overflow:hidden;">
       ${entryCards}
@@ -15696,7 +15854,7 @@ async function saveBulkPurchase(custId) {
   amounts.forEach(amt => {
     const bill = "B" + String(Date.now() + Math.random()).replace(".", "").slice(-6);
     const saleTxId = "SALE_" + Date.now() + "_" + Math.random().toString(36).slice(2,5);
-    c.purchases = [{ bill, amount: amt, date, notes: notes || "Bulk entry", _cashRefId: saleTxId }, ...(c.purchases || [])];
+    c.purchases = [{ bill, amount: amt, date, notes: notes || "Bulk entry", _cashRefId: saleTxId, actor: getActorName() }, ...(c.purchases || [])];
     c.totalSpend += amt;
     cashRecordTx({ direction: "in", amount: amt, date, note: `Sale to ${c.name} · Bill ${bill}${notes ? " · " + notes : " (bulk entry)"}`, source: "sale_payment", refId: saleTxId, mode: payMode });
   });
@@ -16671,6 +16829,7 @@ function cpPurchaseCard(p,custId){
       ${isBorrow&&p.due?`<div style="font-size:11px;color:${isOverdue?'#f44':'#7a8aaa'};margin-top:2px;">Due: ${new Date(p.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${isOverdue?' ⚠️':''}</div>`:''}
       ${p.notes&&!isBorrow?`<div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:3px;">📝 ${p.notes}</div>`:''}
       ${isBorrow&&p.notes?`<div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:3px;">Item: ${p.notes}</div>`:''}
+      ${p.actor?`<div style="margin-top:4px;"><span style="font-size:10px;padding:2px 7px;border-radius:8px;background:${p.actor==='Owner'?'#FFD70022':'#a78bfa22'};color:${p.actor==='Owner'?'#FFD700':'#a78bfa'};border:1px solid ${p.actor==='Owner'?'#FFD70044':'#a78bfa44'};font-weight:700;">👤 ${escHtml(p.actor)}</span></div>`:''}
       ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${p.soldItems.map(si=>si._deleted?`<span style="background:#1a0a0a;border:1px solid #4a2020;border-radius:6px;padding:2px 8px;font-size:11px;color:#884444;text-decoration:line-through;">📦 ${si.qty} ${si.name}</span><span style="background:#2a0a0a;border:1px solid #4a1a1a;border-radius:6px;padding:2px 6px;font-size:10px;color:#f66;">🗑 deleted from inventory</span>`:`<span style="background:var(--bg-card,#0a1628);border:1px solid var(--border-input,#2a3560);border-radius:6px;padding:2px 8px;font-size:11px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||"unit"} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
     </div>
     <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:12px;" onclick="event.stopPropagation()">
@@ -16714,6 +16873,7 @@ function phPurchaseCardHTML(p,custId){
       ${isSubFeatureAllowed(11)?`<div style="font-size:11px;color:#5af;">Visit #${p.visitNum}</div>`:""}
       ${p.notes&&!isBorrow?`<div style="font-size:11px;color:var(--text-muted,#7a8aaa);">${p.notes}</div>`:''}
       ${isBorrow&&p.notes?`<div style="font-size:11px;color:var(--text-muted,#7a8aaa);">Item: ${p.notes}</div>`:''}
+      ${p.actor?`<div style="margin-top:3px;"><span style="font-size:10px;padding:2px 7px;border-radius:8px;background:${p.actor==='Owner'?'#FFD70022':'#a78bfa22'};color:${p.actor==='Owner'?'#FFD700':'#a78bfa'};border:1px solid ${p.actor==='Owner'?'#FFD70044':'#a78bfa44'};font-weight:700;">👤 ${escHtml(p.actor)}</span></div>`:''}
       ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;">${p.soldItems.map(si=>si._deleted?`<span style="background:#1a0a0a;border:1px solid #4a2020;border-radius:5px;padding:2px 7px;font-size:10px;color:#884444;text-decoration:line-through;">📦 ${si.qty} ${si.name}</span><span style="background:#2a0a0a;border:1px solid #4a1a1a;border-radius:5px;padding:2px 5px;font-size:10px;color:#f66;">🗑 deleted from inventory</span>`:`<span style="background:var(--bg-card,#0a1628);border:1px solid var(--border-input,#2a3560);border-radius:5px;padding:2px 7px;font-size:10px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||""} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
     </div>
     <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;" onclick="event.stopPropagation()">
@@ -22513,6 +22673,7 @@ function renderBillHTML(bill) {
   const billWidth = paperSize === "58mm" ? "200px" : paperSize === "80mm" ? "280px" : "100%";
   const shopAddress = getBillSetting("billShopAddress") || "";
   const hsnEnabled = getBillSetting("billHSNEnabled");
+  const showStaffOnBill = getBillSetting("billShowStaffName");
 
   const _billDate = safeParseBillDate(bill.createdAt);
   const dateStr = _billDate.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -22677,6 +22838,7 @@ function renderBillHTML(bill) {
     <!-- Footer -->
     <div style="margin-top:16px;text-align:center;border-top:1px solid #ccc;padding-top:12px;">
       <div style="font-size:12px;color:#555;">${footer}</div>
+      ${showStaffOnBill && bill.actor ? `<div style="font-size:11px;color:#666;margin-top:6px;">Served by: <strong>${bill.actor}</strong></div>` : ""}
       <div style="font-size:10px;color:#aaa;margin-top:4px;">Powered by ShopChampion</div>
     </div>
   </div>`;
@@ -22732,6 +22894,7 @@ function renderBillHTML(bill) {
     <!-- Footer -->
     <div style="margin-top:12px;text-align:center;border-top:1px dashed #999;padding-top:8px;">
       <div style="font-size:11px;color:#555;">${footer}</div>
+      ${showStaffOnBill && bill.actor ? `<div style="font-size:10px;color:#666;margin-top:4px;">Served by: <strong>${bill.actor}</strong></div>` : ""}
       <div style="font-size:9px;color:#999;margin-top:4px;">Powered by ShopChampion</div>
     </div>
   </div>`;
@@ -22790,7 +22953,7 @@ async function addPurchase(custId, { amount, bill, date, notes, soldItems, payMo
   // Run original logic (totalSpend update, push to c.purchases, notify, voice, save)
   c.totalSpend += amt;
   const saleTxId = "SALE_" + Date.now() + "_" + Math.random().toString(36).slice(2,5);
-  c.purchases = [{ bill, amount: amt, date: date || new Date().toISOString(), notes, soldItems: soldItems || [], _cashRefId: saleTxId }, ...(c.purchases || [])];
+  c.purchases = [{ bill, amount: amt, date: date || new Date().toISOString(), notes, soldItems: soldItems || [], _cashRefId: saleTxId, actor: getActorName() }, ...(c.purchases || [])];
   notify(`✅ ${formatINR(amt)} added for ${c.name}`);
   const _sortedV = getSorted();
   const _rankedV = _sortedV.find(x => x.id === custId);
@@ -22916,6 +23079,7 @@ function openBillingSettingsModal() {
     ${toggle("billAutoPrint",    autoPr,  "Auto Print Bill",    "Automatically print bill after each purchase")}
     ${toggle("billShowGST",      showGST, "Show GSTIN on Bill", "Display your GST number on the printed bill")}
     ${toggle("billHSNEnabled",   hsnEnabled, "Show HSN/SAC Column", "Add HSN/SAC code column on A4 invoice")}
+    ${toggle("billShowStaffName", getBillSetting("billShowStaffName"), "Show Staff Name on Bill", "Print the entry person's name (Owner / member) on bill")}
   </div>
 
   <!-- Paper Size -->
