@@ -19,7 +19,7 @@ const SC_FIREBASE_CONFIG = {
 // Get these from Supabase Dashboard → Project Settings → API
 // Use the ANON (public) key here — never the service_role key
 const SC_SUPABASE_URL  = "https://dgmzfqwglnafghpfnqau.supabase.co";
-const SC_SUPABASE_ANON = "sb_publishable_yxPk_18wrBIPebrJkYn9FQ_91lhKmjE";
+const SC_SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnbXpmcXdnbG5hZmdocGZucWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NDA3NzcsImV4cCI6MjA5NTAxNjc3N30.9yVo-xggH3zDIIG6wsTXKa1GgCZ_KZA3FV2GB0t-lHQ";
 
 // ═══════════════════════════════════════════════════════════════
 //  ⚠️  SECURITY RULES — READ BEFORE GOING LIVE
