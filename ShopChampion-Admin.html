@@ -6845,8 +6845,12 @@ async function deletePurchase(custId,bill,dateEnc){
     notify("✅ Purchase deleted");
     try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
     addHistoryLog('sale','Sale deleted',`${c.name} · ${formatINR(_delAmt)}${bill?` · Bill ${bill}`:''}`);
-    // Reverse the cash/bank entry that was created when this sale was recorded
-    cashRecordTx({direction:"out", amount:_delAmt, date:new Date().toISOString().slice(0,10), note:`Sale deleted · ${c.name}${bill?" · Bill "+bill:""}`, source:"sale_delete", refId:(_delCashRefId||"DEL_"+Date.now()), mode:"Cash"});
+    // Reverse the cash/bank entry that was created when this sale was recorded.
+    // Look up the ORIGINAL entry's mode (Cash/UPI/NEFT/Cheque) by refId so the
+    // reversal hits the same account it was originally credited to — never assume Cash.
+    const _origCashEntry = _delCashRefId ? _bsGetCashLedger().find(e=>e.refId===_delCashRefId) : null;
+    const _delMode = _origCashEntry ? _origCashEntry.mode : "Cash";
+    cashRecordTx({direction:"out", amount:_delAmt, date:new Date().toISOString().slice(0,10), note:`Sale deleted · ${c.name}${bill?" · Bill "+bill:""}`, source:"sale_delete", refId:(_delCashRefId||"DEL_"+Date.now()), mode:_delMode});
     if(useLocalOnly)safeRenderTab(currentTab);
   }
 }
@@ -10669,6 +10673,16 @@ function openReturnModal(creditorId){
         <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t('crReason')}</label>
         <input class="input" id="tx-note" placeholder="e.g. Damaged goods returned" style="margin-bottom:0;" />
       </div>
+      <div>
+        <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">💳 RECEIVED BACK VIA</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${["Cash","UPI","NEFT","Cheque","Other"].map((m,i)=>`
+            <button onclick="document.querySelectorAll('.txret-mode-btn').forEach(b=>b.style.background='#0a0e1a');document.querySelectorAll('.txret-mode-btn').forEach(b=>b.style.borderColor='#1e2a45');document.querySelectorAll('.txret-mode-btn').forEach(b=>b.style.color='#4a5a7a');this.style.background='#001a0e';this.style.borderColor='#22c55e';this.style.color='#22c55e';document.getElementById('tx-ret-mode').value='${m}'"
+              class="txret-mode-btn" style="cursor:pointer;padding:6px 12px;border-radius:8px;border:1px solid ${i===0?'#22c55e':'#1e2a45'};background:${i===0?'#001a0e':'#0a0e1a'};color:${i===0?'#22c55e':'#4a5a7a'};font-size:12px;font-weight:700;">${m}</button>
+          `).join("")}
+        </div>
+        <input type="hidden" id="tx-ret-mode" value="Cash" />
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div>
           <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${t('crDate')}</label>
@@ -10763,13 +10777,10 @@ function saveCrTransaction(){
   });
   saveCreditors(creditors);
   addHistoryLog('creditor',`Creditor ${type==="purchase"?"purchase":type==="payment"?"payment":"return"} recorded`,`${creditors[idx].name||'Creditor'} · ${formatINR(amount)}${invoiceNo?` · ${invoiceNo}`:''}`,null,_histGroupId);
-  if(type==="payment"){
-    const crTxMode = document.getElementById("tx-pay-mode")?.value||"Cash";
-    cashRecordTx({direction:"out", amount, date, note:`Paid to ${creditors[idx].name||"creditor"}${note?(" · "+note):""}`, source:"creditor_payment", refId:txId, mode:crTxMode});
-  }
   if(type==="return"){
     // Supplier credits us back (debit note) — cash comes IN
-    cashRecordTx({direction:"in", amount, date, note:`Return / Dr Note from ${creditors[idx].name||"creditor"}${note?(" · "+note):""}`, source:"creditor_return", refId:txId, mode:"Cash"});
+    const crRetMode = document.getElementById("tx-ret-mode")?.value||"Cash";
+    cashRecordTx({direction:"in", amount, date, note:`Return / Dr Note from ${creditors[idx].name||"creditor"}${note?(" · "+note):""}`, source:"creditor_return", refId:txId, mode:crRetMode});
   }
   closeModal();
   notify(`✅ ${type==="purchase"?"Purchase":type==="payment"?"Payment":"Return / Dr Note"} of ${formatINR(amount)} recorded${invLinked?" · "+invItemName+(type==="return"?" stock deducted":" stock updated"):""}`);
@@ -12576,10 +12587,10 @@ function openAddDebtTxModal(debtorId, defaultType){
       </div>
     </div>` : "";
 
-  // Payment mode selector — only relevant for receipts (cash/bank movement)
-  const modeSection = (defaultType === "payment") ? `
+  // Payment mode selector — relevant for receipts AND refunds (both move cash/bank)
+  const modeSection = (defaultType === "payment" || defaultType === "return") ? `
     <div>
-      <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">RECEIVED VIA</label>
+      <label style="font-size:11px;color:#7a8aaa;font-weight:700;display:block;margin-bottom:4px;">${defaultType === "return" ? "REFUNDED VIA" : "RECEIVED VIA"}</label>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${["Cash","UPI","NEFT","Cheque","Other"].map((m,i)=>`
           <button type="button" onclick="document.querySelectorAll('.drtx-mode-btn').forEach(b=>{b.style.background='#0a0e1a';b.style.borderColor='#1e2a45';b.style.color='#4a5a7a';});this.style.background='#001a2a';this.style.borderColor='#60a5fa';this.style.color='#60a5fa';document.getElementById('drtx-mode').value='${m}'"
@@ -12684,7 +12695,7 @@ function saveDebtTransaction(){
     amount: amtRaw,
     note,
     date,
-    ...(type==="payment" ? { mode } : {}),
+    ...((type==="payment"||type==="return") ? { mode } : {}),
     ...(invLinked ? { _invItem: invItemName, _invQty: invQty } : {}),
     createdAt: Date.now(),
   });
