@@ -5131,7 +5131,7 @@ function _safeRenderTabImmediate(i) {
   if (i === 5 && userIsTyping && !isInvSearch) {
     return; // Don't re-render settings tab while user is editing any field
   }
-  if (i === 2) {
+  if (i === 0) {
     // If the user currently has focus inside the Purchase tab, skip re-render
     // entirely — data is already updated in memory, DOM is fine as-is.
     if (userIsTyping) {
