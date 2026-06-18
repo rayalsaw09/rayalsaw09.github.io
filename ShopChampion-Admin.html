@@ -788,6 +788,10 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   .progress-bar-track { height: 8px; background: #0a0e1a; border-radius: 4px; overflow: hidden; }
   .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s; }
   .purchase-card { background: var(--bg-dark,#0a0e1a); border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+  /* ── Theme-aware hover rows — replaces all hardcoded dark onmouseover colors ── */
+  .hover-row { transition: background 0.15s; cursor: pointer; }
+  .hover-row:hover { background: var(--bg-row-hover) !important; }
+  .hover-row:active { background: var(--bg-row-hover) !important; }
   label { cursor: pointer; }
 
   /* Photo upload circle */
@@ -2745,6 +2749,11 @@ function tallyHighlight(text, query) {
   return result;
 }
 function autoId() { return "SC" + Math.random().toString(36).substr(2,6).toUpperCase(); }
+// Theme-aware hover color helper — returns CSS var value for current theme
+function _hoverBg() { return getComputedStyle(document.body).getPropertyValue('--bg-row-hover').trim() || '#151f38'; }
+function _hoverOn(el) { el.style.background = _hoverBg(); }
+function _hoverOff(el, orig) { el.style.background = orig || ''; }
+
 function escHtml(s) {
   if (s == null) return "";
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
@@ -5281,7 +5290,7 @@ function renderLeaderboard(sorted){
       ? `<span style="font-size:10px;color:#3a5a4a;margin-left:4px;">(${t('allTimeBracket')} ${formatINR(c._realSpend)})</span>` : "";
     const zeroDay = isFiltered && c.totalSpend === 0;
     return `
-    <div class="lb-row" style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;align-items:center;background:${zeroDay?'#0a0d14':gi%2===0?"#0d1220":"#0f1628"};border-left:1px solid #1e2a45;border-right:1px solid #1e2a45;border-bottom:1px solid #141c30;padding:10px 16px;cursor:pointer;transition:background 0.15s;${zeroDay?'opacity:0.55':''}" onclick="openCustomerPage('${c.id}')" onmouseenter="this.style.background='#151f38'" onmouseleave="this.style.background='${zeroDay?'#0a0d14':gi%2===0?'#0d1220':'#0f1628'}'">
+    <div class="lb-row" style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;align-items:center;background:${zeroDay?'#0a0d14':gi%2===0?"#0d1220":"#0f1628"};border-left:1px solid #1e2a45;border-right:1px solid #1e2a45;border-bottom:1px solid #141c30;padding:10px 16px;cursor:pointer;transition:background 0.15s;${zeroDay?'opacity:0.55':''}" onclick="openCustomerPage('${c.id}')" onmouseenter="_hoverOn(this)" onmouseleave="this.style.background=''">
       ${rankBadge(c.rank)}
       <div style="display:flex;align-items:center;gap:10px;min-width:0;">
         ${avatarEl(c,34)}
@@ -5772,7 +5781,7 @@ function ptFilterCustomers(){
   }
   dd.style.display="block";
   dd.innerHTML=matches.map(c=>`
-    <div onclick="ptSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;border-bottom:1px solid #0f1628;" onmouseover="this.style.background='#0d1a30'" onmouseout="this.style.background='transparent'">
+    <div onclick="ptSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;border-bottom:1px solid #0f1628;" onmouseover="_hoverOn(this)" onmouseout="_hoverOff(this)">
       ${avatarEl(c,36)}
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:14px;color:#e8eaf0;">${tallyHighlight(c.name,q)}</div>
@@ -5906,7 +5915,7 @@ function bptFilterCustomers(){
   const matches=getSorted().filter(c=>tallyMatch(c.name,q)||(c.phone&&tallyMatch(c.phone,q))||tallyMatch(c.id,q)).slice(0,8);
   if(!matches.length){dd.style.display="none";return;}
   dd.style.display="block";
-  dd.innerHTML=matches.map(c=>`<div onclick="bptSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='transparent'">${avatarEl(c,34)}<div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${tallyHighlight(c.name,q)}</div><div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span> · ${formatINR(c.totalSpend)}</div></div></div>`).join("");
+  dd.innerHTML=matches.map(c=>`<div onclick="bptSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;border-bottom:1px solid #1a2040;" onmouseover="_hoverOn(this)" onmouseout="_hoverOff(this)">${avatarEl(c,34)}<div><div style="font-weight:700;font-size:13px;color:#e8eaf0;">${tallyHighlight(c.name,q)}</div><div style="font-size:11px;color:#4a5a7a;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span> · ${formatINR(c.totalSpend)}</div></div></div>`).join("");
 }
 
 function bptSelectCustomer(id){
@@ -5997,7 +6006,7 @@ function bwFilterCustomers(){
     return;
   }
   dd.style.display="block";
-  dd.innerHTML=matches.map(c=>`<div onclick="bwSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;border-bottom:1px solid #0f1628;" onmouseover="this.style.background='#0d1a30'" onmouseout="this.style.background='transparent'">
+  dd.innerHTML=matches.map(c=>`<div onclick="bwSelectCustomer('${c.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;border-bottom:1px solid #0f1628;" onmouseover="_hoverOn(this)" onmouseout="_hoverOff(this)">
     ${avatarEl(c,36)}
     <div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:#e8eaf0;">${tallyHighlight(c.name,q)}</div>
     <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${c.phone?"📞 "+c.phone+" · ":""}<span style="font-family:monospace;">${c.id}</span></div></div>
@@ -13834,7 +13843,7 @@ function renderHistoryTab(){
         const actor = e.actor || "Owner";
         const actorColor = actor === "Owner" ? "#FFD700" : "#a78bfa";
         const groupCount = e.groupId ? entries.filter(x=>x.groupId===e.groupId).length : 1;
-        return `<div onclick="showHistoryGroup('${e.id}','${dayKey}')" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border-main);cursor:pointer;" onmouseover="this.style.background='#0d1525'" onmouseout="this.style.background='transparent'">
+        return `<div onclick="showHistoryGroup('${e.id}','${dayKey}')" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border-main);cursor:pointer;" onmouseover="_hoverOn(this)" onmouseout="_hoverOff(this)">
           <div style="width:38px;height:38px;border-radius:10px;background:${meta.color}22;border:1px solid ${meta.color}55;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">${meta.icon}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:800;color:var(--text-main);">${escHtml(e.action)}</div>
@@ -14234,7 +14243,7 @@ function _showHistManager(){
     const total=(c.purchases||[]).reduce((s,p)=>s+Number(p.amount),0);
     return `<div id="hm-row-${c.id}" onclick="_hmToggle('${c.id}',this)"
       style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #0d1220;cursor:pointer;transition:background 0.12s;"
-      onmouseenter="if(!window._hmSelected?.has('${c.id}'))this.style.background='#0d1525'"
+      onmouseenter="if(!window._hmSelected?.has('${c.id}'))_hoverOn(this)"
       onmouseleave="if(!window._hmSelected?.has('${c.id}'))this.style.background=''">
       <div id="hm-chk-${c.id}" style="width:20px;height:20px;border-radius:6px;border:2px solid #2a3560;background:#0a0e1a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;"></div>
       ${avatarEl(c,32)}
@@ -16241,7 +16250,7 @@ function toggleLangMenu() {
   if (menu.style.display === "none") {
     menu.innerHTML = Object.entries(LANGUAGES).map(([code, info]) => {
       const isActive = code === currentLang;
-      return `<div onclick="setLanguage('${code}')" style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-radius:8px;background:${isActive?'#1a2540':'transparent'};color:${isActive?'#FFD700':'var(--text-main)'};font-size:13px;font-weight:${isActive?800:600};transition:background 0.1s;" onmouseover="this.style.background='#0f1e38'" onmouseout="this.style.background='${isActive?'#1a2540':'transparent'}'">
+      return `<div onclick="setLanguage('${code}')" style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-radius:8px;background:${isActive?'#1a2540':'transparent'};color:${isActive?'#FFD700':'var(--text-main)'};font-size:13px;font-weight:${isActive?800:600};transition:background 0.1s;" onmouseover="_hoverOn(this)" onmouseout="this.style.background=(this.dataset.active==='1'?'#1a2540':'')">
         <span style="font-size:16px;">${info.flag}</span>
         <span>${info.name}</span>
         ${isActive?'<span style="margin-left:auto;font-size:10px;color:#FFD700;">✓</span>':''}
@@ -16617,8 +16626,8 @@ function cpPurchaseCard(p,custId){
   const amtColor=isBorrow?(isPending?(isOverdue?'#f44':isPartialB?'#f59e0b':'#f84'):'#4f4'):'#e8eaf0';
   const borderStyle=isBorrow?`border-left:3px solid ${isPending?(isOverdue?'#f44':isPartialB?'#f59e0b':'#f84'):'#4f4'};`:'';
   const clickHandler = !isBorrow
-    ? `onclick="reprintBill('${p.bill}')" style="${borderStyle}padding:12px 16px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"`
-    : `onclick="showBorrowSlipModal('${custId}','${p.bill}')" style="${borderStyle}padding:12px 16px;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"`;
+    ? `onclick="reprintBill('${p.bill}')" style="${borderStyle}padding:12px 16px;cursor:pointer;transition:background 0.15s;" onmouseover="_hoverOn(this)" onmouseout="_hoverOff(this)"`
+    : `onclick="showBorrowSlipModal('${custId}','${p.bill}')" style="${borderStyle}padding:12px 16px;cursor:pointer;transition:background 0.15s;" onmouseover="_hoverOn(this)" onmouseout="_hoverOff(this)"`;
   return `<div class="purchase-card" ${clickHandler}>
     <div style="flex:1;">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -16660,8 +16669,8 @@ function phPurchaseCardHTML(p,custId){
   const amtColor=isBorrow?(isPending?(isOverdue?'#f44':isPartialB?'#f59e0b':'#f84'):'#4f4'):'#e8eaf0';
   const borderStyle=isBorrow?`border-left:3px solid ${isPending?(isOverdue?'#f44':isPartialB?'#f59e0b':'#f84'):'#4f4'};`:'';
   const phClickHandler = !isBorrow
-    ? `onclick="reprintBill('${p.bill}')" style="${borderStyle}cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"`
-    : `onclick="showBorrowSlipModal('${custId}','${p.bill}')" style="${borderStyle}cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#0f1a30'" onmouseout="this.style.background=''"`;
+    ? `onclick="reprintBill('${p.bill}')" style="${borderStyle}cursor:pointer;transition:background 0.15s;" onmouseover="_hoverOn(this)" onmouseout="_hoverOff(this)"`
+    : `onclick="showBorrowSlipModal('${custId}','${p.bill}')" style="${borderStyle}cursor:pointer;transition:background 0.15s;" onmouseover="_hoverOn(this)" onmouseout="_hoverOff(this)"`;
   return `<div class="purchase-card" ${phClickHandler}>
     <div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -22809,7 +22818,7 @@ async function showCustomerBillHistory(custId) {
           ? safeParseBillDate(b.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
           : "—";
         return `
-        <div onclick="closeModal();setTimeout(()=>reprintBill('${b.billId}'),100)" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #0d1220;cursor:pointer;border-radius:10px;transition:background 0.15s;" onmouseover="this.style.background='#0d1525'" onmouseleave="this.style.background=''">
+        <div onclick="closeModal();setTimeout(()=>reprintBill('${b.billId}'),100)" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #0d1220;cursor:pointer;border-radius:10px;transition:background 0.15s;" onmouseover="_hoverOn(this)" onmouseleave="_hoverOff(this)">
           <div style="width:36px;height:36px;background:#1a2a45;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🧾</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:14px;font-weight:800;color:#e8eaf0;">${b.billId}</div>
