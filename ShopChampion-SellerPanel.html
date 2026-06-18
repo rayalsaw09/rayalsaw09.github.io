@@ -875,8 +875,17 @@ function doLogin() {
   const p = document.getElementById("login-pass").value;
   hashSellerPass(p).then(hashed => {
     if (hashed === SELLER_PASS) {
-      document.getElementById("login-overlay").style.display = "none";
-      openMain();
+      if (!SB_SERVICE_KEY) {
+        // Old config saved without service key — force re-setup
+        document.getElementById("login-overlay").style.display = "none";
+        document.getElementById("setup-overlay").style.display = "flex";
+        const err = document.getElementById("setup-err");
+        err.textContent = "⚠️ Service Role Key missing — please re-enter your setup details.";
+        err.style.display = "block";
+      } else {
+        document.getElementById("login-overlay").style.display = "none";
+        openMain();
+      }
     } else {
       document.getElementById("login-err").style.display = "block";
     }
@@ -903,6 +912,15 @@ function openMain() {
   if (spTheme === "day") {
     document.body.classList.add("day-theme");
     document.getElementById("sp-theme-btn").textContent = "☀️";
+  }
+  // Safety check: if service key is missing, show banner and block operations
+  if (!SB_SERVICE_KEY) {
+    const banner = document.createElement("div");
+    banner.id = "sp-no-key-banner";
+    banner.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#c00;color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;";
+    banner.textContent = "⚠️ Supabase Service Role Key missing — approvals will fail. Click here to re-enter setup.";
+    banner.onclick = () => { localStorage.removeItem("sc_seller_cfg"); location.reload(); };
+    document.body.prepend(banner);
   }
   refreshAll();
   loadFreeTabsFromSupabase();
@@ -1855,7 +1873,11 @@ async function _doApprove(payment) {
   console.log("SB_SERVICE_KEY set:", !!SB_SERVICE_KEY, "length:", SB_SERVICE_KEY.length);
   console.log("SB_URL:", SB_URL);
   if (!SB_SERVICE_KEY) {
-    throw new Error("Service Role Key not loaded. Please Logout and re-enter your service role key in setup.");
+    if (confirm("❌ Supabase Service Role Key is missing.\n\nClick OK to reset setup and re-enter your key.\nClick Cancel to dismiss.")) {
+      localStorage.removeItem("sc_seller_cfg");
+      location.reload();
+    }
+    throw new Error("Service Role Key missing — setup was reset, please reload.");
   }
   const phone      = payment.customer_phone || null;
   const userNum    = payment.user_number    || null;

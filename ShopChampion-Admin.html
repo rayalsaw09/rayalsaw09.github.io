@@ -3123,10 +3123,12 @@ function startFirestoreListener() {
             // Newly granted Pro — update UI immediately
             updateLicenseUI();
             try { renderTabs(); safeRenderTab(currentTab); } catch {}
-            // Also activate payment modal if it was waiting
+            // Activate payment modal only if it was waiting AND this license matches our pending payment
+            // (not just any old license that was already in Firestore)
             try {
               const pmModal = document.getElementById("payment-modal");
-              if (pmModal && pmModal.style.display === "flex") {
+              const _pendingPay = (() => { try { return localStorage.getItem(storageKey("pending_payment")); } catch { return null; } })();
+              if (pmModal && pmModal.style.display === "flex" && _pendingPay) {
                 document.getElementById("pm-conf-status").innerHTML = '<span style="color:#4f4;">✅ Activated!</span>';
                 document.getElementById("pm-checking-box").style.display = "none";
                 document.getElementById("pm-activated-box").style.display = "block";
@@ -17162,7 +17164,9 @@ window.addEventListener("load", () => {
         }
       }
       // Fallback: poll Supabase by phone — catches assignProKey path (no UTR, no Firestore push)
-      // This covers the case where Seller assigns Pro directly without a payment request
+      // Skip this if user just submitted a pending payment — don't activate from an old license row
+      const _pendingPay = (() => { try { return localStorage.getItem(storageKey("pending_payment")); } catch { return null; } })();
+      if (_pendingPay) return; // user has a fresh pending payment, don't auto-activate from old license
       const res = await fetch(
         `${SC_SUPABASE_URL}/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(authPhone)}&select=key,plan,active,expires_at&order=created_at.desc&limit=1`,
         { headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON } }
