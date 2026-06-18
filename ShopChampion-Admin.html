@@ -12227,7 +12227,7 @@ function _renderDebtorCard(dr){
       <div style="width:46px;height:46px;border-radius:50%;background:${isArchived?'linear-gradient(135deg,#2a2a2a,#3a3a3a)':'linear-gradient(135deg,#166534,#22c55e)'};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;opacity:${isArchived?'0.6':'1'};">${initials}</div>
       <!-- Info -->
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:800;font-size:15px;color:var(--text-main,#e8eaf0);">${escHtml(dr.name)</div>
+        <div style="font-weight:800;font-size:15px;color:var(--text-main,#e8eaf0);">${escHtml(dr.name)}</div>
         <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:2px;">
           ${dr.phone?`📞 ${dr.phone}`:""}
           ${dr.gstin?` · 🔢 ${dr.gstin}`:""}
