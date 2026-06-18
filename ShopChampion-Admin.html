@@ -3789,16 +3789,26 @@ function todayStr() { return new Date().toISOString().slice(0,10); }
 // Returns filtered spend for a customer based on active date filter.
 // Original purchases are NEVER removed — only the view changes.
 function filteredSpend(c) {
-  if (lbFilter.mode === "all") return c.totalSpend;
+  // Helper: resolve actual paid amount for a purchase entry (excludes unpaid borrows)
+  function _paidAmt(p) {
+    if (p.type === 'borrow' && p.borrowStatus !== 'returned') {
+      return p.borrowStatus === 'partial' ? Number(p.amountPaid || 0) : 0;
+    }
+    return Number(p.amount);
+  }
+  if (lbFilter.mode === "all") {
+    // Recompute from purchases so unpaid borrows are excluded (totalSpend includes them)
+    return (c.purchases||[]).reduce((s,p) => s + _paidAmt(p), 0);
+  }
   if (lbFilter.mode === "year") {
     const yr = String(lbFilter.year);
-    return (c.purchases||[]).filter(p=>(p.date||"").slice(0,4)===yr).reduce((s,p)=>s+Number(p.amount),0);
+    return (c.purchases||[]).filter(p=>(p.date||"").slice(0,4)===yr).reduce((s,p)=>s+_paidAmt(p),0);
   }
   const target = lbFilter.mode === "today" ? todayStr() : lbFilter.customDate;
-  if (!target) return c.totalSpend;
+  if (!target) return (c.purchases||[]).reduce((s,p) => s + _paidAmt(p), 0);
   return (c.purchases||[])
     .filter(p => (p.date||"").slice(0,10) === target)
-    .reduce((s,p) => s + Number(p.amount), 0);
+    .reduce((s,p) => s + _paidAmt(p), 0);
 }
 
 function getSortedFiltered() {
@@ -15206,7 +15216,14 @@ async function viRunImport() {
   try {
     if (st.type === 'customers') {
       const existingCount = customers.length;
-      const MAX_IMPORT = Math.max(0, 450 - existingCount);
+      // Free plan: cap at FREE_MAX_CUSTOMERS. Pro/trial: cap at 450 (Firestore limit).
+      const hardCap = _hasFullAccess() ? 450 : FREE_MAX_CUSTOMERS;
+      if (!_hasFullAccess() && existingCount >= FREE_MAX_CUSTOMERS) {
+        _showUpgradePrompt(`Free plan में अधिकतम ${FREE_MAX_CUSTOMERS} customers · Pro पर unlimited`);
+        statusEl.innerHTML = `<span style="color:#f66;">⚠️ Free plan limit reached (${FREE_MAX_CUSTOMERS} customers). Upgrade to Pro to import more.</span>`;
+        return;
+      }
+      const MAX_IMPORT = Math.max(0, hardCap - existingCount);
       let notImported = 0;
       for (const r of records) {
         if (added >= MAX_IMPORT) { notImported++; continue; }
@@ -15220,8 +15237,11 @@ async function viRunImport() {
       await saveCustomers();
       addHistoryLog('customer','Imported from Vyapar',`${added} customer${added!==1?'s':''}`);
       if (notImported > 0) {
-        statusEl.innerHTML = `<span style="color:#f66;">⚠️ Only ${added} imported. Your shop already has ${existingCount} customers — import is capped at 450 total to avoid a Firestore limit. ${notImported} record(s) not imported. Export existing data first or do multiple smaller imports.</span>`;
-        notify(`⚠️ Import capped: ${added} added, ${notImported} not imported (total would exceed 450)`);
+        const capMsg = _hasFullAccess()
+          ? `import is capped at 450 total to avoid a Firestore limit`
+          : `Free plan limit is ${FREE_MAX_CUSTOMERS} customers · Upgrade to Pro for unlimited`;
+        statusEl.innerHTML = `<span style="color:#f66;">⚠️ Only ${added} imported. Your shop already has ${existingCount} customers — ${capMsg}. ${notImported} record(s) not imported.</span>`;
+        notify(`⚠️ Import capped: ${added} added, ${notImported} not imported`);
         return;
       }
     }
