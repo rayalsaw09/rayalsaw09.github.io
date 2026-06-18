@@ -6474,6 +6474,8 @@ async function bwMarkReturned(custId,borrowId,payMode){
       if(p){p.borrowStatus="returned";}
       notify(`✅ Marked as returned for ${c.name}`);
     }
+    const _bwClrRefId = "BW_CLR_"+borrowId+"_"+Date.now(); b._clrCashRefId = _bwClrRefId;
+
     // Record any remaining unpaid amount as cash-in when marking fully cleared
     if(remaining > 0){
       cashRecordTx({
@@ -6482,7 +6484,7 @@ async function bwMarkReturned(custId,borrowId,payMode){
         date: new Date().toISOString().slice(0,10),
         note: `Borrow cleared by ${c.name}${b.item?" · "+b.item:""}`,
         source: "borrow_payment",
-        refId: "BW_CLR_"+borrowId+"_"+Date.now(),
+        refId: _bwClrRefId,
         mode: payMode
       });
     }
@@ -6624,10 +6626,13 @@ async function bwRecordPartialPayment(custId, borrowId, payAmount, payMode){
   if(!b.payments)   b.payments   = [];
 
   b.amountPaid = Math.round((b.amountPaid + payAmount) * 100) / 100;
-  b.payments.push({ amount: payAmount, date: new Date().toISOString().slice(0,10), paidAt: new Date().toISOString(), mode: payMode });
+  const payRefId = "BW_PAY_" + Date.now() + "_" + Math.random().toString(36).slice(2,5);
+  b.payments.push({ amount: payAmount, date: new Date().toISOString().slice(0,10), paidAt: new Date().toISOString(), mode: payMode, _cashRefId: payRefId });
+
 
   const remaining = Math.round((Number(b.amount) - b.amountPaid) * 100) / 100;
-  const payRefId = "BW_PAY_" + Date.now() + "_" + Math.random().toString(36).slice(2,5);
+
+
 
   // Record cash/bank movement for this borrow payment received
   cashRecordTx({
@@ -6846,11 +6851,21 @@ async function deletePurchase(custId,bill,dateEnc){
     try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
     addHistoryLog('sale','Sale deleted',`${c.name} · ${formatINR(_delAmt)}${bill?` · Bill ${bill}`:''}`);
     // Reverse the cash/bank entry that was created when this sale was recorded.
-    // Look up the ORIGINAL entry's mode (Cash/UPI/NEFT/Cheque) by refId so the
-    // reversal hits the same account it was originally credited to — never assume Cash.
-    const _origCashEntry = _delCashRefId ? _bsGetCashLedger().find(e=>e.refId===_delCashRefId) : null;
-    const _delMode = _origCashEntry ? _origCashEntry.mode : "Cash";
-    cashRecordTx({direction:"out", amount:_delAmt, date:new Date().toISOString().slice(0,10), note:`Sale deleted · ${c.name}${bill?" · Bill "+bill:""}`, source:"sale_delete", refId:(_delCashRefId||"DEL_"+Date.now()), mode:_delMode});
+    // Remove the original "in" entry by its refId — this correctly restores the
+    // balance without double-counting. Falls back to a manual "in" reversal if
+    // the original entry can't be found (e.g. older records without _cashRefId).
+    if(_delCashRefId){
+      const _origCashEntry = _bsGetCashLedger().find(e=>e.refId===_delCashRefId);
+      if(_origCashEntry){
+        cashRemoveByRef(_delCashRefId);
+      } else {
+        // Original entry not found — add an "in" to restore balance
+        cashRecordTx({direction:"in", amount:_delAmt, date:new Date().toISOString().slice(0,10), note:`Sale deleted (reversal) · ${c.name}${bill?" · Bill "+bill:""}`, source:"sale_delete", refId:"REV_"+_delCashRefId, mode:"Cash"});
+      }
+    } else {
+      // No refId stored (old sale) — add an "in" reversal as best-effort
+      cashRecordTx({direction:"in", amount:_delAmt, date:new Date().toISOString().slice(0,10), note:`Sale deleted (reversal) · ${c.name}${bill?" · Bill "+bill:""}`, source:"sale_delete", refId:"REV_DEL_"+Date.now(), mode:"Cash"});
+    }
     if(useLocalOnly)safeRenderTab(currentTab);
   }
 }
@@ -9564,6 +9579,8 @@ function _doSimpleDeleteCreditor(id){
   if(requireOnline()) return;
   const creditors = getCreditors();
   const cr = creditors.find(c=>c.id===id);
+  // Remove all cash ledger entries linked to this creditor's transactions
+  if(cr && cr.transactions){ cr.transactions.forEach(t=>{ if(t.id) cashRemoveByRef(t.id); }); }
   saveCreditors(creditors.filter(c=>c.id!==id));
   addHistoryLog('creditor','Creditor deleted', cr?cr.name:"Supplier");
   closeModal();
@@ -9702,6 +9719,8 @@ function confirmHardDeleteCreditor(id){
   });
   saveInventory();
 
+  // Remove all cash ledger entries linked to this creditor's transactions
+  if(cr && cr.transactions){ cr.transactions.forEach(t=>{ if(t.id) cashRemoveByRef(t.id); }); }
   saveCreditors(creditors.filter(c=>c.id!==id));
   addHistoryLog('creditor','Creditor deleted (with stock reversal)', cr.name);
   closeModal();
@@ -14217,6 +14236,7 @@ async function _hmDeleteSelected(){
   let cleared=0, records=0;
   sel.forEach(id=>{
     const c=customers.find(x=>x.id===id);
+    if(c){ (c.purchases||[]).forEach(p=>{ if(p._cashRefId) cashRemoveByRef(p._cashRefId); }); }
     if(c){ records+=(c.purchases||[]).length; c.purchases=[]; c.totalSpend=0; cleared++; }
   });
   await saveCustomers();
@@ -14228,6 +14248,7 @@ async function _hmDeleteSelected(){
 async function _hmDeleteAll(){
   const total=customers.reduce((s,c)=>s+(c.purchases||[]).length,0);
   if(!confirm(`⚠️ Delete ALL purchase history for ALL ${customers.length} customers?\n\n${total} records will be permanently erased.\n\nCustomers stay. History goes.\n\nThis CANNOT be undone.`)) return;
+  customers.forEach(c=>{ (c.purchases||[]).forEach(p=>{ if(p._cashRefId) cashRemoveByRef(p._cashRefId); }); });
   customers.forEach(c=>{ c.purchases=[]; c.totalSpend=0; });
   await saveCustomers();
   notify(`🔥 All purchase history deleted (${total} records)`);
@@ -15341,6 +15362,13 @@ async function deleteCustomer(id){
   if(!confirm("Delete this customer and all their purchases?"))return;
   const _c=customers.find(x=>x.id===id);
   const _cName=_c?_c.name:id;
+  // Remove all cash ledger entries linked to this customer's sales
+  if(_c && _c.purchases){
+    _c.purchases.forEach(p=>{ if(p._cashRefId) cashRemoveByRef(p._cashRefId); });
+  }
+  // Remove cash ledger entries for borrow payments
+  if(_c && _c.borrows){ _c.borrows.forEach(b=>{ (b.payments||[]).forEach(p=>{ if(p._cashRefId) cashRemoveByRef(p._cashRefId); }); if(b._clrCashRefId) cashRemoveByRef(b._clrCashRefId); }); }
+
   try{await deleteOneCustomer(id);notify("🗑 Customer deleted");}
   catch(e){notify("⚠️ Delete error: "+e.message);}
   addHistoryLog('customer','Customer deleted',_cName);
@@ -15375,6 +15403,10 @@ async function deleteSelectedCustomers(){
   const _names=ids.map(id=>{const c=customers.find(x=>x.id===id);return c?c.name:id;});
   let errors=0;
   for(const id of ids){
+    const _bc=customers.find(x=>x.id===id);
+    if(_bc && _bc.purchases){ _bc.purchases.forEach(p=>{ if(p._cashRefId) cashRemoveByRef(p._cashRefId); }); }
+    if(_bc && _bc.borrows){ _bc.borrows.forEach(b=>{ (b.payments||[]).forEach(p=>{ if(p._cashRefId) cashRemoveByRef(p._cashRefId); }); if(b._clrCashRefId) cashRemoveByRef(b._clrCashRefId); }); }
+
     try{await deleteOneCustomer(id);}
     catch(e){errors++;}
   }
