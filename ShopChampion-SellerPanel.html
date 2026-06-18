@@ -160,7 +160,8 @@
       ✅ Supabase already connected to your project
     </div>
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:4px;">Supabase Service Role Key</label>
-    <input id="setup-service-key" class="input" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." style="margin-bottom:4px;font-family:monospace;font-size:11px;"/>
+    <input id="setup-service-key" class="input" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6...  (service_role secret)" style="margin-bottom:4px;font-family:monospace;font-size:11px;"/>
+    <div style="font-size:11px;color:#f84;margin-bottom:4px;font-weight:700;">⚠️ Use the <u>service_role</u> secret — NOT the anon/public key</div>
     <div style="font-size:11px;color:#4a5a7a;margin-bottom:14px;">Supabase Dashboard → Project Settings → API → service_role</div>
     <label style="display:block;font-size:12px;color:#7a8aaa;margin-bottom:4px;">Choose a Seller Password</label>
     <input id="setup-pass" class="input" type="password" placeholder="Choose a strong password" style="margin-bottom:16px;"/>
@@ -853,7 +854,11 @@ function saveSetup() {
   const err        = document.getElementById("setup-err");
   err.style.display = "none";
   if (!serviceKey || !serviceKey.startsWith("eyJ")) {
-    err.textContent = "❌ Please enter your Supabase Service Role Key (starts with eyJ...)";
+    if (serviceKey && serviceKey.startsWith("sb_")) {
+      err.textContent = "❌ This is a Publishable/Anon key (sb_...), not the service_role key. Go to Supabase Dashboard → Project Settings → API → click 'Legacy anon, service_role API keys' tab → copy the service_role JWT key (starts with eyJ).";
+    } else {
+      err.textContent = "❌ Please enter your Supabase Service Role Key (starts with eyJ...)";
+    }
     err.style.display = "block";
     return;
   }
@@ -862,12 +867,41 @@ function saveSetup() {
     err.style.display = "block";
     return;
   }
-  hashSellerPass(pass).then(hashed => {
-    SELLER_PASS    = hashed;
-    SB_SERVICE_KEY = serviceKey;
-    localStorage.setItem("sc_seller_cfg", JSON.stringify({pass: hashed, serviceKey}));
-    document.getElementById("setup-overlay").style.display = "none";
-    openMain();
+  // Validate: test the key against a service-role-only endpoint
+  // If it returns 401, it's the anon key not the service role key
+  err.textContent = "⏳ Validating service key...";
+  err.style.color = "#FFD700";
+  err.style.display = "block";
+  fetch(`${SB_URL}/rest/v1/licenses?select=count&limit=1`, {
+    headers: { "apikey": serviceKey, "Authorization": "Bearer " + serviceKey, "Content-Type": "application/json" }
+  }).then(res => {
+    err.style.color = "#f66";
+    if (res.status === 401 || res.status === 403) {
+      err.textContent = "❌ This looks like the Anon Key, not the Service Role Key. Go to Supabase Dashboard → Project Settings → API → copy the 'service_role' secret (NOT 'anon public').";
+      err.style.display = "block";
+      return;
+    }
+    // Key is valid — save and continue
+    hashSellerPass(pass).then(hashed => {
+      SELLER_PASS    = hashed;
+      SB_SERVICE_KEY = serviceKey;
+      localStorage.setItem("sc_seller_cfg", JSON.stringify({pass: hashed, serviceKey}));
+      document.getElementById("setup-overlay").style.display = "none";
+      openMain();
+    });
+  }).catch(() => {
+    // Network error — save anyway, can't validate offline
+    err.style.color = "#f84";
+    err.textContent = "⚠️ Could not validate key (offline?). Saving anyway — approvals may fail if key is wrong.";
+    setTimeout(() => {
+      hashSellerPass(pass).then(hashed => {
+        SELLER_PASS    = hashed;
+        SB_SERVICE_KEY = serviceKey;
+        localStorage.setItem("sc_seller_cfg", JSON.stringify({pass: hashed, serviceKey}));
+        document.getElementById("setup-overlay").style.display = "none";
+        openMain();
+      });
+    }, 2000);
   });
 }
 
@@ -1053,6 +1087,9 @@ async function sbFetch(path, opts = {}) {
   });
   if (!res.ok) {
     const errText = await res.text();
+    if (res.status === 401) {
+      throw new Error(`Authentication Error (401) — Invalid API key or key mismatch. Raw: ${errText.substring(0,120)}`);
+    }
     if (errText.includes("42501") || errText.includes("row-level security")) {
       throw new Error("Authentication Error — make sure you entered your Supabase Service Role Key (not the anon key). Find it in: Supabase Dashboard → Project Settings → API → service_role secret.");
     }
@@ -1926,7 +1963,10 @@ async function _doApprove(payment) {
         notes: (existing.notes || "") + " | Pro UTR " + payment.utr_number
       })
     });
-    if (!patchRes.ok) throw new Error(await patchRes.text());
+    if (!patchRes.ok) {
+      const errBody = await patchRes.text();
+      throw new Error(`PATCH failed (${patchRes.status}): ${errBody.substring(0,200)}`);
+    }
     usedKey = existing.key;
   } else {
     // No existing license — create one linked to their phone + user_number

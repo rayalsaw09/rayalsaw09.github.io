@@ -65,7 +65,9 @@ const SC_FIREBASE_CONFIG = {
   measurementId:     "G-YCX9WJ4DP5"
 };
 const SC_SUPABASE_URL  = "https://dgmzfqwglnafghpfnqau.supabase.co";
-const SC_SUPABASE_ANON = "sb_publishable_yxPk_18wrBIPebrJkYn9FQ_91lhKmjE";
+// ⚠️ REPLACE THIS: Use the Legacy JWT anon key (eyJ...) from Supabase → Project Settings → API → "Legacy anon, service_role API keys" tab
+// The sb_publishable_ key does NOT work with direct REST API calls
+const SC_SUPABASE_ANON = "sb_publishable_yxPk_18wrBIPebrJkYn9FQ_91lhKmjE"; // ← REPLACE WITH eyJ... key
 // FCM VAPID key — get from Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
 // Replace the string below with your actual VAPID key after enabling Cloud Messaging in Firebase Console
 const SC_FCM_VAPID_KEY = "BEKJDBufmyfEAGYMrd05gtDMOAPbzvUaF6gCPFXtvGvc16HPLT7eWYBpppxnZ8Hfmr8HX76gVIRkjGXvRdal4js";
@@ -3111,24 +3113,35 @@ function startFirestoreListener() {
     // Live listener: get notified when other shops accept our connect requests
     startAutoAcceptedListener();
     // ── REALTIME LICENSE LISTENER: fires instantly when SellerPanel grants Pro ──
+    // Uses a flag to skip the FIRST snapshot (page load) — only react to CHANGES
+    let _prefsListenerReady = false;
     db.collection("users").doc(authPhone)
       .collection("settings").doc("prefs")
       .onSnapshot(snap => {
+        // Skip the initial snapshot fired on page load — only process actual changes
+        if (!_prefsListenerReady) { _prefsListenerReady = true; return; }
         if (!snap || !snap.exists) return;
         const d = snap.data();
         if (d && d.license && d.license.plan === "pro" && d.license.status === "pro") {
           const alreadyPro = (licensePlan === "pro" && licenseStatus === "pro");
-          saveLicense(d.license.key || licenseKey || "", "pro", "pro");
-          if (!alreadyPro) {
-            // Newly granted Pro — update UI immediately
+          if (alreadyPro) return;
+          // Verify with Supabase that this license is actually active before applying
+          const keyToCheck = d.license.key || "";
+          fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(keyToCheck)}&select=key,plan,active,expires_at`,
+            { headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON } }
+          ).then(r => r.json()).then(rows => {
+            if (!rows || !rows.length) return; // no valid license in Supabase
+            const row = rows[0];
+            if (!row.active || row.plan !== "pro") return; // not active pro
+            if (row.expires_at && new Date(row.expires_at) < new Date()) return; // expired
+            // Confirmed valid — now activate
+            saveLicense(row.key, "pro", "pro");
             updateLicenseUI();
             try { renderTabs(); safeRenderTab(currentTab); } catch {}
-            // Activate payment modal only if it was waiting AND this license matches our pending payment
-            // (not just any old license that was already in Firestore)
+            // Update payment modal if it was waiting
             try {
               const pmModal = document.getElementById("payment-modal");
-              const _pendingPay = (() => { try { return localStorage.getItem(storageKey("pending_payment")); } catch { return null; } })();
-              if (pmModal && pmModal.style.display === "flex" && _pendingPay) {
+              if (pmModal && pmModal.style.display === "flex") {
                 document.getElementById("pm-conf-status").innerHTML = '<span style="color:#4f4;">✅ Activated!</span>';
                 document.getElementById("pm-checking-box").style.display = "none";
                 document.getElementById("pm-activated-box").style.display = "block";
@@ -3136,8 +3149,8 @@ function startFirestoreListener() {
                 if (pmPollTimer) clearInterval(pmPollTimer);
               }
             } catch(_) {}
-            console.log("[SC] Prefs listener: Pro license activated in real-time!");
-          }
+            console.log("[SC] Prefs listener: Pro license verified & activated!");
+          }).catch(() => {}); // silent if offline
         }
       }, err => { console.warn("[SC] Prefs listener error:", err.message); });
   }
@@ -3195,6 +3208,13 @@ window.addEventListener('beforeinstallprompt', e => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+  // ── Detect wrong Supabase anon key format ──
+  if (typeof SC_SUPABASE_ANON !== 'undefined' && SC_SUPABASE_ANON.startsWith('sb_publishable_')) {
+    const banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#c00;color:#fff;padding:10px 16px;font-size:12px;font-weight:700;text-align:center;';
+    banner.innerHTML = '⚠️ Config Error: SC_SUPABASE_ANON is a Publishable key (sb_publishable_...) — Supabase REST API requires the Legacy JWT key (eyJ...). Go to Supabase Dashboard → Project Settings → API → <b>Legacy anon, service_role API keys</b> tab → copy the <b>anon</b> JWT key → update config.js';
+    document.body.prepend(banner);
+  }
   const btn = document.getElementById('pwa-install-btn');
   if (btn) {
     btn.addEventListener('click', async () => {
@@ -17148,48 +17168,23 @@ window.addEventListener("load", () => {
     // OR if Seller Panel directly granted Pro without a payment flow
     if (!authPhone) return;
     try {
-      // Check Firestore first (fastest — Seller Panel writes here on approve)
-      if (db) {
-        const snap = await db.collection("users").doc(authPhone)
-          .collection("settings").doc("prefs").get();
-        if (snap && snap.exists) {
-          const d = snap.data();
-          if (d.license && d.license.plan === "pro" && d.license.status === "pro") {
-            saveLicense(d.license.key || licenseKey || "", "pro", "pro");
-            updateLicenseUI();
-            try { renderTabs(); safeRenderTab(currentTab); } catch {}
-            console.log("[SC] BG poller: Pro license detected from Firestore — activated!");
-            return;
-          }
-        }
-      }
-      // Fallback: poll Supabase by phone — catches assignProKey path (no UTR, no Firestore push)
-      // Skip this if user just submitted a pending payment — don't activate from an old license row
+      // Skip entirely if user has a pending payment in progress
       const _pendingPay = (() => { try { return localStorage.getItem(storageKey("pending_payment")); } catch { return null; } })();
-      if (_pendingPay) return; // user has a fresh pending payment, don't auto-activate from old license
-      const res = await fetch(
+      if (_pendingPay) return;
+
+      // Check Supabase directly by phone — the only source of truth for active licenses
+      const sbRes = await fetch(
         `${SC_SUPABASE_URL}/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(authPhone)}&select=key,plan,active,expires_at&order=created_at.desc&limit=1`,
         { headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON } }
       );
-      if (res.ok) {
-        const rows = await res.json();
+      if (sbRes.ok) {
+        const rows = await sbRes.json();
         if (rows && rows.length > 0) {
           const row = rows[0];
           if (row.active && row.plan === "pro" && (!row.expires_at || new Date(row.expires_at) > new Date())) {
             saveLicense(row.key, "pro", "pro");
             updateLicenseUI();
-            // Also close payment modal if it was open in pending state
-            try {
-              const pmModal = document.getElementById("payment-modal");
-              if (pmModal && pmModal.style.display === "flex") {
-                document.getElementById("pm-conf-status").innerHTML = '<span style="color:#4f4;">✅ Activated!</span>';
-                document.getElementById("pm-checking-box").style.display = "none";
-                document.getElementById("pm-activated-box").style.display = "block";
-                try { localStorage.removeItem(storageKey("pending_payment")); } catch{}
-                if (pmPollTimer) clearInterval(pmPollTimer);
-              }
-            } catch(_) {}
-            console.log("[SC] BG poller: Pro license detected from Supabase (phone match) — activated!");
+            console.log("[SC] BG poller: Pro license confirmed from Supabase — activated!");
             return;
           }
         }

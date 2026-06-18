@@ -4,7 +4,6 @@
 // ═══════════════════════════════════════════════════════════════
 
 // ── Firebase ──────────────────────────────────────────────────
-// Get these from Firebase Console → Project Settings → Your apps → Web
 const SC_FIREBASE_CONFIG = {
   apiKey:            "AIzaSyAdNjL9gCptnAbJ6ZVm9BZ61rKfBtwc1Qc",
   authDomain:        "shop-champion.firebaseapp.com",
@@ -16,37 +15,17 @@ const SC_FIREBASE_CONFIG = {
 };
 
 // ── Supabase ──────────────────────────────────────────────────
-// Get these from Supabase Dashboard → Project Settings → API
-// Use the ANON (public) key here — never the service_role key
+// ⚠️  IMPORTANT: Use the LEGACY JWT key (eyJ...), NOT the new Publishable key (sb_publishable_...)
+// Where to find it:
+//   Supabase Dashboard → Project Settings → API
+//   → Click "Legacy anon, service_role API keys" tab
+//   → Copy the "anon" key that starts with eyJ...
+//
+// The new "Publishable" key (sb_publishable_...) does NOT work with direct REST API calls.
+
 const SC_SUPABASE_URL  = "https://dgmzfqwglnafghpfnqau.supabase.co";
-const SC_SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnbXpmcXdnbG5hZmdocGZucWF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NDA3NzcsImV4cCI6MjA5NTAxNjc3N30.9yVo-xggH3zDIIG6wsTXKa1GgCZ_KZA3FV2GB0t-lHQ";
+const SC_SUPABASE_ANON = "PASTE_YOUR_LEGACY_JWT_ANON_KEY_HERE"; // ← eyJ... from Legacy tab
 
 // ═══════════════════════════════════════════════════════════════
 //  ⚠️  SECURITY RULES — READ BEFORE GOING LIVE
-//
-//  These keys ARE visible in browser DevTools — that is normal for
-//  frontend apps. The real protection is backend security rules.
-//
-//  FIREBASE FIRESTORE RULES (Firebase Console → Firestore → Rules):
-//  ─────────────────────────────────────────────────────────────────
-//  rules_version = '2';
-//  service cloud.firestore {
-//    match /databases/{database}/documents {
-//      // Only allow reads — no direct writes from browser
-//      match /sc_shops/{shopId}/{document=**} {
-//        allow read: if true;
-//        allow write: if false;  // writes go via Admin panel only
-//      }
-//    }
-//  }
-//
-//  SUPABASE ROW LEVEL SECURITY (Supabase Dashboard → Table Editor → RLS):
-//  ─────────────────────────────────────────────────────────────────
-//  1. Enable RLS on the sc_users table
-//  2. Add policy: "Users can only read their own row"
-//     USING (phone = current_setting('request.jwt.claims', true)::json->>'phone')
-//  3. Block all anon INSERTs except via your trusted flow
-//
-//  Until RLS is configured, your database is open to anyone
-//  who finds these keys. Set up rules immediately after launch.
 // ═══════════════════════════════════════════════════════════════
