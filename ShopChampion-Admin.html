@@ -9731,9 +9731,24 @@ function saveCreditorModal(editId){
   };
 
   const idx = creditors.findIndex(c=>c.id===editId);
-  if(idx>=0) creditors[idx]=cr; else creditors.push(cr);
-  saveCreditors(creditors);
-  addHistoryLog('creditor', editId?'Creditor updated':'Creditor added', name);
+  // Build before→after diff for audit trail
+  if(idx>=0 && editId){
+    const _oldCr = creditors[idx];
+    const _diffs=[];
+    if(cr.name!==_oldCr.name) _diffs.push(`Name: "${_oldCr.name}" → "${cr.name}"`);
+    if(cr.phone!==(_oldCr.phone||'')) _diffs.push(`Phone: ${_oldCr.phone||'—'} → ${cr.phone||'—'}`);
+    if(cr.gstin!==(_oldCr.gstin||'')) _diffs.push(`GSTIN: ${_oldCr.gstin||'—'} → ${cr.gstin||'—'}`);
+    if(cr.address!==(_oldCr.address||'')) _diffs.push(`Address: ${_oldCr.address||'—'} → ${cr.address||'—'}`);
+    if(cr.notes!==(_oldCr.notes||'')) _diffs.push(`Notes: ${_oldCr.notes||'—'} → ${cr.notes||'—'}`);
+    const _logDet = `${name} · _eid:${editId}${_diffs.length?' · '+_diffs.join(' · '):''}`;
+    creditors[idx]=cr;
+    saveCreditors(creditors);
+    addHistoryLog('creditor', _diffs.length?'Creditor details updated':'Creditor updated', _logDet);
+  } else {
+    if(idx>=0) creditors[idx]=cr; else creditors.push(cr);
+    saveCreditors(creditors);
+    addHistoryLog('creditor', 'Creditor added', `${name} · _eid:${cr.id}`);
+  }
   closeModal();
   notify(editId?"✅ Creditor updated":"✅ Creditor added");
   renderTab(2);
@@ -10163,6 +10178,14 @@ function openCreditorDetail(id){
           ${txs.length===0?`<div style="text-align:center;padding:30px;color:var(--text-dim,#4a5a7a);">${t('crNoTxYet')}</div>`:"⏳"}
         </div>
       </div>
+
+      <!-- ── Audit Trail ── -->
+      <div style="background:var(--bg-card,#0f1628);border:1px solid var(--border-main,#1e2a45);border-radius:14px;padding:16px;">
+        <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:4px;">🕵️ Audit Trail</div>
+        <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:12px;">Who changed what, and when</div>
+        ${!isUnrec ? entityAuditTabHtml('cr-audit-list-${id}','cr-audit-search-${id}') : '<div style="color:#4a5a7a;font-size:12px;padding:10px;">Audit not available for unassigned entries.</div>'}
+      </div>
+
     </div>
   </div>`;
   _crTxCurrentFilter="all";
@@ -10174,6 +10197,11 @@ function openCreditorDetail(id){
       window._crTxNavMonth=now.getMonth();
       window._crTxIsCustom=false;
       if(typeof _crTxApplyMonthNav==='function') _crTxApplyMonthNav(creditorId);
+      // Load audit trail
+      const _cr2 = getCreditors().find(c=>c.id===creditorId);
+      if(_cr2 && creditorId!=='CR_UNRECONCILED'){
+        setTimeout(()=>entityAuditLoad('cr-audit-list-'+creditorId,'cr-audit-search-'+creditorId, creditorId, _cr2.name, 'creditor'), 150);
+      }
     }, 50);
   })(id);
 } // end openCreditorDetail
@@ -11594,12 +11622,20 @@ function updateExpense(id, category, amount, note, date, recurring, payMode){
   const list = getExpenses();
   const idx = list.findIndex(e=>e.id===id);
   if(idx===-1) return;
+  const _oldExp = list[idx];
+  const _expDiffs=[];
+  if(category!==_oldExp.category) _expDiffs.push(`Category: ${_oldExp.category||'—'} → ${category||'—'}`);
+  if(Number(amount)!==Number(_oldExp.amount)) _expDiffs.push(`Amount: ₹${_oldExp.amount} → ₹${Number(amount)}`);
+  if((note||'')!==(_oldExp.note||'')) _expDiffs.push(`Note: ${_oldExp.note||'—'} → ${note||'—'}`);
+  if(date!==_oldExp.date) _expDiffs.push(`Date: ${_oldExp.date||'—'} → ${date||'—'}`);
+  if((payMode||'')!==(_oldExp.payMode||'')) _expDiffs.push(`Mode: ${_oldExp.payMode||'—'} → ${payMode||'—'}`);
+  const _expLogDet = `${category} — ${formatINR(Number(amount))} · _eid:${id}${_expDiffs.length?' · '+_expDiffs.join(' · '):''}`;
   list[idx] = { ...list[idx], category, amount: Number(amount)||0, note: note||"", date, recurring: !!recurring, payMode: payMode||list[idx].payMode||"Cash" };
   saveExpenses(list);
   // Replace the cash ledger entry with updated values
   cashRemoveByRef(id);
   cashRecordTx({direction:"out", amount:Number(amount)||0, date, note:`Expense · ${category}${note?" · "+note:""}`, source:"expense", refId:id, mode:list[idx].payMode});
-  addHistoryLog("expense", "Expense edited", `${category} — ${formatINR(Number(amount))}${payMode?" · "+payMode:""}`);
+  addHistoryLog("expense", _expDiffs.length?"Expense edited":"Expense updated", _expLogDet);
 }
 
 function deleteExpense(id){
@@ -12114,7 +12150,26 @@ ${monthTotal>0 ? `
   </div>
 </div>
 
+<!-- ── Expense Audit Trail ── -->
+<div style="background:var(--bg-card,#0f1628);border:1px solid var(--border-main,#1e2a45);border-radius:14px;padding:16px;margin-top:14px;">
+  <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:4px;">🕵️ Expense Audit Trail</div>
+  <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:12px;">All expense add / edit / delete events</div>
+  <input class="input" id="exp-audit-search" placeholder="🔍 Search audit history..." oninput="expAuditSearch()" style="margin-bottom:10px;font-size:13px;" />
+  <div id="exp-audit-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+</div>
+
 </div>`;
+  // Load expense audit after render
+  setTimeout(()=>{
+    const _expEntries = getEntityAuditLog(null, null, 'expense');
+    const _expAuditEl = document.getElementById('exp-audit-list');
+    if(_expAuditEl){ _expAuditEl._auditData = _expEntries; }
+    entityAuditRender('exp-audit-list', _expEntries, 'No expense audit history yet');
+  }, 100);
+}
+
+function expAuditSearch(){
+  entityAuditSearch('exp-audit-list','exp-audit-search');
 }
 
 function expSetMode(mode){
@@ -12461,9 +12516,24 @@ function saveDebtorModal(editId){
   };
 
   const idx = debtors.findIndex(d=>d.id===editId);
-  if(idx>=0) debtors[idx]=dr; else debtors.push(dr);
-  saveDebtors(debtors);
-  addHistoryLog('debtor', editId?'Debtor updated':'Debtor added', name);
+  // Build before→after diff for audit trail
+  if(idx>=0 && editId){
+    const _oldDr = debtors[idx];
+    const _diffs=[];
+    if(dr.name!==_oldDr.name) _diffs.push(`Name: "${_oldDr.name}" → "${dr.name}"`);
+    if(dr.phone!==(_oldDr.phone||'')) _diffs.push(`Phone: ${_oldDr.phone||'—'} → ${dr.phone||'—'}`);
+    if(dr.gstin!==(_oldDr.gstin||'')) _diffs.push(`GSTIN: ${_oldDr.gstin||'—'} → ${dr.gstin||'—'}`);
+    if(dr.address!==(_oldDr.address||'')) _diffs.push(`Address: ${_oldDr.address||'—'} → ${dr.address||'—'}`);
+    if(dr.notes!==(_oldDr.notes||'')) _diffs.push(`Notes: ${_oldDr.notes||'—'} → ${dr.notes||'—'}`);
+    const _logDet = `${name} · _eid:${editId}${_diffs.length?' · '+_diffs.join(' · '):''}`;
+    debtors[idx]=dr;
+    saveDebtors(debtors);
+    addHistoryLog('debtor', _diffs.length?'Debtor details updated':'Debtor updated', _logDet);
+  } else {
+    if(idx>=0) debtors[idx]=dr; else debtors.push(dr);
+    saveDebtors(debtors);
+    addHistoryLog('debtor', 'Debtor added', `${name} · _eid:${dr.id}`);
+  }
   closeModal();
   notify(editId?"✅ Debtor updated":"✅ Debtor added");
   renderTab(3);
@@ -12634,6 +12704,14 @@ function openDebtorDetail(id){
           ${txs.length===0?`<div style="text-align:center;padding:30px;color:var(--text-dim,#4a5a7a);">${t('crNoTxYet')}</div>`:"⏳"}
         </div>
       </div>
+
+      <!-- ── Audit Trail ── -->
+      <div style="background:var(--bg-card,#0f1628);border:1px solid var(--border-main,#1e2a45);border-radius:14px;padding:16px;">
+        <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:4px;">🕵️ Audit Trail</div>
+        <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:12px;">Who changed what, and when</div>
+        ${entityAuditTabHtml('dr-audit-list-${id}','dr-audit-search-${id}')}
+      </div>
+
     </div>
   </div>`;
   _drTxCurrentFilter="all";
@@ -12644,6 +12722,9 @@ function openDebtorDetail(id){
       window._drTxNavMonth=now.getMonth();
       window._drTxIsCustom=false;
       if(typeof _drTxApplyMonthNav==="function") _drTxApplyMonthNav(debtorId);
+      // Load audit trail
+      const _dr2 = getDebtors().find(d=>d.id===debtorId);
+      if(_dr2) setTimeout(()=>entityAuditLoad('dr-audit-list-'+debtorId,'dr-audit-search-'+debtorId, debtorId, _dr2.name, 'debtor'), 150);
     }, 50);
   })(id);
 }
@@ -13934,7 +14015,7 @@ function showHistoryGroup(entryId, dayKey){
       <div style="width:32px;height:32px;border-radius:8px;background:${meta.color}22;border:1px solid ${meta.color}55;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${meta.icon}</div>
       <div style="flex:1;min-width:0;">
         <div style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);">${escHtml(e.action)}${isThis?` <span style="font-size:10px;color:#60a5fa;font-weight:700;">(${t('histThisEntry')})</span>`:""}</div>
-        ${e.details?`<div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-top:2px;line-height:1.4;">${escHtml(e.details)}</div>`:""}
+        ${invAuditFormatDetails(e.details)}
       </div>
       <div style="font-size:10px;color:var(--text-dim,#4a5a7a);flex-shrink:0;white-space:nowrap;">${timeStr}</div>
     </div>`;
@@ -15651,11 +15732,18 @@ async function saveEditCustomer(oldId){
   if(idChanged && !useLocalOnly && db) {
     try { await userCol().doc(oldId).delete(); } catch{}
   }
+  // Build before→after diff for audit trail
+  const _custDiffs=[];
+  if(c.name!==name) _custDiffs.push(`Name: "${c.name}" → "${name}"`);
+  if((c.phone||'')!==phone) _custDiffs.push(`Phone: ${c.phone||'—'} → ${phone||'—'}`);
+  if(idChanged) _custDiffs.push(`ID: ${oldId} → ${newId}`);
+  if((c.gstin||'')!==gstin) _custDiffs.push(`GSTIN: ${c.gstin||'—'} → ${gstin||'—'}`);
+  const _custLogDet = `${name} · _eid:${oldId}${_custDiffs.length?' · '+_custDiffs.join(' · '):''}`;
   c.id=newId;c.name=name;c.phone=phone;c.photo=tempPhoto||"";
   if(gstin){ c.gstin=gstin; c.gstName=gstName; c.gstAddress=gstAddr; }
   else { delete c.gstin; delete c.gstName; delete c.gstAddress; }
   closeModal();tempPhoto="";notify("✅ Customer updated!");
-  addHistoryLog('customer','Customer updated',`${name}${idChanged?' · ID changed: '+oldId+' → '+newId:''}`);
+  addHistoryLog('customer', _custDiffs.length?'Customer details updated':'Customer updated', _custLogDet);
   try { await saveOneCustomer(c); } catch(e){notify("⚠️ Saved locally, Firebase error: "+e.message);}
   if(useLocalOnly) safeRenderTab(currentTab);
 }
@@ -16633,6 +16721,13 @@ function openCustomerPage(id){
       <div id="cp-purchase-list" style="display:flex;flex-direction:column;gap:8px;"></div>
       `:`<div style="color:#556;font-size:13px;text-align:center;padding:30px;">${t('noPurchases')}</div>`}
     </div>
+    <!-- ── Audit Trail ── -->
+    <div style="background:var(--bg-card,#0f1628);border:1px solid var(--border-main,#1e2a45);border-radius:14px;padding:16px;margin-top:14px;">
+      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:4px;">🕵️ Audit Trail</div>
+      <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:12px;">Who changed what, and when</div>
+      ${entityAuditTabHtml('cust-audit-list-${c.id}','cust-audit-search-${c.id}')}
+    </div>
+
     <div style="height:40px;"></div>
   `;
 
@@ -16653,6 +16748,8 @@ function openCustomerPage(id){
     setTimeout(()=>{ if(document.getElementById("cp-purchase-list")&&document.getElementById("cp-purchase-list").innerHTML==="") cpApply(); },500);
     setTimeout(()=>{ if(document.getElementById("cp-purchase-list")&&document.getElementById("cp-purchase-list").innerHTML==="") cpApply(); },1000);
   }
+  // Load audit trail
+  setTimeout(()=>entityAuditLoad('cust-audit-list-'+c.id,'cust-audit-search-'+c.id, c.id, c.name, 'customer'), 200);
 }
 
 function _cpAddMonthNav(){
@@ -18068,8 +18165,9 @@ function invEditUnit(name){
   if(!hasPermission('inventory_add')) return notify("🚫 No permission to edit inventory items","error");
   const item = inventoryItems.find(x=>x.name===name);
   if(!item) return;
-  const nu = prompt("Unit for "+name+" (e.g. kg, pcs, litre):", item.unit||"unit");
-  if(nu!==null){ item.unit=nu.trim()||"unit"; saveInventory(); addHistoryLog('inventory','Item unit updated',`${name} · unit → ${item.unit}`); safeRenderTab(currentTab); }
+  const oldUnit = item.unit||"unit";
+  const nu = prompt("Unit for "+name+" (e.g. kg, pcs, litre):", oldUnit);
+  if(nu!==null){ item.unit=nu.trim()||"unit"; saveInventory(); if(item.unit!==oldUnit) addHistoryLog('inventory','Item unit updated',`${name} · Unit: ${oldUnit} → ${item.unit}`); safeRenderTab(currentTab); }
 }
 
 function invEditSellPrice(name){
@@ -18081,7 +18179,7 @@ function invEditSellPrice(name){
   const np = prompt("Selling Price per "+( item.unit||"unit")+" for "+name+" (₹):", cur);
   if(np===null) return;
   const val = parseFloat(np);
-  if(!isNaN(val) && val>=0){ item.sellingPrice=val; saveInventory(); addHistoryLog('inventory','Selling price updated',`${name} · ₹${val}`); notify("✅ Selling price updated for "+name); safeRenderTab(currentTab); }
+  if(!isNaN(val) && val>=0){ const oldSell=item.sellingPrice||0; item.sellingPrice=val; saveInventory(); if(val!==oldSell) addHistoryLog('inventory','Selling price updated',`${name} · Price: ₹${oldSell} → ₹${val}`); notify("✅ Selling price updated for "+name); safeRenderTab(currentTab); }
 }
 
 function invEditCategory(name){
@@ -18092,7 +18190,7 @@ function invEditCategory(name){
   const allCats = [...new Set(inventoryItems.map(x=>x.category||"General").filter(Boolean))].sort();
   const suggestion = allCats.length ? "\n\nExisting: "+allCats.join(", ") : "";
   const nc = prompt("Category for \""+name+"\":"+suggestion, item.category||"General");
-  if(nc!==null){ const newCat=(nc.trim()||"General").replace(/\b\w/g,c=>c.toUpperCase()); addHistoryLog('inventory','Item category updated',`${name} · ${item.category||'General'} → ${newCat}`); item.category=newCat; saveInventory(); safeRenderTab(currentTab); }
+  if(nc!==null){ const newCat=(nc.trim()||"General").replace(/\b\w/g,c=>c.toUpperCase()); const oldCat=item.category||'General'; if(newCat!==oldCat) addHistoryLog('inventory','Item category updated',`${name} · Category: ${oldCat} → ${newCat}`); item.category=newCat; saveInventory(); safeRenderTab(currentTab); }
 }
 
 
@@ -18105,6 +18203,11 @@ function openInvEditModal(name){
   showWideModal(`
     ${modalHeader("\u270f\ufe0f Edit Item \u2014 " + escHtml(name))}
     <div style="display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label style="font-size:11px;color:var(--text-muted,#7a8aaa);font-weight:700;display:block;margin-bottom:4px;">ITEM NAME</label>
+        <input class="input" id="iei-name" type="text" placeholder="Item name"
+          value="${escHtml(name)}" style="margin-bottom:0;font-weight:700;" />
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <div>
           <label style="font-size:11px;color:var(--text-muted,#7a8aaa);font-weight:700;display:block;margin-bottom:4px;">SELLING PRICE (\u20b9)</label>
@@ -18238,6 +18341,26 @@ function invEditModalSave(name){
   if(!hasPermission('inventory_add')) return notify("🚫 No permission to edit inventory items","error");
   const item = inventoryItems.find(x=>x.name===name);
   if(!item){ notify("\u274c Item not found","error"); return; }
+
+  // ── snapshot old values for the audit diff ──
+  const oldName = item.name;
+  const oldSell = item.sellingPrice||0;
+  const oldUnit = item.unit||"unit";
+  const oldCategory = item.category||"General";
+  const oldGstRate = item.gstRate!==undefined ? item.gstRate : 0;
+  const oldGstIncluded = item.gstIncluded||"inclusive";
+  const oldHsn = item.hsnCode||"";
+  const oldMinStock = item.minStock||0;
+  const oldBarcode = item.barcode||"";
+
+  // ── Item name (rename, with cascade across linked records) ──
+  const newNameRaw = (document.getElementById("iei-name")?.value||"").trim();
+  if(!newNameRaw){ notify("❌ Item name can't be empty","error"); return; }
+  if(newNameRaw!==oldName){
+    const dup = inventoryItems.find(x=>x!==item && x.name.trim().toLowerCase()===newNameRaw.toLowerCase());
+    if(dup){ notify(`❌ An item named "${newNameRaw}" already exists. Use "Merge Duplicates" instead.`,"error"); return; }
+  }
+
   const sell = parseFloat(document.getElementById("iei-sell")?.value||"0");
   const unit = (document.getElementById("iei-unit")?.value||"").trim();
   const category = (document.getElementById("iei-category")?.value||"General").trim().replace(/\b\w/g,c=>c.toUpperCase());
@@ -18248,6 +18371,9 @@ function invEditModalSave(name){
   const gstIncluded = document.getElementById("iei-gst-included")?.value||"inclusive";
   const hsnCode = (document.getElementById("iei-hsn")?.value||"").trim();
   const minStockVal = document.getElementById("iei-min-stock")?.value;
+  const barcodeVal = (document.getElementById("iei-barcode")?.value||"").trim();
+
+  if(newNameRaw!==oldName) item.name = newNameRaw;
   if(!isNaN(sell) && sell >= 0) item.sellingPrice = sell;
   if(unit) item.unit = unit;
   if(category) item.category = category;
@@ -18255,12 +18381,51 @@ function invEditModalSave(name){
   item.gstIncluded = gstIncluded;
   if(hsnCode) item.hsnCode = hsnCode; else delete item.hsnCode;
   if(minStockVal !== "" && minStockVal !== null && minStockVal !== undefined) item.minStock = Number(minStockVal)||0;
-  const barcodeVal = (document.getElementById("iei-barcode")?.value||"").trim();
   if(barcodeVal) item.barcode = barcodeVal; else delete item.barcode;
+
+  // Cascade the rename across every place the item name is referenced as a string
+  if(newNameRaw!==oldName){
+    customers.forEach(c=>{
+      (c.purchases||[]).forEach(p=>{ (p.soldItems||[]).forEach(si=>{ if(si.name===oldName) si.name=newNameRaw; }); });
+      (c.borrows||[]).forEach(b=>{ (b.items||[]).forEach(bi=>{ if(bi.name===oldName) bi.name=newNameRaw; }); });
+    });
+    try{
+      const crs = getCreditors();
+      let crChanged=false;
+      crs.forEach(cr=>{ (cr.transactions||[]).forEach(t=>{ if(t._invItem===oldName){ t._invItem=newNameRaw; crChanged=true; } }); });
+      if(crChanged) saveCreditors(crs);
+    }catch(e){}
+    try{
+      const drs = getDebtors();
+      let drChanged=false;
+      drs.forEach(dr=>{ (dr.transactions||[]).forEach(t=>{ if(t._invItem===oldName){ t._invItem=newNameRaw; drChanged=true; } }); });
+      if(drChanged) saveDebtors(drs);
+    }catch(e){}
+    try{ saveCustomers && saveCustomers(); }catch(e){}
+    if(typeof invDetailItem!=="undefined" && invDetailItem===oldName) invDetailItem=newNameRaw;
+  }
+
   saveInventory();
-  addHistoryLog('inventory','Item details updated',`${name}${sell>=0?' · ₹'+sell:''}${unit?' · '+unit:''}${category?' · '+category:''}`);
+
+  // ── Build a clear before → after diff for the audit trail ──
+  const diffs=[];
+  if(newNameRaw!==oldName) diffs.push(`Name: "${oldName}" → "${newNameRaw}"`);
+  if(item.sellingPrice!==oldSell) diffs.push(`Price: ₹${oldSell} → ₹${item.sellingPrice}`);
+  if(item.unit!==oldUnit) diffs.push(`Unit: ${oldUnit} → ${item.unit}`);
+  if(item.category!==oldCategory) diffs.push(`Category: ${oldCategory} → ${item.category}`);
+  if(item.gstRate!==oldGstRate) diffs.push(`GST: ${oldGstRate}% → ${item.gstRate}%`);
+  if(item.gstIncluded!==oldGstIncluded) diffs.push(`GST mode: ${oldGstIncluded} → ${item.gstIncluded}`);
+  if((item.hsnCode||"")!==oldHsn) diffs.push(`HSN: ${oldHsn||'—'} → ${item.hsnCode||'—'}`);
+  if((item.minStock||0)!==oldMinStock) diffs.push(`Min stock: ${oldMinStock} → ${item.minStock||0}`);
+  if((item.barcode||"")!==oldBarcode) diffs.push(`Barcode: ${oldBarcode||'—'} → ${item.barcode||'—'}`);
+
+  if(diffs.length){
+    const logName = `${oldName}${newNameRaw!==oldName?' (now "'+newNameRaw+'")':''}`;
+    addHistoryLog('inventory', newNameRaw!==oldName?'Item renamed & updated':'Item details updated', `${logName} · ${diffs.join(' · ')}`);
+  }
+
   closeModal();
-  notify("\u2705 " + name + " updated");
+  notify("\u2705 " + newNameRaw + " updated");
   safeRenderTab(currentTab);
 }
 
@@ -22294,7 +22459,7 @@ function invAuditApply(){
           <span style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);">${escHtml(e.action||'')}</span>
           ${isFirst?`<span style="font-size:10px;color:#7ab3ff;background:#0a1020;border:1px solid #1a2a40;border-radius:5px;padding:1px 5px;">Latest</span>`:''}
         </div>
-        ${e.details?`<div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-top:1px;line-height:1.4;">${escHtml(e.details)}</div>`:''}
+        ${invAuditFormatDetails(e.details)}
         <div style="font-size:11px;color:#FFD700;margin-top:3px;">👤 ${escHtml(e.actor||'Owner')}</div>
       </div>
       <div style="font-size:10px;color:var(--text-dim,#4a5a7a);flex-shrink:0;white-space:nowrap;text-align:right;">${dt}<br>${tm}</div>
@@ -22302,6 +22467,129 @@ function invAuditApply(){
   }).join('');
 }
 
+// Splits a history "details" string on " · " into parts, and renders any
+// part containing "→" (a before/after change) as its own highlighted line —
+// so an item edit clearly shows what it was before, and what it is now.
+function invAuditFormatDetails(details){
+  if(!details) return '';
+  const parts = details.split(' · ').map(p=>p.trim()).filter(Boolean);
+  if(parts.length<=1) return `<div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-top:1px;line-height:1.4;">${escHtml(details)}</div>`;
+
+  const head = parts.filter(p=>!p.includes('→'));
+  const changes = parts.filter(p=>p.includes('→'));
+
+  return `
+    ${head.length?`<div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-top:1px;line-height:1.4;">${escHtml(head.join(' · '))}</div>`:''}
+    ${changes.length?`<div style="margin-top:4px;display:flex;flex-direction:column;gap:2px;">${changes.map(c=>{
+      const m = c.match(/^(.+?):\s*(.+?)\s*→\s*(.+)$/);
+      if(!m) return `<div style="font-size:11px;color:var(--text-muted,#7a8aaa);">${escHtml(c)}</div>`;
+      const [,field,before,after] = m;
+      return `<div style="font-size:11px;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:6px;padding:4px 8px;">
+        <span style="color:#7a8aaa;font-weight:700;">${escHtml(field)}:</span>
+        <span style="color:#f87171;text-decoration:line-through;margin-left:4px;">${escHtml(before)}</span>
+        <span style="color:#4a5a7a;margin:0 3px;">→</span>
+        <span style="color:#4ade80;font-weight:700;">${escHtml(after)}</span>
+      </div>`;
+    }).join('')}</div>`:''}`;
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// GENERIC ENTITY AUDIT SYSTEM
+// Reusable across Creditors, Debtors, Customers, Expenses
+// ══════════════════════════════════════════════════════════════
+
+// Scan all history log buckets for entries that reference a given entity.
+// Matches on: _eid:<entityId> tag in details, or entity name in details/action.
+function getEntityAuditLog(entityId, entityName, histType){
+  const prefix = storageKey("history_");
+  const out = [];
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(!k || k.indexOf(prefix)!==0) continue;
+      let list;
+      try{ list = JSON.parse(localStorage.getItem(k)||"[]"); } catch{ continue; }
+      list.forEach(e=>{
+        if(!e) return;
+        const matchType  = !histType || e.type===histType;
+        const matchId    = entityId   && typeof e.details==="string" && e.details.includes("_eid:"+entityId);
+        const matchName  = entityName && typeof e.details==="string" && e.details.includes(entityName);
+        if(matchType && (matchId || matchName)) out.push(e);
+      });
+    }
+  } catch(ex){}
+  out.sort((a,b)=>b.ts-a.ts);
+  // Deduplicate by entry id
+  const seen=new Set();
+  return out.filter(e=>{ if(seen.has(e.id)) return false; seen.add(e.id); return true; });
+}
+
+// Render an audit log list into a container element.
+// Reuses invAuditFormatDetails for before→after diff rendering.
+function entityAuditRender(containerId, entries, emptyMsg){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  if(!entries || !entries.length){
+    el.innerHTML=`<div style="color:var(--text-dim,#4a5a7a);font-size:13px;text-align:center;padding:30px;">${emptyMsg||'No audit history yet'}</div>`;
+    return;
+  }
+  el.innerHTML = entries.map((e,i)=>{
+    const meta = HIST_TYPE_META[e.type] || HIST_TYPE_META.other;
+    const dt=new Date(e.ts).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+    const tm=new Date(e.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    const isFirst=i===0;
+    // Strip internal _eid:xxx tag from displayed details
+    const displayDetails=(e.details||'').replace(/\s*·?\s*_eid:[^\s·]+/g,'').trim();
+    return `<div class="card" style="padding:11px 14px;display:flex;align-items:flex-start;gap:11px;${isFirst?`border-color:${meta.color}55;`:''}">
+      <div style="width:34px;height:34px;border-radius:9px;background:${meta.color}22;border:1px solid ${meta.color}55;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${meta.icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;flex-wrap:wrap;">
+          <span style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);">${escHtml(e.action||'')}</span>
+          ${isFirst?`<span style="font-size:10px;color:#7ab3ff;background:#0a1020;border:1px solid #1a2a40;border-radius:5px;padding:1px 5px;">Latest</span>`:''}
+        </div>
+        ${invAuditFormatDetails(displayDetails)}
+        <div style="font-size:11px;color:#FFD700;margin-top:3px;">👤 ${escHtml(e.actor||'Owner')}</div>
+      </div>
+      <div style="font-size:10px;color:var(--text-dim,#4a5a7a);flex-shrink:0;white-space:nowrap;text-align:right;">${dt}<br>${tm}</div>
+    </div>`;
+  }).join('');
+}
+
+// Build the HTML for an Audit tab panel (search input + list container).
+// Call entityAuditRender after inserting this HTML to populate the list.
+function entityAuditTabHtml(containerId, searchId){
+  return `
+    <div style="padding:14px 0 0;">
+      <input class="input" id="${searchId}" placeholder="🔍 Search audit history..." oninput="entityAuditSearch('${containerId}','${searchId}')" style="margin-bottom:10px;font-size:13px;" />
+      <div id="${containerId}" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>`;
+}
+
+// Live search filter for entity audit lists.
+// Stores raw entries on the container element as _auditData.
+function entityAuditSearch(containerId, searchId){
+  const el = document.getElementById(containerId);
+  if(!el || !el._auditData) return;
+  const q=(document.getElementById(searchId)?.value||'').toLowerCase().trim();
+  const filtered = q ? el._auditData.filter(e=>
+    (e.action||'').toLowerCase().includes(q)||
+    (e.details||'').toLowerCase().includes(q)||
+    (e.actor||'').toLowerCase().includes(q)
+  ) : el._auditData;
+  entityAuditRender(containerId, filtered, 'No entries match your search');
+  // Re-attach data after render (render replaces innerHTML)
+  const el2=document.getElementById(containerId);
+  if(el2) el2._auditData = el._auditData;
+}
+
+// One-shot loader: fetch entries, attach to DOM, then render.
+function entityAuditLoad(containerId, searchId, entityId, entityName, histType){
+  const entries = getEntityAuditLog(entityId, entityName, histType);
+  const el = document.getElementById(containerId);
+  if(el){ el._auditData = entries; }
+  entityAuditRender(containerId, entries, 'No audit history yet for this record');
+}
 
 // ═══════════════════════════════════════════════════════════════
 // SHOPCHAMPION — BILLING SYSTEM
