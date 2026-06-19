@@ -10121,7 +10121,7 @@ function openCreditorDetail(id){
           <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);">${t('crTxHistory')}</div>
           <div style="display:flex;gap:8px;">
             <button onclick="printCreditorStatement('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">🖨 Print</button>
-            ${!isUnrec ? `<button onclick="openAddCreditorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>` : ""}
+            ${!isUnrec ? `<button onclick="openAddCreditorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button><button onclick="showEditHistoryModal('${item.id||item.name}','${item.name}','inventory')" style="background:#243b63;border:none;border-radius:7px;color:#d6e4ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;margin-left:4px;">📋 History</button><button onclick="showEditHistoryModal('${id}','${(_cr2&&_cr2.name)||'Creditor'}','creditor')" style="cursor:pointer;background:#243b63;border:none;border-radius:8px;color:#d6e4ff;font-size:11px;font-weight:700;padding:6px 12px;margin-left:6px;">📋 Edit History</button>` : ""}
           </div>
         </div>
 
@@ -12647,7 +12647,7 @@ function openDebtorDetail(id){
           <div style="display:flex;gap:8px;">
             ${dr.phone&&bal>0?`<a href="${_debtWAReminder(dr)}" target="_blank" style="cursor:pointer;background:#052a14;border:1px solid #16a34a;border-radius:8px;color:#4ade80;font-size:11px;font-weight:800;padding:6px 12px;text-decoration:none;">💬 Remind</a>`:''}
             <button onclick="printDebtorStatement('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">🖨 Print</button>
-            <button onclick="openAddDebtorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>
+            <button onclick="openAddDebtorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button><button onclick="showEditHistoryModal('${id}',(_dr2&&_dr2.name)||'Debtor','debtor')" style="cursor:pointer;background:#243b63;border:none;border-radius:8px;color:#d6e4ff;font-size:11px;font-weight:700;padding:6px 12px;margin-left:6px;">📋 Edit History</button>
           </div>
         </div>
 
@@ -22589,6 +22589,28 @@ function entityAuditLoad(containerId, searchId, entityId, entityName, histType){
   const el = document.getElementById(containerId);
   if(el){ el._auditData = entries; }
   entityAuditRender(containerId, entries, 'No audit history yet for this record');
+}
+
+
+
+function showEditHistoryModal(entityId, entityName, histType){
+  const entries=getEntityAuditLog(entityId, entityName, histType);
+  openModal(`
+    <div style="padding:16px;max-height:80vh;overflow:auto;">
+      ${modalHeader('📋 Edit History - '+(entityName||'Record'))}
+      <input class="input" id="editHistSearchBox" placeholder="Search history..." oninput="editHistSearch()" style="margin-bottom:10px;" />
+      <div id="editHistList"></div>
+    </div>`);
+  const el=document.getElementById('editHistList');
+  if(el) el._auditData=entries;
+  entityAuditRender('editHistList',entries,'No edit history found');
+}
+function editHistSearch(){
+ const el=document.getElementById('editHistList'); if(!el||!el._auditData) return;
+ const q=(document.getElementById('editHistSearchBox')?.value||'').toLowerCase();
+ const f=el._auditData.filter(e=>JSON.stringify(e).toLowerCase().includes(q));
+ entityAuditRender('editHistList',f,'No matching history');
+ document.getElementById('editHistList')._auditData=el._auditData;
 }
 
 // ═══════════════════════════════════════════════════════════════
