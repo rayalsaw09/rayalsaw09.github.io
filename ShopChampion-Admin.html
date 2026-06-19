@@ -4190,6 +4190,30 @@ function loadHistoryFromCloud(dayKey){
     }).catch(()=>{});
 }
 
+// Scan every stored history day-bucket and return all entries that mention
+// this specific item — i.e. a per-item audit trail ("who touched this item, when, what changed").
+// Reads from the same addHistoryLog entries already written; zero new storage.
+function getItemAuditLog(itemName){
+  if(!itemName) return [];
+  const prefix = storageKey("history_");
+  const out = [];
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(!k || k.indexOf(prefix)!==0) continue;
+      let list;
+      try{ list = JSON.parse(localStorage.getItem(k)||"[]"); } catch{ continue; }
+      list.forEach(e=>{
+        if(e && typeof e.details==="string" && e.details.indexOf(itemName)!==-1){
+          out.push(e);
+        }
+      });
+    }
+  } catch(e){ /* never break the app over an audit read */ }
+  out.sort((a,b)=>b.ts-a.ts);
+  return out;
+}
+
 // ── Helpers ──
 function authShowStep(step) {
   ["auth-step-phone","auth-step-password","auth-step-newpass","auth-step-otp","auth-step-setpass","auth-step-forgot","auth-step-secq","auth-step-resetpass"]
@@ -9719,6 +9743,7 @@ function saveCreditorModal(editId){
 function archiveCreditor(id){
   if(requireOnline()) return;
   if(!hasPermission('creditor_archive')) return notify("🚫 No permission to archive creditors","error");
+  const creditors = getCreditors();
   const cr = creditors.find(c=>c.id===id);
   if(!cr) return;
   cr._archived = true;
@@ -9732,6 +9757,7 @@ function archiveCreditor(id){
 function archiveDebtor(id){
   if(requireOnline()) return;
   if(!hasPermission('debtor_archive')) return notify("🚫 No permission to archive debtors","error");
+  const debtors = getDebtors();
   const dr = debtors.find(d=>d.id===id);
   if(!dr) return;
   dr._archived = true;
@@ -9917,6 +9943,7 @@ function confirmHardDeleteCreditor(id){
 function deleteDebtor(id){
   if(requireOnline()) return;
   if(!hasPermission('debtor_delete')) return notify("🚫 No permission to delete debtors","error");
+  const debtors = getDebtors();
   const dr = debtors.find(d=>d.id===id);
   if(!dr) return;
 
@@ -10810,6 +10837,7 @@ async function saveSmartPayment(){
     mode, ref,
     _paysBill: selectedBill,        // legacy single-bill reference (first bill)
     ...(paysBills.length>0 ? { _paysBills: paysBills } : {}),
+    actor: getActorName(),
     createdAt: Date.now(),
     syncStatus: "local",
   };
@@ -11340,6 +11368,8 @@ function deleteCrTx(creditorId, origIdx){
       if(sIdx>-1){ invItem.salesLog.splice(invItem.salesLog.length-1-sIdx,1); saveInventory(); }
     }
   }
+  const _crName = getCreditors().find(c=>c.id===creditorId)?.name || 'Creditor';
+  addHistoryLog('creditor','Creditor transaction deleted',`${_crName}${removedTx?` · ${formatINR(removedTx.amount)} · ${removedTx.type}`:''}`);
   notify("🗑 Transaction deleted");
   setTimeout(() => openCreditorDetail(creditorId), 200);
 }
@@ -12100,6 +12130,8 @@ function expSetMode(mode){
 }
 
 function expSaveFromForm(){
+  if(requireOnline()) return;
+  if(!hasPermission('expense_create')) return notify("🚫 No permission to manage expenses","error");
   const cat  = document.getElementById("exp-cat")?.value||"";
   const amt  = parseFloat(document.getElementById("exp-amt")?.value||"0");
   const note = (document.getElementById("exp-note")?.value||"").trim();
@@ -12120,6 +12152,8 @@ function expSaveFromForm(){
 }
 
 function expDeleteEntry(id){
+  if(requireOnline()) return;
+  if(!hasPermission('expense_delete')) return notify("🚫 No permission to delete expenses","error");
   if(!confirm("Delete this expense?")) return;
   deleteExpense(id);
   notify("Expense deleted");
@@ -15621,6 +15655,7 @@ async function saveEditCustomer(oldId){
   if(gstin){ c.gstin=gstin; c.gstName=gstName; c.gstAddress=gstAddr; }
   else { delete c.gstin; delete c.gstName; delete c.gstAddress; }
   closeModal();tempPhoto="";notify("✅ Customer updated!");
+  addHistoryLog('customer','Customer updated',`${name}${idChanged?' · ID changed: '+oldId+' → '+newId:''}`);
   try { await saveOneCustomer(c); } catch(e){notify("⚠️ Saved locally, Firebase error: "+e.message);}
   if(useLocalOnly) safeRenderTab(currentTab);
 }
@@ -15840,6 +15875,8 @@ function bpParseAmounts(raw) {
 }
 
 async function saveBulkPurchase(custId) {
+  if(requireOnline()) return;
+  if(!hasPermission('sale_create')) return notify("🚫 No permission to create sales","error");
   const raw = document.getElementById("bp-amounts")?.value || "";
   const amounts = bpParseAmounts(raw);
   if (amounts.length === 0) {
@@ -15862,6 +15899,7 @@ async function saveBulkPurchase(custId) {
   const total = amounts.reduce((a, b) => a + b, 0);
   closeModal();
   notify(`✅ ${amounts.length} purchases added for ${c.name} — Total ₹${total.toLocaleString("en-IN")}`);
+  addHistoryLog('sale','Bulk sale recorded',`${c.name} · ${amounts.length} entries · Total ${formatINR(total)}`);
   try { await saveOneCustomer(c); } catch(e) { notify("⚠️ Firebase error: " + e.message); }
   if (useLocalOnly) safeRenderTab(currentTab);
 }
@@ -17951,7 +17989,7 @@ function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellin
   if(hsnCode) item.hsnCode = hsnCode;
   if(minStock !== undefined && minStock !== null && minStock !== "") item.minStock = Number(minStock)||0;
   if(!item.stock) item.stock=[];
-  item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes, expiryDate: expiryDate||""});
+  item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes, expiryDate: expiryDate||"", actor: getActorName()});
   saveInventory();
   notify("✅ Stock added for "+name);
   addHistoryLog('inventory','Stock added',`${name} · +${qty} ${unit||'unit'}${costPerUnit?` @ ₹${costPerUnit}`:''}`,null,groupId);
@@ -18026,29 +18064,35 @@ function _confirmInvDelete(name){
 }
 
 function invEditUnit(name){
+  if(requireOnline()) return;
+  if(!hasPermission('inventory_add')) return notify("🚫 No permission to edit inventory items","error");
   const item = inventoryItems.find(x=>x.name===name);
   if(!item) return;
   const nu = prompt("Unit for "+name+" (e.g. kg, pcs, litre):", item.unit||"unit");
-  if(nu!==null){ item.unit=nu.trim()||"unit"; saveInventory(); safeRenderTab(currentTab); }
+  if(nu!==null){ item.unit=nu.trim()||"unit"; saveInventory(); addHistoryLog('inventory','Item unit updated',`${name} · unit → ${item.unit}`); safeRenderTab(currentTab); }
 }
 
 function invEditSellPrice(name){
+  if(requireOnline()) return;
+  if(!hasPermission('inventory_add')) return notify("🚫 No permission to edit inventory items","error");
   const item = inventoryItems.find(x=>x.name===name);
   if(!item) return;
   const cur = item.sellingPrice>0 ? Number(item.sellingPrice).toFixed(2) : "";
   const np = prompt("Selling Price per "+( item.unit||"unit")+" for "+name+" (₹):", cur);
   if(np===null) return;
   const val = parseFloat(np);
-  if(!isNaN(val) && val>=0){ item.sellingPrice=val; saveInventory(); notify("✅ Selling price updated for "+name); safeRenderTab(currentTab); }
+  if(!isNaN(val) && val>=0){ item.sellingPrice=val; saveInventory(); addHistoryLog('inventory','Selling price updated',`${name} · ₹${val}`); notify("✅ Selling price updated for "+name); safeRenderTab(currentTab); }
 }
 
 function invEditCategory(name){
+  if(requireOnline()) return;
+  if(!hasPermission('inventory_add')) return notify("🚫 No permission to edit inventory items","error");
   const item = inventoryItems.find(x=>x.name===name);
   if(!item) return;
   const allCats = [...new Set(inventoryItems.map(x=>x.category||"General").filter(Boolean))].sort();
   const suggestion = allCats.length ? "\n\nExisting: "+allCats.join(", ") : "";
   const nc = prompt("Category for \""+name+"\":"+suggestion, item.category||"General");
-  if(nc!==null){ item.category=(nc.trim()||"General").replace(/\b\w/g,c=>c.toUpperCase()); saveInventory(); safeRenderTab(currentTab); }
+  if(nc!==null){ const newCat=(nc.trim()||"General").replace(/\b\w/g,c=>c.toUpperCase()); addHistoryLog('inventory','Item category updated',`${name} · ${item.category||'General'} → ${newCat}`); item.category=newCat; saveInventory(); safeRenderTab(currentTab); }
 }
 
 
@@ -18190,6 +18234,8 @@ function invEditHsnLookup(){
 }
 
 function invEditModalSave(name){
+  if(requireOnline()) return;
+  if(!hasPermission('inventory_add')) return notify("🚫 No permission to edit inventory items","error");
   const item = inventoryItems.find(x=>x.name===name);
   if(!item){ notify("\u274c Item not found","error"); return; }
   const sell = parseFloat(document.getElementById("iei-sell")?.value||"0");
@@ -18212,6 +18258,7 @@ function invEditModalSave(name){
   const barcodeVal = (document.getElementById("iei-barcode")?.value||"").trim();
   if(barcodeVal) item.barcode = barcodeVal; else delete item.barcode;
   saveInventory();
+  addHistoryLog('inventory','Item details updated',`${name}${sell>=0?' · ₹'+sell:''}${unit?' · '+unit:''}${category?' · '+category:''}`);
   closeModal();
   notify("\u2705 " + name + " updated");
   safeRenderTab(currentTab);
@@ -18862,6 +18909,7 @@ function invSubmitAdd(){
     if(hsnCode) item.hsnCode = hsnCode;
     if(minStock !== "") item.minStock = Number(minStock)||0;
     if(barcodeVal) item.barcode = barcodeVal;
+    addHistoryLog('inventory','Item updated',`${name} · ${unit||'unit'} · ${category}${sellPrice>0?' · ₹'+sellPrice:''}`);
     notify("✅ Item updated: " + name);
   } else {
     // Create new item with zero stock
@@ -18872,6 +18920,7 @@ function invSubmitAdd(){
     if(minStock !== "") item.minStock = Number(minStock)||0;
     if(barcodeVal) item.barcode = barcodeVal;
     inventoryItems.push(item);
+    addHistoryLog('inventory','Item added',`${name} · ${unit||'unit'} · ${category}${sellPrice>0?' · ₹'+sellPrice:''}`);
     notify("✅ Item added: " + name + " — use Creditor tab to add stock");
   }
   // ── Opening stock: add qty directly to inventory if provided ──
@@ -18880,8 +18929,9 @@ function invSubmitAdd(){
   if(openingQty > 0){
     const today = new Date().toISOString().slice(0,10);
     if(!item.stock) item.stock = [];
-    item.stock.push({ qty: openingQty, costPerUnit: openingCost, date: today, notes: "Opening Stock", expiryDate: "" });
+    item.stock.push({ qty: openingQty, costPerUnit: openingCost, date: today, notes: "Opening Stock", expiryDate: "", actor: getActorName() });
     saveInventory();
+    addHistoryLog('inventory','Opening stock added',`${name} · +${openingQty} ${unit||'unit'}${openingCost?' @ ₹'+openingCost:''}`);
     notify("✅ " + name + " saved with " + openingQty + " " + (unit||"unit") + " opening stock");
   } else {
     saveInventory();
@@ -19947,6 +19997,8 @@ function openInventoryHealthCheck(){
 // Merge a duplicate group: combine stock, salesLog, keep best barcode/price/etc on the chosen survivor,
 // rename references in customer purchase/borrow history, then remove the other items.
 function invMergeGroup(gi){
+  if(requireOnline()) return;
+  if(!hasPermission('inventory_add')) return notify("🚫 No permission to merge inventory items","error");
   const btn = document.querySelector(`button[onclick="invMergeGroup(${gi})"]`);
   if(!btn) return;
   const names = JSON.parse(btn.getAttribute("data-group"));
@@ -19992,6 +20044,7 @@ function invMergeGroup(gi){
 
   saveInventory();
   try{ saveCustomers && saveCustomers(); }catch(e){}
+  addHistoryLog('inventory','Items merged',`${others.map(o=>o.name).join(', ')} → ${survivor.name}`);
   notify("✅ Merged successfully — your data is intact");
   closeModal();
   safeRenderTab(currentTab);
@@ -21858,8 +21911,8 @@ function invShowItemDetail(itemName){
   invDetailItem = itemName;
   invView = "detail";
   safeRenderTab(currentTab);
-  setTimeout(()=>{ invHistApply(); invCustApply(); }, 80);
-  setTimeout(()=>{ invHistApply(); invCustApply(); }, 400);
+  setTimeout(()=>{ invHistApply(); invCustApply(); invAuditApply(); }, 80);
+  setTimeout(()=>{ invHistApply(); invCustApply(); invAuditApply(); }, 400);
 }
 
 function renderInventoryItemDetail(itemName){
@@ -21888,7 +21941,7 @@ function renderInventoryItemDetail(itemName){
 
   // Build unified timeline
   const timeline = [];
-  (item.stock||[]).forEach(e=>timeline.push({type:'restock',date:e.date,qty:Number(e.qty),costPerUnit:Number(e.costPerUnit||0),notes:e.notes||"",custName:""}));
+  (item.stock||[]).forEach(e=>timeline.push({type:'restock',date:e.date,qty:Number(e.qty),costPerUnit:Number(e.costPerUnit||0),notes:e.notes||"",custName:"",actor:e.actor||""}));
   (item.salesLog||[]).forEach(e=>{
     const cust=customers.find(c=>c.id===e.custId);
     timeline.push({type:'sale',date:e.date,qty:Number(e.qty),pricePerUnit:Number(e.pricePerUnit||0),custName:e.custName||(cust&&cust.name)||"",custId:e.custId||""});
@@ -21902,6 +21955,7 @@ function renderInventoryItemDetail(itemName){
   // Store data for live filter functions
   window._invHistData={timeline,unit,itemName};
   window._invCustData={custs,unit};
+  window._invAuditData={entries:getItemAuditLog(itemName),itemName};
   if(!window._invHistMode) window._invHistMode='all';
   if(!window._invCustMode) window._invCustMode='all';
 
@@ -21965,6 +22019,14 @@ function renderInventoryItemDetail(itemName){
     </div>
     <div id="inv-cust-list" style="display:flex;flex-direction:column;gap:8px;"></div>`;
 
+  // ── Audit tab HTML (Tally-style "who changed what" trail for this item) ──
+  const auditTabHtml=`
+    <div style="margin-bottom:10px;">
+      <input class="input" id="inv-audit-search" placeholder="🔍 Search by action, person, details..." oninput="invAuditApply()" style="margin-bottom:8px;font-size:13px;"/>
+      <div id="inv-audit-info" style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:6px;display:none;"></div>
+    </div>
+    <div id="inv-audit-list" style="display:flex;flex-direction:column;gap:6px;"></div>`;
+
   return `<div style="padding:16px 14px;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
       <button onclick="invView='stock';invDetailItem=null;window._invDetailTab='history';window._invHistMode='all';window._invCustMode='all';safeRenderTab(currentTab)" style="background:#1a2540;border:none;border-radius:9px;color:#7ab3ff;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;">← पीछे</button>
@@ -21991,9 +22053,11 @@ function renderInventoryItemDetail(itemName){
     <div style="display:flex;gap:4px;background:#050810;border-radius:12px;padding:4px;margin-bottom:14px;">
       ${tabBtn('history','📋 All History',timeline.length,'#e8eaf0')}
       ${tabBtn('customers','👥 Customers',custs.length,'#4a8aff')}
+      ${tabBtn('audit','👤 Audit',window._invAuditData.entries.length,'#FFD700')}
     </div>
     <div id="inv-tab-history" style="display:${activeTab==='history'?'block':'none'};">${historyTabHtml}</div>
     <div id="inv-tab-customers" style="display:${activeTab==='customers'?'block':'none'};">${customersTabHtml}</div>
+    <div id="inv-tab-audit" style="display:${activeTab==='audit'?'block':'none'};">${auditTabHtml}</div>
   </div>`;
 }
 
@@ -22001,13 +22065,13 @@ function renderInventoryItemDetail(itemName){
 function invDetailSwitchTab(id){
   window._invDetailTab=id;
   // Update panel visibility
-  ['history','customers'].forEach(tab=>{
+  ['history','customers','audit'].forEach(tab=>{
     const panel=document.getElementById('inv-tab-'+tab);
     if(panel) panel.style.display=(tab===id?'block':'none');
   });
   // Update button styles
-  const colors={history:'#e8eaf0',customers:'#4a8aff'};
-  ['history','customers'].forEach(tab=>{
+  const colors={history:'#e8eaf0',customers:'#4a8aff',audit:'#FFD700'};
+  ['history','customers','audit'].forEach(tab=>{
     const btn=document.getElementById('inv-tab-btn-'+tab);
     if(!btn) return;
     const active=(tab===id);
@@ -22017,6 +22081,7 @@ function invDetailSwitchTab(id){
   });
   // Trigger the apply so the list renders (it's deferred until first shown)
   if(id==='history') invHistApply();
+  else if(id==='audit') invAuditApply();
   else invCustApply();
 }
 
@@ -22103,6 +22168,7 @@ function invHistApply(){
         <div style="font-size:12px;font-weight:700;color:var(--text-main,#e8eaf0);">${dt} <span style="color:var(--text-dim,#4a5a7a);font-size:11px;">· ${tm}</span></div>
         ${!isRestock&&e.custName?`<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">👤 ${e.custName}</div>`:''}
         ${isRestock&&e.notes?`<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">📝 ${e.notes}</div>`:''}
+        ${isRestock&&e.actor?`<div style="font-size:10px;color:var(--text-dim,#4a5a7a);margin-top:1px;">👤 ${escHtml(e.actor)}</div>`:''}
       </div>
       <div style="text-align:right;flex-shrink:0;">${rightHtml}</div>
     </div>`;
@@ -22184,6 +22250,54 @@ function invCustApply(){
         </div>`).join('')}
         ${c.visits.length>3?`<div style="font-size:11px;color:var(--text-dim,#4a5a7a);text-align:center;">+${c.visits.length-3} more visits</div>`:''}
       </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+
+// ── Inventory Item Audit tab — Tally-style "who changed what" log ──
+function invAuditApply(){
+  const d=window._invAuditData; if(!d) return;
+  const q=(document.getElementById('inv-audit-search')?.value||'').toLowerCase().trim();
+  let filtered=[...d.entries];
+
+  if(q) filtered=filtered.filter(e=>
+    tallyMatch(e.action||'',q)||
+    tallyMatch(e.details||'',q)||
+    tallyMatch(e.actor||'',q)
+  );
+
+  const list=document.getElementById('inv-audit-list');
+  const info=document.getElementById('inv-audit-info');
+  if(!list) return;
+
+  if(info){
+    const isF=filtered.length!==d.entries.length;
+    info.style.display=isF?'block':'none';
+    if(isF) info.innerHTML=`Showing <strong style="color:var(--text-main,#e8eaf0);">${filtered.length}</strong> of ${d.entries.length} entries`;
+  }
+
+  if(filtered.length===0){
+    list.innerHTML=`<div style="color:var(--text-dim,#4a5a7a);font-size:13px;text-align:center;padding:30px;">${d.entries.length===0?'No audit history yet for this item':'No entries match your search'}</div>`;
+    return;
+  }
+
+  list.innerHTML=filtered.map((e,i)=>{
+    const meta = HIST_TYPE_META[e.type] || HIST_TYPE_META.other;
+    const dt=new Date(e.ts).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+    const tm=new Date(e.ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    const isFirst=i===0&&filtered.length===d.entries.length;
+    return `<div class="card" style="padding:11px 14px;display:flex;align-items:flex-start;gap:11px;${isFirst?`border-color:${meta.color}55;`:''}">
+      <div style="width:34px;height:34px;border-radius:9px;background:${meta.color}22;border:1px solid ${meta.color}55;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">${meta.icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;flex-wrap:wrap;">
+          <span style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);">${escHtml(e.action||'')}</span>
+          ${isFirst?`<span style="font-size:10px;color:#7ab3ff;background:#0a1020;border:1px solid #1a2a40;border-radius:5px;padding:1px 5px;">Latest</span>`:''}
+        </div>
+        ${e.details?`<div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-top:1px;line-height:1.4;">${escHtml(e.details)}</div>`:''}
+        <div style="font-size:11px;color:#FFD700;margin-top:3px;">👤 ${escHtml(e.actor||'Owner')}</div>
+      </div>
+      <div style="font-size:10px;color:var(--text-dim,#4a5a7a);flex-shrink:0;white-space:nowrap;text-align:right;">${dt}<br>${tm}</div>
     </div>`;
   }).join('');
 }
