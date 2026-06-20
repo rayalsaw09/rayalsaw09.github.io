@@ -10307,7 +10307,7 @@ function _crTxRender(creditorId){
       tx.syncStatus==="declined"?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#7f1d1d44;color:#f87171;margin-left:4px;">⚠️Retry</span>':'';
 
     return `<div>
-      <div id="${rowId}" onclick="openTxBillDetail('${creditorId}','${tx.id}','creditor')"
+      <div id="${rowId}" onclick="openTxBillDetail('${creditorId}','${tx.id||origIdx}','creditor')"
         style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;" onmouseenter="this.style.background='#0a1828'" onmouseleave="this.style.background='transparent'">
         <div style="font-size:11px;color:#6a7a9a;font-family:monospace;white-space:nowrap;">${dateShort}</div>
         <div style="min-width:0;">
@@ -12771,7 +12771,7 @@ function _drTxRender(debtorId){
     const rowId="dr-row-"+tx.id;
     const detailId="dr-det-"+tx.id;
     return `<div>
-      <div id="${rowId}" onclick="openTxBillDetail('${debtorId}','${tx.id}','debtor')"
+      <div id="${rowId}" onclick="openTxBillDetail('${debtorId}','${tx.id||origIdx}','debtor')"
         style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;" onmouseenter="this.style.background='#08180e'" onmouseleave="this.style.background='transparent'">
         <div style="font-size:11px;color:#6a7a9a;font-family:monospace;white-space:nowrap;">${dateShort}</div>
         <div style="min-width:0;">
@@ -12818,8 +12818,22 @@ function openTxBillDetail(parentId, txId, entityType) {
   const isCr = entityType === 'creditor';
   const entity = isCr ? getCreditors().find(c=>c.id===parentId) : getDebtors().find(d=>d.id===parentId);
   if (!entity) { notify('❌ Entry not found', 'error'); return; }
-  const tx = (entity.transactions||[]).find(t=>t.id===txId);
-  if (!tx) { notify('❌ Transaction not found', 'error'); return; }
+  // Try by id first; fall back to index for legacy transactions without id
+  const _txList = entity.transactions||[];
+  let _txFoundIdx = _txList.findIndex(t=>t.id===txId);
+  if (_txFoundIdx < 0 && txId && !isNaN(txId)) _txFoundIdx = parseInt(txId);
+  if (_txFoundIdx < 0 || _txFoundIdx >= _txList.length) { notify('❌ Transaction not found', 'error'); return; }
+  let tx = _txList[_txFoundIdx];
+  // Ensure tx has an id (assign one if missing so edit/delete work)
+  if (!tx.id) {
+    tx.id = 'TX' + Date.now() + Math.random().toString(36).slice(2,5);
+    const eList = isCr ? getCreditors() : getDebtors();
+    const eObj = eList.find(e=>e.id===parentId);
+    if (eObj && eObj.transactions[_txFoundIdx]) {
+      eObj.transactions[_txFoundIdx].id = tx.id;
+      if (isCr) saveCreditors(eList); else saveDebtors(eList);
+    }
+  }
 
   // Push creditor/debtor detail into stack so back goes there
   const stackTop = window._pageStack[window._pageStack.length-1];
@@ -12827,7 +12841,7 @@ function openTxBillDetail(parentId, txId, entityType) {
     window._pageStack.push({ type: isCr ? 'creditorDetail' : 'debtorDetail', id: parentId });
   }
   // Set detail guard so safeRenderTab won't wipe this page
-  window._scDetailPage = { type: 'txBillDetail', parentId, txId, entityType };
+  window._scDetailPage = { type: 'txBillDetail', parentId, txId: tx.id, entityType };
 
   const typeCfg = isCr ? {
     purchase: {label:'Purchase / Bill', bg:'#92400e22', col:'#fbbf24', icon:'📦'},
@@ -12839,13 +12853,13 @@ function openTxBillDetail(parentId, txId, entityType) {
     return:   {label:'Returned',        bg:'#2e106522', col:'#c4b5fd', icon:'↩️'},
   };
   const cfg = typeCfg[tx.type] || {label:tx.type, bg:'#1e2a4522', col:'#7a8aaa', icon:'📋'};
-  const accentColor = isCr ? '#fbbf24' : '#22c55e';
   const fullDate = new Date(tx.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric',weekday:'long'});
   const syncBadge = tx.syncStatus==='pending'?'<span style="font-size:11px;padding:3px 9px;border-radius:20px;background:#92400e44;color:#fbbf24;font-weight:700;">⏳ Sync Pending</span>':
     (tx.syncStatus==='accepted'||tx.syncStatus==='synced')?'<span style="font-size:11px;padding:3px 9px;border-radius:20px;background:#14532d44;color:#4ade80;font-weight:700;">🔗 Live</span>':
     tx.syncStatus==='declined'?'<span style="font-size:11px;padding:3px 9px;border-radius:20px;background:#7f1d1d44;color:#f87171;font-weight:700;">⚠️ Declined</span>':'';
 
-  const origIdx = (entity.transactions||[]).findIndex(t=>t.id===txId);
+  // origIdx: use the tracked index from the find phase (reliable even for legacy txs)
+  const origIdx = _txFoundIdx;
 
   const tabEl = document.getElementById('tab-content');
   tabEl.innerHTML = `<div style="padding:16px 14px 100px;max-width:640px;margin:0 auto;">
@@ -12860,60 +12874,116 @@ function openTxBillDetail(parentId, txId, entityType) {
       ${syncBadge ? '<div style="margin-top:8px;">'+syncBadge+'</div>' : ''}
     </div>
 
-    <!-- Detail fields card -->
-    <div style="background:var(--bg-card,#0a1628);border:1px solid var(--border-main,#1e2a45);border-radius:14px;padding:16px;margin-bottom:16px;">
-      <div style="font-size:11px;font-weight:800;color:var(--text-dim,#4a5a7a);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px;">Transaction Details</div>
-      <div style="display:grid;gap:14px;">
+    <!-- Detail fields card — Tally style -->
+    ${(()=>{
+      // Compute running balance up to this transaction
+      const allTxsSorted = (entity.transactions||[]);
+      const isCrType = entityType==='creditor';
+      let runningBal = 0;
+      for (let i=0; i<allTxsSorted.length; i++) {
+        const t = allTxsSorted[i];
+        if (isCrType) {
+          runningBal = t.type==='purchase' ? runningBal+t.amount : runningBal-t.amount;
+        } else {
+          runningBal = t.type==='sale' ? runningBal+t.amount : runningBal-t.amount;
+        }
+        if (t.id === tx.id) break;
+      }
+      const runColor = runningBal>0?'#f59e0b':runningBal<0?'#22c55e':'#7a8aaa';
+      const runLabel = runningBal>0?'Dr (You Owe)':runningBal<0?'Cr (Advance)':'Settled ✓';
+      // Total balance of the entity
+      let totalBal = 0;
+      allTxsSorted.forEach(t=>{
+        if (isCrType) totalBal = t.type==='purchase' ? totalBal+t.amount : totalBal-t.amount;
+        else totalBal = t.type==='sale' ? totalBal+t.amount : totalBal-t.amount;
+      });
+      const totColor = totalBal>0?'#ef4444':totalBal<0?'#22c55e':'#22c55e';
+      const totLabel = isCrType
+        ? (totalBal>0?'You Owe':'Overpaid / Advance')
+        : (totalBal>0?'They Owe':'You Owe');
 
-        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
-          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Party</span>
-          <span style="font-size:13px;font-weight:700;color:var(--text-main,#e8eaf0);">${escHtml(entity.name)}</span>
+      // GST breakdown from amount if gstPercent stored
+      const gstPct = tx.gstPercent||tx.gst||tx._gst||0;
+      const gstAmt = gstPct ? (tx.amount - tx.amount/(1+gstPct/100)) : 0;
+      const baseAmt = gstPct ? tx.amount/(1+gstPct/100) : tx.amount;
+
+      const row = (label, value, valueStyle='') =>
+        `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-main,#1e2a45);">
+          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">${label}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text-main,#e8eaf0);${valueStyle}">${value}</span>
+        </div>`;
+
+      return `<div style="background:var(--bg-card,#0a1628);border:1px solid var(--border-main,#1e2a45);border-radius:14px;margin-bottom:14px;overflow:hidden;">
+        <!-- Section: Voucher Info -->
+        <div style="padding:10px 14px;background:#060d1a;border-bottom:1px solid #1e2a45;">
+          <span style="font-size:10px;font-weight:800;color:#4a5a7a;text-transform:uppercase;letter-spacing:0.1em;">Voucher Info</span>
+        </div>
+        <div style="padding:0 14px;">
+          ${row('Party', escHtml(entity.name))}
+          ${row('Voucher Type', `<span style="font-size:11px;padding:2px 9px;border-radius:6px;background:${cfg.bg};color:${cfg.col};font-weight:800;">${cfg.icon} ${escHtml(cfg.label)}</span>`, '')}
+          ${row('Date', new Date(tx.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'}))}
+          ${tx.invoiceNo ? row('Invoice / Bill No', '🧾 '+escHtml(tx.invoiceNo)) : ''}
+          ${tx.actor ? row('Entry By', `<span style="font-size:11px;padding:2px 9px;border-radius:6px;background:${tx.actor==='Owner'?'#FFD70022':'#a78bfa22'};color:${tx.actor==='Owner'?'#FFD700':'#a78bfa'};border:1px solid ${tx.actor==='Owner'?'#FFD70033':'#a78bfa33'};font-weight:700;">👤 ${escHtml(tx.actor)}</span>`) : ''}
         </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
-          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Date</span>
-          <span style="font-size:13px;font-weight:700;color:var(--text-main,#e8eaf0);">${new Date(tx.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</span>
+        <!-- Section: Amount Breakdown -->
+        <div style="padding:10px 14px;background:#060d1a;border-top:1px solid #1e2a45;border-bottom:1px solid #1e2a45;">
+          <span style="font-size:10px;font-weight:800;color:#4a5a7a;text-transform:uppercase;letter-spacing:0.1em;">Amount Breakdown</span>
+        </div>
+        <div style="padding:0 14px;">
+          ${gstPct ? row('Base Amount', formatINR(baseAmt)) : ''}
+          ${gstPct ? row(`GST (${gstPct}%)`, formatINR(gstAmt), 'color:#fb923c;') : ''}
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-main,#1e2a45);">
+            <span style="font-size:13px;font-weight:800;color:var(--text-muted,#7a8aaa);">Total Amount</span>
+            <span style="font-size:20px;font-weight:900;color:${cfg.col};">${formatINR(tx.amount)}</span>
+          </div>
         </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
-          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Type</span>
-          <span style="font-size:11px;padding:3px 10px;border-radius:8px;background:${cfg.bg};color:${cfg.col};font-weight:700;">${cfg.icon} ${escHtml(cfg.label)}</span>
+        <!-- Section: Ledger Position -->
+        <div style="padding:10px 14px;background:#060d1a;border-top:1px solid #1e2a45;border-bottom:1px solid #1e2a45;">
+          <span style="font-size:10px;font-weight:800;color:#4a5a7a;text-transform:uppercase;letter-spacing:0.1em;">Ledger Position</span>
+        </div>
+        <div style="padding:0 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-main,#1e2a45);">
+            <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Balance After This Entry</span>
+            <div style="text-align:right;">
+              <div style="font-size:15px;font-weight:800;color:${runColor};">${formatINR(Math.abs(runningBal))}</div>
+              <div style="font-size:10px;color:${runColor};font-weight:700;">${runLabel}</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;">
+            <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Current Closing Balance</span>
+            <div style="text-align:right;">
+              <div style="font-size:15px;font-weight:800;color:${totColor};">${formatINR(Math.abs(totalBal))}</div>
+              <div style="font-size:10px;color:${totColor};font-weight:700;">${totLabel}</div>
+            </div>
+          </div>
         </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
-          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Amount</span>
-          <span style="font-size:16px;font-weight:800;color:${cfg.col};">${formatINR(tx.amount)}</span>
+        ${tx.note ? `<!-- Note -->
+        <div style="padding:10px 14px;background:#060d1a;border-top:1px solid #1e2a45;border-bottom:1px solid #1e2a45;">
+          <span style="font-size:10px;font-weight:800;color:#4a5a7a;text-transform:uppercase;letter-spacing:0.1em;">Note / Description</span>
         </div>
+        <div style="padding:12px 14px;">
+          <div style="font-size:13px;color:var(--text-main,#e8eaf0);line-height:1.6;">${escHtml(tx.note)}</div>
+        </div>` : ''}
 
-        ${tx.invoiceNo?`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
-          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Invoice No</span>
-          <span style="font-size:13px;font-weight:700;color:var(--text-main,#e8eaf0);">🧾 ${escHtml(tx.invoiceNo)}</span>
-        </div>`:''}
+        ${tx._invItem ? `<!-- Inventory link -->
+        <div style="padding:10px 14px;background:#060d1a;border-top:1px solid #1e2a45;border-bottom:1px solid #1e2a45;">
+          <span style="font-size:10px;font-weight:800;color:#4a5a7a;text-transform:uppercase;letter-spacing:0.1em;">Inventory Item</span>
+        </div>
+        <div style="padding:12px 14px;">
+          <div style="font-size:13px;font-weight:700;color:#60a5fa;">📦 ${escHtml(tx._invItem)}</div>
+          <div style="font-size:12px;color:#7a8aaa;margin-top:3px;">Qty: ${tx._invQty||1} unit${(tx._invQty||1)>1?'s':''}</div>
+          ${tx._invRate ? `<div style="font-size:12px;color:#7a8aaa;">Rate: ${formatINR(tx._invRate)} / unit</div>` : ''}
+        </div>` : ''}
 
-        ${tx.note?`
-        <div style="padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
-          <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:4px;">Note / Description</div>
-          <div style="font-size:13px;color:var(--text-main,#e8eaf0);line-height:1.5;">${escHtml(tx.note)}</div>
-        </div>`:''}
-
-        ${tx._invItem?`
-        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
-          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Inventory Item</span>
-          <span style="font-size:13px;font-weight:700;color:#60a5fa;">📦 ${escHtml(tx._invItem)} × ${tx._invQty}</span>
-        </div>`:''}
-
-        ${tx.actor?`
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Entry By</span>
-          <span style="font-size:11px;padding:3px 10px;border-radius:8px;background:${tx.actor==='Owner'?'#FFD70022':'#a78bfa22'};color:${tx.actor==='Owner'?'#FFD700':'#a78bfa'};border:1px solid ${tx.actor==='Owner'?'#FFD70044':'#a78bfa44'};font-weight:700;">👤 ${escHtml(tx.actor)}</span>
-        </div>`:''}
-      </div>
-    </div>
+      </div>`;
+    })()}
 
     <!-- Action buttons -->
     <div style="display:flex;flex-direction:column;gap:10px;">
-      <button onclick="openEditTxModal('${parentId}','${txId}','${entityType}')"
+      <button onclick="openEditTxModal('${parentId}','${tx.id}','${entityType}')"
         style="cursor:pointer;background:linear-gradient(135deg,#1e3a6e,#2563eb);border:1px solid #3b82f6;border-radius:12px;color:#fff;font-size:14px;font-weight:800;padding:14px;width:100%;">
         ✏️ Edit This Entry
       </button>
@@ -12927,7 +12997,7 @@ function openTxBillDetail(parentId, txId, entityType) {
           🚛 E-Way Bill
         </button>
       </div>
-      <button onclick="showEditHistoryModal('${parentId}','${escHtml(entity.name)}','${entityType}')"
+      <button onclick="showEditHistoryModal('${parentId}','${(entity.name||'').replace(/\\/g,'\\\\').replace(/'/g,'\\\'')}','${entityType}')"
         style="cursor:pointer;background:var(--bg-card,#0a1628);border:1px solid #FFD70055;border-radius:12px;color:#FFD700;font-size:13px;font-weight:700;padding:12px;width:100%;">
         📝 Edit History
       </button>
@@ -13021,13 +13091,12 @@ function _saveEditedTx(parentId, txId, entityType) {
   if (!entity.transactions[txIdx].invoiceNo) delete entity.transactions[txIdx].invoiceNo;
   if (!entity.transactions[txIdx].note) delete entity.transactions[txIdx].note;
 
-  if (isCr) saveCreditors(getCreditors()); else saveDebtors(getDebtors());
+  if (isCr) saveCreditors(entities); else saveDebtors(entities);
 
-  addHistoryLog(entityType, 'editTransaction', {
-    partyId: parentId, partyName: entity.name, txId,
-    oldAmount: oldTx.amount, newAmount: amtRaw,
-    oldDate: oldTx.date, newDate: date
-  });
+  addHistoryLog(entityType, 'Transaction edited',
+    `${entity.name} · ₹${oldTx.amount}→₹${amtRaw} · _eid:${parentId}`,
+    { txId, oldAmount: oldTx.amount, newAmount: amtRaw, oldDate: oldTx.date, newDate: date }
+  );
 
   closeModal();
   notify('✅ Entry updated', 'success');
@@ -20050,66 +20119,109 @@ async function scFetchAllPeerBalances() {
 // Helper to build ledger modal HTML from entity data
 function _buildSharedLedgerHtml(entity, etype, peerName, connId) {
   const txns = entity.transactions || [];
+  const isCr = etype === "creditor";
   let bal = 0;
-  if (etype === "creditor") {
-    const purchased = txns.filter(t=>t.type==="purchase").reduce((s,t)=>s+(t.amount||0),0);
-    const paid      = txns.filter(t=>t.type==="payment").reduce((s,t)=>s+(t.amount||0),0);
-    const returned  = txns.filter(t=>t.type==="return").reduce((s,t)=>s+(t.amount||0),0);
-    bal = purchased - paid - returned;
+  if (isCr) {
+    bal = txns.reduce((s,t)=> t.type==="purchase" ? s+t.amount : (t.type==="payment"||t.type==="return") ? s-t.amount : s, 0);
   } else {
-    const sold     = txns.filter(t=>t.type==="sale").reduce((s,t)=>s+(t.amount||0),0);
-    const received = txns.filter(t=>t.type==="payment").reduce((s,t)=>s+(t.amount||0),0);
-    const returned = txns.filter(t=>t.type==="return").reduce((s,t)=>s+(t.amount||0),0);
-    bal = sold - received - returned;
+    bal = txns.reduce((s,t)=> t.type==="sale" ? s+t.amount : (t.type==="payment"||t.type==="return") ? s-t.amount : s, 0);
   }
   const balColor = bal > 0 ? "#ef4444" : "#22c55e";
   const displayName = entity.name || peerName;
-  const balLabel = etype === "creditor"
-    ? (bal > 0 ? `You owe ₹${bal.toFixed(2)}` : `Overpaid ₹${Math.abs(bal).toFixed(2)}`)
-    : (bal > 0 ? `They owe ₹${bal.toFixed(2)}` : `You owe ₹${Math.abs(bal).toFixed(2)}`);
-  const csvRows = [["Type","Amount","Date","Notes"],...txns.map(t=>[t.type,t.amount||0,t.date||"",t.notes||t.bill||""])];
+  const balLabel = isCr
+    ? (bal > 0 ? `You Owe ${formatINR(bal)}` : `Overpaid ${formatINR(Math.abs(bal))}`)
+    : (bal > 0 ? `They Owe ${formatINR(bal)}` : `You Owe ${formatINR(Math.abs(bal))}`);
+  const csvRows = [["Date","Type","Debit","Credit","Balance","Note","Invoice"],
+    ...txns.map(t=>{
+      const isDebit = isCr ? t.type==="purchase" : t.type==="sale";
+      return [t.date||"", t.type, isDebit?t.amount||0:"", isDebit?"":(t.amount||0), "", t.note||t.notes||t.bill||"", t.invoiceNo||""];
+    })];
   const csv = csvRows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
   const csvUrl = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
-  const rows = txns.slice().reverse().map(t => {
-    const icon = t.type==="purchase"||t.type==="sale" ? "📦" : t.type==="payment"||t.type==="receipt" ? "💸" : "↩️";
-    const lbl  = {purchase:"Purchase",payment:"Payment",return:(etype==="creditor"?"Return / Dr Note":"Returned / Cr Note"),sale:currentLang==='hi'?'बिक्री':'Sale',receipt:currentLang==='hi'?'रसीद':'Receipt'}[t.type] || t.type;
-    const col  = t.type==="payment"||t.type==="receipt" ? "#22c55e" : t.type==="return" ? "#fb923c" : "#e8eaf0";
-    const dt   = t.date ? new Date(t.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}) : "";
-    return `<tr><td style="padding:9px 8px;font-size:13px;">${icon} ${lbl}</td>
-      <td style="padding:9px 8px;font-size:13px;color:${col};font-weight:700;">₹${Number(t.amount||0).toFixed(2)}</td>
-      <td style="padding:9px 8px;font-size:12px;color:var(--text-muted,#7a8aaa);">${dt}</td>
-      <td style="padding:9px 8px;font-size:12px;color:var(--text-muted,#7a8aaa);">${escHtml(t.notes||t.bill||"")}</td>
-      <td style="padding:9px 8px;font-size:12px;text-align:right;display:flex;gap:5px;justify-content:flex-end;"><button onclick='printTxBill(${JSON.stringify(t)}, ${JSON.stringify(displayName)}, ${JSON.stringify(etype)})' style="cursor:pointer;background:#1e2a45;border:1px solid #2a3a6a;border-radius:6px;color:#60a5fa;font-size:11px;font-weight:700;padding:4px 8px;">🧾 Bill</button><button onclick='openEwayBillHelper(${JSON.stringify(t)}, ${JSON.stringify(displayName)})' style="cursor:pointer;background:#0a1a0a;border:1px solid #1a4a1a;border-radius:6px;color:#4ade80;font-size:11px;font-weight:700;padding:4px 8px;">🚛</button></td></tr>`;
+
+  const typeCfg = isCr ? {
+    purchase:{label:"Purchase", debit:true,  col:"#fbbf24", icon:"📦"},
+    payment: {label:"Payment",  debit:false, col:"#4ade80", icon:"💰"},
+    return:  {label:"Return",   debit:false, col:"#c4b5fd", icon:"↩️"},
+  } : {
+    sale:    {label:"Sale",     debit:true,  col:"#4ade80", icon:"🛒"},
+    payment: {label:"Receipt",  debit:false, col:"#60a5fa", icon:"💰"},
+    return:  {label:"Returned", debit:false, col:"#c4b5fd", icon:"↩️"},
+  };
+
+  // Compute running balance oldest→newest
+  const chronoTxns = txns.slice(); // already oldest-first typically
+  let runBal = 0;
+  const runMap = {};
+  chronoTxns.forEach(tx=>{
+    const cfg = typeCfg[tx.type]||{debit:true};
+    runBal = cfg.debit ? runBal + (tx.amount||0) : runBal - (tx.amount||0);
+    runMap[tx.id||tx.date+tx.amount] = runBal;
+  });
+
+  const rows = txns.slice().reverse().map(tx => {
+    const cfg = typeCfg[tx.type]||{label:tx.type,debit:true,col:"#7a8aaa",icon:"📋"};
+    const d = tx.date ? new Date(tx.date+"T00:00:00") : new Date();
+    const dateShort = d.toLocaleDateString("en-IN",{day:"2-digit",month:"short"});
+    const key = tx.id||tx.date+tx.amount;
+    const rb = runMap[key]||0;
+    const runColor = rb>0?"#f59e0b":rb<0?"#22c55e":"#7a8aaa";
+    const runLabel = rb>0?"Dr":rb<0?"Cr":"✓";
+    return `<div onclick='printTxBill(${JSON.stringify(tx)}, ${JSON.stringify(displayName)}, ${JSON.stringify(etype)})'
+      style="display:grid;grid-template-columns:52px 1fr 60px 60px 68px 28px;align-items:center;gap:4px;padding:8px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;"
+      onmouseenter="this.style.background='#0a1828'" onmouseleave="this.style.background='transparent'">
+      <div style="font-size:11px;color:#6a7a9a;font-family:monospace;white-space:nowrap;">${dateShort}</div>
+      <div style="min-width:0;">
+        <div style="font-size:12px;font-weight:600;color:#cdd5e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(tx.note||tx.notes||tx.bill||cfg.label)}</div>
+        ${tx.invoiceNo?`<div style="font-size:10px;color:#4a5a7a;">🧾 ${escHtml(tx.invoiceNo)}</div>`:""}
+        <div style="font-size:10px;padding:1px 6px;border-radius:4px;background:${cfg.col}22;color:${cfg.col};font-weight:700;display:inline-block;margin-top:2px;">${cfg.icon} ${cfg.label}</div>
+      </div>
+      <div style="text-align:right;font-size:12px;font-weight:700;color:#fbbf24;">${cfg.debit?formatINR(tx.amount||0):""}</div>
+      <div style="text-align:right;font-size:12px;font-weight:700;color:#4ade80;">${!cfg.debit?formatINR(tx.amount||0):""}</div>
+      <div style="text-align:right;">
+        <div style="font-size:12px;font-weight:800;color:${runColor};">${formatINR(Math.abs(rb))}</div>
+        <div style="font-size:9px;color:${runColor};font-weight:700;">${runLabel}</div>
+      </div>
+      <div style="text-align:center;font-size:13px;color:#3a4a6a;">›</div>
+    </div>`;
   }).join("");
-  return `<div style="max-height:78vh;overflow-y:auto;" id="sc-ledger-modal-content">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
-      <div style="font-size:28px;">📋</div>
-      <div style="flex:1;">
+
+  // Column header
+  const headerRow = `<div style="display:grid;grid-template-columns:52px 1fr 60px 60px 68px 28px;gap:4px;padding:6px 10px 5px;border-bottom:2px solid #1e2a45;">
+    <div style="font-size:10px;font-weight:700;color:#4a5a7a;text-transform:uppercase;">Date</div>
+    <div style="font-size:10px;font-weight:700;color:#4a5a7a;text-transform:uppercase;">Particulars</div>
+    <div style="font-size:10px;font-weight:700;color:#fbbf24;text-align:right;text-transform:uppercase;">${isCr?"Debit":"Sale"}</div>
+    <div style="font-size:10px;font-weight:700;color:#4ade80;text-align:right;text-transform:uppercase;">${isCr?"Credit":"Receipt"}</div>
+    <div style="font-size:10px;font-weight:700;color:#4a5a7a;text-align:right;text-transform:uppercase;">Balance</div>
+    <div></div>
+  </div>`;
+
+  return `<div style="max-height:82vh;overflow-y:auto;" id="sc-ledger-modal-content">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:0;">
         <div style="font-size:17px;font-weight:800;color:var(--text-main,#e8eaf0);">${escHtml(displayName)}</div>
-        <div style="font-size:12px;color:var(--text-muted,#7a8aaa);">${etype==="creditor"?"Creditor (Supplier)":"Debtor (Buyer)"} · Shared by ${escHtml(peerName)}</div>
-        <div style="font-size:10px;color:#3a5a3a;margin-top:2px;">🔴 Live — updates automatically</div>
+        <div style="font-size:11px;color:var(--text-muted,#7a8aaa);">${isCr?"Creditor (Supplier)":"Debtor (Buyer)"} · Shared by <strong style="color:#60a5fa;">${escHtml(peerName)}</strong></div>
+        <div style="font-size:10px;color:#22c55e;margin-top:2px;">🔴 Live</div>
       </div>
       <button onclick='printSharedLedgerStatement(${JSON.stringify(entity)}, ${JSON.stringify(etype)}, ${JSON.stringify(displayName)}, ${JSON.stringify(peerName)})'
-        style="cursor:pointer;background:#1e2a45;border:1px solid #3a4a6a;color:#a0b0d0;font-size:12px;font-weight:800;border-radius:8px;padding:7px 12px;">🖨 Print Statement</button>
+        style="cursor:pointer;background:#1e2a45;border:1px solid #3a4a6a;color:#a0b0d0;font-size:11px;font-weight:800;border-radius:8px;padding:6px 10px;">🖨 Print</button>
       <a href="${csvUrl}" download="${escHtml(displayName)}-ledger.csv"
-        style="background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;font-size:12px;font-weight:800;border-radius:8px;padding:7px 14px;text-decoration:none;">⬇ Export CSV</a>
+        style="background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;font-size:11px;font-weight:800;border-radius:8px;padding:6px 10px;text-decoration:none;">⬇ CSV</a>
     </div>
-    <div style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:13px;color:var(--text-muted,#7a8aaa);">${t('invClosingBalance')}</div>
-      <div id="sc-ledger-bal" style="font-size:18px;font-weight:800;color:${balColor};">${balLabel}</div>
+    <!-- Balance card -->
+    <div style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:12px;color:var(--text-muted,#7a8aaa);">Closing Balance</div>
+      <div style="font-size:20px;font-weight:900;color:${balColor};">${balLabel}</div>
     </div>
-    ${txns.length === 0
-      ? `<div style="text-align:center;padding:30px;color:var(--text-dim,#4a5a7a);">${t('crNoTxYet')}</div>`
-      : `<table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="border-bottom:1px solid var(--border-main,#1e2a45);">
-            <th style="padding:8px;font-size:11px;color:var(--text-muted,#7a8aaa);text-align:left;">TYPE</th>
-            <th style="padding:8px;font-size:11px;color:var(--text-muted,#7a8aaa);text-align:left;">AMOUNT</th>
-            <th style="padding:8px;font-size:11px;color:var(--text-muted,#7a8aaa);text-align:left;">${t('crDate')}</th>
-            <th style="padding:8px;font-size:11px;color:var(--text-muted,#7a8aaa);text-align:left;">NOTES</th>
-            <th style="padding:8px;font-size:11px;color:var(--text-muted,#7a8aaa);text-align:right;">${t('invBill').toUpperCase()}</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`}
+    <!-- Tally-style ledger grid -->
+    <div style="background:var(--bg-card,#0a1628);border:1px solid var(--border-main,#1e2a45);border-radius:12px;overflow:hidden;">
+      ${headerRow}
+      ${txns.length === 0
+        ? `<div style="text-align:center;padding:30px;color:var(--text-dim,#4a5a7a);">No transactions yet</div>`
+        : rows}
+    </div>
+    <div style="font-size:10px;color:#2a3a5a;text-align:center;margin-top:10px;">Tap any row to view bill</div>
   </div>`;
 }
 
