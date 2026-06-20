@@ -10121,7 +10121,8 @@ function openCreditorDetail(id){
           <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);">${t('crTxHistory')}</div>
           <div style="display:flex;gap:8px;">
             <button onclick="printCreditorStatement('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">🖨 Print</button>
-            ${!isUnrec ? `<button onclick="openAddCreditorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button><button onclick="showEditHistoryModal('${item.id||item.name}','${item.name}','inventory')" style="background:#243b63;border:none;border-radius:7px;color:#d6e4ff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;margin-left:4px;">📋 History</button><button onclick="showEditHistoryModal('${id}','${(_cr2&&_cr2.name)||'Creditor'}','creditor')" style="cursor:pointer;background:#243b63;border:none;border-radius:8px;color:#d6e4ff;font-size:11px;font-weight:700;padding:6px 12px;margin-left:6px;">📋 Edit History</button>` : ""}
+            ${!isUnrec ? `<button onclick="openAddCreditorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>` : ""}
+            ${!isUnrec ? `<button onclick="showEditHistoryModal('${id}','${cr.name.replace(/'/g,"\\'")}','creditor')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#FFD700;font-size:11px;font-weight:700;padding:6px 12px;white-space:nowrap;">📝 Edit History</button>` : ""}
           </div>
         </div>
 
@@ -10179,13 +10180,6 @@ function openCreditorDetail(id){
         </div>
       </div>
 
-      <!-- ── Audit Trail ── -->
-      <div style="background:var(--bg-card,#0f1628);border:1px solid var(--border-main,#1e2a45);border-radius:14px;padding:16px;">
-        <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:4px;">🕵️ Audit Trail</div>
-        <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:12px;">Who changed what, and when</div>
-        ${!isUnrec ? entityAuditTabHtml('cr-audit-list-${id}','cr-audit-search-${id}') : '<div style="color:#4a5a7a;font-size:12px;padding:10px;">Audit not available for unassigned entries.</div>'}
-      </div>
-
     </div>
   </div>`;
   _crTxCurrentFilter="all";
@@ -10197,11 +10191,6 @@ function openCreditorDetail(id){
       window._crTxNavMonth=now.getMonth();
       window._crTxIsCustom=false;
       if(typeof _crTxApplyMonthNav==='function') _crTxApplyMonthNav(creditorId);
-      // Load audit trail
-      const _cr2 = getCreditors().find(c=>c.id===creditorId);
-      if(_cr2 && creditorId!=='CR_UNRECONCILED'){
-        setTimeout(()=>entityAuditLoad('cr-audit-list-'+creditorId,'cr-audit-search-'+creditorId, creditorId, _cr2.name, 'creditor'), 150);
-      }
     }, 50);
   })(id);
 } // end openCreditorDetail
@@ -11612,7 +11601,7 @@ function addExpense(category, amount, note, date, recurring, payMode){
   };
   list.unshift(entry);
   saveExpenses(list);
-  addHistoryLog("expense", "Expense added", `${category} — ${formatINR(entry.amount)}${note?" ("+note+")":""}${payMode?" · "+payMode:""}`);
+  addHistoryLog("expense", "Expense added", `${category} — ${formatINR(entry.amount)}${note?" ("+note+")":""}${payMode?" · "+payMode:""} · _eid:${entry.id}`);
   // Record cash/bank movement for this expense
   cashRecordTx({direction:"out", amount:entry.amount, date:entry.date, note:`Expense · ${category}${note?" · "+note:""}`, source:"expense", refId:entry.id, mode:entry.payMode});
   return entry;
@@ -11644,7 +11633,7 @@ function deleteExpense(id){
   const list = all.filter(e=>e.id!==id);
   saveExpenses(list);
   if(removed) cashRemoveByRef(removed.id);
-  addHistoryLog("expense", "Expense deleted", removed?`${removed.category} — ${formatINR(removed.amount)}`:id);
+  addHistoryLog("expense", "Expense deleted", `${removed?`${removed.category} — ${formatINR(removed.amount)}`:id} · _eid:${id}`);
 }
 
 function duplicateExpense(id){
@@ -12104,6 +12093,7 @@ ${monthTotal>0 ? `
       <div>${e.recurring?`<span class="exp-badge" style="background:#1a1e3a;color:#818cf8;">${t('expFilterRecurring')}</span>`:"<span style='color:var(--text-dim,#4a5a7a);font-size:11px;'>—</span>"}</div>
       <div style="display:flex;gap:5px;">
         <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#1e2a45;border:none;border-radius:6px;color:#818cf8;font-size:11px;padding:5px 8px;cursor:pointer;" title="Edit">✏️</button>
+        <button onclick="showEditHistoryModal('${e.id}','','expense','${e.category.replace(/'/g,"\'")}')" style="background:#1e2a45;border:none;border-radius:6px;color:#FFD700;font-size:11px;padding:5px 8px;cursor:pointer;" title="Edit History">📝</button>
         <button onclick="duplicateExpense('${e.id}')" style="background:#1e2a45;border:none;border-radius:6px;color:#34d399;font-size:11px;padding:5px 8px;cursor:pointer;" title="Duplicate">📋</button>
         <button onclick="expDeleteEntry('${e.id}')" style="background:#2a0808;border:1px solid #4a1515;border-radius:6px;color:#f87171;font-size:11px;padding:5px 8px;cursor:pointer;" title="Delete">🗑</button>
       </div>
@@ -12125,6 +12115,7 @@ ${monthTotal>0 ? `
         </div>
         <div style="display:flex;gap:5px;margin-top:6px;">
           <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#1e2a45;border:none;border-radius:6px;color:#818cf8;font-size:11px;padding:5px 8px;cursor:pointer;">${t('expEditBtn')}</button>
+          <button onclick="showEditHistoryModal('${e.id}','','expense','${e.category.replace(/'/g,"\'")}')" style="background:#1e2a45;border:none;border-radius:6px;color:#FFD700;font-size:11px;padding:5px 8px;cursor:pointer;">📝</button>
           <button onclick="duplicateExpense('${e.id}')" style="background:#1e2a45;border:none;border-radius:6px;color:#34d399;font-size:11px;padding:5px 8px;cursor:pointer;">${t('expCopyBtn')}</button>
           <button onclick="expDeleteEntry('${e.id}')" style="background:#2a0808;border:1px solid #4a1515;border-radius:6px;color:#f87171;font-size:11px;padding:5px 8px;cursor:pointer;">🗑</button>
         </div>
@@ -12150,26 +12141,8 @@ ${monthTotal>0 ? `
   </div>
 </div>
 
-<!-- ── Expense Audit Trail ── -->
-<div style="background:var(--bg-card,#0f1628);border:1px solid var(--border-main,#1e2a45);border-radius:14px;padding:16px;margin-top:14px;">
-  <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:4px;">🕵️ Expense Audit Trail</div>
-  <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:12px;">All expense add / edit / delete events</div>
-  <input class="input" id="exp-audit-search" placeholder="🔍 Search audit history..." oninput="expAuditSearch()" style="margin-bottom:10px;font-size:13px;" />
-  <div id="exp-audit-list" style="display:flex;flex-direction:column;gap:8px;"></div>
-</div>
-
 </div>`;
-  // Load expense audit after render
-  setTimeout(()=>{
-    const _expEntries = getEntityAuditLog(null, null, 'expense');
-    const _expAuditEl = document.getElementById('exp-audit-list');
-    if(_expAuditEl){ _expAuditEl._auditData = _expEntries; }
-    entityAuditRender('exp-audit-list', _expEntries, 'No expense audit history yet');
-  }, 100);
-}
-
-function expAuditSearch(){
-  entityAuditSearch('exp-audit-list','exp-audit-search');
+  // (per-row Edit History buttons replace the old global audit trail panel)
 }
 
 function expSetMode(mode){
@@ -12647,7 +12620,8 @@ function openDebtorDetail(id){
           <div style="display:flex;gap:8px;">
             ${dr.phone&&bal>0?`<a href="${_debtWAReminder(dr)}" target="_blank" style="cursor:pointer;background:#052a14;border:1px solid #16a34a;border-radius:8px;color:#4ade80;font-size:11px;font-weight:800;padding:6px 12px;text-decoration:none;">💬 Remind</a>`:''}
             <button onclick="printDebtorStatement('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">🖨 Print</button>
-            <button onclick="openAddDebtorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button><button onclick="showEditHistoryModal('${id}',(_dr2&&_dr2.name)||'Debtor','debtor')" style="cursor:pointer;background:#243b63;border:none;border-radius:8px;color:#d6e4ff;font-size:11px;font-weight:700;padding:6px 12px;margin-left:6px;">📋 Edit History</button>
+            <button onclick="openAddDebtorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>
+            <button onclick="showEditHistoryModal('${id}','${dr.name.replace(/'/g,"\\'")}','debtor')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#FFD700;font-size:11px;font-weight:700;padding:6px 12px;white-space:nowrap;">📝 Edit History</button>
           </div>
         </div>
 
@@ -12705,13 +12679,6 @@ function openDebtorDetail(id){
         </div>
       </div>
 
-      <!-- ── Audit Trail ── -->
-      <div style="background:var(--bg-card,#0f1628);border:1px solid var(--border-main,#1e2a45);border-radius:14px;padding:16px;">
-        <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:4px;">🕵️ Audit Trail</div>
-        <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:12px;">Who changed what, and when</div>
-        ${entityAuditTabHtml('dr-audit-list-${id}','dr-audit-search-${id}')}
-      </div>
-
     </div>
   </div>`;
   _drTxCurrentFilter="all";
@@ -12722,9 +12689,6 @@ function openDebtorDetail(id){
       window._drTxNavMonth=now.getMonth();
       window._drTxIsCustom=false;
       if(typeof _drTxApplyMonthNav==="function") _drTxApplyMonthNav(debtorId);
-      // Load audit trail
-      const _dr2 = getDebtors().find(d=>d.id===debtorId);
-      if(_dr2) setTimeout(()=>entityAuditLoad('dr-audit-list-'+debtorId,'dr-audit-search-'+debtorId, debtorId, _dr2.name, 'debtor'), 150);
     }, 50);
   })(id);
 }
@@ -16639,6 +16603,7 @@ function openCustomerPage(id){
         <button class="btn" onclick="closeCustomerPage();openPurchaseModal('${c.id}')" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 14px;font-size:12px;font-weight:800;">+ ${t('addPurchaseBtn')}</button>
         ${(licensePlan === "pro" && licenseStatus === "pro") && c.phone?`<a href="https://wa.me/91${c.phone}?text=${encodeURIComponent('Hi '+c.name.split(' ')[0]+'! 👋 You are ranked #'+c.rank+' at '+appSettings.shopName+'. Total spend: '+formatINR(c.totalSpend)+' 🏆 Visit us again!')}" target="_blank" class="btn" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px 12px;font-size:12px;font-weight:800;text-decoration:none;">💬 WA</a>`:''}
         <button class="btn" onclick="closeCustomerPage();openEditModal('${c.id}')" style="background:#1a2540;color:#aaa;border:1px solid var(--border-input,#2a3560);padding:8px 12px;font-size:12px;">✏️</button>
+        <button class="btn" onclick="showEditHistoryModal('${c.id}','${c.name.replace(/'/g,"\\'")}','customer')" style="background:#1a2540;color:#FFD700;border:1px solid var(--border-input,#2a3560);padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;">📝 Edit History</button>
       </div>
     </div>
 
@@ -16721,12 +16686,6 @@ function openCustomerPage(id){
       <div id="cp-purchase-list" style="display:flex;flex-direction:column;gap:8px;"></div>
       `:`<div style="color:#556;font-size:13px;text-align:center;padding:30px;">${t('noPurchases')}</div>`}
     </div>
-    <!-- ── Audit Trail ── -->
-    <div style="background:var(--bg-card,#0f1628);border:1px solid var(--border-main,#1e2a45);border-radius:14px;padding:16px;margin-top:14px;">
-      <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:4px;">🕵️ Audit Trail</div>
-      <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:12px;">Who changed what, and when</div>
-      ${entityAuditTabHtml('cust-audit-list-${c.id}','cust-audit-search-${c.id}')}
-    </div>
 
     <div style="height:40px;"></div>
   `;
@@ -16748,8 +16707,6 @@ function openCustomerPage(id){
     setTimeout(()=>{ if(document.getElementById("cp-purchase-list")&&document.getElementById("cp-purchase-list").innerHTML==="") cpApply(); },500);
     setTimeout(()=>{ if(document.getElementById("cp-purchase-list")&&document.getElementById("cp-purchase-list").innerHTML==="") cpApply(); },1000);
   }
-  // Load audit trail
-  setTimeout(()=>entityAuditLoad('cust-audit-list-'+c.id,'cust-audit-search-'+c.id, c.id, c.name, 'customer'), 200);
 }
 
 function _cpAddMonthNav(){
@@ -22037,6 +21994,7 @@ function renderInventoryCategoryPage(catName){
                 <div style="display:flex;gap:5px;" onclick="event.stopPropagation()">
                   
                   <button onclick="openInvEditModal('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#0a1a3a;border:none;border-radius:7px;color:#4a8aff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">✏️ Edit</button>
+                  <button onclick="invShowItemEditHistory('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1500;border:none;border-radius:7px;color:#FFD700;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">📝 Edit History</button>
                   <button onclick="invDeleteItem('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#2a0808;border:none;border-radius:7px;color:#f66;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🗑</button>
                 </div>
               </div>
@@ -22078,6 +22036,13 @@ function invShowItemDetail(itemName){
   safeRenderTab(currentTab);
   setTimeout(()=>{ invHistApply(); invCustApply(); invAuditApply(); }, 80);
   setTimeout(()=>{ invHistApply(); invCustApply(); invAuditApply(); }, 400);
+}
+
+// Open an item's detail page straight on the Audit tab — used by the
+// "📝 Edit History" button on each inventory list row.
+function invShowItemEditHistory(itemName){
+  window._invDetailTab = 'audit';
+  invShowItemDetail(itemName);
 }
 
 function renderInventoryItemDetail(itemName){
@@ -22556,16 +22521,6 @@ function entityAuditRender(containerId, entries, emptyMsg){
   }).join('');
 }
 
-// Build the HTML for an Audit tab panel (search input + list container).
-// Call entityAuditRender after inserting this HTML to populate the list.
-function entityAuditTabHtml(containerId, searchId){
-  return `
-    <div style="padding:14px 0 0;">
-      <input class="input" id="${searchId}" placeholder="🔍 Search audit history..." oninput="entityAuditSearch('${containerId}','${searchId}')" style="margin-bottom:10px;font-size:13px;" />
-      <div id="${containerId}" style="display:flex;flex-direction:column;gap:8px;"></div>
-    </div>`;
-}
-
 // Live search filter for entity audit lists.
 // Stores raw entries on the container element as _auditData.
 function entityAuditSearch(containerId, searchId){
@@ -22591,26 +22546,21 @@ function entityAuditLoad(containerId, searchId, entityId, entityName, histType){
   entityAuditRender(containerId, entries, 'No audit history yet for this record');
 }
 
-
-
-function showEditHistoryModal(entityId, entityName, histType){
-  const entries=getEntityAuditLog(entityId, entityName, histType);
-  openModal(`
-    <div style="padding:16px;max-height:80vh;overflow:auto;">
-      ${modalHeader('📋 Edit History - '+(entityName||'Record'))}
-      <input class="input" id="editHistSearchBox" placeholder="Search history..." oninput="editHistSearch()" style="margin-bottom:10px;" />
-      <div id="editHistList"></div>
-    </div>`);
-  const el=document.getElementById('editHistList');
-  if(el) el._auditData=entries;
-  entityAuditRender('editHistList',entries,'No edit history found');
+// ── Edit History Modal ──────────────────────────────────────────
+// Single shared modal used by the "📝 Edit History" button on each
+// record (customers, creditors, debtors, expenses, inventory) instead
+// of an inline "Audit Trail" section cluttering the detail page.
+function showEditHistoryModal(entityId, entityName, histType, displayLabel){
+  const label = displayLabel || entityName;
+  const title = '📝 Edit History' + (label ? (' — ' + escHtml(label)) : '');
+  const html = modalHeader(title) +
+    '<input class="input" id="edithist-search" placeholder="🔍 Search edit history..." oninput="editHistSearch()" style="margin-bottom:12px;font-size:13px;" />' +
+    '<div id="edithist-list" style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto;"></div>';
+  showWideModal(html);
+  setTimeout(()=>entityAuditLoad('edithist-list','edithist-search', entityId, entityName, histType), 50);
 }
 function editHistSearch(){
- const el=document.getElementById('editHistList'); if(!el||!el._auditData) return;
- const q=(document.getElementById('editHistSearchBox')?.value||'').toLowerCase();
- const f=el._auditData.filter(e=>JSON.stringify(e).toLowerCase().includes(q));
- entityAuditRender('editHistList',f,'No matching history');
- document.getElementById('editHistList')._auditData=el._auditData;
+  entityAuditSearch('edithist-list','edithist-search');
 }
 
 // ═══════════════════════════════════════════════════════════════
