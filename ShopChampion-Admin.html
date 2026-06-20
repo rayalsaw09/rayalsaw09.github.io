@@ -6976,7 +6976,7 @@ async function deletePurchase(custId,bill,dateEnc){
     }
     notify("✅ Purchase deleted");
     try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
-    addHistoryLog('sale','Sale deleted',`${c.name} · ${formatINR(_delAmt)}${bill?` · Bill ${bill}`:''}`);
+    addHistoryLog('sale','Sale deleted',`${c.name} · ${formatINR(_delAmt)}${bill?` · Bill ${bill}`:''} · _eid:${custId}`);
     // Reverse the cash/bank entry that was created when this sale was recorded.
     // Remove the original "in" entry by its refId — this correctly restores the
     // balance without double-counting. Falls back to a manual "in" reversal if
@@ -9766,7 +9766,7 @@ function archiveCreditor(id){
   if(!cr) return;
   cr._archived = true;
   saveCreditors(creditors);
-  addHistoryLog('creditor','Creditor archived',cr.name);
+  addHistoryLog('creditor','Creditor archived',`${cr.name} · _eid:${id}`);
   closeModal();
   notify("📦 " + cr.name + " archived");
   renderTab(2);
@@ -9780,7 +9780,7 @@ function archiveDebtor(id){
   if(!dr) return;
   dr._archived = true;
   saveDebtors(debtors);
-  addHistoryLog('debtor','Debtor archived',dr.name);
+  addHistoryLog('debtor','Debtor archived',`${dr.name} · _eid:${id}`);
   closeModal();
   notify("📦 " + dr.name + " archived");
   renderTab(3);
@@ -9793,7 +9793,7 @@ function unarchiveCreditor(id){
   if(!cr) return;
   delete cr._archived;
   saveCreditors(creditors);
-  addHistoryLog('creditor','Creditor restored',cr.name);
+  addHistoryLog('creditor','Creditor restored',`${cr.name} · _eid:${id}`);
   notify("✅ " + cr.name + " restored");
   renderTab(2);
 }
@@ -9805,7 +9805,7 @@ function unarchiveDebtor(id){
   if(!dr) return;
   delete dr._archived;
   saveDebtors(debtors);
-  addHistoryLog('debtor','Debtor restored',dr.name);
+  addHistoryLog('debtor','Debtor restored',`${dr.name} · _eid:${id}`);
   notify("✅ " + dr.name + " restored");
   renderTab(3);
 }
@@ -9817,7 +9817,7 @@ function _doSimpleDeleteCreditor(id){
   // Remove all cash ledger entries linked to this creditor's transactions
   if(cr && cr.transactions){ cr.transactions.forEach(t=>{ if(t.id) cashRemoveByRef(t.id); }); }
   saveCreditors(creditors.filter(c=>c.id!==id));
-  addHistoryLog('creditor','Creditor deleted', cr?cr.name:"Supplier");
+  addHistoryLog('creditor','Creditor deleted', `${cr?cr.name:"Supplier"} · _eid:${id}`);
   closeModal();
   notify("🗑 " + (cr?cr.name:"Supplier") + " deleted");
   renderTab(2);
@@ -9951,7 +9951,7 @@ function confirmHardDeleteCreditor(id){
   // Remove all cash ledger entries linked to this creditor's transactions
   if(cr && cr.transactions){ cr.transactions.forEach(t=>{ if(t.id) cashRemoveByRef(t.id); }); }
   saveCreditors(creditors.filter(c=>c.id!==id));
-  addHistoryLog('creditor','Creditor deleted (with stock reversal)', cr.name);
+  addHistoryLog('creditor','Creditor deleted (with stock reversal)', `${cr.name} · _eid:${id}`);
   closeModal();
   notify("🗑 " + cr.name + " deleted and stock reversed");
   renderTab(2);
@@ -9969,7 +9969,7 @@ function deleteDebtor(id){
   if(txs.length === 0){
     if(!confirm("Delete " + dr.name + "? " + t('dbCannotUndo'))) return;
     saveDebtors(debtors.filter(d=>d.id!==id));
-    addHistoryLog('debtor','Debtor deleted', dr.name);
+    addHistoryLog('debtor','Debtor deleted', `${dr.name} · _eid:${id}`);
     closeModal();
     notify("🗑 " + dr.name + " deleted");
     renderTab(3);
@@ -15220,7 +15220,7 @@ async function saveNewCustomer(){
   customers.push(newC);
   closeModal();tempPhoto="";
   notify(`✅ ${name} added! ID: ${id}`);
-  addHistoryLog('customer','Customer added',`${name} · ID ${id}`);
+  addHistoryLog('customer','Customer added',`${name} · ID ${id} · _eid:${id}`);
   try { await saveOneCustomer(newC); } catch(e){notify("⚠️ Saved locally, Firebase error: "+e.message);}
   if(useLocalOnly) safeRenderTab(currentTab);
 }
@@ -16035,7 +16035,7 @@ async function deleteCustomer(id){
 
   try{await deleteOneCustomer(id);notify("🗑 Customer deleted");}
   catch(e){notify("⚠️ Delete error: "+e.message);}
-  addHistoryLog('customer','Customer deleted',_cName);
+  addHistoryLog('customer','Customer deleted',`${_cName} · _eid:${id}`);
   if(useLocalOnly)safeRenderTab(currentTab);
 }
 
@@ -16078,7 +16078,7 @@ async function deleteSelectedCustomers(){
   custSelected.clear();
   custSelectMode=false;
   notify(errors===0?`🗑 ${ids.length} customer${ids.length>1?"s":""} deleted`:`⚠️ Deleted ${ids.length-errors}, ${errors} error(s)`);
-  addHistoryLog('customer','Customers deleted',`${ids.length} customer${ids.length>1?"s":""}: ${_names.join(", ")}`);
+  addHistoryLog('customer','Customers deleted',`${ids.length} customer${ids.length>1?"s":""}: ${_names.join(", ")}${ids.map(id=>` · _eid:${id}`).join('')}`);
   safeRenderTab(currentTab);
 }
 
@@ -22818,12 +22818,23 @@ function getEntityAuditLog(entityId, entityName, histType, txId){
       try{ list = JSON.parse(localStorage.getItem(k)||"[]"); } catch{ continue; }
       list.forEach(e=>{
         if(!e) return;
-        const matchType  = !histType || e.type===histType;
+        // Purchase/sale deletions are logged under type 'sale' (so they keep
+        // showing correctly in the global All History "Sale" filter), but
+        // a deletion is still an edit-worthy event for that customer's own
+        // Edit History. Regular "Sale recorded" entries are intentionally
+        // excluded here — they're routine transactions, not edits, and
+        // already visible on the customer's purchase list.
+        const matchType  = !histType || e.type===histType || (histType==='customer' && e.type==='sale' && e.action==='Sale deleted');
         const detailsStr = typeof e.details==="string" ? e.details : "";
         const hasEid      = /_eid:/.test(detailsStr);
         const matchId    = entityId   && detailsStr.includes("_eid:"+entityId);
         const matchName  = entityName && detailsStr.includes(entityName) && (!hasEid || matchId);
         const matchTx    = !txId || (e.extra && e.extra.txId===txId);
+        // "Transaction edited" entries belong to a single transaction's own
+        // history popup, not the full entity-level view — only include them
+        // there when a specific txId is being looked up.
+        const isTxEditEntry = e.action === 'Transaction edited';
+        if(isTxEditEntry && !txId) return;
         if(matchType && (matchId || matchName) && matchTx) out.push(e);
       });
     }
