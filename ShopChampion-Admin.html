@@ -1849,7 +1849,7 @@ var TRANSLATIONS = {
     crSearchPlaceholder:"🔍 Search creditor by name or phone...",
     crGstStatus:"🔢 GST Status:", crAll:"🏢 All",
     crGstReg:"✅ GST Registered", crNotReg:"❌ Not Registered",
-    crNoCreditors:"No creditors found", crTotalYouOweLabel:"Total You Owe",
+    crNoCreditors:"No creditors found", crTotalYouOweLabel:"Total Payable",
     crBalance:"Balance:", crLinked:"Linked", crGstin:"GSTIN",
     crMoveTo:"Move to Creditor", crTarget:"Target Creditor",
     crSelectAll:"Select All", crTap:"Tap", crDeleting:"Deleting",
@@ -1861,7 +1861,7 @@ var TRANSLATIONS = {
     crInvoiceRef:"INVOICE / REF NO.", crRefUtr:"REF / UTR NO.",
     crAmount:"Amount", crCancel:"Cancel", crType:"Type",
     crCredit:"Credit", crDebit:"Debit",
-    crClosingBalance:"Closing Balance:", crTotalYouOwe:"TOTAL YOU OWE",
+    crClosingBalance:"Closing Balance:", crTotalYouOwe:"TOTAL PAYABLE",
     crTxHistory:"Transaction History", crNoCredFound:"No Creditors Found",
     crNoTxYet:"No transactions yet", crNotFound:"Not found",
     crNegativeItems:"ITEMS THAT WOULD GO NEGATIVE:",
@@ -2282,7 +2282,7 @@ var TRANSLATIONS = {
     crSearchPlaceholder:"🔍 नाम या फ़ोन से लेनदार खोजें...",
     crGstStatus:"🔢 GST स्थिति:", crAll:"🏢 सभी",
     crGstReg:"✅ GST पंजीकृत", crNotReg:"❌ पंजीकृत नहीं",
-    crNoCreditors:"कोई लेनदार नहीं मिला", crTotalYouOwe:"कुल आप पर बकाया",
+    crNoCreditors:"कोई लेनदार नहीं मिला", crTotalYouOwe:"कुल देय",
     crBalance:"बकाया:", crLinked:"जुड़ा हुआ", crGstin:"GSTIN",
     crMoveTo:"लेनदार में ले जाएं", crTarget:"लक्ष्य लेनदार",
     crSelectAll:"सभी चुनें", crTap:"टैप करें", crDeleting:"हटाया जा रहा है",
@@ -2294,7 +2294,7 @@ var TRANSLATIONS = {
     crInvoiceRef:"चालान / संदर्भ सं.", crRefUtr:"संदर्भ / UTR सं.",
     crAmount:"राशि", crCancel:"रद्द करें", crType:"प्रकार",
     crCredit:"क्रेडिट", crDebit:"डेबिट",
-    crClosingBalance:"समापन बैलेंस:", crTotalYouOweLabel:"कुल आप पर बकाया",
+    crClosingBalance:"समापन बैलेंस:", crTotalYouOweLabel:"कुल देय",
     crTxHistory:"लेनदेन इतिहास", crNoCredFound:"कोई लेनदार नहीं मिला",
     crNoTxYet:"अभी तक कोई लेनदेन नहीं", crNotFound:"नहीं मिला",
     crNegativeItems:"आइटम जो ऋणात्मक हो जाएंगे:", crStockReversed:"स्टॉक जो वापस होगा:",
@@ -9589,7 +9589,7 @@ function _credPurchasedThisMonth(creditors){
 function _renderCreditorCard(cr){
   const bal = credBalance(cr);
   const balColor = bal>0?"#f59e0b":bal<0?"#22c55e":"#7a8aaa";
-  const balLabel = bal>0?(currentLang==='hi'?'आप पर बकाया':'You owe'):bal<0?(currentLang==='hi'?'वे आप पर बकाया':'They owe you'):(currentLang==='hi'?'चुकता':'Settled');
+  const balLabel = bal>0?(currentLang==='hi'?'देय':'Payable'):bal<0?(currentLang==='hi'?'अग्रिम भुगतान':'Advance Paid'):(currentLang==='hi'?'चुकता':'Settled');
   const lastTx = (cr.transactions||[]).slice(-1)[0];
   const isUnrec = cr.id === "CR_UNRECONCILED";
   const isArchived = !!cr._archived;
@@ -10847,7 +10847,7 @@ async function saveSmartPayment(){
   if(!cr.transactions) cr.transactions=[];
   cr.transactions.push(tx);
   saveCreditors(creditors);
-  addHistoryLog('creditor','Payment to creditor',`${cr.name||'Creditor'} · ${formatINR(amount)}${ref?` · ${ref}`:''}`);
+  addHistoryLog('creditor','Payment to creditor',`${cr.name||'Creditor'} · ${formatINR(amount)}${ref?` · ${ref}`:''}`,{txId});
   cashRecordTx({direction:"out", amount, date, note:`Paid to ${cr.name||"creditor"}${ref?(" · "+ref):""}`, source:"creditor_payment", refId:txId, mode});
   closeModal();
   notify(`✅ Payment of ${formatINR(amount)} recorded`,"success");
@@ -11013,7 +11013,7 @@ function saveCrTransaction(){
     createdAt:Date.now(), syncStatus:"local"
   });
   saveCreditors(creditors);
-  addHistoryLog('creditor',`Creditor ${type==="purchase"?"purchase":type==="payment"?"payment":"return"} recorded`,`${creditors[idx].name||'Creditor'} · ${formatINR(amount)}${invoiceNo?` · ${invoiceNo}`:''}`,null,_histGroupId);
+  addHistoryLog('creditor',`Creditor ${type==="purchase"?"purchase":type==="payment"?"payment":"return"} recorded`,`${creditors[idx].name||'Creditor'} · ${formatINR(amount)}${invoiceNo?` · ${invoiceNo}`:''}`,{txId},_histGroupId);
   if(type==="return"){
     // Supplier credits us back (debit note) — cash comes IN
     const crRetMode = document.getElementById("tx-ret-mode")?.value||"Cash";
@@ -11372,7 +11372,7 @@ function deleteCrTx(creditorId, origIdx){
     }
   }
   const _crName = getCreditors().find(c=>c.id===creditorId)?.name || 'Creditor';
-  addHistoryLog('creditor','Creditor transaction deleted',`${_crName}${removedTx?` · ${formatINR(removedTx.amount)} · ${removedTx.type}`:''}`);
+  addHistoryLog('creditor','Creditor transaction deleted',`${_crName}${removedTx?` · ${formatINR(removedTx.amount)} · ${removedTx.type}`:''}`,{txId:removedTx?removedTx.id:undefined});
   notify("🗑 Transaction deleted");
   setTimeout(() => openCreditorDetail(creditorId), 200);
 }
@@ -11386,7 +11386,7 @@ async function deleteCrTransaction(creditorId, txId) {
   const _delTx = (cr.transactions||[]).find(t=>t.id===txId);
   creditors[idx].transactions = (cr.transactions || []).filter(t => t.id !== txId);
   saveCreditors(creditors);
-  addHistoryLog('creditor','Creditor transaction deleted',`${cr.name||'Creditor'}${_delTx?` · ${formatINR(_delTx.amount)}`:''}`);
+  addHistoryLog('creditor','Creditor transaction deleted',`${cr.name||'Creditor'}${_delTx?` · ${formatINR(_delTx.amount)}`:''}`,{txId});
   cashRemoveByRef(txId);
   // Restore inventory: handles both single-item and multi-item purchase transactions
   if(_delTx) _invRestoreCreditorPurchaseTx(_delTx);
@@ -12358,7 +12358,7 @@ function _debtSoldThisMonth(debtors){
 function _renderDebtorCard(dr){
   const bal = debtBalance(dr);
   const balColor = bal>0?"#22c55e":bal<0?"#f59e0b":"#7a8aaa";
-  const balLabel = bal>0?(currentLang==='hi'?'वे आप पर बकाया':'They owe you'):bal<0?(currentLang==='hi'?'आप पर बकाया':'You owe them'):(currentLang==='hi'?'चुकता':'Settled');
+  const balLabel = bal>0?(currentLang==='hi'?'प्राप्य':'Receivable'):bal<0?(currentLang==='hi'?'अग्रिम प्राप्त':'Advance Received'):(currentLang==='hi'?'चुकता':'Settled');
   const lastTx = (dr.transactions||[]).slice(-1)[0];
   const initials = dr.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const isArchived = !!dr._archived;
@@ -12889,8 +12889,10 @@ function openTxBillDetail(parentId, txId, entityType) {
         }
         if (t.id === tx.id) break;
       }
-      const runColor = runningBal>0?'#f59e0b':runningBal<0?'#22c55e':'#7a8aaa';
-      const runLabel = runningBal>0?'Dr (You Owe)':runningBal<0?'Cr (Advance)':'Settled ✓';
+      const runColor = runningBal>0?(isCrType?'#f59e0b':'#22c55e'):runningBal<0?(isCrType?'#22c55e':'#f59e0b'):'#7a8aaa';
+      const runLabel = isCrType
+        ? (runningBal>0?'PAYABLE':runningBal<0?'ADVANCE PAID':'SETTLED ✓')
+        : (runningBal>0?'RECEIVABLE':runningBal<0?'ADVANCE RECEIVED':'SETTLED ✓');
       // Total balance of the entity
       let totalBal = 0;
       allTxsSorted.forEach(t=>{
@@ -12899,8 +12901,8 @@ function openTxBillDetail(parentId, txId, entityType) {
       });
       const totColor = totalBal>0?'#ef4444':totalBal<0?'#22c55e':'#22c55e';
       const totLabel = isCrType
-        ? (totalBal>0?'You Owe':'Overpaid / Advance')
-        : (totalBal>0?'They Owe':'You Owe');
+        ? (totalBal>0?'PAYABLE':totalBal<0?'ADVANCE PAID':'SETTLED ✓')
+        : (totalBal>0?'RECEIVABLE':totalBal<0?'ADVANCE RECEIVED':'SETTLED ✓');
 
       // GST breakdown from amount if gstPercent stored
       const gstPct = tx.gstPercent||tx.gst||tx._gst||0;
@@ -12997,7 +12999,7 @@ function openTxBillDetail(parentId, txId, entityType) {
           🚛 E-Way Bill
         </button>
       </div>
-      <button onclick="showEditHistoryModal('${parentId}','${(entity.name||'').replace(/\\/g,'\\\\').replace(/'/g,'\\\'')}','${entityType}')"
+      <button onclick="showEditHistoryModal('${parentId}','${(entity.name||'').replace(/\\/g,'\\\\').replace(/'/g,'\\\'')}','${entityType}',null,'${tx.id}')"
         style="cursor:pointer;background:var(--bg-card,#0a1628);border:1px solid #FFD70055;border-radius:12px;color:#FFD700;font-size:13px;font-weight:700;padding:12px;width:100%;">
         📝 Edit History
       </button>
@@ -13269,7 +13271,7 @@ function saveDebtTransaction(){
     createdAt: Date.now(),
   });
   saveDebtors(debtors);
-  addHistoryLog('debtor',`Debtor ${type==="payment"?"receipt":type==="return"?"return":"sale"} recorded`,`${debtors[idx].name||'Debtor'} · ${formatINR(amtRaw)}`,null,_histGroupId);
+  addHistoryLog('debtor',`Debtor ${type==="payment"?"receipt":type==="return"?"return":"sale"} recorded`,`${debtors[idx].name||'Debtor'} · ${formatINR(amtRaw)}`,{txId:drTxId},_histGroupId);
   if(type==="payment"){
     cashRecordTx({direction:"in", amount: amtRaw, date, note:`Received from ${debtors[idx].name||"customer"}${note?(" · "+note):""}`, source:"debtor_payment", refId:drTxId, mode});
   }
@@ -13338,7 +13340,7 @@ function confirmDeleteDebtTx(debtorId, origIdx){
       if(sIdx>-1){ invItem.stock.splice(invItem.stock.length-1-sIdx,1); saveInventory(); }
     }
   }
-  addHistoryLog('debtor','Debtor transaction deleted',(debtors[idx].name||'Debtor')+(removedTx?(' · '+formatINR(removedTx.amount)):''));
+  addHistoryLog('debtor','Debtor transaction deleted',(debtors[idx].name||'Debtor')+(removedTx?(' · '+formatINR(removedTx.amount)):''),{txId:removedTx?removedTx.id:undefined});
   notify('🗑 Transaction deleted');
   setTimeout(()=>openDebtorDetail(debtorId),200);
 }
@@ -18275,7 +18277,7 @@ function invDeductSold(soldItems, custId){
     if(item && qty > invGetStock(name)) return;
     if(!item){ item={id:autoId(),name,unit:"unit",stock:[],salesLog:[]}; inventoryItems.push(item); }
     if(!item.salesLog) item.salesLog=[];
-    item.salesLog.push({qty,date:now,custId:custId||"",custName,pricePerUnit:pricePerUnit||0});
+    item.salesLog.push({qty,date:now,custId:custId||"",custName,pricePerUnit:pricePerUnit||0,actor:getActorName()});
   });
   saveInventory();
 }
@@ -18308,7 +18310,7 @@ function invAddStock(name, unit, qty, costPerUnit, date, notes, category, sellin
   item.stock.push({qty:Number(qty), costPerUnit:Number(costPerUnit)||0, date, notes, expiryDate: expiryDate||"", actor: getActorName()});
   saveInventory();
   notify("✅ Stock added for "+name);
-  addHistoryLog('inventory','Stock added',`${name} · +${qty} ${unit||'unit'}${costPerUnit?` @ ₹${costPerUnit}`:''}`,null,groupId);
+  addHistoryLog('inventory','Stock added',`${name} · +${qty} ${unit||'unit'}${costPerUnit?` @ ₹${costPerUnit}`:''} · _eid:${item.id}`,null,groupId);
   invView="stock";
   invSelectedCat="";
   invSearchQuery="";
@@ -18351,6 +18353,8 @@ function invDeleteItem(name){
 function _confirmInvDelete(name){
   if(requireOnline()) return;
   if(!hasPermission('inventory_delete')) return notify("🚫 No permission to delete inventory items","error");
+  const _delItem = inventoryItems.find(x=>x.name===name);
+  const _delId = _delItem ? _delItem.id : "";
   inventoryItems = inventoryItems.filter(x=>x.name!==name);
   saveInventory();
   // Cascade: mark soldItem entries as _deleted in all customer purchases, deduct from totalSpend
@@ -18372,7 +18376,7 @@ function _confirmInvDelete(name){
     });
   });
   if(customersTouched) saveCustomers();
-  addHistoryLog('inventory','Item deleted',`"${name}" removed from inventory`+(customersTouched?" · customer history updated":""));
+  addHistoryLog('inventory','Item deleted',`"${name}" removed from inventory`+(customersTouched?" · customer history updated":"")+(_delId?` · _eid:${_delId}`:""));
   // Reset view back to stock list
   invView="stock"; invDetailItem=null;
   safeRenderTab(currentTab);
@@ -18386,7 +18390,7 @@ function invEditUnit(name){
   if(!item) return;
   const oldUnit = item.unit||"unit";
   const nu = prompt("Unit for "+name+" (e.g. kg, pcs, litre):", oldUnit);
-  if(nu!==null){ item.unit=nu.trim()||"unit"; saveInventory(); if(item.unit!==oldUnit) addHistoryLog('inventory','Item unit updated',`${name} · Unit: ${oldUnit} → ${item.unit}`); safeRenderTab(currentTab); }
+  if(nu!==null){ item.unit=nu.trim()||"unit"; saveInventory(); if(item.unit!==oldUnit) addHistoryLog('inventory','Item unit updated',`${name} · Unit: ${oldUnit} → ${item.unit} · _eid:${item.id}`); safeRenderTab(currentTab); }
 }
 
 function invEditSellPrice(name){
@@ -18398,7 +18402,7 @@ function invEditSellPrice(name){
   const np = prompt("Selling Price per "+( item.unit||"unit")+" for "+name+" (₹):", cur);
   if(np===null) return;
   const val = parseFloat(np);
-  if(!isNaN(val) && val>=0){ const oldSell=item.sellingPrice||0; item.sellingPrice=val; saveInventory(); if(val!==oldSell) addHistoryLog('inventory','Selling price updated',`${name} · Price: ₹${oldSell} → ₹${val}`); notify("✅ Selling price updated for "+name); safeRenderTab(currentTab); }
+  if(!isNaN(val) && val>=0){ const oldSell=item.sellingPrice||0; item.sellingPrice=val; saveInventory(); if(val!==oldSell) addHistoryLog('inventory','Selling price updated',`${name} · Price: ₹${oldSell} → ₹${val} · _eid:${item.id}`); notify("✅ Selling price updated for "+name); safeRenderTab(currentTab); }
 }
 
 function invEditCategory(name){
@@ -18409,7 +18413,7 @@ function invEditCategory(name){
   const allCats = [...new Set(inventoryItems.map(x=>x.category||"General").filter(Boolean))].sort();
   const suggestion = allCats.length ? "\n\nExisting: "+allCats.join(", ") : "";
   const nc = prompt("Category for \""+name+"\":"+suggestion, item.category||"General");
-  if(nc!==null){ const newCat=(nc.trim()||"General").replace(/\b\w/g,c=>c.toUpperCase()); const oldCat=item.category||'General'; if(newCat!==oldCat) addHistoryLog('inventory','Item category updated',`${name} · Category: ${oldCat} → ${newCat}`); item.category=newCat; saveInventory(); safeRenderTab(currentTab); }
+  if(nc!==null){ const newCat=(nc.trim()||"General").replace(/\b\w/g,c=>c.toUpperCase()); const oldCat=item.category||'General'; if(newCat!==oldCat) addHistoryLog('inventory','Item category updated',`${name} · Category: ${oldCat} → ${newCat} · _eid:${item.id}`); item.category=newCat; saveInventory(); safeRenderTab(currentTab); }
 }
 
 
@@ -18640,7 +18644,7 @@ function invEditModalSave(name){
 
   if(diffs.length){
     const logName = `${oldName}${newNameRaw!==oldName?' (now "'+newNameRaw+'")':''}`;
-    addHistoryLog('inventory', newNameRaw!==oldName?'Item renamed & updated':'Item details updated', `${logName} · ${diffs.join(' · ')}`);
+    addHistoryLog('inventory', newNameRaw!==oldName?'Item renamed & updated':'Item details updated', `${logName} · ${diffs.join(' · ')} · _eid:${item.id}`);
   }
 
   closeModal();
@@ -19293,7 +19297,7 @@ function invSubmitAdd(){
     if(hsnCode) item.hsnCode = hsnCode;
     if(minStock !== "") item.minStock = Number(minStock)||0;
     if(barcodeVal) item.barcode = barcodeVal;
-    addHistoryLog('inventory','Item updated',`${name} · ${unit||'unit'} · ${category}${sellPrice>0?' · ₹'+sellPrice:''}`);
+    addHistoryLog('inventory','Item updated',`${name} · ${unit||'unit'} · ${category}${sellPrice>0?' · ₹'+sellPrice:''} · _eid:${item.id}`);
     notify("✅ Item updated: " + name);
   } else {
     // Create new item with zero stock
@@ -19304,7 +19308,7 @@ function invSubmitAdd(){
     if(minStock !== "") item.minStock = Number(minStock)||0;
     if(barcodeVal) item.barcode = barcodeVal;
     inventoryItems.push(item);
-    addHistoryLog('inventory','Item added',`${name} · ${unit||'unit'} · ${category}${sellPrice>0?' · ₹'+sellPrice:''}`);
+    addHistoryLog('inventory','Item added',`${name} · ${unit||'unit'} · ${category}${sellPrice>0?' · ₹'+sellPrice:''} · _eid:${item.id}`);
     notify("✅ Item added: " + name + " — use Creditor tab to add stock");
   }
   // ── Opening stock: add qty directly to inventory if provided ──
@@ -19315,7 +19319,7 @@ function invSubmitAdd(){
     if(!item.stock) item.stock = [];
     item.stock.push({ qty: openingQty, costPerUnit: openingCost, date: today, notes: "Opening Stock", expiryDate: "", actor: getActorName() });
     saveInventory();
-    addHistoryLog('inventory','Opening stock added',`${name} · +${openingQty} ${unit||'unit'}${openingCost?' @ ₹'+openingCost:''}`);
+    addHistoryLog('inventory','Opening stock added',`${name} · +${openingQty} ${unit||'unit'}${openingCost?' @ ₹'+openingCost:''} · _eid:${item.id}`);
     notify("✅ " + name + " saved with " + openingQty + " " + (unit||"unit") + " opening stock");
   } else {
     saveInventory();
@@ -20129,8 +20133,8 @@ function _buildSharedLedgerHtml(entity, etype, peerName, connId) {
   const balColor = bal > 0 ? "#ef4444" : "#22c55e";
   const displayName = entity.name || peerName;
   const balLabel = isCr
-    ? (bal > 0 ? `You Owe ${formatINR(bal)}` : `Overpaid ${formatINR(Math.abs(bal))}`)
-    : (bal > 0 ? `They Owe ${formatINR(bal)}` : `You Owe ${formatINR(Math.abs(bal))}`);
+    ? (bal > 0 ? `PAYABLE ${formatINR(bal)}` : `ADVANCE PAID ${formatINR(Math.abs(bal))}`)
+    : (bal > 0 ? `RECEIVABLE ${formatINR(bal)}` : `ADVANCE RECEIVED ${formatINR(Math.abs(bal))}`);
   const csvRows = [["Date","Type","Debit","Credit","Balance","Note","Invoice"],
     ...txns.map(t=>{
       const isDebit = isCr ? t.type==="purchase" : t.type==="sale";
@@ -20471,7 +20475,7 @@ function invMergeGroup(gi){
 
   saveInventory();
   try{ saveCustomers && saveCustomers(); }catch(e){}
-  addHistoryLog('inventory','Items merged',`${others.map(o=>o.name).join(', ')} → ${survivor.name}`);
+  addHistoryLog('inventory','Items merged',`${others.map(o=>o.name).join(', ')} → ${survivor.name} · _eid:${survivor.id}`);
   notify("✅ Merged successfully — your data is intact");
   closeModal();
   safeRenderTab(currentTab);
@@ -22299,7 +22303,7 @@ function renderInventoryCategoryPage(catName){
                 <div style="display:flex;gap:5px;" onclick="event.stopPropagation()">
                   
                   <button onclick="openInvEditModal('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#0a1a3a;border:none;border-radius:7px;color:#4a8aff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">✏️ Edit</button>
-                  <button onclick="invShowItemEditHistory('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1500;border:none;border-radius:7px;color:#FFD700;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">📝 Edit History</button>
+                  <button onclick="invShowItemEditHistory('${(item.id||'').replace(/'/g,"\\'")}','${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1500;border:none;border-radius:7px;color:#FFD700;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">📝 Edit History</button>
                   <button onclick="invDeleteItem('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#2a0808;border:none;border-radius:7px;color:#f66;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🗑</button>
                 </div>
               </div>
@@ -22338,16 +22342,17 @@ var invDetailItem = null; // name of item being viewed
 function invShowItemDetail(itemName){
   invDetailItem = itemName;
   invView = "detail";
+  if(window._invDetailTab==='audit') window._invDetailTab='history'; // legacy guard
   safeRenderTab(currentTab);
-  setTimeout(()=>{ invHistApply(); invCustApply(); invAuditApply(); }, 80);
-  setTimeout(()=>{ invHistApply(); invCustApply(); invAuditApply(); }, 400);
+  setTimeout(()=>{ invHistApply(); invCustApply(); }, 80);
+  setTimeout(()=>{ invHistApply(); invCustApply(); }, 400);
 }
 
-// Open an item's detail page straight on the Audit tab — used by the
-// "📝 Edit History" button on each inventory list row.
-function invShowItemEditHistory(itemName){
-  window._invDetailTab = 'audit';
-  invShowItemDetail(itemName);
+// Item-level "who added / who edited" trail — shown as a popup modal
+// (same pattern as the Edit History modal used for Creditors/Debtors/Customers/Expenses)
+// instead of a tab, since it's a different kind of history than stock movement.
+function invShowItemEditHistory(itemId, itemName){
+  showEditHistoryModal(itemId||null, itemName, 'inventory');
 }
 
 function renderInventoryItemDetail(itemName){
@@ -22379,9 +22384,10 @@ function renderInventoryItemDetail(itemName){
   (item.stock||[]).forEach(e=>timeline.push({type:'restock',date:e.date,qty:Number(e.qty),costPerUnit:Number(e.costPerUnit||0),notes:e.notes||"",custName:"",actor:e.actor||""}));
   (item.salesLog||[]).forEach(e=>{
     const cust=customers.find(c=>c.id===e.custId);
-    timeline.push({type:'sale',date:e.date,qty:Number(e.qty),pricePerUnit:Number(e.pricePerUnit||0),custName:e.custName||(cust&&cust.name)||"",custId:e.custId||""});
+    timeline.push({type:'sale',date:e.date,qty:Number(e.qty),pricePerUnit:Number(e.pricePerUnit||0),custName:e.custName||(cust&&cust.name)||"",custId:e.custId||"",actor:e.actor||""});
   });
   timeline.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  timeline.forEach((e,i)=>e._idx=i);
   const restockCount=(item.stock||[]).length;
 
   if(window._invDetailTab===undefined) window._invDetailTab='history';
@@ -22390,7 +22396,6 @@ function renderInventoryItemDetail(itemName){
   // Store data for live filter functions
   window._invHistData={timeline,unit,itemName};
   window._invCustData={custs,unit};
-  window._invAuditData={entries:getItemAuditLog(itemName),itemName};
   if(!window._invHistMode) window._invHistMode='all';
   if(!window._invCustMode) window._invCustMode='all';
 
@@ -22454,18 +22459,11 @@ function renderInventoryItemDetail(itemName){
     </div>
     <div id="inv-cust-list" style="display:flex;flex-direction:column;gap:8px;"></div>`;
 
-  // ── Audit tab HTML (Tally-style "who changed what" trail for this item) ──
-  const auditTabHtml=`
-    <div style="margin-bottom:10px;">
-      <input class="input" id="inv-audit-search" placeholder="🔍 Search by action, person, details..." oninput="invAuditApply()" style="margin-bottom:8px;font-size:13px;"/>
-      <div id="inv-audit-info" style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:6px;display:none;"></div>
-    </div>
-    <div id="inv-audit-list" style="display:flex;flex-direction:column;gap:6px;"></div>`;
-
   return `<div style="padding:16px 14px;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
       <button onclick="invView='stock';invDetailItem=null;window._invDetailTab='history';window._invHistMode='all';window._invCustMode='all';safeRenderTab(currentTab)" style="background:#1a2540;border:none;border-radius:9px;color:#7ab3ff;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;">← पीछे</button>
       <div style="font-size:17px;font-weight:800;color:#FFD700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${itemName}</div>
+      <button onclick="invShowItemEditHistory('${(item.id||'').replace(/'/g,"\\'")}','${itemName.replace(/'/g,"\\'")}')" style="background:#1a1500;border:none;border-radius:9px;color:#FFD700;cursor:pointer;padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0;">📝 Edit History</button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:16px;">
       <div style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:10px;padding:9px 4px;text-align:center;">
@@ -22488,11 +22486,9 @@ function renderInventoryItemDetail(itemName){
     <div style="display:flex;gap:4px;background:#050810;border-radius:12px;padding:4px;margin-bottom:14px;">
       ${tabBtn('history','📋 All History',timeline.length,'#e8eaf0')}
       ${tabBtn('customers','👥 Customers',custs.length,'#4a8aff')}
-      ${tabBtn('audit','👤 Audit',window._invAuditData.entries.length,'#FFD700')}
     </div>
     <div id="inv-tab-history" style="display:${activeTab==='history'?'block':'none'};">${historyTabHtml}</div>
     <div id="inv-tab-customers" style="display:${activeTab==='customers'?'block':'none'};">${customersTabHtml}</div>
-    <div id="inv-tab-audit" style="display:${activeTab==='audit'?'block':'none'};">${auditTabHtml}</div>
   </div>`;
 }
 
@@ -22500,13 +22496,13 @@ function renderInventoryItemDetail(itemName){
 function invDetailSwitchTab(id){
   window._invDetailTab=id;
   // Update panel visibility
-  ['history','customers','audit'].forEach(tab=>{
+  ['history','customers'].forEach(tab=>{
     const panel=document.getElementById('inv-tab-'+tab);
     if(panel) panel.style.display=(tab===id?'block':'none');
   });
   // Update button styles
-  const colors={history:'#e8eaf0',customers:'#4a8aff',audit:'#FFD700'};
-  ['history','customers','audit'].forEach(tab=>{
+  const colors={history:'#e8eaf0',customers:'#4a8aff'};
+  ['history','customers'].forEach(tab=>{
     const btn=document.getElementById('inv-tab-btn-'+tab);
     if(!btn) return;
     const active=(tab===id);
@@ -22516,7 +22512,6 @@ function invDetailSwitchTab(id){
   });
   // Trigger the apply so the list renders (it's deferred until first shown)
   if(id==='history') invHistApply();
-  else if(id==='audit') invAuditApply();
   else invCustApply();
 }
 
@@ -22593,7 +22588,7 @@ function invHistApply(){
     let rightHtml=isRestock
       ?(e.costPerUnit>0?`<div style="font-size:12px;font-weight:700;color:#FFD700;">₹${e.costPerUnit.toFixed(2)}/${unit}</div><div style="font-size:10px;color:var(--text-dim,#4a5a7a);">₹${(e.qty*e.costPerUnit).toLocaleString('en-IN')} total</div>`:`<div style="font-size:11px;color:var(--text-dim,#4a5a7a);">No cost</div>`)
       :(e.pricePerUnit>0?`<div style="font-size:12px;font-weight:700;color:#4f4;">₹${e.pricePerUnit.toFixed(2)}/${unit}</div><div style="font-size:10px;color:var(--text-dim,#4a5a7a);">₹${(e.qty*e.pricePerUnit).toLocaleString('en-IN')}</div>`:`<div style="font-size:11px;color:var(--text-dim,#4a5a7a);">No price</div>`);
-    return `<div class="card" style="padding:11px 14px;display:flex;align-items:center;gap:11px;${borderExtra}">
+    return `<div class="card" style="padding:11px 14px;display:flex;align-items:center;gap:11px;cursor:pointer;${borderExtra}" onclick="invShowTimelineDetail(${e._idx})">
       <div style="background:${badgeBg};border:1px solid ${badgeBd};border-radius:8px;min-width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:${badgeC};flex-shrink:0;padding:0 4px;">${badge}</div>
       <div style="flex:1;min-width:0;">
         <div style="display:flex;align-items:center;gap:5px;margin-bottom:2px;">
@@ -22603,11 +22598,48 @@ function invHistApply(){
         <div style="font-size:12px;font-weight:700;color:var(--text-main,#e8eaf0);">${dt} <span style="color:var(--text-dim,#4a5a7a);font-size:11px;">· ${tm}</span></div>
         ${!isRestock&&e.custName?`<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">👤 ${e.custName}</div>`:''}
         ${isRestock&&e.notes?`<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">📝 ${e.notes}</div>`:''}
-        ${isRestock&&e.actor?`<div style="font-size:10px;color:var(--text-dim,#4a5a7a);margin-top:1px;">👤 ${escHtml(e.actor)}</div>`:''}
+        ${e.actor?`<div style="font-size:10px;color:var(--text-dim,#4a5a7a);margin-top:1px;">👤 ${escHtml(e.actor)}</div>`:''}
       </div>
       <div style="text-align:right;flex-shrink:0;">${rightHtml}</div>
     </div>`;
   }).join('');
+}
+
+// Full detail popup for a single stock-movement entry (Restock or Sale) — shows
+// who recorded it, customer link (for sales), notes, and pricing breakdown.
+// Replaces the need for a separate per-item "Audit" tab for this kind of detail.
+function invShowTimelineDetail(idx){
+  const d = window._invHistData;
+  const e = d && d.timeline[idx];
+  if(!e) return;
+  const isRestock = e.type==='restock';
+  const unit = d.unit;
+  const dt = new Date(e.date).toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'});
+  const tm = new Date(e.date).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  const icon = isRestock?'📦':'🛒';
+  const label = isRestock?'Restocked':'Sold';
+  const col = isRestock?'#4f4':'#f66';
+  const unitPrice = isRestock ? e.costPerUnit : e.pricePerUnit;
+  const total = (Number(e.qty)||0) * (Number(unitPrice)||0);
+  const row = (lbl, val) => val==null||val==='' ? '' : `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-main,#1e2a45);">
+      <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">${lbl}</span>
+      <span style="font-size:13px;font-weight:700;color:var(--text-main,#e8eaf0);">${val}</span>
+    </div>`;
+  showModal(modalHeader(`${icon} ${label} — ${escHtml(d.itemName)}`) + `
+    <div style="text-align:center;background:var(--bg-card,#0a1628);border:2px solid ${col}33;border-radius:16px;padding:18px;margin-bottom:14px;">
+      <div style="font-size:13px;font-weight:800;color:${col};letter-spacing:0.05em;text-transform:uppercase;margin-bottom:4px;">${label}</div>
+      <div style="font-size:32px;font-weight:900;color:${col};">${isRestock?'+':'-'}${e.qty} ${escHtml(unit)}</div>
+      <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:6px;">${dt} · ${tm}</div>
+    </div>
+    <div style="background:var(--bg-card,#0a1628);border:1px solid var(--border-main,#1e2a45);border-radius:14px;padding:4px 14px;">
+      ${row(isRestock?'Cost / Unit':'Price / Unit', unitPrice>0?formatINR(unitPrice)+'/'+escHtml(unit):'Not set')}
+      ${row('Total Value', total>0?formatINR(total):null)}
+      ${!isRestock?row('Customer', e.custName?escHtml(e.custName):'Walk-in / Not linked'):''}
+      ${isRestock&&e.notes?row('Notes', escHtml(e.notes)):''}
+      ${row('Recorded By', e.actor?('👤 '+escHtml(e.actor)):'Not recorded (older entry)')}
+    </div>
+    ${!isRestock&&e.custId?`<button onclick="closeModal();openCustomerPage('${e.custId}')" style="cursor:pointer;width:100%;margin-top:14px;background:var(--bg-card,#0a1628);border:1px solid #1e3a6e;border-radius:12px;color:#60a5fa;font-size:13px;font-weight:700;padding:12px;">👤 View Customer →</button>`:''}
+  `);
 }
 
 // ── Inventory Customers filter functions ──
@@ -22771,7 +22803,11 @@ function invAuditFormatDetails(details){
 
 // Scan all history log buckets for entries that reference a given entity.
 // Matches on: _eid:<entityId> tag in details, or entity name in details/action.
-function getEntityAuditLog(entityId, entityName, histType){
+// If an entry carries ANY _eid tag, it must match this entity's id to be
+// included — name-substring matching only applies as a fallback for older
+// entries logged before _eid tagging existed (avoids e.g. "Tea" pulling in
+// audit entries that actually belong to "Tea Leaves").
+function getEntityAuditLog(entityId, entityName, histType, txId){
   const prefix = storageKey("history_");
   const out = [];
   try{
@@ -22783,9 +22819,12 @@ function getEntityAuditLog(entityId, entityName, histType){
       list.forEach(e=>{
         if(!e) return;
         const matchType  = !histType || e.type===histType;
-        const matchId    = entityId   && typeof e.details==="string" && e.details.includes("_eid:"+entityId);
-        const matchName  = entityName && typeof e.details==="string" && e.details.includes(entityName);
-        if(matchType && (matchId || matchName)) out.push(e);
+        const detailsStr = typeof e.details==="string" ? e.details : "";
+        const hasEid      = /_eid:/.test(detailsStr);
+        const matchId    = entityId   && detailsStr.includes("_eid:"+entityId);
+        const matchName  = entityName && detailsStr.includes(entityName) && (!hasEid || matchId);
+        const matchTx    = !txId || (e.extra && e.extra.txId===txId);
+        if(matchType && (matchId || matchName) && matchTx) out.push(e);
       });
     }
   } catch(ex){}
@@ -22844,25 +22883,31 @@ function entityAuditSearch(containerId, searchId){
 }
 
 // One-shot loader: fetch entries, attach to DOM, then render.
-function entityAuditLoad(containerId, searchId, entityId, entityName, histType){
-  const entries = getEntityAuditLog(entityId, entityName, histType);
+function entityAuditLoad(containerId, searchId, entityId, entityName, histType, txId){
+  const entries = getEntityAuditLog(entityId, entityName, histType, txId);
   const el = document.getElementById(containerId);
   if(el){ el._auditData = entries; }
-  entityAuditRender(containerId, entries, 'No audit history yet for this record');
+  entityAuditRender(containerId, entries, txId ? 'No edits recorded for this entry yet' : 'No audit history yet for this record');
 }
 
 // ── Edit History Modal ──────────────────────────────────────────
 // Single shared modal used by the "📝 Edit History" button on each
 // record (customers, creditors, debtors, expenses, inventory) instead
 // of an inline "Audit Trail" section cluttering the detail page.
-function showEditHistoryModal(entityId, entityName, histType, displayLabel){
+function showEditHistoryModal(entityId, entityName, histType, displayLabel, txId){
   const label = displayLabel || entityName;
-  const title = '📝 Edit History' + (label ? (' — ' + escHtml(label)) : '');
+  const scopedTitle = '📝 Edit History — This Entry';
+  const fullTitle = '📝 Edit History' + (label ? (' — ' + escHtml(label)) : '');
+  const title = txId ? scopedTitle : fullTitle;
+  const toggleLink = txId
+    ? `<div style="margin-bottom:12px;"><a href="javascript:void(0)" onclick="showEditHistoryModal('${entityId}','${(entityName||'').replace(/'/g,"\\'")}','${histType}','${(displayLabel||'').replace(/'/g,"\\'")}')" style="font-size:12px;color:#7ab3ff;text-decoration:underline;">View full account history for ${escHtml(label||'this record')} →</a></div>`
+    : '';
   const html = modalHeader(title) +
+    toggleLink +
     '<input class="input" id="edithist-search" placeholder="🔍 Search edit history..." oninput="editHistSearch()" style="margin-bottom:12px;font-size:13px;" />' +
     '<div id="edithist-list" style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto;"></div>';
   showWideModal(html);
-  setTimeout(()=>entityAuditLoad('edithist-list','edithist-search', entityId, entityName, histType), 50);
+  setTimeout(()=>entityAuditLoad('edithist-list','edithist-search', entityId, entityName, histType, txId), 50);
 }
 function editHistSearch(){
   entityAuditSearch('edithist-list','edithist-search');
