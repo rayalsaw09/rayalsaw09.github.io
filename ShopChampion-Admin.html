@@ -11552,7 +11552,7 @@ var EXP_CATS = [
   { key:"Maintenance", icon:"🔧", color:"#94a3b8" },
   { key:"GST/Tax",     icon:"🧾", color:"#f472b6" },
   { key:"Marketing",   icon:"📣", color:"#22d3ee" },
-  { key:"Other",       icon:"📌", color:"#e2e8f0" }
+  { key:"Other",       icon:"📌", color:"#64748b" }
 ];
 
 function expCategoryIcon(cat){
@@ -11778,51 +11778,102 @@ function renderExpensesTab(){
   const calPrev = calMonth===0?{year:calYear-1,month:11}:{year:calYear,month:calMonth-1};
   const calNext = calMonth===11?{year:calYear+1,month:0}:{year:calYear,month:calMonth+1};
 
-  const inp = (id,type,ph,val,extra="")=>`<input id="${id}" type="${type}" placeholder="${ph}" value="${val||""}" style="width:100%;box-sizing:border-box;background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:10px 12px;font-size:13px;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#1e2a45'" ${extra}/>`;
-  const sel = (id,opts,val)=>`<select id="${id}" style="width:100%;box-sizing:border-box;background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:10px 12px;font-size:13px;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#1e2a45'">${opts.map(o=>`<option value="${o.v}" ${o.v===val?"selected":""}>${o.l}</option>`).join("")}</select>`;
+  const inp = (id,type,ph,val,extra="")=>`<input id="${id}" type="${type}" placeholder="${ph}" value="${val||""}" style="width:100%;box-sizing:border-box;background:#ffffff;border:1.5px solid #d8dee9;border-radius:10px;color:#1a2236;padding:10px 12px;font-size:13px;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#d8dee9'" ${extra}/>`;
+  const sel = (id,opts,val)=>`<select id="${id}" style="width:100%;box-sizing:border-box;background:#ffffff;border:1.5px solid #d8dee9;border-radius:10px;color:#1a2236;padding:10px 12px;font-size:13px;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#d8dee9'">${opts.map(o=>`<option value="${o.v}" ${o.v===val?"selected":""}>${o.l}</option>`).join("")}</select>`;
 
   const editingExp = _expEditId ? all.find(e=>e.id===_expEditId) : null;
 
   return `
 <style>
-.exp-card{background:rgba(13,19,33,0.85);border:1.5px solid #1e2a45;border-radius:16px;padding:18px;backdrop-filter:blur(8px);transition:box-shadow 0.2s,transform 0.2s;}
-.exp-card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.4);transform:translateY(-2px);}
+.exp-card{background:#ffffff;border:1.5px solid #e4e8f0;border-radius:16px;padding:18px;box-shadow:0 1px 3px rgba(20,30,60,0.06);transition:box-shadow 0.2s,transform 0.2s;}
+.exp-card:hover{box-shadow:0 8px 24px rgba(20,30,60,0.10);transform:translateY(-2px);}
 .exp-stat{display:flex;flex-direction:column;gap:4px;}
-.exp-stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;}
+.exp-stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#8893a8;}
 .exp-stat-val{font-size:24px;font-weight:900;line-height:1;}
 .exp-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;}
 .exp-btn{border:none;border-radius:10px;font-weight:700;cursor:pointer;transition:opacity 0.15s,transform 0.1s;font-size:13px;}
 .exp-btn:hover{opacity:0.88;transform:scale(0.98);}
-.exp-quick{background:#1e2a45;border:1px solid #2d3f5e;border-radius:8px;color:#94a3b8;font-size:12px;font-weight:600;padding:7px 12px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
-.exp-quick:hover{background:#2d3f5e;color:#e2e8f0;border-color:#6366f1;}
-.exp-table-row{display:grid;grid-template-columns:2fr 1fr 1fr 1.5fr auto;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid #1a2235;transition:background 0.15s;}
-.exp-table-row:hover{background:#0d1321;}
-.exp-table-hdr{display:grid;grid-template-columns:2fr 1fr 1fr 1.5fr auto;gap:8px;align-items:center;padding:8px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--text-dim,#4a5a7a);border-bottom:1px solid var(--border-main,#1e2a45);}
-.exp-mobile-row{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:1px solid #1a2235;transition:background 0.15s;}
-.exp-mobile-row:hover{background:#0d1321;}
+.exp-quick{background:#f1f4f9;border:1px solid #dde3ee;border-radius:8px;color:#566177;font-size:12px;font-weight:600;padding:7px 12px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.exp-quick:hover{background:#e7ecf5;color:#1a2236;border-color:#6366f1;}
+.exp-table-row{display:grid;grid-template-columns:2fr 1fr 1fr 1.5fr auto;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid #eef1f7;transition:background 0.15s;}
+.exp-table-row:hover{background:#f8fafc;}
+.exp-table-hdr{display:grid;grid-template-columns:2fr 1fr 1fr 1.5fr auto;gap:8px;align-items:center;padding:8px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:#9aa3b6;border-bottom:1px solid #e4e8f0;}
+.exp-mobile-row{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:1px solid #eef1f7;transition:background 0.15s;}
+.exp-mobile-row:hover{background:#f8fafc;}
 @media(max-width:600px){.exp-table-row,.exp-table-hdr{display:none!important;}.exp-grid-4{grid-template-columns:1fr 1fr!important;}}
 @media(min-width:601px){.exp-mobile-row{display:none!important;}}
 .exp-insight{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;margin-bottom:8px;font-size:13px;}
 .exp-cal-day{border-radius:8px;padding:4px;cursor:pointer;transition:background 0.15s;min-height:36px;font-size:12px;font-weight:600;text-align:center;}
-.exp-cal-day:hover{background:#1e2a45;}
-.exp-progress-bar{height:6px;border-radius:3px;background:#1e2a45;overflow:hidden;margin-top:4px;}
+.exp-cal-day:hover{background:#eef1f7;}
+.exp-progress-bar{height:6px;border-radius:3px;background:#eef1f7;overflow:hidden;margin-top:4px;}
 .exp-progress-fill{height:100%;border-radius:3px;transition:width 0.6s cubic-bezier(.4,0,.2,1);}
 </style>
 
-<div style="padding:12px 10px;max-width:700px;margin:0 auto;">
+<div style="padding:12px 10px;max-width:700px;margin:0 auto;background:#f4f6fb;border-radius:18px;">
 
 <!-- ── HEADER ── -->
-<div style="margin-bottom:18px;">
+<div style="margin-bottom:18px;padding-top:6px;">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;">
     <div>
-      <div style="font-size:22px;font-weight:900;color:#e2e8f0;letter-spacing:-0.3px;">${t('expMgmt')}</div>
-      <div style="font-size:12px;color:#64748b;margin-top:3px;">${t('expSubtitle')}</div>
+      <div style="font-size:22px;font-weight:900;color:#1a2236;letter-spacing:-0.3px;">${t('expMgmt')}</div>
+      <div style="font-size:12px;color:#6b7689;margin-top:3px;">${t('expSubtitle')}</div>
     </div>
     <div style="text-align:right;">
-      <div style="font-size:10px;color:var(--text-dim,#4a5a7a);">${t('expLastUpdated')}</div>
-      <div style="font-size:12px;font-weight:700;color:#94a3b8;">${now.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div>
-      <div style="font-size:11px;color:#f87171;font-weight:700;margin-top:2px;">${t('expThisMonth')} ${formatINR(monthTotal)}</div>
+      <div style="font-size:10px;color:#9aa3b6;">${t('expLastUpdated')}</div>
+      <div style="font-size:12px;font-weight:700;color:#566177;">${now.toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</div>
+      <div style="font-size:11px;color:#e11d48;font-weight:700;margin-top:2px;">${t('expThisMonth')} ${formatINR(monthTotal)}</div>
     </div>
+  </div>
+</div>
+
+<!-- ── ADD / EDIT EXPENSE ── -->
+<div class="exp-card" style="margin-bottom:16px;border-color:#6366f1;border-width:2px;" id="exp-form-card">
+  <div style="font-size:14px;font-weight:800;color:#1a2236;margin-bottom:14px;display:flex;align-items:center;gap:7px;">
+    <span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;font-size:14px;">+</span>
+    ${editingExp?t('expEditExpenseTitle'):t('expAddExpenseTitle')}
+  </div>
+
+  <!-- Quick add buttons -->
+  ${!editingExp ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+    ${["Rent","Salary","Electricity","Internet","Transport","GST/Tax"].map(cat=>
+      `<button class="exp-quick" onclick="document.getElementById('exp-cat').value='${cat}';document.getElementById('exp-cat').dispatchEvent(new Event('change'))">+ ${expCategoryIcon(cat)} ${cat}</button>`
+    ).join("")}
+  </div>` : ""}
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+    <div>
+      <div style="font-size:11px;color:#6b7689;margin-bottom:5px;font-weight:600;">${t('expCategory')}</div>
+      ${sel("exp-cat", EXP_CATS.map(c=>({v:c.key,l:c.icon+" "+c.key})), editingExp?editingExp.category:"")}
+    </div>
+    <div>
+      <div style="font-size:11px;color:#6b7689;margin-bottom:5px;font-weight:600;">${t('expAmountWithSymbol')}</div>
+      ${inp("exp-amt","number","e.g. 5000",editingExp?editingExp.amount:"",'min="0" step="1"')}
+    </div>
+  </div>
+  <div style="margin-bottom:10px;">
+    <div style="font-size:11px;color:#6b7689;margin-bottom:5px;font-weight:600;">${t('invDescription')}</div>
+    <textarea id="exp-note" placeholder="e.g. Monthly shop rent payment" style="width:100%;box-sizing:border-box;background:#ffffff;border:1.5px solid #d8dee9;border-radius:10px;color:#1a2236;padding:10px 12px;font-size:13px;outline:none;resize:vertical;min-height:60px;transition:border 0.2s;font-family:inherit;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#d8dee9'">${editingExp?escHtml(editingExp.note||""):""}</textarea>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+    <div>
+      <div style="font-size:11px;color:#6b7689;margin-bottom:5px;font-weight:600;">${t('expDate')}</div>
+      ${inp("exp-date","date","",editingExp?editingExp.date:todayStr)}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding-top:22px;">
+      <input type="checkbox" id="exp-recurring" ${editingExp&&editingExp.recurring?"checked":""} style="width:16px;height:16px;accent-color:#6366f1;cursor:pointer;"/>
+      <label for="exp-recurring" style="font-size:13px;color:#566177;cursor:pointer;">${t('expRecurringMonthly')}</label>
+    </div>
+  </div>
+  <div style="margin-bottom:14px;">
+    <div style="font-size:11px;color:#6b7689;margin-bottom:6px;font-weight:600;">💳 Payment Mode</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;" id="exp-mode-row">
+      ${["Cash","UPI","NEFT","Cheque","Other"].map((m,i)=>`<button type="button" onclick="expSetMode('${m}')" id="exp-mode-${m}" style="cursor:pointer;flex:1;min-width:56px;padding:8px 4px;border-radius:9px;border:2px solid ${(editingExp?editingExp.payMode||'Cash':'Cash')===m?'#6366f1':'#d8dee9'};background:${(editingExp?editingExp.payMode||'Cash':'Cash')===m?'#eef0fe':'#ffffff'};color:${(editingExp?editingExp.payMode||'Cash':'Cash')===m?'#5457e5':'#7b8499'};font-size:12px;font-weight:700;transition:all 0.15s;">${m}</button>`).join("")}
+    </div>
+    <input type="hidden" id="exp-mode-val" value="${editingExp?editingExp.payMode||'Cash':'Cash'}" />
+  </div>
+  <div style="display:flex;gap:10px;">
+    <button class="exp-btn" onclick="expSaveFromForm()" style="flex:1;background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;padding:13px;font-size:14px;box-shadow:0 4px 14px rgba(99,102,241,0.35);">${editingExp?t('expUpdateBtn'):t('expSaveBtn')}</button>
+    ${editingExp ? `<button class="exp-btn" onclick="_expEditId=null;safeRenderTab(currentTab);" style="background:#eef1f7;color:#566177;padding:13px 18px;">${t('invCancel')}</button>` : ""}
   </div>
 </div>
 
@@ -11854,17 +11905,17 @@ function renderExpensesTab(){
 ${(topCat||pctChange!==null||prevMonthTotal>0) ? `
 <div class="exp-card" style="margin-bottom:16px;">
   <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px;">${t('expSmartInsights')}</div>
-  ${topCat ? `<div class="exp-insight" style="background:#1e1a2e;">
-    <span>💡</span><span style="color:#c4b5fd;">${expCategoryIcon(topCat[0])} <b>${topCat[0]}</b> ${t('expAccountsFor')} <b>${topCatPct}%</b> ${t('expOfExpensesThisMonth')} (${formatINR(topCat[1])}).</span>
+  ${topCat ? `<div class="exp-insight" style="background:#f3f0ff;">
+    <span>💡</span><span style="color:#6d28d9;">${expCategoryIcon(topCat[0])} <b>${topCat[0]}</b> ${t('expAccountsFor')} <b>${topCatPct}%</b> ${t('expOfExpensesThisMonth')} (${formatINR(topCat[1])}).</span>
   </div>` : ""}
-  ${pctChange!==null && pctChange>0 ? `<div class="exp-insight" style="background:#2a1a1a;">
-    <span>⚠</span><span style="color:#fca5a5;">${t('expIncreased')} <b>${pctChange}%</b> ${t('expVsLastMonth')}</span>
+  ${pctChange!==null && pctChange>0 ? `<div class="exp-insight" style="background:#fef2f2;">
+    <span>⚠</span><span style="color:#b91c1c;">${t('expIncreased')} <b>${pctChange}%</b> ${t('expVsLastMonth')}</span>
   </div>` : ""}
-  ${pctChange!==null && pctChange<=0 ? `<div class="exp-insight" style="background:#0d2218;">
-    <span>💰</span><span style="color:#6ee7b7;">${t('expSaved')} <b>${formatINR(prevMonthTotal-monthTotal)}</b> ${t('expVsLastMonth')} (${Math.abs(pctChange)}% ${t('expLessSpend')}).</span>
+  ${pctChange!==null && pctChange<=0 ? `<div class="exp-insight" style="background:#ecfdf5;">
+    <span>💰</span><span style="color:#15803d;">${t('expSaved')} <b>${formatINR(prevMonthTotal-monthTotal)}</b> ${t('expVsLastMonth')} (${Math.abs(pctChange)}% ${t('expLessSpend')}).</span>
   </div>` : ""}
-  ${monthSales>0 && monthTotal>0 ? `<div class="exp-insight" style="background:#0d1a2e;">
-    <span>📊</span><span style="color:#93c5fd;">${t('expOfRevenue')} <b>${Math.round(monthTotal/monthSales*100)}%</b>. ${monthTotal/monthSales>0.5?t('expReduceOverhead'):t('expHealthyRatio')}</span>
+  ${monthSales>0 && monthTotal>0 ? `<div class="exp-insight" style="background:#eff6ff;">
+    <span>📊</span><span style="color:#1d4ed8;">${t('expOfRevenue')} <b>${Math.round(monthTotal/monthSales*100)}%</b>. ${monthTotal/monthSales>0.5?t('expReduceOverhead'):t('expHealthyRatio')}</span>
   </div>` : ""}
 </div>` : ""}
 
@@ -11875,12 +11926,12 @@ ${(topCat||pctChange!==null||prevMonthTotal>0) ? `
     <svg viewBox="0 -4 100 ${chartH+8}" preserveAspectRatio="none" style="width:100%;height:90px;overflow:visible;">
       <defs>
         <linearGradient id="expGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#6366f1" stop-opacity="0.3"/>
+          <stop offset="0%" stop-color="#6366f1" stop-opacity="0.25"/>
           <stop offset="100%" stop-color="#6366f1" stop-opacity="0.02"/>
         </linearGradient>
       </defs>
       <!-- Grid lines -->
-      ${[0,0.25,0.5,0.75,1].map(v=>`<line x1="0" y1="${chartH*v}" x2="100" y2="${chartH*v}" stroke="#1e2a45" stroke-width="0.3" vector-effect="non-scaling-stroke"/>`).join("")}
+      ${[0,0.25,0.5,0.75,1].map(v=>`<line x1="0" y1="${chartH*v}" x2="100" y2="${chartH*v}" stroke="#e4e8f0" stroke-width="0.3" vector-effect="non-scaling-stroke"/>`).join("")}
       <!-- Fill area -->
       <polygon points="0,${chartH} ${chartPoints} 100,${chartH}" fill="url(#expGrad)"/>
       <!-- Line -->
@@ -11889,17 +11940,17 @@ ${(topCat||pctChange!==null||prevMonthTotal>0) ? `
       ${trendData.map((s,i)=>{
         const x=(i/(trendData.length-1))*100;
         const y=chartH-(s.total/trendMax)*chartH;
-        return s.total>0?`<circle cx="${x}" cy="${y}" r="2.5" fill="#6366f1" stroke="#0d1321" stroke-width="1" vector-effect="non-scaling-stroke"/>`:""
+        return s.total>0?`<circle cx="${x}" cy="${y}" r="2.5" fill="#6366f1" stroke="#ffffff" stroke-width="1" vector-effect="non-scaling-stroke"/>`:""
       }).join("")}
     </svg>
   </div>
   <div style="display:flex;justify-content:space-between;">
-    ${trendData.filter((_,i)=>i%2===0).map(s=>`<div style="font-size:9px;color:var(--text-dim,#4a5a7a);text-align:center;">${s.label}</div>`).join("")}
+    ${trendData.filter((_,i)=>i%2===0).map(s=>`<div style="font-size:9px;color:#9aa3b6;text-align:center;">${s.label}</div>`).join("")}
   </div>
   <div style="display:flex;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:6px;">
-    ${trendData.slice(-3).map(s=>`<div style="background:#0d1321;border:1px solid var(--border-main,#1e2a45);border-radius:8px;padding:6px 10px;flex:1;min-width:70px;">
-      <div style="font-size:10px;color:#64748b;">${s.label}</div>
-      <div style="font-size:13px;font-weight:700;color:#a78bfa;">${formatINR(s.total)}</div>
+    ${trendData.slice(-3).map(s=>`<div style="background:#f8fafc;border:1px solid #e4e8f0;border-radius:8px;padding:6px 10px;flex:1;min-width:70px;">
+      <div style="font-size:10px;color:#8893a8;">${s.label}</div>
+      <div style="font-size:13px;font-weight:700;color:#7c3aed;">${formatINR(s.total)}</div>
     </div>`).join("")}
   </div>
 </div>
@@ -11913,9 +11964,9 @@ ${monthTotal>0 ? `
     const clr=expCategoryColor(cat);
     return `<div style="margin-bottom:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
-        <div style="font-size:13px;color:#e2e8f0;">${expCategoryIcon(cat)} ${cat}</div>
+        <div style="font-size:13px;color:#1a2236;">${expCategoryIcon(cat)} ${cat}</div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <span style="font-size:11px;color:#64748b;">${pct}%</span>
+          <span style="font-size:11px;color:#8893a8;">${pct}%</span>
           <span style="font-size:13px;font-weight:700;color:${clr};">${formatINR(amt)}</span>
         </div>
       </div>
@@ -11925,73 +11976,25 @@ ${monthTotal>0 ? `
 </div>` : ""}
 
 <!-- ── PROFIT IMPACT ── -->
-<div class="exp-card" style="margin-bottom:16px;border-color:#22d3ee30;">
-  <div style="font-size:11px;font-weight:800;color:#22d3ee;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">${t('expProfitImpactHeader')}</div>
+<div class="exp-card" style="margin-bottom:16px;border-color:#22d3ee;">
+  <div style="font-size:11px;font-weight:800;color:#0e9bb5;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;">${t('expProfitImpactHeader')}</div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;">
     <div style="text-align:center;">
-      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">${t('expStatSales')}</div>
-      <div style="font-size:17px;font-weight:800;color:#34d399;">${formatINR(monthSales)}</div>
+      <div style="font-size:10px;color:#8893a8;margin-bottom:4px;">${t('expStatSales')}</div>
+      <div style="font-size:17px;font-weight:800;color:#15803d;">${formatINR(monthSales)}</div>
     </div>
     <div style="text-align:center;">
-      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">${t('expStatExpenses')}</div>
-      <div style="font-size:17px;font-weight:800;color:#f87171;">${formatINR(monthTotal+monthCost)}</div>
+      <div style="font-size:10px;color:#8893a8;margin-bottom:4px;">${t('expStatExpenses')}</div>
+      <div style="font-size:17px;font-weight:800;color:#dc2626;">${formatINR(monthTotal+monthCost)}</div>
     </div>
     <div style="text-align:center;">
-      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">${t('expStatProfit')}</div>
-      <div style="font-size:17px;font-weight:800;color:${monthProfit>=0?"#22d3ee":"#f87171"};">${formatINR(monthProfit)}</div>
+      <div style="font-size:10px;color:#8893a8;margin-bottom:4px;">${t('expStatProfit')}</div>
+      <div style="font-size:17px;font-weight:800;color:${monthProfit>=0?"#0e9bb5":"#dc2626"};">${formatINR(monthProfit)}</div>
     </div>
     <div style="text-align:center;">
-      <div style="font-size:10px;color:#64748b;margin-bottom:4px;">${t('expStatMargin')}</div>
-      <div style="font-size:17px;font-weight:800;color:${monthMargin>=0?"#a78bfa":"#f87171"};">${monthSales>0?monthMargin+"%":"—"}</div>
+      <div style="font-size:10px;color:#8893a8;margin-bottom:4px;">${t('expStatMargin')}</div>
+      <div style="font-size:17px;font-weight:800;color:${monthMargin>=0?"#7c3aed":"#dc2626"};">${monthSales>0?monthMargin+"%":"—"}</div>
     </div>
-  </div>
-</div>
-
-<!-- ── ADD / EDIT EXPENSE ── -->
-<div class="exp-card" style="margin-bottom:16px;border-color:#6366f130;" id="exp-form-card">
-  <div style="font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:14px;">${editingExp?t('expEditExpenseTitle'):t('expAddExpenseTitle')}</div>
-
-  <!-- Quick add buttons -->
-  ${!editingExp ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
-    ${["Rent","Salary","Electricity","Internet","Transport","GST/Tax"].map(cat=>
-      `<button class="exp-quick" onclick="document.getElementById('exp-cat').value='${cat}';document.getElementById('exp-cat').dispatchEvent(new Event('change'))">+ ${expCategoryIcon(cat)} ${cat}</button>`
-    ).join("")}
-  </div>` : ""}
-
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-    <div>
-      <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">${t('expCategory')}</div>
-      ${sel("exp-cat", EXP_CATS.map(c=>({v:c.key,l:c.icon+" "+c.key})), editingExp?editingExp.category:"")}
-    </div>
-    <div>
-      <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">${t('expAmountWithSymbol')}</div>
-      ${inp("exp-amt","number","e.g. 5000",editingExp?editingExp.amount:"",'min="0" step="1"')}
-    </div>
-  </div>
-  <div style="margin-bottom:10px;">
-    <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">${t('invDescription')}</div>
-    <textarea id="exp-note" placeholder="e.g. Monthly shop rent payment" style="width:100%;box-sizing:border-box;background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:10px 12px;font-size:13px;outline:none;resize:vertical;min-height:60px;transition:border 0.2s;font-family:inherit;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#1e2a45'">${editingExp?escHtml(editingExp.note||""):""}</textarea>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-    <div>
-      <div style="font-size:11px;color:#64748b;margin-bottom:5px;font-weight:600;">${t('expDate')}</div>
-      ${inp("exp-date","date","",editingExp?editingExp.date:todayStr)}
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;padding-top:22px;">
-      <input type="checkbox" id="exp-recurring" ${editingExp&&editingExp.recurring?"checked":""} style="width:16px;height:16px;accent-color:#6366f1;cursor:pointer;"/>
-      <label for="exp-recurring" style="font-size:13px;color:#94a3b8;cursor:pointer;">${t('expRecurringMonthly')}</label>
-    </div>
-  </div>
-  <div style="margin-bottom:14px;">
-    <div style="font-size:11px;color:#64748b;margin-bottom:6px;font-weight:600;">💳 Payment Mode</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;" id="exp-mode-row">
-      ${["Cash","UPI","NEFT","Cheque","Other"].map((m,i)=>`<button type="button" onclick="expSetMode('${m}')" id="exp-mode-${m}" style="cursor:pointer;flex:1;min-width:56px;padding:8px 4px;border-radius:9px;border:2px solid ${(editingExp?editingExp.payMode||'Cash':'Cash')===m?'#6366f1':'#1e2a45'};background:${(editingExp?editingExp.payMode||'Cash':'Cash')===m?'#0f0a2a':'transparent'};color:${(editingExp?editingExp.payMode||'Cash':'Cash')===m?'#818cf8':'#4a5a7a'};font-size:12px;font-weight:700;transition:all 0.15s;">${m}</button>`).join("")}
-    </div>
-    <input type="hidden" id="exp-mode-val" value="${editingExp?editingExp.payMode||'Cash':'Cash'}" />
-  </div>
-  <div style="display:flex;gap:10px;">
-    <button class="exp-btn" onclick="expSaveFromForm()" style="flex:1;background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;padding:12px;">${editingExp?t('expUpdateBtn'):t('expSaveBtn')}</button>
-    ${editingExp ? `<button class="exp-btn" onclick="_expEditId=null;safeRenderTab(currentTab);" style="background:#1e2a45;color:#94a3b8;padding:12px 18px;">${t('invCancel')}</button>` : ""}
   </div>
 </div>
 
@@ -12001,15 +12004,15 @@ ${monthTotal>0 ? `
     <div style="font-size:11px;font-weight:800;color:#6366f1;text-transform:uppercase;letter-spacing:0.8px;">${t('expHistoryHeader')}</div>
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
       <!-- View toggle -->
-      <button class="exp-quick" onclick="_expView='list';safeRenderTab(currentTab);" style="${_expView==="list"?"background:#1e2d4a;border-color:#6366f1;color:#818cf8;":""}">${t('expBtnList')}</button>
-      <button class="exp-quick" onclick="_expView='calendar';safeRenderTab(currentTab);" style="${_expView==="calendar"?"background:#1e2d4a;border-color:#6366f1;color:#818cf8;":""}">${t('expBtnCalendar')}</button>
+      <button class="exp-quick" onclick="_expView='list';safeRenderTab(currentTab);" style="${_expView==="list"?"background:#eef0fe;border-color:#6366f1;color:#5457e5;":""}">${t('expBtnList')}</button>
+      <button class="exp-quick" onclick="_expView='calendar';safeRenderTab(currentTab);" style="${_expView==="calendar"?"background:#eef0fe;border-color:#6366f1;color:#5457e5;":""}">${t('expBtnCalendar')}</button>
     </div>
   </div>
 
   <!-- Filters -->
   <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
     ${["today","week","month","year","recurring"].map(f=>`
-      <button class="exp-quick" onclick="_expFilter='${f}';_expPage=0;safeRenderTab(currentTab);" style="${_expFilter===f?"background:#1e2d4a;border-color:#6366f1;color:#818cf8;":""}">
+      <button class="exp-quick" onclick="_expFilter='${f}';_expPage=0;safeRenderTab(currentTab);" style="${_expFilter===f?"background:#eef0fe;border-color:#6366f1;color:#5457e5;":""}">
         ${{today:t('expFilterToday'),week:t('expFilterWeek'),month:t('expFilterMonth'),year:t('expFilterYear'),recurring:t('expFilterRecurring')}[f]}
       </button>`).join("")}
   </div>
@@ -12018,9 +12021,9 @@ ${monthTotal>0 ? `
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
     <input id="exp-search" type="text" placeholder="🔍 Search expenses..." value="${escHtml(_expSearch)}"
       oninput="_expSearch=this.value;_expPage=0;safeRenderTab(currentTab);"
-      style="background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;width:100%;"/>
+      style="background:#ffffff;border:1.5px solid #d8dee9;border-radius:10px;color:#1a2236;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;width:100%;"/>
     <select onchange="_expCatFilter=this.value;_expPage=0;safeRenderTab(currentTab);"
-      style="background:#0d1321;border:1.5px solid #1e2a45;border-radius:10px;color:#e2e8f0;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;width:100%;">
+      style="background:#ffffff;border:1.5px solid #d8dee9;border-radius:10px;color:#1a2236;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;width:100%;">
       <option value="">${t('expAllCategories')}</option>
       ${EXP_CATS.map(c=>`<option value="${c.key}" ${_expCatFilter===c.key?"selected":""}>${c.icon} ${c.key}</option>`).join("")}
     </select>
@@ -12031,11 +12034,11 @@ ${monthTotal>0 ? `
   <div style="margin-bottom:10px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
       <button class="exp-quick" onclick="_expCalMonth={year:${calPrev.year},month:${calPrev.month}};safeRenderTab(currentTab);">${t('expPrevBtn')}</button>
-      <div style="font-weight:700;color:#e2e8f0;">${calMonthNames[calMonth]} ${calYear}</div>
+      <div style="font-weight:700;color:#1a2236;">${calMonthNames[calMonth]} ${calYear}</div>
       <button class="exp-quick" onclick="_expCalMonth={year:${calNext.year},month:${calNext.month}};safeRenderTab(currentTab);">${t('expNextBtn')}</button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:6px;">
-      ${["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-size:10px;font-weight:700;color:var(--text-dim,#4a5a7a);padding:4px;">${d}</div>`).join("")}
+      ${["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=>`<div style="text-align:center;font-size:10px;font-weight:700;color:#9aa3b6;padding:4px;">${d}</div>`).join("")}
     </div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;">
       ${Array.from({length:calFirstDay},(_,i)=>`<div key="${i}"></div>`).join("")}
@@ -12045,23 +12048,23 @@ ${monthTotal>0 ? `
         const dayExps=calExpByDate[dk]||[];
         const dayTotal=dayExps.reduce((s,e)=>s+Number(e.amount),0);
         const isToday=dk===todayStr;
-        return `<div class="exp-cal-day" style="${isToday?"background:#1e2d4a;border:1.5px solid #6366f1;":"border:1px solid #1a2235;"}${dayTotal>0?"border-color:#f87171;":""}"
+        return `<div class="exp-cal-day" style="${isToday?"background:#eef0fe;border:1.5px solid #6366f1;":"border:1px solid #eef1f7;"}${dayTotal>0?"border-color:#f87171;":""}"
           onclick="${dayTotal>0?`expShowCalDay('${dk}',${JSON.stringify(dayExps.map(e=>e.id))})`:""}"
           title="${dayTotal>0?formatINR(dayTotal):""}">
-          <div style="color:${isToday?"#818cf8":"#94a3b8"};">${day}</div>
-          ${dayTotal>0?`<div style="font-size:9px;color:#f87171;font-weight:700;margin-top:2px;">${formatINR(dayTotal)}</div>`:""}
+          <div style="color:${isToday?"#5457e5":"#566177"};">${day}</div>
+          ${dayTotal>0?`<div style="font-size:9px;color:#dc2626;font-weight:700;margin-top:2px;">${formatINR(dayTotal)}</div>`:""}
         </div>`;
       }).join("")}
     </div>
   </div>
-  <div id="exp-cal-detail" style="display:none;background:#0d1321;border:1px solid var(--border-main,#1e2a45);border-radius:10px;padding:12px;margin-top:8px;"></div>
+  <div id="exp-cal-detail" style="display:none;background:#f8fafc;border:1px solid #e4e8f0;border-radius:10px;padding:12px;margin-top:8px;"></div>
   ` : `
   <!-- ── LIST VIEW ── -->
   ${filtered.length===0 ? `
     <div style="text-align:center;padding:50px 20px;">
       <div style="font-size:48px;margin-bottom:12px;">💸</div>
-      <div style="font-size:16px;font-weight:700;color:#e2e8f0;margin-bottom:6px;">${t('expNoExpenses')}</div>
-      <div style="font-size:13px;color:#64748b;margin-bottom:16px;">${t('expTrackingDesc')}</div>
+      <div style="font-size:16px;font-weight:700;color:#1a2236;margin-bottom:6px;">${t('expNoExpenses')}</div>
+      <div style="font-size:13px;color:#6b7689;margin-bottom:16px;">${t('expTrackingDesc')}</div>
       <button class="exp-btn" onclick="document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;padding:11px 24px;">${t('expAddFirstBtn')}</button>
     </div>` : `
     <!-- Desktop table -->
@@ -12071,17 +12074,17 @@ ${monthTotal>0 ? `
     ${pageItems.map(e=>`
     <div class="exp-table-row">
       <div style="min-width:0;">
-        <div style="font-size:13px;font-weight:700;color:#e2e8f0;">${expCategoryIcon(e.category)} ${e.category}</div>
-        ${e.note?`<div style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(e.note)}</div>`:""}
+        <div style="font-size:13px;font-weight:700;color:#1a2236;">${expCategoryIcon(e.category)} ${e.category}</div>
+        ${e.note?`<div style="font-size:11px;color:#8893a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(e.note)}</div>`:""}
       </div>
       <div style="font-size:14px;font-weight:800;color:${expCategoryColor(e.category)};">${formatINR(e.amount)}</div>
-      <div style="font-size:12px;color:#94a3b8;">${new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>
-      <div>${e.recurring?`<span class="exp-badge" style="background:#1a1e3a;color:#818cf8;">${t('expFilterRecurring')}</span>`:"<span style='color:var(--text-dim,#4a5a7a);font-size:11px;'>—</span>"}</div>
+      <div style="font-size:12px;color:#566177;">${new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>
+      <div>${e.recurring?`<span class="exp-badge" style="background:#eef0fe;color:#5457e5;">${t('expFilterRecurring')}</span>`:"<span style='color:#9aa3b6;font-size:11px;'>—</span>"}</div>
       <div style="display:flex;gap:5px;">
-        <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#1e2a45;border:none;border-radius:6px;color:#818cf8;font-size:11px;padding:5px 8px;cursor:pointer;" title="Edit">✏️</button>
-        <button onclick="showEditHistoryModal('${e.id}','','expense','${e.category.replace(/'/g,"\'")}')" style="background:#1e2a45;border:none;border-radius:6px;color:#FFD700;font-size:11px;padding:5px 8px;cursor:pointer;" title="Edit History">📝</button>
-        <button onclick="duplicateExpense('${e.id}')" style="background:#1e2a45;border:none;border-radius:6px;color:#34d399;font-size:11px;padding:5px 8px;cursor:pointer;" title="Duplicate">📋</button>
-        <button onclick="expDeleteEntry('${e.id}')" style="background:#2a0808;border:1px solid #4a1515;border-radius:6px;color:#f87171;font-size:11px;padding:5px 8px;cursor:pointer;" title="Delete">🗑</button>
+        <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#eef1f7;border:none;border-radius:6px;color:#5457e5;font-size:11px;padding:5px 8px;cursor:pointer;" title="Edit">✏️</button>
+        <button onclick="showEditHistoryModal('${e.id}','','expense','${e.category.replace(/'/g,"\'")}')" style="background:#eef1f7;border:none;border-radius:6px;color:#b8860b;font-size:11px;padding:5px 8px;cursor:pointer;" title="Edit History">📝</button>
+        <button onclick="duplicateExpense('${e.id}')" style="background:#eef1f7;border:none;border-radius:6px;color:#15803d;font-size:11px;padding:5px 8px;cursor:pointer;" title="Duplicate">📋</button>
+        <button onclick="expDeleteEntry('${e.id}')" style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#dc2626;font-size:11px;padding:5px 8px;cursor:pointer;" title="Delete">🗑</button>
       </div>
     </div>`).join("")}
 
@@ -12091,27 +12094,27 @@ ${monthTotal>0 ? `
       <div style="font-size:24px;line-height:1;">${expCategoryIcon(e.category)}</div>
       <div style="flex:1;min-width:0;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-size:13px;font-weight:700;color:#e2e8f0;">${e.category}</div>
+          <div style="font-size:13px;font-weight:700;color:#1a2236;">${e.category}</div>
           <div style="font-size:14px;font-weight:800;color:${expCategoryColor(e.category)};">${formatINR(e.amount)}</div>
         </div>
-        ${e.note?`<div style="font-size:11px;color:#64748b;margin-top:2px;">${escHtml(e.note)}</div>`:""}
+        ${e.note?`<div style="font-size:11px;color:#8893a8;margin-top:2px;">${escHtml(e.note)}</div>`:""}
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
-          <span style="font-size:11px;color:var(--text-dim,#4a5a7a);">${new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span>
-          ${e.recurring?`<span class="exp-badge" style="background:#1a1e3a;color:#818cf8;font-size:10px;">🔄</span>`:""}
+          <span style="font-size:11px;color:#9aa3b6;">${new Date(e.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span>
+          ${e.recurring?`<span class="exp-badge" style="background:#eef0fe;color:#5457e5;font-size:10px;">🔄</span>`:""}
         </div>
         <div style="display:flex;gap:5px;margin-top:6px;">
-          <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#1e2a45;border:none;border-radius:6px;color:#818cf8;font-size:11px;padding:5px 8px;cursor:pointer;">${t('expEditBtn')}</button>
-          <button onclick="showEditHistoryModal('${e.id}','','expense','${e.category.replace(/'/g,"\'")}')" style="background:#1e2a45;border:none;border-radius:6px;color:#FFD700;font-size:11px;padding:5px 8px;cursor:pointer;">📝</button>
-          <button onclick="duplicateExpense('${e.id}')" style="background:#1e2a45;border:none;border-radius:6px;color:#34d399;font-size:11px;padding:5px 8px;cursor:pointer;">${t('expCopyBtn')}</button>
-          <button onclick="expDeleteEntry('${e.id}')" style="background:#2a0808;border:1px solid #4a1515;border-radius:6px;color:#f87171;font-size:11px;padding:5px 8px;cursor:pointer;">🗑</button>
+          <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#eef1f7;border:none;border-radius:6px;color:#5457e5;font-size:11px;padding:5px 8px;cursor:pointer;">${t('expEditBtn')}</button>
+          <button onclick="showEditHistoryModal('${e.id}','','expense','${e.category.replace(/'/g,"\'")}')" style="background:#eef1f7;border:none;border-radius:6px;color:#b8860b;font-size:11px;padding:5px 8px;cursor:pointer;">📝</button>
+          <button onclick="duplicateExpense('${e.id}')" style="background:#eef1f7;border:none;border-radius:6px;color:#15803d;font-size:11px;padding:5px 8px;cursor:pointer;">${t('expCopyBtn')}</button>
+          <button onclick="expDeleteEntry('${e.id}')" style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#dc2626;font-size:11px;padding:5px 8px;cursor:pointer;">🗑</button>
         </div>
       </div>
     </div>`).join("")}
 
     <!-- Pagination -->
     ${totalPages>1 ? `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--border-main,#1e2a45);">
-      <div style="font-size:12px;color:#64748b;">${t('expShowingRange').replace('{a}',_expPage*_expPageSize+1).replace('{b}',Math.min((_expPage+1)*_expPageSize,filtered.length)).replace('{c}',filtered.length)}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid #e4e8f0;">
+      <div style="font-size:12px;color:#8893a8;">${t('expShowingRange').replace('{a}',_expPage*_expPageSize+1).replace('{b}',Math.min((_expPage+1)*_expPageSize,filtered.length)).replace('{c}',filtered.length)}</div>
       <div style="display:flex;gap:6px;">
         ${_expPage>0?`<button class="exp-quick" onclick="_expPage=${_expPage-1};safeRenderTab(currentTab);">${t('expPrevBtn')}</button>`:""}
         ${_expPage<totalPages-1?`<button class="exp-quick" onclick="_expPage=${_expPage+1};safeRenderTab(currentTab);">${t('expNextBtn')}</button>`:""}
@@ -12121,9 +12124,9 @@ ${monthTotal>0 ? `
   `}
 
   <!-- Export row -->
-  <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:12px;border-top:1px solid #1a2235;margin-top:4px;">
-    <button class="exp-btn" onclick="expExportCSV()" style="background:#1e2a45;color:#94a3b8;padding:8px 14px;font-size:12px;">${t('expExportCsvBtn')}</button>
-    <button class="exp-btn" onclick="expPrintReport()" style="background:#1e2a45;color:#94a3b8;padding:8px 14px;font-size:12px;">${t('expPrintReportBtn')}</button>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;padding-top:12px;border-top:1px solid #eef1f7;margin-top:4px;">
+    <button class="exp-btn" onclick="expExportCSV()" style="background:#eef1f7;color:#566177;padding:8px 14px;font-size:12px;">${t('expExportCsvBtn')}</button>
+    <button class="exp-btn" onclick="expPrintReport()" style="background:#eef1f7;color:#566177;padding:8px 14px;font-size:12px;">${t('expPrintReportBtn')}</button>
   </div>
 </div>
 
@@ -12137,9 +12140,9 @@ function expSetMode(mode){
     const btn = document.getElementById("exp-mode-"+m);
     if(!btn) return;
     const active = m===mode;
-    btn.style.border = "2px solid "+(active?"#6366f1":"#1e2a45");
-    btn.style.background = active?"#0f0a2a":"transparent";
-    btn.style.color = active?"#818cf8":"#4a5a7a";
+    btn.style.border = "2px solid "+(active?"#6366f1":"#d8dee9");
+    btn.style.background = active?"#eef0fe":"#ffffff";
+    btn.style.color = active?"#5457e5":"#7b8499";
   });
 }
 
@@ -12182,11 +12185,11 @@ function expShowCalDay(dateStr, ids){
   const dayTotal = exps.reduce((s,e)=>s+Number(e.amount),0);
   el.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <div style="font-size:13px;font-weight:700;color:#e2e8f0;">📅 ${new Date(dateStr).toLocaleDateString("en-IN",{day:"numeric",month:"long"})}</div>
-      <div style="font-size:13px;font-weight:800;color:#f87171;">${formatINR(dayTotal)}</div>
+      <div style="font-size:13px;font-weight:700;color:#1a2236;">📅 ${new Date(dateStr).toLocaleDateString("en-IN",{day:"numeric",month:"long"})}</div>
+      <div style="font-size:13px;font-weight:800;color:#dc2626;">${formatINR(dayTotal)}</div>
     </div>
-    ${exps.map(e=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border-main,#1e2a45);font-size:12px;">
-      <span style="color:#94a3b8;">${expCategoryIcon(e.category)} ${e.category}${e.note?" — "+escHtml(e.note):""}</span>
+    ${exps.map(e=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #e4e8f0;font-size:12px;">
+      <span style="color:#566177;">${expCategoryIcon(e.category)} ${e.category}${e.note?" — "+escHtml(e.note):""}</span>
       <span style="color:${expCategoryColor(e.category)};font-weight:700;">${formatINR(e.amount)}</span>
     </div>`).join("")}`;
 }
