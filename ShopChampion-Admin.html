@@ -5026,7 +5026,7 @@ function safeRenderTab(i) {
 // ── Detail-page guard ─────────────────────────────────────────────────────────
 // Track which detail page is currently open so safeRenderTab won't blow it away.
 // Set by openCreditorDetail / openDebtorDetail, cleared by switchTab / goBack.
-window._scDetailPage = null; // { type: 'creditor'|'debtor', id: string } | null
+window._scDetailPage = null; // { type: 'creditor'|'debtor'|'txBillDetail', id: string } | null
 function _safeRenderTabImmediate(i) {
   // ── Detail-page guard ──────────────────────────────────────────────────────
   // If a creditor/debtor detail page is open and the re-render is for the same
@@ -5034,6 +5034,8 @@ function _safeRenderTabImmediate(i) {
   // detail instead of wiping it back to the list.
   const dp = window._scDetailPage;
   if (dp) {
+    // If user is on a bill detail page, never wipe it via background refresh
+    if (dp.type === 'txBillDetail') return;
     const detailTab = dp.type === 'creditor' ? 6 : 7;
     if (i === detailTab) {
       // Refresh only the running balance banner and the transaction list so
@@ -5218,6 +5220,7 @@ function goBack(){
   if(!prev){ window._scDetailPage=null; renderTab(currentTab); return; }
   if(prev.type === 'creditorDetail'){ openCreditorDetail(prev.id); }
   else if(prev.type === 'debtorDetail'){ openDebtorDetail(prev.id); }
+  else if(prev.type === 'txBillDetail'){ openTxBillDetail(prev.parentId, prev.txId, prev.entityType); }
   else if(prev.type === 'tab'){ window._scDetailPage=null; renderTab(prev.tabIndex); }
   else { window._scDetailPage=null; renderTab(currentTab); }
 }
@@ -10304,8 +10307,8 @@ function _crTxRender(creditorId){
       tx.syncStatus==="declined"?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#7f1d1d44;color:#f87171;margin-left:4px;">⚠️Retry</span>':'';
 
     return `<div>
-      <div id="${rowId}" onclick="(function(){var d=document.getElementById('${detailId}');var open=d.style.display!=='none';document.querySelectorAll('[id^=cr-det-]').forEach(function(x){x.style.display='none';document.getElementById('cr-row-'+x.id.slice(7)).style.background='transparent';});if(!open){d.style.display='block';document.getElementById('${rowId}').style.background='#0a1828';};})()"
-        style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;">
+      <div id="${rowId}" onclick="openTxBillDetail('${creditorId}','${tx.id}','creditor')"
+        style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;" onmouseenter="this.style.background='#0a1828'" onmouseleave="this.style.background='transparent'">
         <div style="font-size:11px;color:#6a7a9a;font-family:monospace;white-space:nowrap;">${dateShort}</div>
         <div style="min-width:0;">
           <div style="font-size:12.5px;font-weight:600;color:#cdd5e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${hl(tx.note||cfg.label)}${syncBadge}</div>
@@ -10317,24 +10320,7 @@ function _crTxRender(creditorId){
           <div style="font-size:12px;font-weight:800;color:${runColor};">${formatINR(Math.abs(runBal))}</div>
           <div style="font-size:9px;color:${runColor};font-weight:700;">${runLabel}</div>
         </div>
-        <div style="text-align:center;font-size:11px;color:#3a4a6a;">▾</div>
-      </div>
-      <div id="${detailId}" style="display:none;background:#060d1a;border-bottom:1px solid #0d1525;padding:10px 14px;font-size:12px;">
-        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
-          <div><span style="color:var(--text-dim,#4a5a7a);">${t("txDate")}</span><br><span style="color:var(--text-main,#e8eaf0);font-weight:700;">${new Date(tx.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span></div>
-          <div><span style="color:var(--text-dim,#4a5a7a);">${t("txType")}<br><span style="font-size:11px;padding:2px 8px;border-radius:5px;background:${cfg.bg};color:${cfg.col};font-weight:700;">${cfg.icon} ${cfg.label}</span></div>
-          <div><span style="color:var(--text-dim,#4a5a7a);">${t("txAmount")}</span><br><span style="color:${cfg.col};font-weight:800;">${formatINR(tx.amount)}</span></div>
-          ${tx.invoiceNo?`<div><span style="color:var(--text-dim,#4a5a7a);">${t("txInvoice")}<br><span style="color:var(--text-main,#e8eaf0);font-weight:700;">🧾 ${escHtml(tx.invoiceNo)}</span></div>`:""}
-          ${tx._invItem?`<div><span style="color:var(--text-dim,#4a5a7a);">इन्वेंट्री</span><br><span style="color:#60a5fa;font-weight:700;">📦 ${escHtml(tx._invItem)} × ${tx._invQty}</span></div>`:""}
-          ${tx.actor?`<div><span style="color:var(--text-dim,#4a5a7a);">Entry By</span><br><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:${tx.actor==='Owner'?'#FFD70022':'#a78bfa22'};color:${tx.actor==='Owner'?'#FFD700':'#a78bfa'};border:1px solid ${tx.actor==='Owner'?'#FFD70044':'#a78bfa44'};font-weight:700;">👤 ${escHtml(tx.actor)}</span></div>`:""}
-        </div>
-        ${tx.note?`<div style="color:var(--text-muted,#7a8aaa);margin-bottom:8px;">📝 ${escHtml(tx.note)}</div>`:""}
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick='printTxBill(${JSON.stringify(tx)}, ${JSON.stringify(cr.name)}, "creditor")' style="cursor:pointer;background:var(--bg-card,#0a1628);border:1px solid #1e3a6e;border-radius:6px;color:#60a5fa;font-size:11px;font-weight:700;padding:5px 10px;">🧾 View Bill</button>
-          <button onclick='openEwayBillHelper(${JSON.stringify(tx)}, ${JSON.stringify(cr.name)})' style="cursor:pointer;background:#0a1a0a;border:1px solid #1a4a1a;border-radius:6px;color:#4ade80;font-size:11px;font-weight:700;padding:5px 10px;">🚛 E-Way Bill</button>
-          ${(tx.syncStatus==="declined"||tx.syncStatus==="local")&&cr._fromShopConnect?`<button onclick="openRequestAgainModal('${creditorId}','${tx.id||""}',${tx.amount},'${(tx.note||"").replace(/'/g,"\'")}','${tx.date||""}','${(tx.invoiceNo||"").replace(/'/g,"\'")}','${tx.syncReqId}')" style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:6px;color:#f87171;font-size:11px;font-weight:700;padding:5px 10px;">🔄 Request Again</button>`:""}
-          <button onclick="deleteCrTx('${creditorId}',${origIdx});setTimeout(()=>_crTxRender('${creditorId}'),300);" style="cursor:pointer;background:#1a0808;border:1px solid #5a1a1a;border-radius:6px;color:#f66;font-size:11px;font-weight:700;padding:5px 10px;">🗑 Delete</button>
-        </div>
+        <div style="text-align:center;font-size:14px;color:#60a5fa;">›</div>
       </div>
     </div>`;
   }).join("");
@@ -12785,8 +12771,8 @@ function _drTxRender(debtorId){
     const rowId="dr-row-"+tx.id;
     const detailId="dr-det-"+tx.id;
     return `<div>
-      <div id="${rowId}" onclick="(function(){var d=document.getElementById('${detailId}');var open=d.style.display!=='none';document.querySelectorAll('[id^=dr-det-]').forEach(function(x){x.style.display='none';document.getElementById('dr-row-'+x.id.slice(7)).style.background='transparent';});if(!open){d.style.display='block';document.getElementById('${rowId}').style.background='#08180e';};})()"
-        style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;">
+      <div id="${rowId}" onclick="openTxBillDetail('${debtorId}','${tx.id}','debtor')"
+        style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;" onmouseenter="this.style.background='#08180e'" onmouseleave="this.style.background='transparent'">
         <div style="font-size:11px;color:#6a7a9a;font-family:monospace;white-space:nowrap;">${dateShort}</div>
         <div style="min-width:0;">
           <div style="font-size:12.5px;font-weight:600;color:#cdd5e8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(tx.note||cfg.label)}</div>
@@ -12798,22 +12784,7 @@ function _drTxRender(debtorId){
           <div style="font-size:12px;font-weight:800;color:${runColor};">${formatINR(Math.abs(runBal))}</div>
           <div style="font-size:9px;color:${runColor};font-weight:700;">${runLabel}</div>
         </div>
-        <div style="text-align:center;font-size:11px;color:#3a4a6a;">▾</div>
-      </div>
-      <div id="${detailId}" style="display:none;background:#060d0a;border-bottom:1px solid #0d1525;padding:10px 14px;font-size:12px;">
-        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px;">
-          <div><span style="color:var(--text-dim,#4a5a7a);">Date</span><br><span style="color:var(--text-main,#e8eaf0);font-weight:700;">${new Date(tx.date+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}</span></div>
-          <div><span style="color:var(--text-dim,#4a5a7a);">Type</span><br><span style="font-size:11px;padding:2px 8px;border-radius:5px;background:${cfg.bg};color:${cfg.col};font-weight:700;">${cfg.icon} ${cfg.label}</span></div>
-          <div><span style="color:var(--text-dim,#4a5a7a);">Amount</span><br><span style="color:${cfg.col};font-weight:800;">${formatINR(tx.amount)}</span></div>
-          ${tx._invItem?`<div><span style="color:var(--text-dim,#4a5a7a);">इन्वेंट्री</span><br><span style="color:#60a5fa;font-weight:700;">📦 ${escHtml(tx._invItem)} × ${tx._invQty}</span></div>`:""}
-          ${tx.actor?`<div><span style="color:var(--text-dim,#4a5a7a);">Entry By</span><br><span style="font-size:11px;padding:2px 8px;border-radius:8px;background:${tx.actor==='Owner'?'#FFD70022':'#a78bfa22'};color:${tx.actor==='Owner'?'#FFD700':'#a78bfa'};border:1px solid ${tx.actor==='Owner'?'#FFD70044':'#a78bfa44'};font-weight:700;">👤 ${escHtml(tx.actor)}</span></div>`:""}
-        </div>
-        ${tx.note?`<div style="color:var(--text-muted,#7a8aaa);margin-bottom:8px;">📝 ${escHtml(tx.note)}</div>`:""}
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick='printTxBill(${JSON.stringify(tx)}, ${JSON.stringify(dr.name)}, "debtor")' style="cursor:pointer;background:var(--bg-card,#0a1628);border:1px solid #1e3a6e;border-radius:6px;color:#60a5fa;font-size:11px;font-weight:700;padding:5px 10px;">🧾 View Bill</button>
-          <button onclick='openEwayBillHelper(${JSON.stringify(tx)}, ${JSON.stringify(dr.name)})' style="cursor:pointer;background:#0a1a0a;border:1px solid #1a4a1a;border-radius:6px;color:#4ade80;font-size:11px;font-weight:700;padding:5px 10px;">🚛 E-Way Bill</button>
-          <button onclick="deleteDebtTx('${debtorId}',${origIdx});setTimeout(()=>_drTxRender('${debtorId}'),300);" style="cursor:pointer;background:#1a0808;border:1px solid #5a1a1a;border-radius:6px;color:#f66;font-size:11px;font-weight:700;padding:5px 10px;">🗑 Delete</button>
-        </div>
+        <div style="text-align:center;font-size:14px;color:#22c55e;">›</div>
       </div>
     </div>`;
   }).join("");
@@ -12840,6 +12811,228 @@ function _drTxRender(debtorId){
   </div>`;
 
   listEl.innerHTML=`<div style="background:#08101e;border:1px solid var(--border-main,#1e2a45);border-radius:10px;overflow:hidden;">${colHeader}${rows}${totalsRow}</div>`;
+}
+
+// ── Tally-Style Bill Detail Page ───────────────────────────────────────────────
+function openTxBillDetail(parentId, txId, entityType) {
+  const isCr = entityType === 'creditor';
+  const entity = isCr ? getCreditors().find(c=>c.id===parentId) : getDebtors().find(d=>d.id===parentId);
+  if (!entity) { notify('❌ Entry not found', 'error'); return; }
+  const tx = (entity.transactions||[]).find(t=>t.id===txId);
+  if (!tx) { notify('❌ Transaction not found', 'error'); return; }
+
+  // Push creditor/debtor detail into stack so back goes there
+  const stackTop = window._pageStack[window._pageStack.length-1];
+  if (!stackTop || !(stackTop.type === (isCr?'creditorDetail':'debtorDetail') && stackTop.id === parentId)) {
+    window._pageStack.push({ type: isCr ? 'creditorDetail' : 'debtorDetail', id: parentId });
+  }
+  // Set detail guard so safeRenderTab won't wipe this page
+  window._scDetailPage = { type: 'txBillDetail', parentId, txId, entityType };
+
+  const typeCfg = isCr ? {
+    purchase: {label:'Purchase / Bill', bg:'#92400e22', col:'#fbbf24', icon:'📦'},
+    payment:  {label:'Payment',         bg:'#14532d22', col:'#4ade80', icon:'💰'},
+    return:   {label:'Return / Dr Note',bg:'#2e106522', col:'#c4b5fd', icon:'↩️'},
+  } : {
+    sale:     {label:'Sale',            bg:'#14532d22', col:'#4ade80', icon:'🛒'},
+    payment:  {label:'Receipt',         bg:'#1e3a6e22', col:'#60a5fa', icon:'💰'},
+    return:   {label:'Returned',        bg:'#2e106522', col:'#c4b5fd', icon:'↩️'},
+  };
+  const cfg = typeCfg[tx.type] || {label:tx.type, bg:'#1e2a4522', col:'#7a8aaa', icon:'📋'};
+  const accentColor = isCr ? '#fbbf24' : '#22c55e';
+  const fullDate = new Date(tx.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric',weekday:'long'});
+  const syncBadge = tx.syncStatus==='pending'?'<span style="font-size:11px;padding:3px 9px;border-radius:20px;background:#92400e44;color:#fbbf24;font-weight:700;">⏳ Sync Pending</span>':
+    (tx.syncStatus==='accepted'||tx.syncStatus==='synced')?'<span style="font-size:11px;padding:3px 9px;border-radius:20px;background:#14532d44;color:#4ade80;font-weight:700;">🔗 Live</span>':
+    tx.syncStatus==='declined'?'<span style="font-size:11px;padding:3px 9px;border-radius:20px;background:#7f1d1d44;color:#f87171;font-weight:700;">⚠️ Declined</span>':'';
+
+  const origIdx = (entity.transactions||[]).findIndex(t=>t.id===txId);
+
+  const tabEl = document.getElementById('tab-content');
+  tabEl.innerHTML = `<div style="padding:16px 14px 100px;max-width:640px;margin:0 auto;">
+    ${_backBtn(escHtml(entity.name))}
+
+    <!-- Big amount header like Tally -->
+    <div style="background:var(--bg-card,#0a1628);border:2px solid ${cfg.col}33;border-radius:16px;padding:20px;margin-bottom:16px;text-align:center;">
+      <div style="font-size:28px;margin-bottom:4px;">${cfg.icon}</div>
+      <div style="font-size:13px;font-weight:800;color:${cfg.col};letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">${escHtml(cfg.label)}</div>
+      <div style="font-size:38px;font-weight:900;color:${cfg.col};letter-spacing:-0.02em;">${formatINR(tx.amount)}</div>
+      <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:8px;">${fullDate}</div>
+      ${syncBadge ? '<div style="margin-top:8px;">'+syncBadge+'</div>' : ''}
+    </div>
+
+    <!-- Detail fields card -->
+    <div style="background:var(--bg-card,#0a1628);border:1px solid var(--border-main,#1e2a45);border-radius:14px;padding:16px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:800;color:var(--text-dim,#4a5a7a);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px;">Transaction Details</div>
+      <div style="display:grid;gap:14px;">
+
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
+          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Party</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text-main,#e8eaf0);">${escHtml(entity.name)}</span>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
+          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Date</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text-main,#e8eaf0);">${new Date(tx.date+'T00:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</span>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
+          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Type</span>
+          <span style="font-size:11px;padding:3px 10px;border-radius:8px;background:${cfg.bg};color:${cfg.col};font-weight:700;">${cfg.icon} ${escHtml(cfg.label)}</span>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
+          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Amount</span>
+          <span style="font-size:16px;font-weight:800;color:${cfg.col};">${formatINR(tx.amount)}</span>
+        </div>
+
+        ${tx.invoiceNo?`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
+          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Invoice No</span>
+          <span style="font-size:13px;font-weight:700;color:var(--text-main,#e8eaf0);">🧾 ${escHtml(tx.invoiceNo)}</span>
+        </div>`:''}
+
+        ${tx.note?`
+        <div style="padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
+          <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:4px;">Note / Description</div>
+          <div style="font-size:13px;color:var(--text-main,#e8eaf0);line-height:1.5;">${escHtml(tx.note)}</div>
+        </div>`:''}
+
+        ${tx._invItem?`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--border-main,#1e2a45);">
+          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Inventory Item</span>
+          <span style="font-size:13px;font-weight:700;color:#60a5fa;">📦 ${escHtml(tx._invItem)} × ${tx._invQty}</span>
+        </div>`:''}
+
+        ${tx.actor?`
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:var(--text-muted,#7a8aaa);">Entry By</span>
+          <span style="font-size:11px;padding:3px 10px;border-radius:8px;background:${tx.actor==='Owner'?'#FFD70022':'#a78bfa22'};color:${tx.actor==='Owner'?'#FFD700':'#a78bfa'};border:1px solid ${tx.actor==='Owner'?'#FFD70044':'#a78bfa44'};font-weight:700;">👤 ${escHtml(tx.actor)}</span>
+        </div>`:''}
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button onclick="openEditTxModal('${parentId}','${txId}','${entityType}')"
+        style="cursor:pointer;background:linear-gradient(135deg,#1e3a6e,#2563eb);border:1px solid #3b82f6;border-radius:12px;color:#fff;font-size:14px;font-weight:800;padding:14px;width:100%;">
+        ✏️ Edit This Entry
+      </button>
+      <div style="display:flex;gap:10px;">
+        <button onclick='printTxBill(${JSON.stringify(tx)}, ${JSON.stringify(entity.name)}, "${entityType}")'
+          style="cursor:pointer;flex:1;background:var(--bg-card,#0a1628);border:1px solid #1e3a6e;border-radius:12px;color:#60a5fa;font-size:13px;font-weight:700;padding:12px;">
+          🧾 View Bill
+        </button>
+        <button onclick='openEwayBillHelper(${JSON.stringify(tx)}, ${JSON.stringify(entity.name)})'
+          style="cursor:pointer;flex:1;background:var(--bg-card,#0a1628);border:1px solid #1a4a1a;border-radius:12px;color:#4ade80;font-size:13px;font-weight:700;padding:12px;">
+          🚛 E-Way Bill
+        </button>
+      </div>
+      <button onclick="showEditHistoryModal('${parentId}','${escHtml(entity.name)}','${entityType}')"
+        style="cursor:pointer;background:var(--bg-card,#0a1628);border:1px solid #FFD70055;border-radius:12px;color:#FFD700;font-size:13px;font-weight:700;padding:12px;width:100%;">
+        📝 Edit History
+      </button>
+      ${(tx.syncStatus==='declined'||tx.syncStatus==='local')&&entity._fromShopConnect&&isCr?`
+      <div style="font-size:11px;color:#f87171;background:#1a0808;border:1px solid #ef444444;border-radius:10px;padding:8px 12px;margin-bottom:6px;">⚠️ <strong>ShopConnect:</strong> Sync was declined/failed — tap below to re-send.</div>
+      <button onclick="openRequestAgainModal('${parentId}','${txId||''}',${tx.amount},'${(tx.note||'').replace(/'/g,"\\'")}','${tx.date||''}','${(tx.invoiceNo||'').replace(/'/g,"\\'")}','${tx.syncReqId||''}')"
+        style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:12px;color:#f87171;font-size:13px;font-weight:700;padding:12px;width:100%;">
+        🔄 Re-send to Linked Shop
+      </button>`:''}
+      <button onclick="if(confirm('Delete this entry? This cannot be undone.')){${isCr?`deleteCrTx('${parentId}',${origIdx})`:`deleteDebtTx('${parentId}',${origIdx})`};goBack();}"
+        style="cursor:pointer;background:#1a0808;border:1px solid #5a1a1a;border-radius:12px;color:#f87171;font-size:13px;font-weight:700;padding:12px;width:100%;">
+        🗑 Delete Entry
+      </button>
+    </div>
+  </div>`;
+}
+
+// ── Edit Transaction Modal ─────────────────────────────────────────────────────
+function openEditTxModal(parentId, txId, entityType) {
+  const isCr = entityType === 'creditor';
+  const entities = isCr ? getCreditors() : getDebtors();
+  const entity = entities.find(e=>e.id===parentId);
+  if (!entity) { notify('❌ Entry not found', 'error'); return; }
+  const txIdx = (entity.transactions||[]).findIndex(t=>t.id===txId);
+  if (txIdx < 0) { notify('❌ Transaction not found', 'error'); return; }
+  const tx = entity.transactions[txIdx];
+
+  const typeCfg = isCr ? {
+    purchase:'Purchase / Bill', payment:'Payment', return:'Return / Dr Note'
+  } : {
+    sale:'Sale', payment:'Receipt', return:'Returned / Cr Note'
+  };
+  const typeLabel = typeCfg[tx.type] || tx.type;
+
+  showModal(`<div style="padding:4px;">
+    <div style="font-size:15px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:16px;">✏️ Edit Entry</div>
+
+    <div style="font-size:11px;padding:6px 12px;border-radius:8px;background:var(--bg-main,#0a0e1a);color:var(--text-muted,#7a8aaa);margin-bottom:16px;display:inline-block;">
+      Type: <strong style="color:var(--text-main,#e8eaf0);">${escHtml(typeLabel)}</strong> &nbsp;·&nbsp; Party: <strong style="color:var(--text-main,#e8eaf0);">${escHtml(entity.name)}</strong>
+    </div>
+
+    <div style="display:grid;gap:12px;">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim,#4a5a7a);display:block;margin-bottom:4px;">Amount (₹)</label>
+        <input id="etx-amount" type="number" step="0.01" value="${tx.amount}"
+          style="width:100%;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:8px;padding:10px 12px;color:var(--text-main,#e8eaf0);font-size:15px;font-weight:700;box-sizing:border-box;outline:none;" />
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim,#4a5a7a);display:block;margin-bottom:4px;">Date</label>
+        <input id="etx-date" type="date" value="${tx.date}"
+          style="width:100%;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:8px;padding:10px 12px;color:var(--text-main,#e8eaf0);font-size:14px;box-sizing:border-box;outline:none;" />
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim,#4a5a7a);display:block;margin-bottom:4px;">Invoice / Bill No</label>
+        <input id="etx-invoice" type="text" placeholder="Optional" value="${escHtml(tx.invoiceNo||'')}"
+          style="width:100%;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:8px;padding:10px 12px;color:var(--text-main,#e8eaf0);font-size:13px;box-sizing:border-box;outline:none;" />
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--text-dim,#4a5a7a);display:block;margin-bottom:4px;">Note / Description</label>
+        <textarea id="etx-note" rows="2" placeholder="Optional"
+          style="width:100%;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:8px;padding:10px 12px;color:var(--text-main,#e8eaf0);font-size:13px;box-sizing:border-box;outline:none;resize:vertical;">${escHtml(tx.note||'')}</textarea>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button onclick="closeModal()" style="flex:1;cursor:pointer;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:10px;color:var(--text-muted,#7a8aaa);font-size:13px;font-weight:700;padding:12px;">Cancel</button>
+      <button onclick="_saveEditedTx('${parentId}','${txId}','${entityType}')" style="flex:2;cursor:pointer;background:linear-gradient(135deg,#1e3a6e,#2563eb);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;padding:12px;">Save Changes</button>
+    </div>
+  </div>`);
+}
+
+function _saveEditedTx(parentId, txId, entityType) {
+  const amtRaw = parseFloat(document.getElementById('etx-amount')?.value || '');
+  const date   = document.getElementById('etx-date')?.value || '';
+  const invoiceNo = (document.getElementById('etx-invoice')?.value || '').trim();
+  const note   = (document.getElementById('etx-note')?.value || '').trim();
+
+  if (isNaN(amtRaw) || amtRaw <= 0) { notify('❌ Enter valid amount', 'error'); return; }
+  if (!date) { notify('❌ Select date', 'error'); return; }
+
+  const isCr = entityType === 'creditor';
+  const entities = isCr ? getCreditors() : getDebtors();
+  const entity = entities.find(e=>e.id===parentId);
+  if (!entity) { notify('❌ Entry not found', 'error'); return; }
+  const txIdx = (entity.transactions||[]).findIndex(t=>t.id===txId);
+  if (txIdx < 0) { notify('❌ Transaction not found', 'error'); return; }
+
+  const oldTx = entity.transactions[txIdx];
+  entity.transactions[txIdx] = { ...oldTx, amount: amtRaw, date, invoiceNo: invoiceNo||undefined, note: note||undefined };
+  // Clean undefined keys
+  if (!entity.transactions[txIdx].invoiceNo) delete entity.transactions[txIdx].invoiceNo;
+  if (!entity.transactions[txIdx].note) delete entity.transactions[txIdx].note;
+
+  if (isCr) saveCreditors(getCreditors()); else saveDebtors(getDebtors());
+
+  addHistoryLog(entityType, 'editTransaction', {
+    partyId: parentId, partyName: entity.name, txId,
+    oldAmount: oldTx.amount, newAmount: amtRaw,
+    oldDate: oldTx.date, newDate: date
+  });
+
+  closeModal();
+  notify('✅ Entry updated', 'success');
+  // Re-render the bill detail page with updated data
+  setTimeout(()=> openTxBillDetail(parentId, txId, entityType), 100);
 }
 
 // ── Add Debtor Transaction Modal ──────────────────────────────────────────────
