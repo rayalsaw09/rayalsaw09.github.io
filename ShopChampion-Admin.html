@@ -19857,7 +19857,7 @@ async function scSendConnRequest(toShopId) {
   const suffix = toShopId.replace(/^SC-/i,"");
   // sc_users direct SELECT is revoked from anon (CRIT-07/CRIT-06 lockdown),
   // so resolve the Shop ID via the find_shop_by_suffix RPC instead.
-  const searchRes = await scSupa("rpc/find_shop_by_suffix", {method:"POST", headers:{"Prefer":""}, body: JSON.stringify({ p_suffix: suffix })});
+  const searchRes = await scSupa("rpc/find_shop_by_suffix", {method:"POST", headers:{"Prefer":""}, body: JSON.stringify({ suffix: suffix })});
   if (!searchRes.ok) { notify("❌ Couldn't look up that Shop ID. Try again in a moment.","error"); return; }
   const users = await searchRes.json();
   if (!users || users.length === 0) { notify("❌ Shop ID not found — check the ID","error"); return; }
