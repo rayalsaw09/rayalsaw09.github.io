@@ -1849,7 +1849,7 @@ var TRANSLATIONS = {
     crSearchPlaceholder:"🔍 Search creditor by name or phone...",
     crGstStatus:"🔢 GST Status:", crAll:"🏢 All",
     crGstReg:"✅ GST Registered", crNotReg:"❌ Not Registered",
-    crNoCreditors:"No creditors found", crTotalYouOweLabel:"Total Payable",
+    crNoCreditors:"No creditors found", crTotalYouOweLabel:"Total Payable", drTotalOwedLabel:"Total Receivable",
     crBalance:"Balance:", crLinked:"Linked", crGstin:"GSTIN",
     crMoveTo:"Move to Creditor", crTarget:"Target Creditor",
     crSelectAll:"Select All", crTap:"Tap", crDeleting:"Deleting",
@@ -2294,7 +2294,7 @@ var TRANSLATIONS = {
     crInvoiceRef:"चालान / संदर्भ सं.", crRefUtr:"संदर्भ / UTR सं.",
     crAmount:"राशि", crCancel:"रद्द करें", crType:"प्रकार",
     crCredit:"क्रेडिट", crDebit:"डेबिट",
-    crClosingBalance:"समापन बैलेंस:", crTotalYouOweLabel:"कुल देय",
+    crClosingBalance:"समापन बैलेंस:", crTotalYouOweLabel:"कुल देय", drTotalOwedLabel:"कुल प्राप्य",
     crTxHistory:"लेनदेन इतिहास", crNoCredFound:"कोई लेनदार नहीं मिला",
     crNoTxYet:"अभी तक कोई लेनदेन नहीं", crNotFound:"नहीं मिला",
     crNegativeItems:"आइटम जो ऋणात्मक हो जाएंगे:", crStockReversed:"स्टॉक जो वापस होगा:",
@@ -5894,7 +5894,7 @@ function ptClearCustomer(){
   setTimeout(()=>{const el=document.getElementById("pt-search");if(el)el.focus();},50);
   ptPts();
 }
-function ptPts(){const a=parseFloat(document.getElementById("pt-amt").value)||0,s=document.getElementById("pt-sel").value,b=document.getElementById("pt-pts");if(a&&s){b.style.display="block";b.innerHTML=`Points: <strong style="color:#FFD700;">+${getPoints(a).toLocaleString()}</strong> pts`;}else b.style.display="none";}
+function ptPts(){const aEl=document.getElementById("pt-amt"),sEl=document.getElementById("pt-sel"),b=document.getElementById("pt-pts");if(!aEl||!sEl||!b)return;const a=parseFloat(aEl.value)||0,s=sEl.value;if(a&&s){b.style.display="block";b.innerHTML=`Points: <strong style="color:#FFD700;">+${getPoints(a).toLocaleString()}</strong> pts`;}else b.style.display="none";}
 function ptSetMode(mode){
   document.getElementById("pt-mode-val").value = mode;
   ["Cash","UPI","NEFT","Cheque","Other"].forEach(m=>{
@@ -7678,6 +7678,22 @@ function cashRemoveByRef(refId){
   if(!refId) return;
   const ledger = _bsGetCashLedger().filter(e=>e.refId!==refId);
   _bsSaveCashLedger(ledger);
+}
+
+// Update cash-ledger entries linked to a specific transaction (used when a
+// creditor/debtor transaction's amount/date/note is edited, so the cash/bank
+// ledger stays reconciled instead of showing the stale original figure).
+function cashUpdateByRef(refId, {amount, date, note}={}){
+  if(!refId) return;
+  const ledger = _bsGetCashLedger();
+  let changed = false;
+  ledger.forEach(e=>{
+    if(e.refId!==refId) return;
+    if(amount!==undefined && Number(amount)>0){ e.amount = Number(amount); changed = true; }
+    if(date!==undefined && date){ e.date = date; changed = true; }
+    if(note!==undefined){ e.note = note; changed = true; }
+  });
+  if(changed) _bsSaveCashLedger(ledger);
 }
 
 // Sync helpers (best-effort, mirror existing cloud-save pattern)
@@ -13012,7 +13028,7 @@ function openTxBillDetail(parentId, txId, entityType) {
         style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:12px;color:#f87171;font-size:13px;font-weight:700;padding:12px;width:100%;">
         🔄 Re-send to Linked Shop
       </button>`:''}
-      <button onclick="if(confirm('Delete this entry? This cannot be undone.')){${isCr?`deleteCrTx('${parentId}',${origIdx})`:`deleteDebtTx('${parentId}',${origIdx})`};goBack();}"
+      <button onclick="${isCr?`deleteCrTx('${parentId}',${origIdx})`:`deleteDebtTx('${parentId}',${origIdx})`}"
         style="cursor:pointer;background:#1a0808;border:1px solid #5a1a1a;border-radius:12px;color:#f87171;font-size:13px;font-weight:700;padding:12px;width:100%;">
         🗑 Delete Entry
       </button>
@@ -13098,6 +13114,21 @@ function _saveEditedTx(parentId, txId, entityType) {
 
   if (isCr) saveCreditors(entities); else saveDebtors(entities);
 
+  // Keep the cash/bank ledger in sync — only payment & return types ever
+  // post to the ledger (purchase/sale do not), matching cashRecordTx call
+  // sites in saveDebtTransaction / creditor payment & return recorders.
+  if (oldTx.type === 'payment' || oldTx.type === 'return') {
+    const partyName = entity.name || (isCr ? 'creditor' : 'customer');
+    const ledgerNote = isCr
+      ? (oldTx.type === 'payment'
+          ? `Paid to ${partyName}${note?(" · "+note):""}`
+          : `Return / Dr Note from ${partyName}${note?(" · "+note):""}`)
+      : (oldTx.type === 'payment'
+          ? `Received from ${partyName}${note?(" · "+note):""}`
+          : `Refund to ${partyName}${note?(" · "+note):""}`);
+    cashUpdateByRef(txId, { amount: amtRaw, date, note: ledgerNote });
+  }
+
   addHistoryLog(entityType, 'Transaction edited',
     `${entity.name} · ₹${oldTx.amount}→₹${amtRaw} · _eid:${parentId}`,
     { txId, oldAmount: oldTx.amount, newAmount: amtRaw, oldDate: oldTx.date, newDate: date }
@@ -13110,7 +13141,234 @@ function _saveEditedTx(parentId, txId, entityType) {
 }
 
 // ── Add Debtor Transaction Modal ──────────────────────────────────────────────
+// ── Smart Receipt Modal: select bill(s) a receipt is being paid against ───────
+// Mirrors openSmartPaymentModal (creditor side) but for debtors: "bills" are
+// unpaid/partially-paid sale transactions instead of purchase transactions.
+function openDebtSmartPaymentModal(debtorId){
+  const debtors = getDebtors();
+  const dr = debtors.find(d=>d.id===debtorId);
+  if(!dr){ notify("❌ Debtor not found"); return; }
+  const today = new Date().toISOString().slice(0,10);
+  const bal = debtBalance(dr);
+
+  // Collect all unpaid / partially-paid sale transactions
+  const sales    = (dr.transactions||[]).filter(t=>t.type==="sale");
+  const payments = (dr.transactions||[]).filter(t=>t.type==="payment"||t.type==="return");
+
+  // Build a per-bill outstanding map (same shape as creditor side)
+  const billMap = {}; // txId -> { tx, paid }
+  sales.forEach(t=>{ billMap[t.id]={ tx:t, paid: t._paidAmount||0 }; });
+  payments.forEach(t=>{
+    if(Array.isArray(t._paysBills)){
+      t._paysBills.forEach(pb=>{ if(pb.billId && billMap[pb.billId]) billMap[pb.billId].paid += Number(pb.amount)||0; });
+    } else if(t._paysBill && billMap[t._paysBill]){
+      billMap[t._paysBill].paid += t.amount;
+    }
+  });
+
+  const pendingBills = Object.values(billMap).filter(b=> b.paid < b.tx.amount )
+    .sort((a,b)=>new Date(a.tx.date)-new Date(b.tx.date));
+
+  const billsHtml = pendingBills.length===0
+    ? `<div style="text-align:center;padding:16px;color:var(--text-dim,#4a5a7a);font-size:13px;">✅ No outstanding bills — fully settled!</div>`
+    : pendingBills.map(b=>{
+        const remaining = Math.max(0, b.tx.amount - b.paid);
+        const pct = Math.min(100, Math.round((b.paid/b.tx.amount)*100));
+        return `<div class="dr-bill-row" data-bill-id="${b.tx.id}" data-remaining="${remaining}"
+          onclick="drSelectBill('${b.tx.id}', ${remaining})"
+          style="cursor:pointer;padding:12px;border-radius:10px;border:2px solid #1e2a45;background:var(--bg-main,#0a0e1a);margin-bottom:8px;transition:border-color 0.15s;"
+          onmouseenter="this.style.borderColor='#2a5aaa'" onmouseleave="if(!this.classList.contains('selected'))this.style.borderColor='#1e2a45'">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div style="display:flex;align-items:flex-start;gap:8px;flex:1;">
+              <input type="checkbox" class="dr-bill-checkbox" data-bill-id="${b.tx.id}" style="margin-top:3px;width:16px;height:16px;accent-color:#22c55e;pointer-events:none;" />
+              <div style="flex:1;">
+                <div style="font-size:13px;font-weight:700;color:var(--text-main,#e8eaf0);">${escHtml(b.tx.note||b.tx.invoiceNo||"Sale")}</div>
+                <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-top:2px;">
+                  ${b.tx.date} ${b.tx.invoiceNo?`· <span style="color:#60a5fa;">${escHtml(b.tx.invoiceNo)}</span>`:""}
+                </div>
+                <div style="margin-top:6px;background:#1e2a45;border-radius:99px;height:5px;overflow:hidden;">
+                  <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#22c55e,#4ade80);border-radius:99px;"></div>
+                </div>
+                <div style="font-size:10px;color:var(--text-dim,#4a5a7a);margin-top:2px;">${pct}% paid · ₹${remaining.toLocaleString("en-IN")} remaining</div>
+              </div>
+            </div>
+            <div style="text-align:right;white-space:nowrap;">
+              <div style="font-size:16px;font-weight:800;color:#f84;">₹${remaining.toLocaleString("en-IN")}</div>
+              <div style="font-size:10px;color:var(--text-dim,#4a5a7a);">of ₹${b.tx.amount.toLocaleString("en-IN")}</div>
+            </div>
+          </div>
+        </div>`;
+      }).join("");
+
+  showWideModal(`
+    ${modalHeader("💰 Record Receipt from " + escHtml(dr.name))}
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <input type="hidden" id="dspm-debtor-id" value="${debtorId}" />
+      <input type="hidden" id="dspm-selected-bills" value="" />
+
+      <!-- Balance summary -->
+      <div style="background:#001a2a;border:1px solid #2563eb;border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted,#7a8aaa);font-weight:700;">${t('drTotalOwedLabel').toUpperCase()}</div>
+          <div style="font-size:22px;font-weight:800;color:#60a5fa;">${formatINR(Math.max(0,bal))}</div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim,#4a5a7a);text-align:right;">${pendingBills.length} unpaid bill${pendingBills.length!==1?"s":""}</div>
+      </div>
+
+      <!-- Bill selection -->
+      <div>
+        <div style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:8px;">📋 Select Bill(s) Being Paid (optional, multiple allowed)</div>
+        <div style="max-height:220px;overflow-y:auto;">${billsHtml}</div>
+      </div>
+
+      <!-- Payment details -->
+      <div style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+        <div>
+          <label style="font-size:11px;color:var(--text-muted,#7a8aaa);font-weight:700;display:block;margin-bottom:4px;">RECEIPT AMOUNT (₹) *</label>
+          <input class="input" id="dspm-amount" type="number" placeholder="0" min="0"
+            style="margin-bottom:0;font-size:20px;font-weight:800;border-color:#22c55e33;" />
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-muted,#7a8aaa);font-weight:700;display:block;margin-bottom:4px;">RECEIVED VIA</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${["Cash","UPI","NEFT","Cheque","Other"].map((m,i)=>`
+              <button type="button" onclick="document.querySelectorAll('.dspm-mode-btn').forEach(b=>{b.style.background='#0a0e1a';b.style.borderColor='#1e2a45';b.style.color='#4a5a7a';});this.style.background='#001a2a';this.style.borderColor='#60a5fa';this.style.color='#60a5fa';document.getElementById('dspm-mode').value='${m}'"
+                class="dspm-mode-btn" style="cursor:pointer;padding:6px 12px;border-radius:8px;border:1px solid ${i===0?'#60a5fa':'#1e2a45'};background:${i===0?'#001a2a':'#0a0e1a'};color:${i===0?'#60a5fa':'#4a5a7a'};font-size:12px;font-weight:700;">${m}</button>
+            `).join("")}
+          </div>
+          <input type="hidden" id="dspm-mode" value="Cash" />
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <label style="font-size:11px;color:var(--text-muted,#7a8aaa);font-weight:700;display:block;margin-bottom:4px;">${t('crDate')}</label>
+            <input class="input" id="dspm-date" type="date" value="${today}" style="margin-bottom:0;" />
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text-muted,#7a8aaa);font-weight:700;display:block;margin-bottom:4px;">${t('crRefUtr')}</label>
+            <input class="input" id="dspm-ref" placeholder="UTR or cheque no." style="margin-bottom:0;" />
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text-muted,#7a8aaa);font-weight:700;display:block;margin-bottom:4px;">${t('crNoteOptional')}</label>
+          <input class="input" id="dspm-note" placeholder="Receipt note..." style="margin-bottom:0;" />
+        </div>
+      </div>
+
+      <button onclick="saveDebtSmartPayment()" class="btn"
+        style="background:linear-gradient(135deg,#1e3a6e,#2563eb);color:#fff;font-size:14px;font-weight:800;padding:14px;">
+        💰 Record Receipt
+      </button>
+      <button onclick="closeModal()" class="btn" style="background:#1a2540;color:var(--text-muted,#7a8aaa);border:1px solid var(--border-input,#2a3560);padding:12px;">
+        ← Cancel
+      </button>
+    </div>
+  `);
+  setTimeout(()=>document.getElementById("dspm-amount")?.focus(),100);
+}
+
+function drSelectBill(billId, remaining){
+  const hidden = document.getElementById("dspm-selected-bills");
+  let selected = (hidden.value||"").split(",").filter(Boolean);
+  const row = document.querySelector(`[data-bill-id="${billId}"]`);
+  const checkbox = row?.querySelector(".dr-bill-checkbox");
+
+  if(selected.includes(billId)){
+    // Deselect
+    selected = selected.filter(id=>id!==billId);
+    if(row){ row.style.borderColor="#1e2a45"; row.style.background="#0a0e1a"; row.classList.remove("selected"); }
+    if(checkbox) checkbox.checked = false;
+  } else {
+    selected.push(billId);
+    if(row){ row.style.borderColor="#22c55e"; row.style.background="#001a0e"; row.classList.add("selected"); }
+    if(checkbox) checkbox.checked = true;
+  }
+  hidden.value = selected.join(",");
+
+  // Sum remaining of all selected bills and set as receipt amount
+  const total = selected.reduce((sum,id)=>{
+    const r = document.querySelector(`[data-bill-id="${id}"]`);
+    return sum + (r ? parseFloat(r.getAttribute("data-remaining"))||0 : 0);
+  }, 0);
+  const amtEl = document.getElementById("dspm-amount");
+  if(amtEl){
+    if(selected.length>0) amtEl.value = total>0 ? total.toFixed(2).replace(/\.00$/,"") : "";
+    else amtEl.value = "";
+  }
+}
+
+async function saveDebtSmartPayment(){
+  if(requireOnline()) return;
+  if(!hasPermission('debtor_tx')) return notify("🚫 No permission to record debtor transactions","error");
+  const debtorId    = document.getElementById("dspm-debtor-id")?.value||"";
+  const selectedBillsRaw = document.getElementById("dspm-selected-bills")?.value||"";
+  const selectedBillIds = selectedBillsRaw.split(",").filter(Boolean);
+  const amount      = parseFloat(document.getElementById("dspm-amount")?.value)||0;
+  const mode        = document.getElementById("dspm-mode")?.value||"Cash";
+  const date        = document.getElementById("dspm-date")?.value||new Date().toISOString().slice(0,10);
+  const ref         = document.getElementById("dspm-ref")?.value.trim()||"";
+  const note        = document.getElementById("dspm-note")?.value.trim()||"";
+
+  if(!amount||amount<=0){ notify("⚠️ Enter a valid receipt amount"); return; }
+
+  const debtors = getDebtors();
+  const idx = debtors.findIndex(d=>d.id===debtorId);
+  if(idx<0){ notify("❌ Debtor not found"); return; }
+
+  const dr = debtors[idx];
+
+  // Split receipt across selected bills, oldest first, by remaining due
+  let paysBills = [];
+  let selectedBill = ""; // legacy single-bill field (first bill)
+  if(selectedBillIds.length>0){
+    const sales    = (dr.transactions||[]).filter(t=>t.type==="sale");
+    const payments = (dr.transactions||[]).filter(t=>t.type==="payment"||t.type==="return");
+    const billMap = {};
+    sales.forEach(t=>{ billMap[t.id]={ tx:t, paid: t._paidAmount||0 }; });
+    payments.forEach(t=>{
+      if(Array.isArray(t._paysBills)){
+        t._paysBills.forEach(pb=>{ if(pb.billId && billMap[pb.billId]) billMap[pb.billId].paid += Number(pb.amount)||0; });
+      } else if(t._paysBill && billMap[t._paysBill]){
+        billMap[t._paysBill].paid += t.amount;
+      }
+    });
+    const ordered = selectedBillIds
+      .map(id=>billMap[id])
+      .filter(Boolean)
+      .sort((a,b)=>new Date(a.tx.date)-new Date(b.tx.date));
+
+    let remainingAmt = amount;
+    ordered.forEach(b=>{
+      if(remainingAmt<=0) return;
+      const due = Math.max(0, b.tx.amount - b.paid);
+      const apply = Math.min(due, remainingAmt);
+      if(apply>0){ paysBills.push({billId:b.tx.id, amount:apply}); remainingAmt -= apply; }
+    });
+    selectedBill = paysBills[0]?.billId || "";
+  }
+
+  const txId = "DT"+Date.now()+Math.random().toString(36).slice(2,5);
+  const tx = {
+    id: txId, type:"payment", amount, date,
+    note: [note, mode, ref].filter(Boolean).join(" · ")||"Receipt",
+    invoiceNo: ref||"",
+    mode, ref,
+    _paysBill: selectedBill,         // legacy single-bill reference (first bill)
+    ...(paysBills.length>0 ? { _paysBills: paysBills } : {}),
+    actor: getActorName(),
+    createdAt: Date.now(),
+  };
+  if(!dr.transactions) dr.transactions=[];
+  dr.transactions.push(tx);
+  saveDebtors(debtors);
+  addHistoryLog('debtor','Debtor receipt recorded',`${dr.name||'Debtor'} · ${formatINR(amount)}${ref?` · ${ref}`:''}`,{txId});
+  cashRecordTx({direction:"in", amount, date, note:`Received from ${dr.name||"customer"}${ref?(" · "+ref):""}`, source:"debtor_payment", refId:txId, mode});
+  closeModal();
+  notify(`✅ Receipt of ${formatINR(amount)} recorded`,"success");
+  setTimeout(()=>openDebtorDetail(debtorId),200);
+}
+
 function openAddDebtTxModal(debtorId, defaultType){
+  if(defaultType === "payment") { openDebtSmartPaymentModal(debtorId); return; }
   const today = new Date().toISOString().slice(0,10);
   const dr = getDebtors().find(d=>d.id===debtorId);
   if(!dr){ notify("❌ Debtor not found","error"); return; }
@@ -19590,7 +19848,10 @@ async function scSendConnRequest(toShopId) {
   if (!toShopId || !/^SC-\d{6}$/i.test(toShopId)) { notify("❌ Invalid Shop ID. Format: SC-123456","error"); return; }
   if (toShopId === scMyShopId()) { notify("❌ That's your own Shop ID","error"); return; }
   const suffix = toShopId.replace(/^SC-/i,"");
-  const searchRes = await scSupa(`sc_users?phone=like.*${suffix}&select=phone`, {method:"GET",headers:{"Prefer":""}});
+  // sc_users direct SELECT is revoked from anon (CRIT-07/CRIT-06 lockdown),
+  // so resolve the Shop ID via the find_shop_by_suffix RPC instead.
+  const searchRes = await scSupa("rpc/find_shop_by_suffix", {method:"POST", headers:{"Prefer":""}, body: JSON.stringify({ p_suffix: suffix })});
+  if (!searchRes.ok) { notify("❌ Couldn't look up that Shop ID. Try again in a moment.","error"); return; }
   const users = await searchRes.json();
   if (!users || users.length === 0) { notify("❌ Shop ID not found — check the ID","error"); return; }
   const targetPhone = users[0].phone;
