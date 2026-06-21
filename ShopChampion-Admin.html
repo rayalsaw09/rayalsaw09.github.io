@@ -3934,6 +3934,7 @@ async function pushSync() {
             if (row && row.user_number) localStorage.setItem("sc_usernum_" + p, row.user_number);
           }
         } catch(e) {}
+      }
     }
   } catch(e) { console.warn("Could not pre-fetch user numbers:", e); }
   const btn=document.getElementById("push-btn"),dot=document.getElementById("sync-status-dot"),txt=document.getElementById("sync-status-text");
