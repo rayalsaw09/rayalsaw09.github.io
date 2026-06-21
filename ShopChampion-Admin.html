@@ -3414,13 +3414,16 @@ window.addEventListener("load", () => {
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 6000);
-        const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(savedPhone)}&select=blocked`, {
-          headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON },
+        const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/check_phone_exists`, {
+          method: "POST",
+          headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_phone: savedPhone }),
           signal: controller.signal
         });
         clearTimeout(timer);
         if (res.ok) {
-          const rows = await res.json();
+          const data = await res.json();
+          const rows = [{ blocked: data && data.blocked }];
           if (rows && rows.length > 0 && rows[0].blocked === true) {
             localStorage.removeItem("sc_auth_phone");
             document.getElementById("auth-phone").value = savedPhone;
@@ -3916,18 +3919,21 @@ async function pushSync() {
   try {
     const phones = customers.filter(c=>c.phone).map(c=>c.phone);
     if (phones.length > 0) {
-      const q = phones.slice(0,50).map(p=>`phone.eq.${encodeURIComponent(p)}`).join(",");
-      const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?or=(${q})&select=phone,user_number`, {
-        headers: {"apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON}
-      });
-      if (res.ok) {
-        const rows = await res.json();
-        rows.forEach(r => {
-          if (r.phone && r.user_number) {
-            localStorage.setItem("sc_usernum_" + r.phone, r.user_number);
+      const phoneList = phones.slice(0, 50);
+      for (const p of phoneList) {
+        if (localStorage.getItem("sc_usernum_" + p)) continue;
+        try {
+          const r = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/find_shop_by_suffix`, {
+            method: "POST",
+            headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+            body: JSON.stringify({ suffix: p })
+          });
+          if (r.ok) {
+            const d = await r.json();
+            const row = Array.isArray(d) ? d[0] : d;
+            if (row && row.user_number) localStorage.setItem("sc_usernum_" + p, row.user_number);
           }
-        });
-      }
+        } catch(e) {}
     }
   } catch(e) { console.warn("Could not pre-fetch user numbers:", e); }
   const btn=document.getElementById("push-btn"),dot=document.getElementById("sync-status-dot"),txt=document.getElementById("sync-status-text");
@@ -4728,12 +4734,7 @@ async function setNewPassword() {
         body: JSON.stringify({ p_phone: authPhone, p_new_hash: hashed })
       });
       if (!patchRpc.ok) {
-        // Fallback: direct PATCH
-        await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(authPhone)}`, {
-          method: "PATCH",
-          headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
-          body: JSON.stringify({ password_hash: hashed })
-        });
+        console.warn("update_password RPC failed:", await patchRpc.text());
       }
     }
   } catch(e) { console.warn("Supabase save error (continuing with local):", e.message); }
@@ -4860,11 +4861,14 @@ function onLoginSuccess(phone) {
   }
   // Cache user_number for Support ID display
   if (phone && !localStorage.getItem("sc_usernum_" + phone)) {
-    fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=user_number`, {
-      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/find_shop_by_suffix`, {
+      method: "POST",
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ suffix: phone })
     }).then(r => r.json()).then(d => {
-      if (d && d[0] && d[0].user_number) {
-        localStorage.setItem("sc_usernum_" + phone, d[0].user_number);
+      const row = Array.isArray(d) ? d[0] : d;
+      if (row && row.user_number) {
+        localStorage.setItem("sc_usernum_" + phone, row.user_number);
       }
     }).catch(() => {});
   }
@@ -4883,11 +4887,13 @@ function onLoginSuccess(phone) {
 async function checkIfBlocked(phone) {
   if (!phone) return;
   try {
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_users?phone=eq.${encodeURIComponent(phone)}&select=blocked`, {
-      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/check_phone_exists`, {
+      method: "POST",
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_phone: phone })
     });
-    const rows = await res.json();
-    if (rows && rows.length > 0 && rows[0].blocked === true) {
+    const data = await res.json();
+    if (data && data.blocked === true) {
       // User is blocked — force logout
       localStorage.removeItem("sc_auth_phone");
       document.getElementById("main-app").style.display = "none";
