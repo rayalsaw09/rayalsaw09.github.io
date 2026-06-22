@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Shop Champion — Admin</title>
-<meta name="app-version" content="v5.1" />
+<meta name="app-version" content="v5.3" />
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
@@ -9826,6 +9826,15 @@ function saveCreditorModal(editId){
 
   const creditors = getCreditors();
 
+  // Free plan cap (new entries only)
+  if(!editId && !_hasFullAccess()){
+    const activeCount = creditors.filter(c=>!c._archived).length;
+    if(activeCount >= FREE_MAX_CREDITORS){
+      _showUpgradePrompt(`Free plan में अधिकतम ${FREE_MAX_CREDITORS} creditors · Pro पर unlimited`);
+      return;
+    }
+  }
+
   // Duplicate name check (case-insensitive, skip self when editing)
   const dupCr = creditors.find(c => c.name.trim().toLowerCase() === name.toLowerCase() && c.id !== editId && !c._archived);
   if(dupCr){
@@ -12582,6 +12591,15 @@ function saveDebtorModal(editId){
 
   const debtors = getDebtors();
 
+  // Free plan cap (new entries only)
+  if(!editId && !_hasFullAccess()){
+    const activeCount = debtors.filter(d=>!d._archived).length;
+    if(activeCount >= FREE_MAX_DEBTORS){
+      _showUpgradePrompt(`Free plan में अधिकतम ${FREE_MAX_DEBTORS} debtors · Pro पर unlimited`);
+      return;
+    }
+  }
+
   // Duplicate name check (case-insensitive, skip self when editing)
   const dupDr = debtors.find(d => d.name.trim().toLowerCase() === name.toLowerCase() && d.id !== editId && !d._archived);
   if(dupDr){
@@ -14825,26 +14843,26 @@ function renderSettings(){
 
   // ── Feature comparison data ──
   const FREE_FEATURES = [
-    ["👥", t('ftCustomers'), t('fvUpTo100')],
-    ["🛒", t('ftSalesPurchases'), t('fvIncluded')],
-    ["🏆", t('ftLeaderboard'), t('fvIncluded')],
-    ["📱", t('ftWhatsApp'), t('fvProOnly')],
-    ["📦", t('ftInventory'), t('fvUpTo50')],
-    ["📺", t('ftDisplay'), t('fvWithAds')],
-    ["💳", t('ftCreditorsDebtors'), t('fvUpTo10')],
-    ["💬", t('ftMessages'), t('fvIncluded')],
+    ["👥", "Customers", `Up to ${FREE_MAX_CUSTOMERS}`],
+    ["🛒", "Sales & Purchases", "Included"],
+    ["💳", "Creditors & Debtors", "Up to 10 each"],
+    ["📦", "Inventory Items", `Up to ${FREE_MAX_INV_ITEMS}`],
+    ["💬", "Shop Messaging", "Included"],
+    ["🏆", "Rankings / Leaderboard", "Included"],
+    ["📱", "WhatsApp Reminders", "Pro only"],
+    ["📺", "Display Screen", "With ads"],
   ];
   const PRO_FEATURES = [
-    ["👥", t('ftCustomers'), t('fvUnlimited')],
-    ["📊", t('ftAnalytics'), t('fvFullAccess')],
-    ["📈", t('ftCompare'), t('fvFullAccess')],
-    ["📦", t('ftInventory'), t('fvUnlimited')],
-    ["💳", t('ftCreditorsDebtors'), t('fvUnlimited')],
-    ["📱", t('ftWhatsApp'), t('fvIncluded')],
-    ["🧾", t('ftExport'), t('fvIncluded')],
-    ["🏷️", t('ftGst'), t('fvIncluded')],
-    ["🔔", t('ftPush'), t('fvIncluded')],
-    ["📺", t('ftDisplay'), t('fvAdFree')],
+    ["👥", "Customers", "Unlimited"],
+    ["💳", "Creditors & Debtors", "Unlimited"],
+    ["📦", "Inventory", "Unlimited"],
+    ["📊", "Analytics", "Full access"],
+    ["⚖️", "Compare Periods", "Full access"],
+    ["🧾", "GST Bills & Export", "Included"],
+    ["🏷️", "GSTIN Auto-lookup", "Included"],
+    ["👤", "Team Members", "Included"],
+    ["🔔", "Push Notifications", "Included"],
+    ["📺", "Display Screen", "Ad-free"],
   ];
 
   const trialDaysLeft = _trialDaysLeft();
@@ -14907,6 +14925,14 @@ function renderSettings(){
             <div style="display:flex;align-items:center;gap:8px;">
               <div style="flex:1;background:#1e2a45;border-radius:4px;height:6px;overflow:hidden;"><div style="background:#f90;height:100%;width:${Math.min(100,Math.round(inventoryItems.length/FREE_MAX_INV_ITEMS*100))}%;transition:width .3s;"></div></div>
               <span style="font-size:11px;color:#f90;font-weight:700;min-width:70px;">📦 ${inventoryItems.length}/${FREE_MAX_INV_ITEMS}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;background:#1e2a45;border-radius:4px;height:6px;overflow:hidden;"><div style="background:#a78bfa;height:100%;width:${Math.min(100,Math.round(getCreditors().filter(c=>!c._archived).length/FREE_MAX_CREDITORS*100))}%;transition:width .3s;"></div></div>
+              <span style="font-size:11px;color:#a78bfa;font-weight:700;min-width:70px;">🏦 ${getCreditors().filter(c=>!c._archived).length}/${FREE_MAX_CREDITORS}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;background:#1e2a45;border-radius:4px;height:6px;overflow:hidden;"><div style="background:#34d399;height:100%;width:${Math.min(100,Math.round(getDebtors().filter(d=>!d._archived).length/FREE_MAX_DEBTORS*100))}%;transition:width .3s;"></div></div>
+              <span style="font-size:11px;color:#34d399;font-weight:700;min-width:70px;">🧾 ${getDebtors().filter(d=>!d._archived).length}/${FREE_MAX_DEBTORS}</span>
             </div>
           </div>
         </div>
@@ -15049,39 +15075,62 @@ function renderSettings(){
     ${(()=>{
       const SC_CHANGELOG = [
         {
-          version: "v5.2",
+          version: "v5.3",
           date: "June 2026",
           badge: "Latest",
           badgeColor: "#22c55e",
           items: [
+            "🔔 Push notifications fixed end-to-end — token now saves correctly",
+            "💬 Received message bubbles now visible on all themes (light/dark/day)",
+            "⚡ Nav badge updates instantly when messages arrive or are read",
+            "🛡️ Firestore listener leaks on logout fixed — no ghost data after re-login",
+            "👤 Team tab now includes Expense permissions (Add & Delete)",
+            "📋 History tab — Expense entries now show correct icon and filter pill",
+            "⚠️ Alerts tab — Overdue days now based on actual unpaid bills only",
+            "⚙️ Settings — Cash tracking & price fill modes now sync across devices",
+            "🔢 Customers tab loading fixed — no more blank screen after tab switch",
+            "📲 Notification permission prompt shows as friendly card, not browser popup"
+          ]
+        },
+        {
+          version: "v5.2",
+          date: "May 2026",
+          badge: "",
+          badgeColor: "",
+          items: [
             "🌐 Language picker now sets app language on first registration",
             "🏷️ Renamed 'Cust. Sales' to 'Add Sale' for clarity",
             "🔒 Pro upgrade screen now shows ₹299/month pricing",
-            "📋 What's New section added to Settings"
+            "📋 What's New section added to Settings",
+            "✏️ Edit History modal for all entity types (Inventory, Creditors, Debtors, Customers, Expenses)",
+            "👤 Actor / staff name stamped on every transaction entry",
+            "💰 Payment mode selector (Cash / UPI / NEFT / Cheque) on Sale and Expense forms"
           ]
         },
         {
           version: "v5.1",
-          date: "May 2026",
+          date: "April 2026",
           badge: "",
           badgeColor: "",
           items: [
             "💬 WhatsApp-style inter-shop messaging system",
             "🔑 Security question based password reset",
             "🏪 Mandatory shop name field at registration",
-            "⚡ Real-time message polling"
+            "⚡ Real-time message polling & unread badge",
+            "🔗 Shop Connect — link shops, share ledger, sync transactions"
           ]
         },
         {
           version: "v5.0",
-          date: "April 2026",
+          date: "March 2026",
           badge: "",
           badgeColor: "",
           items: [
             "🧾 Full GST billing with CGST/SGST/IGST",
             "🏷️ HSN codes & GSTIN auto-validator",
             "🖨️ A4 and thermal invoice layouts",
-            "📦 Inventory category filters & search"
+            "📦 Inventory category filters & search",
+            "📷 Barcode scanner (BarcodeDetector API + ZXing fallback)"
           ]
         }
       ];
@@ -16184,7 +16233,16 @@ async function viRunImport() {
 
     else if (st.type === 'debtors') {
       const debtors = getDebtors();
+      const activeCount = debtors.filter(d=>!d._archived).length;
+      if(!_hasFullAccess() && activeCount >= FREE_MAX_DEBTORS){
+        _showUpgradePrompt(`Free plan में अधिकतम ${FREE_MAX_DEBTORS} debtors · Pro पर unlimited`);
+        statusEl.innerHTML = `<span style="color:#f66;">⚠️ Free plan limit reached (${FREE_MAX_DEBTORS} debtors). Upgrade to Pro to import more.</span>`;
+        return;
+      }
+      const debtorCap = _hasFullAccess() ? Infinity : FREE_MAX_DEBTORS;
+      let notImported = 0;
       records.forEach(r=>{
+        if(!_hasFullAccess() && debtors.filter(d=>!d._archived).length >= debtorCap){ notImported++; return; }
         const dup = debtors.find(d=>d.name.trim().toLowerCase()===r.name.toLowerCase() && !d._archived);
         if (dup) { skipped++; return; }
         const bal = parseFloat((r.balance||"0").replace(/[^0-9.\-]/g,'')) || 0;
@@ -16203,11 +16261,25 @@ async function viRunImport() {
       });
       saveDebtors(debtors);
       addHistoryLog('debtor','Imported from Vyapar',`${added} debtor${added!==1?'s':''}`);
+      if(notImported > 0){
+        statusEl.innerHTML = `<span style="color:#f66;">⚠️ Only ${added} imported. Free plan limit is ${FREE_MAX_DEBTORS} debtors. ${notImported} not imported. Upgrade to Pro for unlimited.</span>`;
+        notify(`⚠️ Import capped: ${added} added, ${notImported} not imported`);
+        return;
+      }
     }
 
     else if (st.type === 'creditors') {
       const creditors = getCreditors();
+      const activeCrCount = creditors.filter(c=>!c._archived).length;
+      if(!_hasFullAccess() && activeCrCount >= FREE_MAX_CREDITORS){
+        _showUpgradePrompt(`Free plan में अधिकतम ${FREE_MAX_CREDITORS} creditors · Pro पर unlimited`);
+        statusEl.innerHTML = `<span style="color:#f66;">⚠️ Free plan limit reached (${FREE_MAX_CREDITORS} creditors). Upgrade to Pro to import more.</span>`;
+        return;
+      }
+      const creditorCap = _hasFullAccess() ? Infinity : FREE_MAX_CREDITORS;
+      let notImportedCr = 0;
       records.forEach(r=>{
+        if(!_hasFullAccess() && creditors.filter(c=>!c._archived).length >= creditorCap){ notImportedCr++; return; }
         const dup = creditors.find(c=>c.name.trim().toLowerCase()===r.name.toLowerCase() && !c._archived);
         if (dup) { skipped++; return; }
         const bal = parseFloat((r.balance||"0").replace(/[^0-9.\-]/g,'')) || 0;
@@ -16227,10 +16299,23 @@ async function viRunImport() {
       });
       saveCreditors(creditors);
       addHistoryLog('creditor','Imported from Vyapar',`${added} creditor${added!==1?'s':''}`);
+      if(notImportedCr > 0){
+        statusEl.innerHTML = `<span style="color:#f66;">⚠️ Only ${added} imported. Free plan limit is ${FREE_MAX_CREDITORS} creditors. ${notImportedCr} not imported. Upgrade to Pro for unlimited.</span>`;
+        notify(`⚠️ Import capped: ${added} added, ${notImportedCr} not imported`);
+        return;
+      }
     }
 
     else if (st.type === 'inventory') {
+      if(!_hasFullAccess() && inventoryItems.length >= FREE_MAX_INV_ITEMS){
+        _showUpgradePrompt(`Free plan में अधिकतम ${FREE_MAX_INV_ITEMS} inventory items · Pro पर unlimited`);
+        statusEl.innerHTML = `<span style="color:#f66;">⚠️ Free plan limit reached (${FREE_MAX_INV_ITEMS} items). Upgrade to Pro to import more.</span>`;
+        return;
+      }
+      const invCap = _hasFullAccess() ? Infinity : FREE_MAX_INV_ITEMS;
+      let notImportedInv = 0;
       records.forEach(r=>{
+        if(!_hasFullAccess() && inventoryItems.length >= invCap){ notImportedInv++; return; }
         const dup = inventoryItems.find(x=>x.name.trim().toLowerCase()===r.name.toLowerCase());
         if (dup) { skipped++; return; }
         const stock = parseFloat((r.stock||"0").replace(/[^0-9.\-]/g,'')) || 0;
@@ -16246,6 +16331,11 @@ async function viRunImport() {
       });
       saveInventory();
       addHistoryLog('inventory','Imported from Vyapar',`${added} item${added!==1?'s':''}`);
+      if(notImportedInv > 0){
+        statusEl.innerHTML = `<span style="color:#f66;">⚠️ Only ${added} imported. Free plan limit is ${FREE_MAX_INV_ITEMS} items. ${notImportedInv} not imported. Upgrade to Pro for unlimited.</span>`;
+        notify(`⚠️ Import capped: ${added} added, ${notImportedInv} not imported`);
+        return;
+      }
     }
 
     statusEl.innerHTML = `<span style="color:#5aaa8a;">✅ ${t('viDone')} ${added} ${t('viPreviewRows')}${skipped?` · ⚠️ ${skipped} skipped (duplicate names)`:''}</span>`;
@@ -17774,6 +17864,8 @@ var FREE_TABS = [0, 8]; // sales (0) and leaderboard/rankings (8) free by defaul
 // ── FREE PLAN USAGE CAPS ──────────────────────────────────────
 const FREE_MAX_CUSTOMERS  = 100;
 const FREE_MAX_INV_ITEMS  = 50;
+const FREE_MAX_CREDITORS  = 10;
+const FREE_MAX_DEBTORS    = 10;
 
 // ── 14-DAY PRO TRIAL ──────────────────────────────────────────
 // Trial starts on first login. trialStatus: "active"|"expired"|"none"
@@ -23747,7 +23839,7 @@ function createBillObject({ custId, soldItems, amount, billNum, notes, date }) {
 function sendBillWhatsApp(bill) {
   // Pro-only feature
   if (!(licensePlan === "pro" && licenseStatus === "pro")) {
-    showProGate();
+    _showUpgradePrompt("WhatsApp bill send is a Pro feature · Upgrade to send bills via WhatsApp");
     return;
   }
   const shopName = appSettings.shopName || "Shop Champion";
