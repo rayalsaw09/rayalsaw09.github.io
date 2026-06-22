@@ -1769,7 +1769,7 @@ var TRANSLATIONS = {
     // Sales tab extras
     salesHeading:"🧾 Sales", addSaleTab:"🧾 Add Sale",
     inventoryMode:"Inventory Mode", invModeDesc:"Amount auto-calculated from items × price",
-    switchMode:"Switch", standardMode:"Standard Mode", stdModeDesc:"Enter amount manually",
+    switchMode:"Switch", standardMode:"Quick Sale Mode", stdModeDesc:"Enter amount manually (no stock update)",
     searchCustomer:"Search Customer", searchByNamePhone:"Search by name, phone or ID...",
     purchaseAmount:"Purchase Amount (₹)",
     itemsSoldInv:"🛒 Items Sold — enter qty & selling price",
@@ -2202,7 +2202,7 @@ var TRANSLATIONS = {
     // Sales tab extras
     salesHeading:"🧾 बिक्री", addSaleTab:"🧾 बिक्री जोड़ें",
     inventoryMode:"इन्वेंटरी मोड", invModeDesc:"राशि आइटम × कीमत से स्वतः भरी जाती है",
-    switchMode:"बदलें", standardMode:"सामान्य मोड", stdModeDesc:"राशि मैन्युअल दर्ज करें",
+    switchMode:"बदलें", standardMode:"त्वरित बिक्री", stdModeDesc:"राशि मैन्युअल दर्ज करें (स्टॉक नहीं घटेगा)",
     searchCustomer:"ग्राहक खोजें", searchByNamePhone:"नाम, फ़ोन या ID से खोजें...",
     purchaseAmount:"बिक्री राशि (₹)",
     itemsSoldInv:"🛒 बेचे गए आइटम — मात्रा और कीमत दर्ज करें",
@@ -3122,7 +3122,7 @@ function loadSettingsFromCloud(cb) {
           if (!localLang) { setLanguage(d.lang); }
           else { currentLang = localLang; } // keep local preference
         }
-        if (d.purchase_mode)     { try { localStorage.setItem(storageKey("purchase_mode"), d.purchase_mode); } catch {} }
+        if (d.purchase_mode)     { try { localStorage.setItem(storageKey("purchase_mode"), d.purchase_mode); _purchaseModeCache = d.purchase_mode; } catch {} }
         if (d.cash_tracking_mode){ try { localStorage.setItem(cashTrackingModeKey(), d.cash_tracking_mode); } catch {} }
         if (d.sync_data)         { syncBinId = d.sync_data.binId || ""; syncApiKey = d.sync_data.apiKey || ""; }
         if (d.license) {
@@ -6012,13 +6012,15 @@ async function ptSubmit(){
   });
   const isInvMode = getPurchaseMode()==="inventory";
 
-  // Prevent selling more than available stock
-  for(const si of soldItems){
-    const available = invGetStock(si.name);
-    if(si.qty > available){
-      notify(`❌ Insufficient stock for ${si.name}. Available: ${available}`,'error');
-      if(submitBtn) submitBtn.disabled=false;
-      return;
+  // Prevent selling more than available stock (only in Inventory Mode)
+  if(isInvMode){
+    for(const si of soldItems){
+      const available = invGetStock(si.name);
+      if(si.qty > available){
+        notify(`❌ Insufficient stock for ${si.name}. Available: ${available}`,'error');
+        if(submitBtn) submitBtn.disabled=false;
+        return;
+      }
     }
   }
   // In inventory mode, amount comes from items total
@@ -6040,7 +6042,7 @@ async function ptSubmit(){
     if(!a||a<=0){notify("❌ Amount must be greater than ₹0","error");document.getElementById("pt-amt").focus();if(submitBtn)submitBtn.disabled=false;return;}
     if(a>10000000){notify("❌ Amount seems too high — please check","error");if(submitBtn)submitBtn.disabled=false;return;}
   }
-  if(soldItems.length)invDeductSold(soldItems, s);
+  if(isInvMode && soldItems.length)invDeductSold(soldItems, s);
   const ptPayMode = document.getElementById("pt-mode-val")?.value || "Cash";
   addPurchase(s,{amount:a,bill:document.getElementById("pt-bill").value,notes:document.getElementById("pt-notes").value,date:document.getElementById("pt-date-val").value||document.getElementById("pt-date").value,soldItems,payMode:ptPayMode});
   // Bug 4 fix: only clear amt in standard mode (pt-amt doesn't exist in inventory mode)
@@ -7715,10 +7717,10 @@ function cashLedgerKey(){ return storageKey("cash_ledger"); }
 function cashOpeningKey(account){ return storageKey("cash_opening"+(account&&account!=="cash"?"_"+account:"")); }
 function cashTrackingModeKey(){ return storageKey("cash_tracking_mode"); }
 
-// "mixed"    → one combined Cash+Bank balance (default, simplest)
-// "separate" → independent Cash and Bank balances based on payment mode
+// "mixed"    → one combined Cash+Bank balance
+// "separate" → independent Cash and Bank balances based on payment mode (default)
 function getCashTrackingMode(){
-  return localStorage.getItem(cashTrackingModeKey())||"mixed";
+  return localStorage.getItem(cashTrackingModeKey())||"separate";
 }
 function setCashTrackingMode(mode){
   localStorage.setItem(cashTrackingModeKey(), mode==="separate"?"separate":"mixed");
@@ -14845,7 +14847,7 @@ function renderSettings(){
   const FREE_FEATURES = [
     ["👥", "Customers", `Up to ${FREE_MAX_CUSTOMERS}`],
     ["🛒", "Sales & Purchases", "Included"],
-    ["💳", "Creditors & Debtors", "Up to 10 each"],
+    ["💳", "Creditors & Debtors", `Up to ${FREE_MAX_CREDITORS} each`],
     ["📦", "Inventory Items", `Up to ${FREE_MAX_INV_ITEMS}`],
     ["💬", "Shop Messaging", "Included"],
     ["🏆", "Rankings / Leaderboard", "Included"],
@@ -15054,7 +15056,7 @@ function renderSettings(){
     ${section("Shop",
       row("🏪","Shop Name & Icon",appSettings.shopName||"Not set","openShopNameModal()") +
       row("🔊","Voice Announcement",voiceOn?"Enabled":"Disabled","openVoiceModal()") +
-      row("📦","Purchase Mode",getPurchaseMode()==="inventory"?"📦 Inventory Mode — items × price":"🛒 Standard Mode — manual amount","openPurchaseModeModal()") +
+      row("📦","Purchase Mode",getPurchaseMode()==="inventory"?"📦 Inventory Mode — items × price":"🛒 Quick Sale Mode — manual amount, no stock update","openPurchaseModeModal()") +
       row("💰","Item Price Fill",getAutoPriceMode()==="auto"?"🔒 Auto — fills & locks from inventory price":"✏️ Manual — pre-fills but user can edit","openAutoPriceModeModal()") +
       row("🏦","Cash & Bank Tracking",getCashTrackingMode()==="separate"?"🏦 Separate — Cash vs Bank balances":"💵 Combined — one total balance","openCashTrackingModal()")
     )}
@@ -19168,10 +19170,13 @@ function setAutoPriceMode(mode){
   try{localStorage.setItem("sc_app_settings",JSON.stringify(appSettings));}catch(e){}
   saveSettingsToCloud();
 }
+let _purchaseModeCache = null;
 function getPurchaseMode(){
+  if(_purchaseModeCache) return _purchaseModeCache;
   return localStorage.getItem(storageKey("purchase_mode"))||"standard";
 }
 function setPurchaseMode(m){
+  _purchaseModeCache = m;
   localStorage.setItem(storageKey("purchase_mode"),m);
   saveSettingsToCloud();
 }
@@ -19419,7 +19424,8 @@ function ptShowItemStock(input){
       }
     }
   } else {
-    hint.textContent = name?"⚠️ Not in inventory — will be created on save":"";
+    const _isInv = getPurchaseMode()==="inventory";
+    hint.textContent = name?(_isInv?"⚠️ Not in inventory — will be created on save":"⚠️ Not in inventory (reference only — stock unchanged)"):"";
     hint.style.color="#f84";
   }
 }
@@ -19915,7 +19921,11 @@ var _scFcmToken         = null; // FCM push token for this browser/device
 async function scRequestPushPermission() {
   if (!("Notification" in window)) { notify("❌ Notifications not supported on this browser","error"); return; }
   if (Notification.permission === "denied") {
-    notify("❌ Notifications blocked. Open browser Settings → Site Settings → Notifications → Allow for this site.","error");
+    notify("❌ Notifications blocked. Go to browser Settings → Site Settings → Notifications → Allow for this site. Works best on Chrome/Edge.", "error");
+    return;
+  }
+  if (!("PushManager" in window)) {
+    notify("❌ This browser doesn't support push notifications. Use Chrome or Edge for notifications.", "error");
     return;
   }
   try {
@@ -19966,23 +19976,48 @@ async function scInitFCM(force=false) {
   if (typeof SC_FCM_VAPID_KEY === "undefined" || SC_FCM_VAPID_KEY === "YOUR_VAPID_KEY_HERE") return;
   try {
     if (!("Notification" in window)) return;
-    // If already granted — just get/refresh the token silently
-    // If denied — never ask again via scInitFCM (user must go to Settings)
-    // If default (not asked) — only prompt if force=true (user tapped Allow button)
+    // Check for push support (missing on some Android browsers like Samsung Internet, UC, older Firefox)
+    if (!("PushManager" in window)) {
+      if (force) notify("❌ This browser doesn't support push notifications. Try Chrome or Edge.", "error");
+      return;
+    }
     const perm = Notification.permission;
     if (perm === "denied") return;
     if (perm !== "granted" && !force) return;
     const finalPerm = perm === "granted" ? "granted" : await Notification.requestPermission();
     if (finalPerm !== "granted") return;
+
+    // Ensure Firebase messaging is available
+    if (typeof firebase === "undefined" || typeof firebase.messaging !== "function") {
+      console.warn("[FCM] Firebase messaging SDK not loaded"); return;
+    }
     const messaging = firebase.messaging();
-    // Use the already-registered SW (stored at app load) — avoids path mismatch on GitHub Pages
-    const reg = window._swRegistration
-      || await navigator.serviceWorker.getRegistration()
-      || await navigator.serviceWorker.register('./sw.js');
+
+    // Wait for SW to be ready — some devices need a moment
+    let reg = window._swRegistration;
+    if (!reg) {
+      try {
+        reg = await navigator.serviceWorker.ready; // waits until SW is active
+      } catch(e) {
+        reg = await navigator.serviceWorker.getRegistration()
+           || await navigator.serviceWorker.register('./sw.js');
+      }
+    }
     if (!reg) { console.warn("[FCM] No SW registration available"); return; }
     window._swRegistration = reg;
-    const token = await messaging.getToken({ vapidKey: SC_FCM_VAPID_KEY, serviceWorkerRegistration: reg });
-    if (!token) { console.warn("[FCM] getToken returned null — check VAPID key and SW registration"); return; }
+
+    // Retry getToken up to 3 times — some devices need a delay after SW activation
+    let token = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        token = await messaging.getToken({ vapidKey: SC_FCM_VAPID_KEY, serviceWorkerRegistration: reg });
+        if (token) break;
+      } catch(tokenErr) {
+        console.warn(`[FCM] getToken attempt ${attempt} failed:`, tokenErr.message);
+        if (attempt < 3) await new Promise(r => setTimeout(r, 1500 * attempt));
+      }
+    }
+    if (!token) { console.warn("[FCM] getToken returned null after retries — check VAPID key and SW registration"); return; }
     _scFcmToken = token;
     console.log("[FCM] Token obtained:", token.slice(0,20)+"...");
     // MED-10: Store FCM token via secure RPC instead of direct PATCH on sc_users
@@ -22771,8 +22806,8 @@ function openPurchaseModeModal(){
            style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:2px solid ${cur==='standard'?'#4a8aff':'#1e2a45'};background:${cur==='standard'?'#0a1628':'#080c18'};cursor:pointer;margin-bottom:12px;">
         <span style="font-size:28px;">🛒</span>
         <div style="flex:1;">
-          <div style="font-weight:800;font-size:15px;color:${cur==='standard'?'#7ab3ff':'#e8eaf0'};">Standard Mode</div>
-          <div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-top:3px;">Enter purchase amount manually. Optionally attach items sold (deducts from inventory).</div>
+          <div style="font-weight:800;font-size:15px;color:${cur==='standard'?'#7ab3ff':'#e8eaf0'};">Quick Sale Mode</div>
+          <div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-top:3px;">Enter purchase amount manually. Optionally list items for reference — stock is NOT deducted.</div>
         </div>
         ${cur==='standard'?'<span style="font-size:20px;color:#4a8aff;">✓</span>':""}
       </div>
