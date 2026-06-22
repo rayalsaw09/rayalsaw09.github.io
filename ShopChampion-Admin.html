@@ -2731,8 +2731,16 @@ function getTabs(){
 function getPoints(n) { return Math.floor(n / 10); }
 function formatINR(n) { return "₹" + Number(n).toLocaleString("en-IN"); }
 // MED-03: Always compute totalSpend from source to avoid denorm drift
+// Unpaid borrows are excluded (partial borrows count only the paid portion) so this
+// matches filteredSpend()'s "All Time" logic used by the Leaderboard tab — otherwise
+// a customer's rank/spend shown here could differ from their rank on the Leaderboard.
 function getCustomerTotalSpend(c) {
-  return (c.purchases || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+  return (c.purchases || []).reduce((s, p) => {
+    if (p.type === 'borrow' && p.borrowStatus !== 'returned') {
+      return s + (p.borrowStatus === 'partial' ? Number(p.amountPaid || 0) : 0);
+    }
+    return s + Number(p.amount || 0);
+  }, 0);
 }
 
 // ─── THEME-AWARE TINT HELPERS ──────────────────────────────────
@@ -2820,6 +2828,7 @@ var custSelectMode = false;  // multi-select mode toggle
 var custSelected = new Set(); // selected customer IDs
 var custFilteredIds = [];     // IDs of currently filtered/visible customers (for Select All)
 var fbUnsubscribe = null; // real-time listener handle
+var _prefsUnsubscribe = null; // prefs/license onSnapshot handle
 
 // ── Firebase init ──
 function initFirebase(cfg) {
@@ -3030,6 +3039,7 @@ function saveSettingsToCloud(extraFields) {
     appStyle:          currentAppStyle,
     lang:              currentLang,
     purchase_mode:     getPurchaseMode(),
+    cash_tracking_mode: getCashTrackingMode(),
     sync_data:         { binId: syncBinId, apiKey: syncApiKey },
     updatedAt:         Date.now(),
     ...(extraFields || {})
@@ -3097,6 +3107,7 @@ function loadSettingsFromCloud(cb) {
           else { currentLang = localLang; } // keep local preference
         }
         if (d.purchase_mode)     { try { localStorage.setItem(storageKey("purchase_mode"), d.purchase_mode); } catch {} }
+        if (d.cash_tracking_mode){ try { localStorage.setItem(cashTrackingModeKey(), d.cash_tracking_mode); } catch {} }
         if (d.sync_data)         { syncBinId = d.sync_data.binId || ""; syncApiKey = d.sync_data.apiKey || ""; }
         if (d.license) {
           // Apply license to memory variables AND localStorage (not just localStorage)
@@ -3131,13 +3142,16 @@ function startFirestoreListener() {
     return;
   }
   if (fbUnsubscribe) fbUnsubscribe();
+  let _firstSnapshotDone = false;
   fbUnsubscribe = userCol().onSnapshot(snap => {
     customers = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
     customers.forEach(c=>{ if(!c.photo)c.photo=""; if(!c.purchases)c.purchases=[]; if(!c.borrows)c.borrows=[]; });
     _invalidateAnalyticsCache(); // MED-05: rebuild cache on live data change
+    _firstSnapshotDone = true;
     safeRenderTab(currentTab);
     updateDbStatus("🔥 Firebase · live", "#4f4");
   }, err => {
+    _firstSnapshotDone = true; // allow render even on error
     updateDbStatus("⚠️ Firebase error: " + err.message, "#f84");
   });
   // Always start inventory listener together with customer listener
@@ -3154,7 +3168,8 @@ function startFirestoreListener() {
     // ── REALTIME LICENSE LISTENER: fires instantly when SellerPanel grants Pro ──
     // Uses a flag to skip the FIRST snapshot (page load) — only react to CHANGES
     let _prefsListenerReady = false;
-    db.collection("users").doc(authPhone)
+    if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
+    _prefsUnsubscribe = db.collection("users").doc(authPhone)
       .collection("settings").doc("prefs")
       .onSnapshot(snap => {
         // Skip the initial snapshot fired on page load — only process actual changes
@@ -3218,12 +3233,14 @@ async function saveCustomers() {
 }
 
 async function saveOneCustomer(c) {
+  _invalidateAnalyticsCache(); // MED-05: a single customer save can change purchase totals too
   if (useLocalOnly) { saveCustomers(); return; }
   const { _docId, ...data } = c;
   await userCol().doc(c.id).set(data);
 }
 
 async function deleteOneCustomer(id) {
+  _invalidateAnalyticsCache(); // MED-05: removing a customer changes purchase totals
   addDeletedId(id); // prevent this ID from being reused
   customers = customers.filter(c => c.id !== id);
   if (useLocalOnly) { saveCustomers(); return; }
@@ -4761,8 +4778,9 @@ function onLoginSuccess(phone) {
   document.getElementById("main-app").style.display = "block";
   // Init ShopChat
   setTimeout(()=>{
-    scLoadConnections().then(()=>scLoadPendingRequests()).then(()=>{
+    scLoadConnections().then(()=>scLoadPendingRequests()).then(async()=>{
       scStartPolling();
+      await scRefreshUnreadBadges();
       if(currentTab===9) safeRenderTab(9);
     });
     scInitFCM(); // request push permission and save FCM token
@@ -4959,7 +4977,9 @@ function doLogout() {
   localStorage.removeItem("sc_auth_uid");
   authPhone = ""; // clear in-memory phone so storageKey() resets
   _loginSuccessFired = false; // allow next login to proceed
-  // Unsubscribe inventory real-time listener
+  // Unsubscribe all Firestore real-time listeners
+  if(fbUnsubscribe){ try{ fbUnsubscribe(); } catch(e){} fbUnsubscribe=null; }
+  if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); } catch(e){} _prefsUnsubscribe=null; }
   if(invUnsubscribe){ try{ invUnsubscribe(); } catch(e){} invUnsubscribe=null; }
   // Unsubscribe shop-connect listeners
   if(_payReqListener){ try{ _payReqListener(); } catch(e){} _payReqListener=null; }
@@ -5245,7 +5265,16 @@ function renderTab(i){
   if(i===0){el.innerHTML=renderPurchaseTab(s);if(getPurchaseMode()==="inventory"){const list=document.getElementById("pt-items-list");if(list&&list.children.length===0)ptAddItemRow();}
     setTimeout(scRenderPurchaseBanners, 0);
   }
-  else if(i===1){const q=document.getElementById("cust-search")?.value||"";el.innerHTML=renderCustomers(s,q);}
+  else if(i===1){
+    if(!_firstSnapshotDone && db && authPhone && !useLocalOnly){
+      el.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;color:#7a8aaa;">
+        <div style="width:32px;height:32px;border:3px solid #1e3a6e;border-top-color:#60a5fa;border-radius:50%;animation:spin .8s linear infinite;"></div>
+        <div style="font-size:13px;">Loading customers...</div>
+      </div>`;
+    } else {
+      const q=document.getElementById("cust-search")?.value||"";el.innerHTML=renderCustomers(s,q);
+    }
+  }
   else if(i===2)el.innerHTML=renderCreditorsTab();
   else if(i===3)el.innerHTML=renderDebtorsTab();
   else if(i===4)el.innerHTML=renderInventoryTab();
@@ -5421,6 +5450,7 @@ var custGstFilter  = 'all'; // 'all' | 'gst' | 'nogst'
 function setCustDateFilter(f, date='') {
   custDateFilter = f;
   custCustomDate = date;
+  custPage = 0;
   renderTab(1);
 }
 
@@ -5970,9 +6000,17 @@ async function ptSubmit(){
   if(soldItems.length)invDeductSold(soldItems, s);
   const ptPayMode = document.getElementById("pt-mode-val")?.value || "Cash";
   addPurchase(s,{amount:a,bill:document.getElementById("pt-bill").value,notes:document.getElementById("pt-notes").value,date:document.getElementById("pt-date-val").value||document.getElementById("pt-date").value,soldItems,payMode:ptPayMode});
-  document.getElementById("pt-amt").value="";
+  // Bug 4 fix: only clear amt in standard mode (pt-amt doesn't exist in inventory mode)
+  const amtEl = document.getElementById("pt-amt"); if(amtEl) amtEl.value="";
   document.getElementById("pt-notes").value="";
+  // Bug 3 fix: regenerate bill number after submit
+  const billEl = document.getElementById("pt-bill"); if(billEl) billEl.value="B"+String(Date.now()).slice(-4);
   ptSetMode("Cash");
+  // Bug 1 fix: clear item rows after submit
+  const itemsList = document.getElementById("pt-items-list"); if(itemsList) itemsList.innerHTML="";
+  if(isInvMode) ptAddItemRow(); // re-add one blank row in inventory mode
+  // Bug 2 fix: clear customer selection after submit
+  ptClearCustomer();
   window._ptState.selId="";window._ptState.selName="";window._ptState.selData=null;window._ptState.amt="";window._ptState.notes="";
   ptRestoreLiveBadge();
   const btn=document.getElementById("pt-sub");
@@ -6951,7 +6989,13 @@ async function deletePurchase(custId,bill,dateEnc){
   if(!confirm("Delete this purchase? The customer's total spend will decrease."))return;
   const c=customers.find(x=>x.id===custId);if(!c)return;
   const date=decodeURIComponent(dateEnc);
-  const idx=c.purchases.findIndex(p=>p.bill===bill&&p.date===date);
+  // Try precise match by bill+date+amount; fall back to bill+date only
+  let idx=c.purchases.findIndex(p=>p.bill===bill&&p.date===date);
+  // If multiple matches (same bill+date), pick the first non-borrow one
+  if(idx>-1 && c.purchases.filter(p=>p.bill===bill&&p.date===date).length>1){
+    idx=c.purchases.findIndex(p=>p.bill===bill&&p.date===date&&p.type!=='borrow');
+    if(idx===-1) idx=c.purchases.findIndex(p=>p.bill===bill&&p.date===date);
+  }
   if(idx>-1){
     const _delPurchase=c.purchases[idx];
     const _delAmt=Number(_delPurchase.amount);
@@ -8607,7 +8651,13 @@ function renderCompare(){
     if(!dateStr)return false;
     const d=dateStr.slice(0,10);
     if(periodArr.length===1&&periodArr[0].startsWith("year:")) return d.startsWith(periodArr[0].slice(5));
-    if(periodArr.length===1&&periodArr[0].startsWith("quarter:")) return true; // simplified
+    if(periodArr.length===1&&periodArr[0].startsWith("quarter:")){
+      const [qy,qn]=periodArr[0].slice(8).split("-Q"); // "quarter:2026-Q2" -> "2026","2"
+      if(d.slice(0,4)!==qy) return false;
+      const startM=(parseInt(qn)-1)*3;
+      const mIdx=parseInt(d.slice(5,7))-1;
+      return mIdx>=startM && mIdx<startM+3;
+    }
     return periodArr.includes(d);
   };
   const curActiveCust=new Set(),prevActiveCust=new Set();
@@ -9459,6 +9509,7 @@ function loadCreditorsFromCloud(){
       if(doc && doc.exists){
         const data = doc.data();
         if(data.list) try { localStorage.setItem(creditorsKey(), JSON.stringify(data.list)); } catch {}
+        if(currentTab === 2) safeRenderTab(2);
       }
     }).catch(()=>{});
 }
@@ -9739,6 +9790,7 @@ function saveCreditorModal(editId){
     document.getElementById("cr-name")?.focus();
     return;
   }
+  const existingCr = editId ? creditors.find(c=>c.id===editId) : null;
   const cr = {
     id:       editId || newCreditorId(),
     name,
@@ -9752,8 +9804,11 @@ function saveCreditorModal(editId){
       ifsc: document.getElementById("cr-bank-ifsc")?.value.trim().toUpperCase()||"",
       upi:  document.getElementById("cr-bank-upi")?.value.trim()||"",
     },
-    createdAt: editId ? (creditors.find(c=>c.id===editId)?.createdAt || Date.now()) : Date.now(),
-    transactions: editId ? (creditors.find(c=>c.id===editId)?.transactions||[]) : [],
+    createdAt: editId ? (existingCr?.createdAt || Date.now()) : Date.now(),
+    transactions: editId ? (existingCr?.transactions||[]) : [],
+    // Preserve these fields from existing record
+    ...(existingCr?._archived ? { _archived: true } : {}),
+    ...(existingCr?._fromShopConnect ? { _fromShopConnect: existingCr._fromShopConnect } : {}),
   };
 
   const idx = creditors.findIndex(c=>c.id===editId);
@@ -11527,6 +11582,7 @@ function loadDebtorsFromCloud(){
       if(doc && doc.exists){
         const data = doc.data();
         if(data.list) try { localStorage.setItem(debtorsKey(), JSON.stringify(data.list)); } catch {}
+        if(currentTab === 3) safeRenderTab(3);
       }
     }).catch(()=>{});
 }
@@ -11559,6 +11615,7 @@ function loadExpensesFromCloud(){
       if(doc && doc.exists){
         const data = doc.data();
         if(data.list) try { localStorage.setItem(expensesKey(), JSON.stringify(data.list)); } catch {}
+        if(currentTab === 5) safeRenderTab(5);
       }
     }).catch(()=>{});
 }
@@ -11648,7 +11705,7 @@ function deleteExpense(id){
 function duplicateExpense(id){
   const e = getExpenses().find(x=>x.id===id);
   if(!e) return;
-  addExpense(e.category, e.amount, e.note, new Date().toISOString().slice(0,10), e.recurring);
+  addExpense(e.category, e.amount, e.note, new Date().toISOString().slice(0,10), e.recurring, e.payMode);
   notify("✅ Expense duplicated");
   safeRenderTab(currentTab);
 }
@@ -12489,6 +12546,7 @@ function saveDebtorModal(editId){
     document.getElementById("dr-name")?.focus();
     return;
   }
+  const existingDr = editId ? debtors.find(d=>d.id===editId) : null;
   const dr = {
     id:       editId || newDebtorId(),
     name,
@@ -12496,8 +12554,10 @@ function saveDebtorModal(editId){
     gstin:    (document.getElementById("dr-gstin")?.value.trim()||"").toUpperCase(),
     address:  document.getElementById("dr-address")?.value.trim()||"",
     notes:    document.getElementById("dr-notes")?.value.trim()||"",
-    createdAt: editId ? (debtors.find(d=>d.id===editId)?.createdAt || Date.now()) : Date.now(),
-    transactions: editId ? (debtors.find(d=>d.id===editId)?.transactions||[]) : [],
+    createdAt: editId ? (existingDr?.createdAt || Date.now()) : Date.now(),
+    transactions: editId ? (existingDr?.transactions||[]) : [],
+    ...(existingDr?._archived ? { _archived: true } : {}),
+    ...(existingDr?._fromShopConnect ? { _fromShopConnect: existingDr._fromShopConnect } : {}),
   };
 
   const idx = debtors.findIndex(d=>d.id===editId);
@@ -12738,6 +12798,7 @@ function _drTxRender(debtorId){
   if(toDate)   filtered=filtered.filter(tx=>new Date(tx.date)<=toDate);
   if(search)   filtered=filtered.filter(tx=>
     (tx.note||"").toLowerCase().includes(search)||
+    (tx.invoiceNo||"").toLowerCase().includes(search)||
     String(tx.amount).includes(search)||
     (tx.date||"").includes(search)||
     (tx.type||"").toLowerCase().includes(search)
@@ -13595,8 +13656,9 @@ function confirmDeleteDebtTx(debtorId, origIdx){
     const invItem=inventoryItems.find(x=>x.name===removedTx._invItem);
     if(invItem){
       if(!invItem.salesLog) invItem.salesLog=[];
-      // Remove the most recent matching salesLog entry to restore stock
-      const sIdx=invItem.salesLog.map((e,i)=>({e,i})).reverse().findIndex(({e})=>Number(e.qty)===Number(removedTx._invQty));
+      // Remove the most recent matching salesLog entry — prefer txId match, fall back to qty match
+      let sIdx=invItem.salesLog.map((e,i)=>({e,i})).reverse().findIndex(({e})=>e.refId===removedTx.id||e.txId===removedTx.id);
+      if(sIdx===-1) sIdx=invItem.salesLog.map((e,i)=>({e,i})).reverse().findIndex(({e})=>Number(e.qty)===Number(removedTx._invQty));
       if(sIdx>-1){ invItem.salesLog.splice(invItem.salesLog.length-1-sIdx,1); saveInventory(); }
     }
   }
@@ -13604,7 +13666,9 @@ function confirmDeleteDebtTx(debtorId, origIdx){
   if(removedTx && removedTx.type==="return" && removedTx._invItem && removedTx._invQty){
     const invItem=inventoryItems.find(x=>x.name===removedTx._invItem);
     if(invItem && invItem.stock){
-      const sIdx=invItem.stock.map((e,i)=>({e,i})).reverse().findIndex(({e})=>Number(e.qty)===Number(removedTx._invQty));
+      // Prefer groupId match, fall back to qty match
+      let sIdx=invItem.stock.map((e,i)=>({e,i})).reverse().findIndex(({e})=>e._histGroupId===removedTx._histGroupId);
+      if(sIdx===-1) sIdx=invItem.stock.map((e,i)=>({e,i})).reverse().findIndex(({e})=>Number(e.qty)===Number(removedTx._invQty));
       if(sIdx>-1){ invItem.stock.splice(invItem.stock.length-1-sIdx,1); saveInventory(); }
     }
   }
@@ -13676,12 +13740,28 @@ function _daysSince(dateStr){
   return Math.round((now-d)/86400000);
 }
 
-// Oldest unpaid "purchase" (creditor) / "sale" (debtor) transaction date, or null
+// Oldest unpaid "purchase" (creditor) / "sale" (debtor) transaction date, or null.
+// Uses the same per-bill outstanding logic as the creditor/debtor detail pages
+// (_paidAmount + _paysBill/_paysBills) so a bill that's already been fully paid
+// off doesn't get mistaken for the oldest *unpaid* one just because it's the
+// oldest transaction on record.
 function _oldestUnpaidTxDate(entity, txType){
-  const txs = (entity.transactions||[]).filter(t=>t.type===txType && t.date);
-  if(!txs.length) return null;
-  const sorted = txs.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
-  return sorted[0].date;
+  const bills   = (entity.transactions||[]).filter(t=>t.type===txType && t.date);
+  if(!bills.length) return null;
+  const payments = (entity.transactions||[]).filter(t=>t.type==="payment"||t.type==="return");
+  const billMap = {};
+  bills.forEach(t=>{ billMap[t.id]={ tx:t, paid: t._paidAmount||0 }; });
+  payments.forEach(t=>{
+    if(Array.isArray(t._paysBills)){
+      t._paysBills.forEach(pb=>{ if(pb.billId && billMap[pb.billId]) billMap[pb.billId].paid += Number(pb.amount)||0; });
+    } else if(t._paysBill && billMap[t._paysBill]){
+      billMap[t._paysBill].paid += t.amount;
+    }
+  });
+  const pending = Object.values(billMap).filter(b=> b.paid < (Number(b.tx.amount)||0));
+  if(!pending.length) return null;
+  pending.sort((a,b)=>new Date(a.tx.date)-new Date(b.tx.date));
+  return pending[0].tx.date;
 }
 
 // Returns a summary count of all active alerts (for the tab badge)
@@ -13736,7 +13816,7 @@ function checkLowStockAndNotify() {
     // 1) In-app banner (always shown)
     const banner = document.createElement("div");
     banner.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a0e00;border:2px solid #f59e0b;border-radius:14px;padding:12px 18px;font-size:13px;font-weight:700;z-index:99999;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px #0008;white-space:nowrap;cursor:pointer;max-width:90vw;";
-    banner.innerHTML = `<span>${msg}</span><span onclick="switchTab(12);this.parentElement.remove();" style="background:#f59e0b;color:#1a0e00;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:800;flex-shrink:0;">View →</span><span onclick="this.parentElement.remove();" style="color:var(--text-muted,#7a8aaa);font-size:16px;cursor:pointer;flex-shrink:0;">✕</span>`;
+    banner.innerHTML = `<span>${msg}</span><span onclick="switchTab(11);this.parentElement.remove();" style="background:#f59e0b;color:#1a0e00;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:800;flex-shrink:0;">View →</span><span onclick="this.parentElement.remove();" style="color:var(--text-muted,#7a8aaa);font-size:16px;cursor:pointer;flex-shrink:0;">✕</span>`;
     document.body.appendChild(banner);
     setTimeout(() => { if (banner.parentElement) banner.remove(); }, 8000);
 
@@ -13747,7 +13827,7 @@ function checkLowStockAndNotify() {
         icon: "/favicon.ico",
         tag: "stock-alert"
       });
-      n.onclick = () => { window.focus(); switchTab(12); n.close(); };
+      n.onclick = () => { window.focus(); switchTab(11); n.close(); };
     }
   } catch(e) { /* silent */ }
 }
@@ -13917,6 +13997,7 @@ var HIST_TYPE_META = {
   customer:  {icon:"👤", color:"#a78bfa", label:"Customer"},
   creditor:  {icon:"🏦", color:"#fbbf24", label:"Creditor"},
   debtor:    {icon:"🧾", color:"#4ade80", label:"Debtor"},
+  expense:   {icon:"💸", color:"#fb923c", label:"Expense"},
   other:     {icon:"📋", color:"#7a8aaa", label:"Other"}
 };
 
@@ -13933,6 +14014,7 @@ var DEFAULT_MEMBER_PERMISSIONS = {
     inventory_add:false, inventory_restock:true, inventory_delete:false,
     creditor_create:false, creditor_tx:false, creditor_delete:false, creditor_archive:false,
     debtor_create:false, debtor_tx:false, debtor_delete:false, debtor_archive:false,
+    expense_create:false, expense_delete:false,
     history_date_filter:false
   }
 };
@@ -13955,6 +14037,8 @@ var PERM_ACTIONS_META = [
   { key:"debtor_tx",            label:"Record Debtor Tx",         group:"Debtors" },
   { key:"debtor_delete",        label:"Delete Debtor",            group:"Debtors" },
   { key:"debtor_archive",       label:"Archive Debtor",           group:"Debtors" },
+  { key:"expense_create",       label:"Add / Edit Expense",       group:"Expenses" },
+  { key:"expense_delete",       label:"Delete Expense",           group:"Expenses" },
   { key:"history_date_filter",  label:"View Past History Dates",  group:"History" }
 ];
 
@@ -14137,7 +14221,7 @@ function openAddMemberModal() {
     </div>
     <div style="margin-bottom:12px;">
       <label style="font-size:12px;color:var(--text-muted,#7a8aaa);display:block;margin-bottom:4px;">${t('alPassword')}</label>
-      <input class="input" type="password" id="nm_pass" placeholder="Min 4 chars" style="font-size:14px;"/>
+      <input class="input" type="password" id="nm_pass" placeholder="Min 8 chars" style="font-size:14px;"/>
     </div>
     <div style="margin-bottom:14px;">
       <label style="font-size:12px;color:var(--text-muted,#7a8aaa);display:block;margin-bottom:4px;">${t('alConfirmPassword')}</label>
@@ -14592,7 +14676,7 @@ function renderHistoryTab(){
     if(k!=="all" && cnt===0) return "";
     const meta = k==="all" ? {icon:"🕘",color:"#60a5fa",label:currentLang==='hi'?'सभी':'All'} : {...HIST_TYPE_META[k], label: k==='sale'?(currentLang==='hi'?'बिक्री':'Sale'):HIST_TYPE_META[k].label};
     const active = activeFilter===k;
-    return `<button onclick="window._histTypeFilter='${k}';renderTab(11)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${active?meta.color:'#1e2a45'};background:${active?meta.color+'22':'transparent'};color:${active?meta.color:'#4a5a7a'};font-size:12px;font-weight:${active?'800':'600'};white-space:nowrap;flex-shrink:0;">${meta.icon} ${meta.label}${cnt?` (${cnt})`:''}</button>`;
+    return `<button onclick="window._histTypeFilter='${k}';renderTab(10)" style="cursor:pointer;border-radius:20px;padding:7px 14px;border:2px solid ${active?meta.color:'#1e2a45'};background:${active?meta.color+'22':'transparent'};color:${active?meta.color:'#4a5a7a'};font-size:12px;font-weight:${active?'800':'600'};white-space:nowrap;flex-shrink:0;">${meta.icon} ${meta.label}${cnt?` (${cnt})`:''}</button>`;
   }).join("");
 
   const entryCards = filtered.length===0
@@ -14631,7 +14715,7 @@ function renderHistoryTab(){
 
   // Member filter dropdown (owner only, only when there are multiple actors)
   const memberDropdown = (!currentMember && allActors.length > 1) ? `
-    <select onchange="window._histMemberFilter=this.value;window._histTypeFilter='all';renderTab(11)"
+    <select onchange="window._histMemberFilter=this.value;window._histTypeFilter='all';renderTab(10)"
       style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:10px;padding:7px 10px;color:var(--text-main);font-size:12px;font-weight:700;cursor:pointer;">
       <option value="all" ${activeMember==="all"?"selected":""}>👥 ${currentLang==='hi'?'सभी सदस्य':'All Members'}</option>
       ${allActors.map(a=>`<option value="${escHtml(a)}" ${activeMember===a?"selected":""}>${a==="Owner"?"👑 Owner":"👤 "+escHtml(a)}</option>`).join("")}
@@ -14647,9 +14731,9 @@ function renderHistoryTab(){
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         ${memberDropdown}
         ${(!currentMember || hasPermission('history_date_filter')) ? `<input type="date" id="hist-date-picker" value="${dayKey}" max="${todayKey}"
-          onchange="historySelectedDate=this.value===('${todayKey}')?'':this.value;window._histTypeFilter='all';window._histMemberFilter='all';window._histTextSearch='';renderTab(11)"
+          onchange="historySelectedDate=this.value===('${todayKey}')?'':this.value;window._histTypeFilter='all';window._histMemberFilter='all';window._histTextSearch='';renderTab(10)"
           style="background:var(--bg-card);border:1px solid var(--border-main);border-radius:10px;padding:8px 12px;color:var(--text-main);font-size:13px;" />
-        ${!isToday?`<button onclick="historySelectedDate='';window._histTypeFilter='all';window._histMemberFilter='all';window._histTextSearch='';renderTab(11)" class="btn" style="background:#1e3a6e;border:1px solid #2a5aaa;color:#60a5fa;font-size:12px;font-weight:800;padding:8px 12px;">${t('alToday')}</button>`:""}` : `<span style="font-size:12px;color:var(--text-dim);">${t('alTodayOnly')}</span>`}
+        ${!isToday?`<button onclick="historySelectedDate='';window._histTypeFilter='all';window._histMemberFilter='all';window._histTextSearch='';renderTab(10)" class="btn" style="background:#1e3a6e;border:1px solid #2a5aaa;color:#60a5fa;font-size:12px;font-weight:800;padding:8px 12px;">${t('alToday')}</button>`:""}` : `<span style="font-size:12px;color:var(--text-dim);">${t('alTodayOnly')}</span>`}
       </div>
     </div>
     <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">${dateLabel}${isToday?" (" + t('alToday') + ")":""} · ${totalInDay} event${totalInDay!==1?"s":""}${activeMember!=="all"?` · 👤 ${activeMember}`:""}</div>
@@ -14660,10 +14744,10 @@ function renderHistoryTab(){
       <input type="text" id="hist-search-box"
         placeholder="${currentLang==='hi'?'गतिविधि खोजें…':'Search activity…'}"
         value="${escHtml(_histTextSearch)}"
-        oninput="window._histTextSearch=this.value;window._histTypeFilter='all';renderTab(11)"
+        oninput="window._histTextSearch=this.value;window._histTypeFilter='all';renderTab(10)"
         style="width:100%;box-sizing:border-box;padding:9px 12px 9px 36px;background:var(--bg-card);border:1px solid var(--border-main);border-radius:10px;color:var(--text-main);font-size:13px;outline:none;"
       />
-      ${searchTerm ? `<button onclick="window._histTextSearch='';document.getElementById('hist-search-box')&&(document.getElementById('hist-search-box').value='');renderTab(11)"
+      ${searchTerm ? `<button onclick="window._histTextSearch='';document.getElementById('hist-search-box')&&(document.getElementById('hist-search-box').value='');renderTab(10)"
         style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-dim);font-size:16px;cursor:pointer;padding:0;">✕</button>` : ""}
     </div>
 
@@ -14886,7 +14970,7 @@ function renderSettings(){
           </button>
         </div>
       </div>` +
-      (isProStyle ? '' : row("🎨","Theme",themeIcon,"toggleTheme();renderTab(9)")) +
+      (isProStyle ? '' : row("🎨","Theme",themeIcon,"toggleTheme();renderTab(12)")) +
       row("🌐","Language",`Current: ${curLangName}`,"toggleLangMenu()") +
       row("🔡","Text Size","Adjust app font size","openTextSizeModal()")
     )}
@@ -15324,7 +15408,7 @@ function applyVoicePreset(i){
 }
 
 
-function setDisplayCount(n){displaySettings.showCount=n;saveDisplaySettings();renderTab(2);notify("✅ Count updated");}
+function setDisplayCount(n){displaySettings.showCount=n;saveDisplaySettings();renderTab(12);notify("✅ Count updated");}
 
 function saveShopName(){
   const val=document.getElementById("shop-name-input")?.value.trim();
@@ -15342,7 +15426,7 @@ function handleIconUpload(inp){
     appSettings.appIcon=e.target.result;
     saveAppSettings();
     updateAppHeader();
-    renderTab(2);
+    renderTab(12);
     notify("✅ App icon updated!");
   };
   r.readAsDataURL(f);
@@ -15352,7 +15436,7 @@ function removeAppIcon(){
   appSettings.appIcon="";
   saveAppSettings();
   updateAppHeader();
-  renderTab(2);
+  renderTab(12);
   notify("🗑 Icon removed");
 }
 
@@ -18643,7 +18727,14 @@ function _confirmInvDelete(name){
       }
     });
   });
-  if(customersTouched) saveCustomers();
+  if(customersTouched){
+    // Save only affected customers individually to avoid bulk Firestore writes
+    customers.forEach(c=>{
+      const touched = (c.purchases||[]).some(p=>(p.soldItems||[]).some(si=>si.name===name&&si._deleted));
+      if(touched) saveOneCustomer(c).catch(()=>{});
+    });
+    try{ safeLocalSet(storageKey("customers_v2"), JSON.stringify(customers)); } catch(e){}
+  }
   addHistoryLog('inventory','Item deleted',`"${name}" removed from inventory`+(customersTouched?" · customer history updated":"")+(_delId?` · _eid:${_delId}`:""));
   // Reset view back to stock list
   invView="stock"; invDetailItem=null;
@@ -18940,6 +19031,7 @@ function setAutoPriceMode(mode){
   appSettings.autoPriceMode = mode;
   try{localStorage.setItem(storageKey("app_settings"),JSON.stringify(appSettings));}catch(e){}
   try{localStorage.setItem("sc_app_settings",JSON.stringify(appSettings));}catch(e){}
+  saveSettingsToCloud();
 }
 function getPurchaseMode(){
   return localStorage.getItem(storageKey("purchase_mode"))||"standard";
@@ -19919,7 +20011,7 @@ async function scAcceptRequest(reqId) {
     method:"PATCH", body:JSON.stringify({status:"accepted"})
   });
   _scPendingReqs = _scPendingReqs.filter(r=>r.id!==reqId);
-  _shopRequestsUnread = _scPendingReqs.length;
+  _shopRequestsUnread = _scPendingReqs.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
   await scLoadConnections();
   notify("✅ Connected! You can now chat.");
   safeRenderTab(currentTab);
@@ -19930,7 +20022,7 @@ async function scDeclineRequest(reqId) {
     method:"PATCH", body:JSON.stringify({status:"declined"})
   });
   _scPendingReqs = _scPendingReqs.filter(r=>r.id!==reqId);
-  _shopRequestsUnread = _scPendingReqs.length;
+  _shopRequestsUnread = _scPendingReqs.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
   safeRenderTab(currentTab);
 }
 
@@ -19951,7 +20043,7 @@ async function scDeclineAndBlockRequest(reqId) {
     _scBlockedShopIds = blocked;
   }
   _scPendingReqs = _scPendingReqs.filter(r=>r.id!==reqId);
-  _shopRequestsUnread = _scPendingReqs.length;
+  _shopRequestsUnread = _scPendingReqs.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
   notify(`🚫 ${escHtml(req.from_shop_name||shopId)} blocked — their future requests will be ignored`);
   safeRenderTab(currentTab);
 }
@@ -20317,6 +20409,27 @@ async function scMarkMessagesRead(peerPhone) {
   } catch(e){}
 }
 
+// Loads messages for every connected shop (not just the one currently open),
+// recomputes the global unread badge, and refreshes any visible UI that
+// depends on it. Without this, _scUnreadCounts/_shopRequestsUnread only ever
+// reflected the single chat the user happened to have open, so the bottom-nav
+// badge and the Messages tab contact list never updated in the background for
+// messages from any other shop.
+async function scRefreshUnreadBadges() {
+  if (!authPhone || !_scConnections || _scConnections.length === 0) return;
+  try {
+    await Promise.all(_scConnections.map(c => scLoadMessages(scPeerPhone(c))));
+  } catch(e){}
+  _shopRequestsUnread = _scPendingReqs.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
+  if (document.getElementById("tab-bar")) renderTabs();
+  // If the Messages tab list (not an open chat) is on screen, refresh it so
+  // unread badges/last-message previews update without needing to leave/reopen the tab.
+  if (currentTab === 9 && !_scActiveChatPhone) {
+    const el = document.getElementById("tab-content");
+    if (el) el.innerHTML = renderMessagesTab();
+  }
+}
+
 function scStartPolling() {
   scStopPolling();
   _scPollTimer = setInterval(async()=>{
@@ -20329,6 +20442,7 @@ function scStartPolling() {
   }, 4000);
   _scConnPollTimer = setInterval(async()=>{
     await scLoadPendingRequests();
+    await scRefreshUnreadBadges();
   }, 15000);
 }
 function scStopPolling() {
@@ -20738,6 +20852,20 @@ function invMergeGroup(gi){
         (b.items||[]).forEach(bi=>{ if(bi.name===other.name) bi.name = survivor.name; });
       });
     });
+
+    // ── Rename references in creditor/debtor transaction _invItem ──
+    try{
+      const crs = getCreditors();
+      let crChanged=false;
+      crs.forEach(cr=>{ (cr.transactions||[]).forEach(t=>{ if(t._invItem===other.name){ t._invItem=survivor.name; crChanged=true; } if(Array.isArray(t.items)) t.items.forEach(it=>{ if(it.name===other.name){ it.name=survivor.name; crChanged=true; } }); }); });
+      if(crChanged) saveCreditors(crs);
+    }catch(e){}
+    try{
+      const drs = getDebtors();
+      let drChanged=false;
+      drs.forEach(dr=>{ (dr.transactions||[]).forEach(t=>{ if(t._invItem===other.name){ t._invItem=survivor.name; drChanged=true; } }); });
+      if(drChanged) saveDebtors(drs);
+    }catch(e){}
 
     // Remove the duplicate from inventory
     const idx = inventoryItems.indexOf(other);
@@ -21603,7 +21731,11 @@ function scRenderChat(peerPhone) {
     </div>`;
   }).join("");
   container.scrollTop = container.scrollHeight;
-  _scUnreadCounts[peerPhone] = 0;
+  if (_scUnreadCounts[peerPhone]) {
+    _scUnreadCounts[peerPhone] = 0;
+    _shopRequestsUnread = _scPendingReqs.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
+    if (document.getElementById("tab-bar")) renderTabs();
+  }
 }
 // ══════════════════════════════════════════════════════════════════
 // End ShopChat helpers
@@ -21656,7 +21788,7 @@ async function loadShopRequests(){
   const seen = new Set();
   _shopRequestsCache = combined.filter(r=>{ if(seen.has(r.id)) return false; seen.add(r.id); return true; })
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  _shopRequestsUnread = _shopRequestsCache.length;
+  _shopRequestsUnread = _shopRequestsCache.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
   if (document.getElementById("tab-bar")) renderTabs();
 }
 
@@ -22160,7 +22292,7 @@ async function acceptShopRequest(req){
 
   // Remove from cache and refresh
   _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==req.id);
-  _shopRequestsUnread = _shopRequestsCache.length;
+  _shopRequestsUnread = _shopRequestsCache.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
   renderTabs();
   if(currentTab===3) renderTab(3);
 }
@@ -22178,7 +22310,7 @@ async function declineShopRequest(req){
     }
   } catch(e) { console.warn("Decline update error:", e); }
   _shopRequestsCache = _shopRequestsCache.filter(r=>r.id!==req.id);
-  _shopRequestsUnread = _shopRequestsCache.length;
+  _shopRequestsUnread = _shopRequestsCache.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
   renderTabs();
   if(currentTab===3) renderTab(3);
   notify("🚫 Request declined");
@@ -22346,6 +22478,8 @@ async function scOpenChatShell(peerPhone, connId) {
 async function scOpenChat(peerPhone, connId) {
   _scActiveChatPhone = peerPhone;
   _scUnreadCounts[peerPhone] = 0;
+  _shopRequestsUnread = _scPendingReqs.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
+  if (document.getElementById("tab-bar")) renderTabs();
   // Persist last-seen timestamp so unread badge doesn't re-appear on reload
   const seenKey = `sc_msg_seen_${authPhone}_${peerPhone}`;
   localStorage.setItem(seenKey, Date.now().toString());
