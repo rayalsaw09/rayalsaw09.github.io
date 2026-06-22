@@ -88,12 +88,16 @@ try {
   self.addEventListener("notificationclick", event => {
     event.notification.close();
     const target = (event.notification.data && event.notification.data.url) || "/ShopChampion-Admin.html";
+    const notifData = event.notification.data || {};
     event.waitUntil(
       clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
         for (const client of list) {
-          if (client.url.includes("ShopChampion-Admin") && "focus" in client) return client.focus();
+          if (client.url.includes("ShopChampion-Admin") && "focus" in client) {
+            client.postMessage({ type: "NOTIF_CLICK", tab: 9, data: notifData });
+            return client.focus();
+          }
         }
-        return clients.openWindow(target);
+        return clients.openWindow(target + "?openTab=9");
       })
     );
   });
