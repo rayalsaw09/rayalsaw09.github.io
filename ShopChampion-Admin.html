@@ -4809,7 +4809,17 @@ function onLoginSuccess(phone) {
         if(urlTab){ const ti=parseInt(urlTab,10); if(!isNaN(ti)) setTimeout(()=>{ try{switchTab(ti);}catch(_){} },300); }
       }catch(_){}
     });
-    scInitFCM(); // request push permission and save FCM token
+    scInitFCM(); // silently refresh token if already granted
+    // Show friendly prompt card if permission not yet decided and not recently dismissed
+    setTimeout(() => {
+      if (!("Notification" in window)) return;
+      if (Notification.permission === "granted") return; // already have it
+      if (Notification.permission === "denied") return;  // user blocked it — respect that
+      const dismissed = parseInt(localStorage.getItem(storageKey("sc_push_dismissed")) || "0", 10);
+      const dayMs = 24 * 60 * 60 * 1000;
+      if (Date.now() - dismissed < 3 * dayMs) return; // dismissed within 3 days — don't re-ask
+      scShowPushPrompt();
+    }, 3000); // wait 3s after login so app feels ready
   }, 1200);
 
   // ── Load all per-account settings from localStorage first (fast), then cloud overwrites ──
@@ -19807,34 +19817,65 @@ var _scFcmToken         = null; // FCM push token for this browser/device
 async function scRequestPushPermission() {
   if (!("Notification" in window)) { notify("❌ Notifications not supported on this browser","error"); return; }
   if (Notification.permission === "denied") {
-    notify("❌ Notifications blocked. Go to browser Settings → Site Settings → Notifications → Allow for this site","error");
+    notify("❌ Notifications blocked. Open browser Settings → Site Settings → Notifications → Allow for this site.","error");
     return;
   }
   try {
     const perm = await Notification.requestPermission();
     if (perm !== "granted") { notify("❌ Permission not granted","error"); return; }
     notify("⏳ Registering for push notifications...");
-    await scInitFCM();
+    await scInitFCM(true);
     if (_scFcmToken) {
       notify("✅ Push notifications enabled on this device!");
-      safeRenderTab(12); // refresh settings to show active state
+      localStorage.setItem(storageKey("sc_push_granted"), "1");
+      safeRenderTab(12);
     } else {
-      notify("❌ Failed to get push token. Check console for details.","error");
+      notify("❌ Failed to register. Check console for details.","error");
     }
   } catch(e) {
     notify("❌ Error: " + e.message, "error");
   }
 }
 
-async function scInitFCM() {
+// Show a friendly in-app prompt card asking user to enable notifications
+function scDismissPushPrompt() {
+  try { localStorage.setItem(storageKey("sc_push_dismissed"), Date.now().toString()); } catch(_){}
+  document.getElementById("sc-push-prompt")?.remove();
+}
+function scShowPushPrompt() {
+  if (document.getElementById("sc-push-prompt")) return; // already showing
+  const card = document.createElement("div");
+  card.id = "sc-push-prompt";
+  card.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--bg-card,#0f1628);border:1px solid #2a5aaa;border-radius:16px;padding:16px 18px;font-family:'Nunito',sans-serif;z-index:9998;max-width:360px;width:92%;box-shadow:0 4px 28px #0009;display:flex;flex-direction:column;gap:10px;";
+  card.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="font-size:24px;">🔔</div>
+      <div>
+        <div style="font-weight:800;color:var(--text-main,#e8eaf0);font-size:14px;">Enable Notifications</div>
+        <div style="color:var(--text-muted,#7a8aaa);font-size:12px;margin-top:2px;">Get alerted when someone messages you or sends a connection request</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="scRequestPushPermission();document.getElementById('sc-push-prompt')?.remove();" style="flex:1;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:800;cursor:pointer;">✅ Allow</button>
+      <button onclick="scDismissPushPrompt()" style="flex:1;background:var(--bg-main,#0a0e1a);color:var(--text-muted,#7a8aaa);border:1px solid var(--border-main,#1e2a45);border-radius:10px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">Not Now</button>
+    </div>`;
+  document.body.appendChild(card);
+  setTimeout(() => card.remove(), 20000); // auto-dismiss after 20s
+}
+
+async function scInitFCM(force=false) {
   if (!authPhone) return;
   if (typeof SC_FCM_VAPID_KEY === "undefined" || SC_FCM_VAPID_KEY === "YOUR_VAPID_KEY_HERE") return;
   try {
     if (!("Notification" in window)) return;
-    const perm = Notification.permission === "granted"
-      ? "granted"
-      : await Notification.requestPermission();
-    if (perm !== "granted") return;
+    // If already granted — just get/refresh the token silently
+    // If denied — never ask again via scInitFCM (user must go to Settings)
+    // If default (not asked) — only prompt if force=true (user tapped Allow button)
+    const perm = Notification.permission;
+    if (perm === "denied") return;
+    if (perm !== "granted" && !force) return;
+    const finalPerm = perm === "granted" ? "granted" : await Notification.requestPermission();
+    if (finalPerm !== "granted") return;
     const messaging = firebase.messaging();
     const reg = await navigator.serviceWorker.getRegistration("/sw.js")
       || await navigator.serviceWorker.register("/sw.js");
