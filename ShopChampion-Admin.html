@@ -22,6 +22,7 @@
         for (const reg of regs) await reg.update();
         // Register latest SW
         const reg = await navigator.serviceWorker.register('./sw.js');
+        window._swRegistration = reg; // store for FCM use
         // When a new SW activates, show a non-intrusive update banner
         reg.addEventListener('updatefound', () => {
           const newSW = reg.installing;
@@ -3467,6 +3468,7 @@ window.addEventListener("load", () => {
         }
       } catch(e) { /* network error — allow cached login */ }
       try {
+        authHash = localStorage.getItem("sc_user_" + savedPhone) || "";
         onLoginSuccess(savedPhone);
       } catch(e) {
         console.error("Auto-login failed:", e);
@@ -4113,6 +4115,7 @@ var authConfirmResult = null;
 var recaptchaVerifier  = null;
 var authMode = ""; // "new_user" | "forgot"
 var authPhone = "";
+var authHash  = ""; // SHA-256 hash of current user's password — used for authenticated RPCs
 // ── Team Member state ──────────────────────────────────────────
 var currentMember = null; // null = shop owner logged in; object = team member
 // { id, username, display_name, permissions: { tabs:{...}, actions:{...} } }
@@ -4475,6 +4478,7 @@ async function verifyPasswordOnline(phone, pass) {
         localStorage.setItem("sc_auth_phone", phone);
         localStorage.setItem("sc_user_" + phone, hashed);
         localStorage.setItem("sc_session_type", "admin");
+        authHash = hashed;
         onLoginSuccess(phone);
         return;
       } else {
@@ -4496,6 +4500,7 @@ async function verifyPasswordOnline(phone, pass) {
       localStorage.setItem("sc_auth_phone", phone);
       localStorage.setItem("sc_user_" + phone, hashed);
       localStorage.setItem("sc_session_type", "admin");
+      authHash = hashed;
       onLoginSuccess(phone);
       return;
     }
@@ -5014,6 +5019,7 @@ function doLogout() {
   authPhone = ""; // clear in-memory phone so storageKey() resets
   _loginSuccessFired = false; // allow next login to proceed
   _firstSnapshotDone = false; // reset so customers tab shows loader on next login
+  authHash = "";             // clear credential hash
   // Unsubscribe all Firestore real-time listeners
   if(fbUnsubscribe){ try{ fbUnsubscribe(); } catch(e){} fbUnsubscribe=null; }
   if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); } catch(e){} _prefsUnsubscribe=null; }
@@ -19877,8 +19883,12 @@ async function scInitFCM(force=false) {
     const finalPerm = perm === "granted" ? "granted" : await Notification.requestPermission();
     if (finalPerm !== "granted") return;
     const messaging = firebase.messaging();
-    const reg = await navigator.serviceWorker.getRegistration("/sw.js")
-      || await navigator.serviceWorker.register("/sw.js");
+    // Use the already-registered SW (stored at app load) — avoids path mismatch on GitHub Pages
+    const reg = window._swRegistration
+      || await navigator.serviceWorker.getRegistration()
+      || await navigator.serviceWorker.register('./sw.js');
+    if (!reg) { console.warn("[FCM] No SW registration available"); return; }
+    window._swRegistration = reg;
     const token = await messaging.getToken({ vapidKey: SC_FCM_VAPID_KEY, serviceWorkerRegistration: reg });
     if (!token) { console.warn("[FCM] getToken returned null — check VAPID key and SW registration"); return; }
     _scFcmToken = token;
@@ -19887,7 +19897,7 @@ async function scInitFCM(force=false) {
     const saveRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/save_fcm_token`, {
       method: "POST",
       headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_phone: authPhone, p_token: token })
+      body: JSON.stringify({ p_phone: authPhone, p_token: token, p_hash: authHash })
     }).catch(e => { console.error("[FCM] Token save failed:", e); return null; });
     if (saveRes && saveRes.ok) console.log("[FCM] Token saved to Supabase ✅");
     else if (saveRes) saveRes.text().then(t => console.warn("[FCM] Token save response:", saveRes.status, t));
