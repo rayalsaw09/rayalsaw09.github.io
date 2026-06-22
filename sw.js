@@ -75,13 +75,14 @@ try {
 
   messaging.onBackgroundMessage(payload => {
     const { title = "ShopChampion", body = "" } = payload.notification || {};
+    const data = { url: "/ShopChampion-Admin.html", openTab: "9", ...(payload.data||{}) };
     return self.registration.showNotification(title, {
       body,
       icon: "/icon-192.png",
       badge: "/icon-96.png",
       tag: "sc-notification",
       renotify: true,
-      data: { url: "/ShopChampion-Admin.html#tab8" }
+      data
     });
   });
 
