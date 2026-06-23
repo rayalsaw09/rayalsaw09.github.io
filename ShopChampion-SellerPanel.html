@@ -3180,15 +3180,34 @@ async function saInitFirebase() {
       const auth = firebase.auth();
       if (auth.currentUser) {
         _saAuthReady = Promise.resolve();
+        // Register existing UID as seller admin if not already done
+        _saRegisterSellerAdmin(auth.currentUser.uid);
       } else {
         _saAuthReady = auth.signInAnonymously()
-          .then(() => {})
+          .then(cred => {
+            // Register this UID in seller_admins so Firestore rules can verify it's the real seller
+            _saRegisterSellerAdmin(cred.user.uid);
+          })
           .catch(e => { console.warn("[ShopActivity] Anon auth failed:", e.message); });
       }
     }
     await _saAuthReady;
   } catch(e) {
     console.warn("[ShopActivity] Firebase init failed:", e.message);
+  }
+}
+
+// Write seller UID to Firestore so rules can verify it's a real seller session
+async function _saRegisterSellerAdmin(uid) {
+  if (!uid || !saDb) return;
+  try {
+    await saDb.collection("seller_admins").doc(uid).set({
+      registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+      panel: "SellerPanel"
+    }, { merge: true });
+  } catch(e) {
+    // Silently ignore — rules may not allow write yet on first deploy
+    console.warn("[ShopActivity] Could not register seller UID:", e.message);
   }
 }
 
