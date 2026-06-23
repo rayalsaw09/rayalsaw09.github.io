@@ -26,9 +26,24 @@ service cloud.firestore {
       );
     }
 
+    // ── Seller admin check — SellerPanel registers its anon UID here on login ──
+    function isSellerAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/seller_admins/$(request.auth.uid));
+    }
+
     // ── User data (customers, settings, display, inventory, etc.) ──────────
+    // read: own shop owner OR verified seller admin (SellerPanel)
+    // write: own shop owner only
     match /users/{phone}/{document=**} {
-      allow read, write: if isOwner(phone) || isAuthenticatedForPhone(phone);
+      allow read: if isOwner(phone) || isAuthenticatedForPhone(phone) || isSellerAdmin();
+      allow write: if isOwner(phone) || isAuthenticatedForPhone(phone);
+    }
+
+    // ── Seller admin registry (SellerPanel writes its own UID here) ────────
+    match /seller_admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid;
     }
 
     // Linked Ledger — partner shop can write into your ledger subtree
