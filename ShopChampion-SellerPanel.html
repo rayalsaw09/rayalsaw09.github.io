@@ -213,16 +213,20 @@
   <!-- ═══ MAIN TAB STRIP ═══ -->
   <div style="display:flex;gap:0;margin-bottom:20px;background:#060d1a;border:1px solid #1e2a45;border-radius:14px;padding:4px;">
     <button id="sp-maintab-1-btn" onclick="spSetMainTab(1)"
-      style="flex:1;padding:11px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:13px;cursor:pointer;transition:all .2s;">
-      👥 Users &amp; Subscriptions
+      style="flex:1;padding:11px 10px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:13px;cursor:pointer;transition:all .2s;">
+      🏠 Home
     </button>
     <button id="sp-maintab-2-btn" onclick="spSetMainTab(2)"
-      style="flex:1;padding:11px 16px;border-radius:10px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;">
+      style="flex:1;padding:11px 10px;border-radius:10px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;">
       🏪 Shop Activity
+    </button>
+    <button id="sp-maintab-3-btn" onclick="spSetMainTab(3)"
+      style="flex:1;padding:11px 10px;border-radius:10px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;">
+      👥 Users &amp; Subs
     </button>
   </div>
 
-  <!-- ═══ TAB 1: Users & Subscriptions ═══ -->
+  <!-- ═══ TAB 1: Home (Overview, Create Key, Ads, Settings) ═══ -->
   <div id="sp-maintab-1-content">
 
   <!-- GSTIN Proxy Health Monitor -->
@@ -368,69 +372,6 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════
-       MERGED USERS + LICENSE TABLE
-  ═══════════════════════════════════════════ -->
-  <div class="card" style="margin-bottom:24px;">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap;">
-      <div class="section-title" style="margin-bottom:0;">👥 Users & Subscriptions
-        <span id="users-count-badge" style="background:#1a2540;color:#7a8aaa;font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px;margin-left:8px;vertical-align:middle;"></span>
-      </div>
-      <button class="btn" onclick="loadUsers();loadKeys();" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;font-size:12px;padding:7px 14px;margin-left:auto;">🔄 Refresh</button>
-    </div>
-    <div style="font-size:12px;color:#4a5a7a;margin-bottom:14px;">All registered users with their subscription status. Click any user to see their payment history. You can reset their subscription from here.</div>
-
-    <!-- Search + filter row -->
-    <div class="search-bar-row">
-      <input id="search-merged" class="input" placeholder="🔍 Name, phone, User ID, key..." style="max-width:260px;" oninput="filterMerged()"/>
-      <select id="filter-sub-status" class="input" style="max-width:160px;" onchange="filterMerged()">
-        <option value="">All Statuses</option>
-        <option value="active">✅ Active Pro</option>
-        <option value="trial">🎁 Trial</option>
-        <option value="extrial">⏳ Ex-Trial</option>
-        <option value="free">🆓 Free Tier</option>
-        <option value="expired">⏰ Expired</option>
-        <option value="disabled">⛔ Disabled</option>
-        <option value="nokey">🔑 No License</option>
-      </select>
-    </div>
-
-    <div style="overflow-x:auto;">
-      <table id="merged-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>User</th>
-            <th>Phone</th>
-            <th>User ID</th>
-            <th>License Key</th>
-            <th>Subscription</th>
-            <th>Expires</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="merged-tbody">
-          <tr><td colspan="8" style="text-align:center;color:#4a5a7a;padding:32px;">Loading...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════
-       PAYMENT REQUESTS
-  ═══════════════════════════════════════════ -->
-  <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="payments-section">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:10px;">
-      <div class="section-title" style="margin-bottom:0;">💳 Payment Requests
-        <span id="pending-badge" style="display:none;background:#f84;color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:20px;margin-left:8px;vertical-align:middle;"></span>
-      </div>
-      <button class="btn" onclick="loadPayments()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;font-size:12px;padding:7px 14px;">🔄 Refresh</button>
-    </div>
-    <div style="font-size:12px;color:#4a5a7a;margin-bottom:16px;">Customers who paid via UPI and submitted their UTR. Verify payment in your UPI app → click Approve → their subscription activates instantly.</div>
-    <div id="payments-list">
-      <div style="text-align:center;color:#4a5a7a;padding:28px;font-size:13px;">Loading payment requests...</div>
-    </div>
-  </div>
 
   <!-- Plan Features Config -->
   <div style="margin-top:20px;background:#0d1117;border:1px solid #1e2a45;border-radius:14px;padding:20px;">
@@ -730,6 +671,75 @@
     </div>
   </div>
   </div><!-- /sp-maintab-2-content -->
+
+  <!-- ═══ TAB 3: Users & Subscriptions (Admin only) ═══ -->
+  <div id="sp-maintab-3-content" style="display:none;">
+
+  <!-- ═══════════════════════════════════════════
+       MERGED USERS + LICENSE TABLE
+  ═══════════════════════════════════════════ -->
+  <div class="card" style="margin-bottom:24px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap;">
+      <div class="section-title" style="margin-bottom:0;">👥 Users & Subscriptions
+        <span id="users-count-badge" style="background:#1a2540;color:#7a8aaa;font-size:11px;font-weight:800;padding:2px 9px;border-radius:20px;margin-left:8px;vertical-align:middle;"></span>
+      </div>
+      <button class="btn" onclick="loadUsers();loadKeys();" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;font-size:12px;padding:7px 14px;margin-left:auto;">🔄 Refresh</button>
+    </div>
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:14px;">All registered users with their subscription status. Click any user to see their payment history. You can reset their subscription from here.</div>
+
+    <!-- Search + filter row -->
+    <div class="search-bar-row">
+      <input id="search-merged" class="input" placeholder="🔍 Name, phone, User ID, key..." style="max-width:260px;" oninput="filterMerged()"/>
+      <select id="filter-sub-status" class="input" style="max-width:160px;" onchange="filterMerged()">
+        <option value="">All Statuses</option>
+        <option value="active">✅ Active Pro</option>
+        <option value="trial">🎁 Trial</option>
+        <option value="extrial">⏳ Ex-Trial</option>
+        <option value="free">🆓 Free Tier</option>
+        <option value="expired">⏰ Expired</option>
+        <option value="disabled">⛔ Disabled</option>
+        <option value="nokey">🔑 No License</option>
+      </select>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table id="merged-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>User</th>
+            <th>Phone</th>
+            <th>User ID</th>
+            <th>License Key</th>
+            <th>Subscription</th>
+            <th>Expires</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="merged-tbody">
+          <tr><td colspan="8" style="text-align:center;color:#4a5a7a;padding:32px;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       PAYMENT REQUESTS
+  ═══════════════════════════════════════════ -->
+  <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="payments-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:10px;">
+      <div class="section-title" style="margin-bottom:0;">💳 Payment Requests
+        <span id="pending-badge" style="display:none;background:#f84;color:#fff;font-size:11px;font-weight:900;padding:2px 8px;border-radius:20px;margin-left:8px;vertical-align:middle;"></span>
+      </div>
+      <button class="btn" onclick="loadPayments()" style="background:#1a2540;border:1px solid #2a3560;color:#aaa;font-size:12px;padding:7px 14px;">🔄 Refresh</button>
+    </div>
+    <div style="font-size:12px;color:#4a5a7a;margin-bottom:16px;">Customers who paid via UPI and submitted their UTR. Verify payment in your UPI app → click Approve → their subscription activates instantly.</div>
+    <div id="payments-list">
+      <div style="text-align:center;color:#4a5a7a;padding:28px;font-size:13px;">Loading payment requests...</div>
+    </div>
+  </div>
+
+  </div><!-- /sp-maintab-3-content -->
 </div><!-- /main-panel -->
 
 <!-- ═══════════════════════════════════════════
@@ -828,6 +838,7 @@
   </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script src="./config.js"></script>
@@ -986,12 +997,13 @@ function resetSettings() {
   if (confirm("Reset seller settings? You will need to enter your service key and password again.")) {
     localStorage.removeItem("sc_seller_cfg");
     window._spTab2Loaded = false;
+    window._spTab3Loaded = false;
     location.reload();
   }
 }
 
 function spSetMainTab(n) {
-  [1, 2].forEach(i => {
+  [1, 2, 3].forEach(i => {
     const content = document.getElementById('sp-maintab-' + i + '-content');
     const btn = document.getElementById('sp-maintab-' + i + '-btn');
     if (!content || !btn) return;
@@ -1005,6 +1017,13 @@ function spSetMainTab(n) {
   if (n === 2 && !window._spTab2Loaded) {
     window._spTab2Loaded = true;
     saSetThisMonth(true); // sets date range and calls loadShopActivity
+  }
+  // Auto-load users & payments when switching to tab 3 (lazy — only first time)
+  if (n === 3 && !window._spTab3Loaded) {
+    window._spTab3Loaded = true;
+    loadUsers();
+    loadKeys();
+    loadPayments();
   }
 }
 
@@ -1028,7 +1047,7 @@ function saveSellerGSTINProxyURL(url) {
 
 async function _pushGSTINProxyToFirebase(url) {
   try {
-    saInitFirebase();
+    await saInitFirebase();
     if (!saDb) return;
     await saDb.collection("global_settings").doc("gstin_proxy").set({
       url: url,
@@ -2632,7 +2651,7 @@ async function saveAndPushBannerSettings() {
     updatedAt: new Date().toISOString(),
   };
 
-  saInitFirebase();
+  await saInitFirebase();
   if (!saDb) { spNotify('❌ Firebase not initialized. Check config.js.'); return; }
 
   spNotify('⏳ Pushing banner...');
@@ -2975,7 +2994,7 @@ async function confirmPushAd(adId) {
   };
 
   // Ensure Firebase is initialized
-  saInitFirebase();
+  await saInitFirebase();
   if (!saDb) {
     spNotify('❌ Firebase not initialized. Check config.js.');
     return;
@@ -3149,12 +3168,25 @@ function modalHeader(title) {
 let saDb = null;           // Firebase Firestore instance
 let saAllShops = [];       // [{phone, name, purchases:[]}]
 let saCurrentShop = null;  // shop being viewed in modal
+let _saAuthReady = null;   // Promise that resolves when anon auth is complete
 
-function saInitFirebase() {
-  if (saDb) return;
+async function saInitFirebase() {
   try {
     if (!firebase.apps.length) firebase.initializeApp(SC_FIREBASE_CONFIG);
-    saDb = firebase.firestore();
+    if (!saDb) saDb = firebase.firestore();
+    // Sign in anonymously so Firestore rules (request.auth != null) pass.
+    // Cache the promise so concurrent callers all wait on the same auth attempt.
+    if (!_saAuthReady) {
+      const auth = firebase.auth();
+      if (auth.currentUser) {
+        _saAuthReady = Promise.resolve();
+      } else {
+        _saAuthReady = auth.signInAnonymously()
+          .then(() => {})
+          .catch(e => { console.warn("[ShopActivity] Anon auth failed:", e.message); });
+      }
+    }
+    await _saAuthReady;
   } catch(e) {
     console.warn("[ShopActivity] Firebase init failed:", e.message);
   }
@@ -3189,7 +3221,7 @@ function saSetThisMonth(autoLoad) {
 }
 
 async function loadShopActivity() {
-  saInitFirebase();
+  await saInitFirebase();
   if (!saDb) {
     document.getElementById("sa-shop-list").innerHTML = `<div style="color:#f66;text-align:center;padding:30px;">❌ Firebase not initialized. Check config.js.</div>`;
     return;
@@ -3419,7 +3451,7 @@ function renderShopBills() {
 const _origOpenMain = openMain;
 openMain = function() {
   _origOpenMain();
-  saInitFirebase();
+  saInitFirebase(); // fire-and-forget early init; loadShopActivity properly awaits it later
   // saSetThisMonth is NOT called here — shop activity loads lazily when Tab 2 is opened
   // Pre-populate shop list for banner tab (after allUsers is loaded)
   setTimeout(renderBannerShopList, 1500);
@@ -3524,7 +3556,7 @@ async function scUploadBannerImage(input, targetInputId) {
   statusEl.placeholder = '⏳ Uploading...';
   statusEl.disabled = true;
   try {
-    saInitFirebase();
+    await saInitFirebase();
     const storage = scGetStorage();
     if (!storage) throw new Error('Firebase Storage not ready — check config.js storageBucket');
     const path = `ad_banners/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
@@ -3553,7 +3585,7 @@ async function loadAdAnalytics() {
   const date = dateEl ? dateEl.value : new Date().toISOString().slice(0,10);
   if (!date) return;
   tableEl.innerHTML = '<div style="color:#4a5a7a;padding:20px;text-align:center;">⏳ Loading...</div>';
-  saInitFirebase();
+  await saInitFirebase();
   if (!saDb) { tableEl.innerHTML = '<div style="color:#f66;padding:20px;text-align:center;">❌ Firebase not initialized. Check config.js.</div>'; return; }
   try {
     // Read all shops' impression data for the date from Firestore
@@ -3940,7 +3972,7 @@ async function scSaveAd() {
 // ── Push a central ad to every shop's Firebase leaderboard doc ──
 // This is the doc Admin (scAdInit) and Display listen to in real time.
 async function scPushCentralAdToShops(ad) {
-  saInitFirebase();
+  await saInitFirebase();
   if (!saDb) { spNotify('⚠️ Firebase not initialized — ad saved locally but not pushed to apps.'); return; }
 
   if (typeof allUsers === 'undefined' || !allUsers.length) {
@@ -3983,7 +4015,7 @@ async function scPushCentralAdToShops(ad) {
 
 // ── Remove a central ad from every shop's Firebase leaderboard doc ──
 async function scRemoveCentralAdFromShops(adId) {
-  saInitFirebase();
+  await saInitFirebase();
   if (!saDb) return;
   if (typeof allUsers === 'undefined' || !allUsers.length) {
     try { allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || []; } catch(_) { allUsers = []; }
@@ -4004,7 +4036,7 @@ async function scRemoveCentralAdFromShops(adId) {
 //    in the central ads list (e.g. deleted before delete-sync existed) ──
 async function scCleanupOrphanAds() {
   if (!confirm('This will remove any ads from all shop apps that are not in your current Ad list above. Continue?')) return;
-  saInitFirebase();
+  await saInitFirebase();
   if (!saDb) { spNotify('❌ Firebase not initialized.'); return; }
 
   if (typeof allUsers === 'undefined' || !allUsers.length) {
@@ -4107,7 +4139,7 @@ async function scConfirmPush(adId) {
   const phones = Array.from(checkboxes).map(cb => cb.value);
   if (!phones.length) { spNotify('⚠️ Select at least one shop'); return; }
 
-  saInitFirebase();
+  await saInitFirebase();
   if (!saDb) { spNotify('❌ Firebase not ready'); return; }
 
   const adPayload = {
@@ -4159,7 +4191,7 @@ let _scStorage = null;
 function scGetStorage() {
   if (_scStorage) return _scStorage;
   try {
-    saInitFirebase(); // ensures firebase app is initialized
+    await saInitFirebase(); // ensures firebase app is initialized
     const bucket = (typeof SC_FIREBASE_CONFIG !== 'undefined' && SC_FIREBASE_CONFIG.storageBucket)
       ? SC_FIREBASE_CONFIG.storageBucket : '';
     _scStorage = bucket ? firebase.app().storage(`gs://${bucket}`) : firebase.storage();
