@@ -210,6 +210,21 @@
     </div>
   </div>
 
+  <!-- ═══ MAIN TAB STRIP ═══ -->
+  <div style="display:flex;gap:0;margin-bottom:20px;background:#060d1a;border:1px solid #1e2a45;border-radius:14px;padding:4px;">
+    <button id="sp-maintab-1-btn" onclick="spSetMainTab(1)"
+      style="flex:1;padding:11px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:13px;cursor:pointer;transition:all .2s;">
+      👥 Users &amp; Subscriptions
+    </button>
+    <button id="sp-maintab-2-btn" onclick="spSetMainTab(2)"
+      style="flex:1;padding:11px 16px;border-radius:10px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;">
+      🏪 Shop Activity
+    </button>
+  </div>
+
+  <!-- ═══ TAB 1: Users & Subscriptions ═══ -->
+  <div id="sp-maintab-1-content">
+
   <!-- GSTIN Proxy Health Monitor -->
   <div id="gstin-proxy-banner" style="display:none;background:linear-gradient(135deg,#1a0500,#2a0800);border:2px solid #f59e0b;border-radius:14px;padding:16px 20px;margin-bottom:20px;">
     <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;">
@@ -634,9 +649,10 @@
           <div style="font-size:12px;color:#7a8aaa;">Old video ads system (use New Ads above for full control)</div>
           <button class="btn" onclick="openCreateAdModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:8px 16px;font-size:12px;font-weight:800;white-space:nowrap;">+ Add Video Ad</button>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
           <div class="stat"><div class="stat-num" id="ad-stat-total">—</div><div class="stat-label">Total Ads</div></div>
           <div class="stat"><div class="stat-num" id="ad-stat-active" style="color:#4f4;">—</div><div class="stat-label">Active</div></div>
+          <div class="stat"><div class="stat-num" id="ad-stat-shops" style="color:#7ab3ff;">—</div><div class="stat-label">Shops</div></div>
           <div class="stat"><div class="stat-num" id="ad-stat-rev" style="color:#FFD700;">—</div><div class="stat-label">Monthly Rev</div></div>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;">
@@ -650,7 +666,26 @@
   </div>
 
 
-    <div style="margin-top:20px;background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="shop-activity-section">
+  <!-- ── Analytics Tab Content (shown inside ads section when analytics tab active) ── -->
+  <div id="sctab-analytics-content" style="display:none;margin-top:16px;">
+    <div style="background:#060d1a;border:1px solid #1e2a45;border-radius:14px;padding:16px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+        <div style="font-size:15px;font-weight:800;color:#FFD700;">📊 Ad Impressions</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="date" id="analytics-date" class="input" style="padding:7px 10px;font-size:12px;max-width:140px;" onchange="loadAdAnalytics()" />
+          <button onclick="loadAdAnalytics()" class="btn" style="background:#1a2540;border:1px solid #2a3560;color:#7ab3ff;padding:7px 14px;font-size:12px;">🔄 Load</button>
+        </div>
+      </div>
+      <div id="analytics-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;"></div>
+      <div id="analytics-table" style="color:#4a5a7a;font-size:13px;text-align:center;padding:20px;">Select a date and click Load.</div>
+    </div>
+  </div>
+
+  </div><!-- /sp-maintab-1-content -->
+
+  <!-- ═══ TAB 2: Shop Activity ═══ -->
+  <div id="sp-maintab-2-content" style="display:none;">
+    <div style="background:#0d1220;border:1px solid #1e2a45;border-radius:20px;padding:20px;" id="shop-activity-section">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
       <div class="section-title">🏪 Shop Activity</div>
       <button class="btn" onclick="loadShopActivity()" style="background:#1a2540;border:1px solid #2a3a5a;color:#7ab3ff;padding:7px 14px;font-size:12px;">🔄 Refresh</button>
@@ -694,22 +729,8 @@
       <code style="color:#4f4;font-size:11px;display:block;margin-top:6px;">match /users/{phone}/{document=**} { allow read: if true; }</code>
     </div>
   </div>
-</div>
-
-<!-- ── Analytics Tab Content ── -->
-<div id="sctab-analytics-content" style="display:none;margin-top:16px;">
-  <div style="background:#060d1a;border:1px solid #1e2a45;border-radius:14px;padding:16px;margin-bottom:12px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-      <div style="font-size:15px;font-weight:800;color:#FFD700;">📊 Ad Impressions</div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <input type="date" id="analytics-date" class="input" style="padding:7px 10px;font-size:12px;max-width:140px;" onchange="loadAdAnalytics()" />
-        <button onclick="loadAdAnalytics()" class="btn" style="background:#1a2540;border:1px solid #2a3560;color:#7ab3ff;padding:7px 14px;font-size:12px;">🔄 Load</button>
-      </div>
-    </div>
-    <div id="analytics-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;"></div>
-    <div id="analytics-table" style="color:#4a5a7a;font-size:13px;text-align:center;padding:20px;">Select a date and click Load.</div>
-  </div>
-</div>
+  </div><!-- /sp-maintab-2-content -->
+</div><!-- /main-panel -->
 
 <!-- ═══════════════════════════════════════════
      PAYMENT HISTORY MODAL
@@ -964,7 +985,26 @@ function openMain() {
 function resetSettings() {
   if (confirm("Reset seller settings? You will need to enter your service key and password again.")) {
     localStorage.removeItem("sc_seller_cfg");
+    window._spTab2Loaded = false;
     location.reload();
+  }
+}
+
+function spSetMainTab(n) {
+  [1, 2].forEach(i => {
+    const content = document.getElementById('sp-maintab-' + i + '-content');
+    const btn = document.getElementById('sp-maintab-' + i + '-btn');
+    if (!content || !btn) return;
+    const active = (i === n);
+    content.style.display = active ? 'block' : 'none';
+    btn.style.background = active ? 'linear-gradient(135deg,#FFD700,#FFA500)' : 'transparent';
+    btn.style.color = active ? '#1a0a00' : '#4a5a7a';
+    btn.style.fontWeight = active ? '800' : '700';
+  });
+  // Auto-load shop activity when switching to tab 2 (lazy — only first time)
+  if (n === 2 && !window._spTab2Loaded) {
+    window._spTab2Loaded = true;
+    saSetThisMonth(true); // sets date range and calls loadShopActivity
   }
 }
 
@@ -988,8 +1028,9 @@ function saveSellerGSTINProxyURL(url) {
 
 async function _pushGSTINProxyToFirebase(url) {
   try {
-    if (!window._spDB) return;
-    await window._spDB.collection("global_settings").doc("gstin_proxy").set({
+    saInitFirebase();
+    if (!saDb) return;
+    await saDb.collection("global_settings").doc("gstin_proxy").set({
       url: url,
       updatedAt: Date.now()
     });
@@ -1064,6 +1105,7 @@ function saveGSTINProxyURL() {
 
 function refreshAll() {
   loadAds();
+  scLoadCentralAds();
   loadKeys();
   loadUsers();
   loadPayments();
@@ -1434,6 +1476,18 @@ async function switchPlan(keyId, newPlan, phone, name) {
       method: "PATCH", prefer: "return=minimal",
       body: JSON.stringify(patch)
     });
+    // Push license change to Firestore so Admin app reflects immediately
+    if (phone && saDb) {
+      try {
+        const expiryIso = patch.expires_at || null;
+        const licObj = newPlan === "pro"
+          ? { plan: "pro", status: "pro", expires_at: expiryIso }
+          : { plan: "free", status: "free" };
+        await saDb.collection("users").doc(String(phone))
+          .collection("settings").doc("prefs")
+          .set({ license: licObj }, { merge: true });
+      } catch(fbErr) { console.warn("[SP] switchPlan Firestore push failed:", fbErr.message); }
+    }
     spNotify(newPlan === "pro"
       ? `✅ ${name || phone} upgraded to ⭐ Pro! Expires in 1 year.`
       : `🆓 ${name || phone} moved to Free tier.`
@@ -2201,6 +2255,14 @@ async function toggleBlock(phone, block) {
       method: "PATCH", prefer: "return=minimal",
       body: JSON.stringify({ blocked: block })
     });
+    // Push blocked status to Firestore so Admin app sees it in real-time
+    if (saDb) {
+      try {
+        await saDb.collection("users").doc(String(phone))
+          .collection("settings").doc("prefs")
+          .set({ blocked: block }, { merge: true });
+      } catch(fbErr) { console.warn("[SP] toggleBlock Firestore push failed:", fbErr.message); }
+    }
     await loadUsers();
     alert(block
       ? `✅ User +91 ${phone} is now BLOCKED.\nThey will see a "Your account has been blocked" message when they try to log in.`
@@ -2611,10 +2673,11 @@ function renderAdStats() {
   const active = allAds.filter(a => a.status === 'active').length;
   const shops = [...new Set(allAds.filter(a=>a.status==='active').flatMap(a=>a.shop_ids||[]))].length;
   const rev = allAds.filter(a=>a.status==='active').reduce((s,a)=>s+(a.monthly_rate||0),0);
-  document.getElementById("ad-stat-total").textContent = allAds.length;
-  document.getElementById("ad-stat-active").textContent = active;
-  document.getElementById("ad-stat-shops").textContent = shops;
-  document.getElementById("ad-stat-rev").textContent = "₹"+rev.toLocaleString();
+  const _setEl = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  _setEl("ad-stat-total", allAds.length);
+  _setEl("ad-stat-active", active);
+  _setEl("ad-stat-shops", shops);
+  _setEl("ad-stat-rev", "₹"+rev.toLocaleString());
 }
 
 // ── Filter ──
@@ -3014,8 +3077,9 @@ async function sendBroadcast() {
       for (const row of tokens) {
         if (!row.fcm_token) continue;
         try {
-          // Use the SCWorker FCM send endpoint (same one used for payment alerts)
-          const workerUrl = (window._scWorkerUrl || "").replace(/\/$/, "");
+          // FCM push: requires window._scWorkerUrl to be set in config.js
+          const workerUrl = (typeof window._scWorkerUrl !== 'undefined' ? window._scWorkerUrl : '').replace(/\/$/, '');
+          if (!workerUrl) { console.warn('[Broadcast] _scWorkerUrl not set — skipping push'); failed++; continue; }
           await fetch(workerUrl + "/send-push", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -3351,19 +3415,12 @@ function renderShopBills() {
   document.getElementById("sa-detail-bills").innerHTML = billsHtml;
 }
 
-// Hook into openMain to init shop section
-const _origOpenMain3 = openMain;
+// Hook into openMain to init shop section, ads, and activity
+const _origOpenMain = openMain;
 openMain = function() {
-  _origOpenMain3();
+  _origOpenMain();
   saInitFirebase();
-  saSetThisMonth();
-};
-// Load ads when panel opens
-const _origOpenMain2 = openMain;
-openMain = function() {
-  _origOpenMain2();
-  loadAds();
-  scLoadCentralAds();
+  // saSetThisMonth is NOT called here — shop activity loads lazily when Tab 2 is opened
   // Pre-populate shop list for banner tab (after allUsers is loaded)
   setTimeout(renderBannerShopList, 1500);
 };
@@ -3467,8 +3524,9 @@ async function scUploadBannerImage(input, targetInputId) {
   statusEl.placeholder = '⏳ Uploading...';
   statusEl.disabled = true;
   try {
-    if (!db || !firebase.storage) throw new Error('Firebase not ready');
-    const storage = firebase.storage();
+    saInitFirebase();
+    const storage = scGetStorage();
+    if (!storage) throw new Error('Firebase Storage not ready — check config.js storageBucket');
     const path = `ad_banners/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
     const ref = storage.ref(path);
     await ref.put(file);
@@ -3478,11 +3536,11 @@ async function scUploadBannerImage(input, targetInputId) {
     statusEl.placeholder = origPlaceholder;
     // Trigger preview if it's the banner editor
     if (targetInputId === 'ds-idle-banner-url') bannerEditorLoadImage();
-    showToast('✅ Image uploaded!');
+    spNotify('✅ Image uploaded!');
   } catch(e) {
     statusEl.disabled = false;
     statusEl.placeholder = origPlaceholder;
-    showToast('❌ Upload failed: ' + e.message);
+    spNotify('❌ Upload failed: ' + e.message);
   }
   input.value = '';
 }
@@ -3495,9 +3553,11 @@ async function loadAdAnalytics() {
   const date = dateEl ? dateEl.value : new Date().toISOString().slice(0,10);
   if (!date) return;
   tableEl.innerHTML = '<div style="color:#4a5a7a;padding:20px;text-align:center;">⏳ Loading...</div>';
+  saInitFirebase();
+  if (!saDb) { tableEl.innerHTML = '<div style="color:#f66;padding:20px;text-align:center;">❌ Firebase not initialized. Check config.js.</div>'; return; }
   try {
     // Read all shops' impression data for the date from Firestore
-    const snapshot = await db.collection('ad_impressions').doc(date).collection('shops').get();
+    const snapshot = await saDb.collection('ad_impressions').doc(date).collection('shops').get();
     if (snapshot.empty) {
       tableEl.innerHTML = '<div style="color:#4a5a7a;padding:20px;text-align:center;">No impressions recorded for this date.</div>';
       summaryEl.innerHTML = '';
@@ -3758,9 +3818,9 @@ function scShowAdModal(ad) {
             <div style="font-size:11px;color:#4a5a7a;">Plays fullscreen. Auto-returns to leaderboard/purchase after.</div>
           </div>
           <label style="cursor:pointer;position:relative;width:44px;height:24px;flex-shrink:0;">
-            <input type="checkbox" id="sca-fullscreen" ${ad?.fullscreen?'checked':''} style="opacity:0;width:0;height:0;" onchange="document.getElementById('sca-fs-label').textContent=this.checked?'ON':'OFF'" />
+            <input type="checkbox" id="sca-fullscreen" ${ad?.fullscreen?'checked':''} style="opacity:0;width:0;height:0;" onchange="const c=this.checked;document.getElementById('sca-fs-toggle').style.background=c?'#4f4':'#2a3560';document.getElementById('sca-fs-knob').style.left=c?'22px':'3px';document.getElementById('sca-fs-label').textContent=c?'ON':'OFF';document.getElementById('sca-fs-label').style.color=c?'#4f4':'#4a5a7a';" />
             <span id="sca-fs-toggle" style="position:absolute;inset:0;background:${ad?.fullscreen?'#4f4':'#2a3560'};border-radius:24px;transition:background 0.2s;"></span>
-            <span style="position:absolute;top:3px;left:${ad?.fullscreen?'22px':'3px'};width:18px;height:18px;background:#fff;border-radius:50%;transition:left 0.2s;"></span>
+            <span id="sca-fs-knob" style="position:absolute;top:3px;left:${ad?.fullscreen?'22px':'3px'};width:18px;height:18px;background:#fff;border-radius:50%;transition:left 0.2s;"></span>
           </label>
           <span id="sca-fs-label" style="font-size:12px;font-weight:700;color:${ad?.fullscreen?'#4f4':'#4a5a7a'};margin-left:8px;">${ad?.fullscreen?'ON':'OFF'}</span>
         </div>

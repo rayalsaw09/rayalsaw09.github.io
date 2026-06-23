@@ -3177,6 +3177,7 @@ function startFirestoreListener() {
     loadDebtorsFromCloud();
     loadExpensesFromCloud();
     loadCashLedgerFromCloud();
+    initCustomExpCats();
     // Load shop connection requests (messages inbox)
     loadShopRequests();
     // Live listener: get notified when other shops accept our connect requests
@@ -7266,6 +7267,7 @@ function getAnalyticsYears(){
 function setAnalyticsYear(y){ analyticsYear=y; renderTab(6); }
 
 function renderAnalytics(sorted){
+  _rebuildExpCats(); // ensure custom expense cats reflected in charts
   const now       = new Date();
   const thisMonth = now.getMonth();
   const thisYear  = now.getFullYear();
@@ -9605,6 +9607,7 @@ function renderCreditorsTab(){
   const archivedCount = creditors.filter(c=>c._archived && c.id!=="CR_UNRECONCILED").length;
 
   let filtered = creditors.filter(c=>
+    (c.id !== "CR_UNRECONCILED" || unrecTxCount > 0) &&
     (showArchived ? c._archived : !c._archived) &&
     (!searchVal ||
     c.name.toLowerCase().includes(searchVal.toLowerCase()) ||
@@ -11675,7 +11678,7 @@ function loadExpensesFromCloud(){
 }
 
 // ── Category metadata ─────────────────────────────────────────
-var EXP_CATS = [
+var EXP_CATS_DEFAULT = [
   { key:"Rent",        icon:"🏠", color:"#f87171" },
   { key:"Salary",      icon:"👨‍💼", color:"#fb923c" },
   { key:"Electricity", icon:"⚡", color:"#fbbf24" },
@@ -11689,15 +11692,168 @@ var EXP_CATS = [
   { key:"Other",       icon:"📌", color:"#64748b" }
 ];
 
+// EXP_CATS is the live array (default + custom). Always read through this.
+var EXP_CATS = [...EXP_CATS_DEFAULT];
+
+function _expCustomCatsKey(){ return storageKey("exp_custom_cats"); }
+
+function loadCustomExpCats(){
+  try {
+    const s = localStorage.getItem(_expCustomCatsKey());
+    return s ? JSON.parse(s) : [];
+  } catch { return []; }
+}
+
+function saveCustomExpCats(list){
+  try { localStorage.setItem(_expCustomCatsKey(), JSON.stringify(list)); } catch {}
+  // Persist to cloud alongside settings
+  if(db && authPhone){
+    db.collection("users").doc(authPhone).collection("app_data").doc("exp_custom_cats")
+      .set({ list, updatedAt: Date.now() }).catch(()=>{});
+  }
+}
+
+function _rebuildExpCats(){
+  const custom = loadCustomExpCats();
+  EXP_CATS = [...EXP_CATS_DEFAULT, ...custom];
+}
+
 function expCategoryIcon(cat){
   const c = EXP_CATS.find(x=>x.key===cat||x.key===cat?.split(" /")[0]);
-  return c ? c.icon : "💰";
+  return c ? c.icon : "🏷️";
 }
 function expCategoryColor(cat){
   const c = EXP_CATS.find(x=>x.key===cat||x.key===cat?.split(" /")[0]);
   return c ? c.color : "#a0aec0";
 }
 function expCategories(){ return EXP_CATS.map(c=>c.key); }
+
+// ── Add/delete custom expense category ──
+function expAddCustomCat(name, icon, color){
+  name = name.trim();
+  if(!name) return false;
+  if(EXP_CATS.find(c=>c.key.toLowerCase()===name.toLowerCase())){
+    notify("Category already exists","error"); return false;
+  }
+  const custom = loadCustomExpCats();
+  custom.push({ key:name, icon, color, custom:true });
+  saveCustomExpCats(custom);
+  _rebuildExpCats();
+  return true;
+}
+
+function expDeleteCustomCat(key){
+  let custom = loadCustomExpCats();
+  custom = custom.filter(c=>c.key!==key);
+  saveCustomExpCats(custom);
+  _rebuildExpCats();
+}
+
+// ── Modal: Add custom expense type ──
+const EXP_ICON_OPTIONS = ["🏷️","🛒","🍽️","💊","📚","🎓","🔑","🛠️","🚗","✈️","🏋️","🎁","📱","💡","🔒","🌿","👕","🐾","🏥","💼","🎨","🧹","🧰","💰","🏦","🎯","📊","🔔","🌟","🛡️"];
+const EXP_COLOR_OPTIONS = ["#f87171","#fb923c","#fbbf24","#4ade80","#34d399","#22d3ee","#60a5fa","#818cf8","#a78bfa","#e879f9","#f472b6","#94a3b8","#f59e0b","#10b981","#06b6d4","#3b82f6","#8b5cf6","#ec4899","#64748b","#14b8a6"];
+
+function openAddExpCatModal(){
+  window._expSelIcon = "🏷️";
+  window._expSelColor = "#818cf8";
+  const overlay = document.createElement("div");
+  overlay.id = "exp-cat-modal-overlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;";
+  overlay.innerHTML = `
+    <div style="background:var(--bg-card,#0d1526);border-radius:20px;padding:24px;width:100%;max-width:380px;border:1.5px solid #1e2a45;max-height:90vh;overflow-y:auto;">
+      <div style="font-size:16px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:18px;">✨ Add Custom Expense Type</div>
+
+      <div style="font-size:11px;color:#6b7689;font-weight:600;margin-bottom:6px;">NAME</div>
+      <input id="exp-newcat-name" type="text" placeholder="e.g. Staff Meals" maxlength="30"
+        style="width:100%;box-sizing:border-box;background:#080c18;border:1.5px solid #1e2a45;border-radius:10px;color:#e8eaf0;padding:11px 13px;font-size:14px;outline:none;margin-bottom:16px;font-family:inherit;"
+        oninput="document.getElementById('exp-cat-preview-name').textContent=this.value||'Preview'"
+      />
+
+      <div style="font-size:11px;color:#6b7689;font-weight:600;margin-bottom:8px;">ICON</div>
+      <div id="exp-icon-grid" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
+        ${EXP_ICON_OPTIONS.map(ic=>`<button type="button" onclick="expCatPickIcon('${ic}',this)" style="width:38px;height:38px;border-radius:9px;border:2px solid ${ic==='🏷️'?'#6366f1':'#1e2a45'};background:${ic==='🏷️'?'#1a1a40':'#080c18'};font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;">${ic}</button>`).join("")}
+      </div>
+
+      <div style="font-size:11px;color:#6b7689;font-weight:600;margin-bottom:8px;">COLOR</div>
+      <div id="exp-color-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;">
+        ${EXP_COLOR_OPTIONS.map(cl=>`<button type="button" onclick="expCatPickColor('${cl}',this)" style="width:28px;height:28px;border-radius:50%;border:2px solid ${cl==='#818cf8'?'#fff':'transparent'};background:${cl};cursor:pointer;" title="${cl}"></button>`).join("")}
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:#080c18;border-radius:12px;margin-bottom:20px;">
+        <span id="exp-cat-preview-icon" style="font-size:26px;">🏷️</span>
+        <div>
+          <div id="exp-cat-preview-name" style="font-size:15px;font-weight:800;color:#e8eaf0;">Preview</div>
+          <div id="exp-cat-preview-color" style="font-size:11px;font-weight:700;color:#818cf8;margin-top:2px;">●</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;">
+        <button onclick="expCatModalSave()" style="flex:1;padding:13px;background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">Add Type</button>
+        <button onclick="document.getElementById('exp-cat-modal-overlay').remove()" style="padding:13px 18px;background:#1a2233;color:#94a3b8;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;">Cancel</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  // click outside to close
+  overlay.addEventListener("click", e=>{ if(e.target===overlay) overlay.remove(); });
+}
+
+function expCatPickIcon(icon, btn){
+  document.querySelectorAll("#exp-icon-grid button").forEach(b=>{ b.style.borderColor="#1e2a45"; b.style.background="#080c18"; });
+  btn.style.borderColor="#6366f1"; btn.style.background="#1a1a40";
+  document.getElementById("exp-cat-preview-icon").textContent = icon;
+  window._expSelIcon = icon;
+}
+
+function expCatPickColor(color, btn){
+  document.querySelectorAll("#exp-color-grid button").forEach(b=>b.style.borderColor="transparent");
+  btn.style.borderColor="#fff";
+  document.getElementById("exp-cat-preview-color").style.color = color;
+  document.getElementById("exp-cat-preview-color").textContent = "●";
+  window._expSelColor = color;
+}
+
+function expCatModalSave(){
+  const name = (document.getElementById("exp-newcat-name")?.value||"").trim();
+  if(!name){ notify("Enter a name for the category","error"); return; }
+  const icon = window._expSelIcon || "🏷️";
+  const color = window._expSelColor || "#818cf8";
+  const ok = expAddCustomCat(name, icon, color);
+  if(!ok) return; // duplicate or empty — expAddCustomCat already notified
+  document.getElementById("exp-cat-modal-overlay")?.remove();
+  notify("✅ Custom expense type added!");
+  safeRenderTab(currentTab);
+}
+
+function expQuickSetCat(btn){
+  const cat = btn.dataset.cat;
+  const el = document.getElementById("exp-cat");
+  if(el){ el.value = cat; el.dispatchEvent(new Event("change")); }
+}
+
+function expDeleteCustomCatConfirm(key){
+  if(!confirm("Delete custom type \""+key+"\"? Existing expenses with this type will still show.")) return;
+  expDeleteCustomCat(key);
+  if(_expCatFilter === key) _expCatFilter = ""; // reset filter if it pointed at deleted cat
+  notify("Custom type deleted");
+  safeRenderTab(currentTab);
+}
+
+// Load custom cats on startup (called after auth)
+function initCustomExpCats(){
+  _rebuildExpCats();
+  // Also load from cloud
+  if(db && authPhone){
+    db.collection("users").doc(authPhone).collection("app_data").doc("exp_custom_cats")
+      .get().then(doc=>{
+        if(doc && doc.exists){
+          const list = doc.data().list || [];
+          try { localStorage.setItem(_expCustomCatsKey(), JSON.stringify(list)); } catch {}
+          _rebuildExpCats();
+        }
+      }).catch(()=>{});
+  }
+}
 
 // ── State for expenses tab UI ─────────────────────────────────
 var _expFilter = "month"; // today|week|month|year|custom
@@ -11841,6 +11997,7 @@ function expGetSalesData(){
 
 // ── Main render ───────────────────────────────────────────────
 function renderExpensesTab(){
+  _rebuildExpCats(); // ensure custom cats are merged
   const all = getExpenses();
   const now = new Date();
   const thisMonth=now.getMonth(), thisYear=now.getFullYear(), yr=String(thisYear);
@@ -11968,16 +12125,27 @@ function renderExpensesTab(){
   </div>
 
   <!-- Quick add buttons -->
-  ${!editingExp ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+  ${!editingExp ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
     ${["Rent","Salary","Electricity","Internet","Transport","GST/Tax"].map(cat=>
       `<button class="exp-quick" onclick="document.getElementById('exp-cat').value='${cat}';document.getElementById('exp-cat').dispatchEvent(new Event('change'))">+ ${expCategoryIcon(cat)} ${cat}</button>`
     ).join("")}
-  </div>` : ""}
+    ${loadCustomExpCats().map(c=>
+      `<button class="exp-quick" style="border-color:${c.color}40;color:${c.color};" onclick="expQuickSetCat(this)" data-cat="${escHtml(c.key)}">+ ${c.icon} ${escHtml(c.key)}</button>`
+    ).join("")}
+    <button class="exp-quick" onclick="openAddExpCatModal()" style="border-color:#6366f150;color:#818cf8;background:#0d0f1e;">✚ Add Type</button>
+  </div>
+  ${loadCustomExpCats().length>0 ? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;align-items:center;">
+    <span style="font-size:10px;color:#4a5a7a;font-weight:600;">CUSTOM:</span>
+    ${loadCustomExpCats().map(c=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px 3px 7px;border-radius:20px;background:#0d0f1e;border:1px solid ${c.color}40;font-size:11px;color:${c.color};font-weight:700;">${c.icon} ${escHtml(c.key)}<span onclick="expDeleteCustomCatConfirm(this.dataset.key)" data-key="${escHtml(c.key)}" style="margin-left:3px;cursor:pointer;color:#4a5a7a;font-size:13px;line-height:1;" title="Delete">×</span></span>`).join("")}
+  </div>` : ""}` : ""}
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
     <div>
       <div style="font-size:11px;color:#6b7689;margin-bottom:5px;font-weight:600;">${t('expCategory')}</div>
-      ${sel("exp-cat", EXP_CATS.map(c=>({v:c.key,l:c.icon+" "+c.key})), editingExp?editingExp.category:"")}
+      ${(()=>{
+        const allCats = [...EXP_CATS_DEFAULT, ...loadCustomExpCats()];
+        return sel("exp-cat", allCats.map(c=>({v:c.key,l:c.icon+" "+escHtml(c.key)})), editingExp?editingExp.category:"");
+      })()}
     </div>
     <div>
       <div style="font-size:11px;color:#6b7689;margin-bottom:5px;font-weight:600;">${t('expAmountWithSymbol')}</div>
@@ -12159,7 +12327,7 @@ ${monthTotal>0 ? `
     <select onchange="_expCatFilter=this.value;_expPage=0;safeRenderTab(currentTab);"
       style="background:#ffffff;border:1.5px solid #d8dee9;border-radius:10px;color:#1a2236;padding:9px 12px;font-size:13px;outline:none;box-sizing:border-box;width:100%;">
       <option value="">${t('expAllCategories')}</option>
-      ${EXP_CATS.map(c=>`<option value="${c.key}" ${_expCatFilter===c.key?"selected":""}>${c.icon} ${c.key}</option>`).join("")}
+      ${[...EXP_CATS_DEFAULT,...loadCustomExpCats()].map(c=>`<option value="${c.key}" ${_expCatFilter===c.key?"selected":""}>${c.icon} ${escHtml(c.key)}</option>`).join("")}
     </select>
   </div>
 
@@ -22764,23 +22932,23 @@ function openCashTrackingModal(){
     <div style="background:var(--bg-row-even,#0d1220);border:1px solid var(--border-main,#1e2a45);border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:560px;padding-bottom:max(24px,env(safe-area-inset-bottom));">
       <div style="font-size:17px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:6px;">🏦 Cash & Bank Tracking</div>
       <div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-bottom:20px;">Choose how creditor payments and customer receipts affect your balances. Based on the payment mode (Cash / UPI / NEFT / Cheque / Other) selected when recording each transaction.</div>
+      <div onclick="setCashTrackingMode('separate');document.getElementById('ctm-modal-overlay').remove();safeRenderTab(currentTab);"
+           style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:2px solid ${cur==='separate'?'#4f4':'#1e2a45'};background:${cur==='separate'?'#081a08':'#080c18'};cursor:pointer;margin-bottom:12px;">
+        <span style="font-size:28px;">🏦</span>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:15px;color:${cur==='separate'?'#4f4':'#e8eaf0'};">Separate Cash & Bank <span style="font-size:10px;background:#1a3a1a;color:#4f4;border-radius:6px;padding:2px 6px;margin-left:6px;">Recommended</span></div>
+          <div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-top:3px;">Two independent balances. Payments made in "Cash" mode affect Cash in Hand; UPI/NEFT/Cheque/Other payments affect your Bank Balance. Both shown on the Balance Sheet.</div>
+        </div>
+        ${cur==='separate'?'<span style="font-size:20px;color:#4f4;">✓</span>':""}
+      </div>
       <div onclick="setCashTrackingMode('mixed');document.getElementById('ctm-modal-overlay').remove();safeRenderTab(currentTab);"
-           style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:2px solid ${cur==='mixed'?'#4a8aff':'#1e2a45'};background:${cur==='mixed'?'#0a1628':'#080c18'};cursor:pointer;margin-bottom:12px;">
+           style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:2px solid ${cur==='mixed'?'#4a8aff':'#1e2a45'};background:${cur==='mixed'?'#0a1628':'#080c18'};cursor:pointer;margin-bottom:20px;">
         <span style="font-size:28px;">💵</span>
         <div style="flex:1;">
           <div style="font-weight:800;font-size:15px;color:${cur==='mixed'?'#7ab3ff':'#e8eaf0'};">Combined (Mixed)</div>
           <div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-top:3px;">One single "Cash in Hand" total. All payments — by cash, UPI, bank transfer, etc — add to or subtract from the same balance. Simplest option.</div>
         </div>
         ${cur==='mixed'?'<span style="font-size:20px;color:#4a8aff;">✓</span>':""}
-      </div>
-      <div onclick="setCashTrackingMode('separate');document.getElementById('ctm-modal-overlay').remove();safeRenderTab(currentTab);"
-           style="display:flex;align-items:center;gap:14px;padding:16px;border-radius:14px;border:2px solid ${cur==='separate'?'#4f4':'#1e2a45'};background:${cur==='separate'?'#081a08':'#080c18'};cursor:pointer;margin-bottom:20px;">
-        <span style="font-size:28px;">🏦</span>
-        <div style="flex:1;">
-          <div style="font-weight:800;font-size:15px;color:${cur==='separate'?'#4f4':'#e8eaf0'};">Separate Cash & Bank</div>
-          <div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-top:3px;">Two independent balances. Payments made in "Cash" mode affect Cash in Hand; UPI/NEFT/Cheque/Other payments affect your Bank Balance. Both shown on the Balance Sheet.</div>
-        </div>
-        ${cur==='separate'?'<span style="font-size:20px;color:#4f4;">✓</span>':""}
       </div>
       <div style="font-size:11px;color:var(--text-dim,#4a5a7a);background:#070f07;border-radius:8px;padding:10px;margin-bottom:14px;">
         💡 You can switch this anytime. Past transactions keep the mode they were recorded with — switching just changes how new entries and balances are grouped going forward.
