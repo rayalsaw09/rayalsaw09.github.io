@@ -650,51 +650,7 @@
     <div id="sa-shop-list"><div style="text-align:center;color:#4a5a7a;padding:40px;font-size:14px;">Click Refresh to load shop data.</div></div>
   </div>
 
-  <!-- Shop Detail Modal -->
-  <div class="modal-overlay" id="sa-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;">
-    <div class="modal-box" style="width:100%;max-width:760px;margin-top:20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <div id="sa-detail-title" style="font-size:17px;font-weight:800;color:#FFD700;"></div>
-        <button onclick="document.getElementById('sa-detail-modal').style.display='none'" style="background:#1a2540;border:none;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:13px;font-weight:700;">✕ Close</button>
-      </div>
-      <!-- Tab strip -->
-      <div style="display:flex;gap:0;margin-bottom:14px;background:#060a14;border:1px solid #1a2040;border-radius:12px;padding:3px;">
-        <button id="sa-tab-bills-btn" onclick="saSetDetailTab('bills')"
-          style="flex:1;padding:9px;border-radius:9px;border:none;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:13px;cursor:pointer;">
-          🧾 Bills
-        </button>
-        <button id="sa-tab-inv-btn" onclick="saSetDetailTab('inventory')"
-          style="flex:1;padding:9px;border-radius:9px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:13px;cursor:pointer;">
-          📦 Inventory
-        </button>
-      </div>
-      <!-- Bills tab content -->
-      <div id="sa-tab-bills-content">
-        <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
-          <input type="date" id="sa-detail-from" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderShopBills()" />
-          <span style="color:#4a5a7a;">to</span>
-          <input type="date" id="sa-detail-to" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderShopBills()" />
-        </div>
-        <div id="sa-detail-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;"></div>
-        <div id="sa-detail-bills"></div>
-      </div>
-      <!-- Inventory tab content -->
-      <div id="sa-tab-inv-content" style="display:none;">
-        <div id="sa-inv-search-row" style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
-          <input id="sa-inv-search" class="input" placeholder="🔍 Search items..." style="flex:1;padding:8px 12px;font-size:13px;" oninput="renderShopInventory()" />
-          <select id="sa-inv-sort" class="input" style="max-width:150px;padding:8px 10px;font-size:12px;" onchange="renderShopInventory()">
-            <option value="name">Name A-Z</option>
-            <option value="stock_low">Stock: Low first</option>
-            <option value="stock_high">Stock: High first</option>
-            <option value="value">Stock Value</option>
-            <option value="category">Category</option>
-          </select>
-        </div>
-        <div id="sa-inv-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;"></div>
-        <div id="sa-inv-list"></div>
-      </div>
-    </div>
-  </div>
+
 
     <div style="margin-top:20px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:12px;padding:16px;font-size:12px;color:#4a5a7a;line-height:1.9;">
     <div style="color:#FFD700;font-weight:700;margin-bottom:6px;">📌 How to paste your Supabase credentials into the customer app:</div>
@@ -812,6 +768,52 @@
   </div><!-- /sp-maintab-4-content -->
 
 </div><!-- /main-panel -->
+
+  <!-- Shop Detail Modal -->
+  <div class="modal-overlay" id="sa-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;">
+    <div class="modal-box" style="width:100%;max-width:760px;margin-top:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div id="sa-detail-title" style="font-size:17px;font-weight:800;color:#FFD700;"></div>
+        <button onclick="document.getElementById('sa-detail-modal').style.display='none'" style="background:#1a2540;border:none;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:13px;font-weight:700;">✕ Close</button>
+      </div>
+      <!-- Tab strip -->
+      <div style="display:flex;gap:0;margin-bottom:14px;background:#060a14;border:1px solid #1a2040;border-radius:12px;padding:3px;">
+        <button id="sa-tab-bills-btn" onclick="saSetDetailTab('bills')"
+          style="flex:1;padding:9px;border-radius:9px;border:none;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:13px;cursor:pointer;">
+          🧾 Bills
+        </button>
+        <button id="sa-tab-inv-btn" onclick="saSetDetailTab('inventory')"
+          style="flex:1;padding:9px;border-radius:9px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:13px;cursor:pointer;">
+          📦 Inventory
+        </button>
+      </div>
+      <!-- Bills tab content -->
+      <div id="sa-tab-bills-content">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+          <input type="date" id="sa-detail-from" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderShopBills()" />
+          <span style="color:#4a5a7a;">to</span>
+          <input type="date" id="sa-detail-to" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderShopBills()" />
+        </div>
+        <div id="sa-detail-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;"></div>
+        <div id="sa-detail-bills"></div>
+      </div>
+      <!-- Inventory tab content -->
+      <div id="sa-tab-inv-content" style="display:none;">
+        <div id="sa-inv-search-row" style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
+          <input id="sa-inv-search" class="input" placeholder="🔍 Search items..." style="flex:1;padding:8px 12px;font-size:13px;" oninput="renderShopInventory()" />
+          <select id="sa-inv-sort" class="input" style="max-width:150px;padding:8px 10px;font-size:12px;" onchange="renderShopInventory()">
+            <option value="name">Name A-Z</option>
+            <option value="stock_low">Stock: Low first</option>
+            <option value="stock_high">Stock: High first</option>
+            <option value="value">Stock Value</option>
+            <option value="category">Category</option>
+          </select>
+        </div>
+        <div id="sa-inv-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;"></div>
+        <div id="sa-inv-list"></div>
+      </div>
+    </div>
+  </div>
 
 <!-- ═══════════════════════════════════════════
      PAYMENT HISTORY MODAL
