@@ -639,6 +639,9 @@
       <button onclick="saSetLast7()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">Last 7 days</button>
       <button onclick="saSetThisMonth()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">This Month</button>
     </div>
+    <div style="margin-bottom:12px;">
+      <input id="sa-search" class="input" placeholder="🔍 Search by shop name or phone..." style="width:100%;max-width:360px;padding:8px 12px;font-size:13px;" oninput="renderShopList()" />
+    </div>
     <div id="sa-shop-list"><div style="text-align:center;color:#4a5a7a;padding:40px;font-size:14px;">Click Refresh to load shop data.</div></div>
   </div>
 
@@ -689,7 +692,7 @@
 
     <!-- Search + filter row -->
     <div class="search-bar-row">
-      <input id="search-merged" class="input" placeholder="🔍 Name, phone, User ID, key..." style="max-width:260px;" oninput="filterMerged()"/>
+      <input id="search-merged" class="input" placeholder="🔍 Shop name, phone, User ID, key..." style="max-width:280px;" oninput="filterMerged()"/>
       <select id="filter-sub-status" class="input" style="max-width:160px;" onchange="filterMerged()">
         <option value="">All Statuses</option>
         <option value="active">✅ Active Pro</option>
@@ -834,8 +837,7 @@
       <button class="btn" onclick="confirmResetPassword()" style="flex:1;background:linear-gradient(135deg,#0a3a6a,#0a1a3a);color:#5af;border:1px solid #1a4a8a;">🔑 Reset Password</button>
     </div>
   </div>
-
-  </div>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -3277,8 +3279,17 @@ async function loadShopActivity() {
     saAllShops = [];
     const promises = shopPhones.map(async phone => {
       let shopName = phone;
-      // Try to get shop name from Supabase users (mergedData contains {user:{phone,name,...}, ...})
-      if (typeof mergedData !== "undefined" && mergedData.length) {
+      // PRIMARY: Read shopName from Firebase shop_profiles/{phone} (set by Admin app on registration)
+      try {
+        const profileDoc = await saDb.collection("shop_profiles").doc(phone).get();
+        if (profileDoc.exists && profileDoc.data().shopName) {
+          shopName = profileDoc.data().shopName;
+        }
+      } catch(profileErr) {
+        console.warn("[ShopActivity] shop_profiles read error for", phone, profileErr.message);
+      }
+      // FALLBACK: If still just a phone number, try Supabase user personal name
+      if (shopName === phone && typeof mergedData !== "undefined" && mergedData.length) {
         const supaRow = mergedData.find(r => r.user && r.user.phone === phone);
         if (supaRow && supaRow.user && supaRow.user.name) shopName = supaRow.user.name;
       }
@@ -3358,6 +3369,7 @@ function saFilterPurchases(purchases, fromStr, toStr) {
 function renderShopList() {
   const fromStr = document.getElementById("sa-date-from").value;
   const toStr   = document.getElementById("sa-date-to").value;
+  const searchQ = (document.getElementById("sa-search")?.value || "").trim().toLowerCase();
   const el = document.getElementById("sa-shop-list");
 
   if (!saAllShops.length) {
@@ -3365,8 +3377,15 @@ function renderShopList() {
     return;
   }
 
+  // Apply search filter
+  const visibleShops = searchQ
+    ? saAllShops.filter(s =>
+        s.name.toLowerCase().includes(searchQ) ||
+        s.phone.toLowerCase().includes(searchQ))
+    : saAllShops;
+
   let totalBills = 0, totalRevenue = 0, totalCustomers = 0;
-  const rows = saAllShops.map(shop => {
+  const rows = visibleShops.map(shop => {
     const filtered = saFilterPurchases(shop.purchases, fromStr, toStr);
     const revenue = filtered.reduce((s, p) => s + p.amount, 0);
     const uniqueCusts = new Set(filtered.map(p => p.custId)).size;
@@ -3378,9 +3397,10 @@ function renderShopList() {
 
   const formatINR2 = n => "₹" + Number(n).toLocaleString("en-IN");
 
-  // Summary row
+  // Summary row (shows filtered count when searching)
+  const shopCountLabel = searchQ ? `${visibleShops.length} of ${saAllShops.length}` : saAllShops.length;
   const summary = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
-    <div class="stat"><div class="stat-num">${saAllShops.length}</div><div class="stat-label">Total Shops</div></div>
+    <div class="stat"><div class="stat-num">${shopCountLabel}</div><div class="stat-label">${searchQ ? "Matching Shops" : "Total Shops"}</div></div>
     <div class="stat"><div class="stat-num" style="color:#4f4;">${formatINR2(totalRevenue)}</div><div class="stat-label">Total Revenue</div></div>
     <div class="stat"><div class="stat-num" style="color:#7ab3ff;">${totalBills}</div><div class="stat-label">Total Bills</div></div>
   </div>`;
@@ -3405,17 +3425,15 @@ function renderShopList() {
   }).join("");
 
   el.innerHTML = summary + `<div style="background:#080c18;border:1px solid #1e2a45;border-radius:12px;overflow:hidden;">
-    ${rows.length ? shopCards : '<div style="padding:30px;text-align:center;color:#4a5a7a;font-size:13px;">No activity in selected date range.</div>'}
+    ${rows.length ? shopCards : `<div style="padding:30px;text-align:center;color:#4a5a7a;font-size:13px;">${searchQ ? "No shops match your search." : "No activity in selected date range."}</div>`}
   </div>`;
 }
 
 function openShopDetail(phone, fromStr, toStr) {
   saCurrentShop = saAllShops.find(s => s.phone === phone);
   if (!saCurrentShop) return;
-  const supaRow = (typeof mergedData !== "undefined" && mergedData.length)
-    ? mergedData.find(r => r.user && r.user.phone === phone)
-    : null;
-  const name = (supaRow && supaRow.user && supaRow.user.name) ? supaRow.user.name : phone;
+  // Shop name is already resolved from shop_profiles during loadShopActivity → use saCurrentShop.name
+  const name = saCurrentShop.name || phone;
   document.getElementById("sa-detail-title").textContent = "🏪 " + name;
   document.getElementById("sa-detail-from").value = fromStr;
   document.getElementById("sa-detail-to").value = toStr;
@@ -3447,8 +3465,14 @@ function renderShopBills() {
 
   const billsHtml = filtered.map(p => {
     const dateStr = p.date ? new Date(p.date).toLocaleString("en-IN", {day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
-    const itemsList = (p.items || []).length
-      ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #1a2040;">${p.items.map(i=>`<span style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:6px;padding:2px 8px;font-size:11px;color:#7ab3ff;margin-right:4px;display:inline-block;margin-bottom:2px;">${escHtml(i.name||i)}${i.qty?' ×'+i.qty:''}</span>`).join("")}</div>`
+    // Filter out generic Standard Mode entries (name "Sale"/"बिक्री" with qty=1 = no real items)
+    const GENERIC_NAMES = ["sale", "बिक्री", "standard sale", "cash sale"];
+    const realItems = (p.items || []).filter(i => {
+      const nm = (i.name || "").trim().toLowerCase();
+      return nm && !GENERIC_NAMES.includes(nm);
+    });
+    const itemsList = realItems.length
+      ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #1a2040;">${realItems.map(i=>`<span style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:6px;padding:2px 8px;font-size:11px;color:#7ab3ff;margin-right:4px;display:inline-block;margin-bottom:2px;">${escHtml(i.name||i)}${i.qty?' ×'+i.qty:''}</span>`).join("")}</div>`
       : "";
     return `<div style="background:#080c18;border:1px solid #1a2040;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
