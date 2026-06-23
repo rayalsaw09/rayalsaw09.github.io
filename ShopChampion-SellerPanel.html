@@ -4191,7 +4191,7 @@ let _scStorage = null;
 function scGetStorage() {
   if (_scStorage) return _scStorage;
   try {
-    await saInitFirebase(); // ensures firebase app is initialized
+    saInitFirebase(); // fire-and-forget init; callers that need auth should await saInitFirebase() themselves
     const bucket = (typeof SC_FIREBASE_CONFIG !== 'undefined' && SC_FIREBASE_CONFIG.storageBucket)
       ? SC_FIREBASE_CONFIG.storageBucket : '';
     _scStorage = bucket ? firebase.app().storage(`gs://${bucket}`) : firebase.storage();
