@@ -3680,6 +3680,28 @@ function renderShopInventory() {
 
 // ─── ALERTS TAB: Low Stock across ALL shops ────────────────────────────────
 
+// Helper: open the shop detail modal from the Alerts tab.
+// Reads the date range from the Shop Activity inputs (if already loaded),
+// falls back to current month so bills always show something.
+function spOpenShopFromAlerts(phone) {
+  // Switch to tab 2 first so the modal renders over the right context,
+  // but the modal is position:fixed so it works from any tab.
+  // We just need the date range — read it safely.
+  const fromEl = document.getElementById('sa-date-from');
+  const toEl   = document.getElementById('sa-date-to');
+  let fromStr  = fromEl ? fromEl.value : '';
+  let toStr    = toEl   ? toEl.value   : '';
+  // If dates are empty (tab 2 never opened), default to this month
+  if (!fromStr || !toStr) {
+    const now   = new Date();
+    const y     = now.getFullYear();
+    const m     = String(now.getMonth() + 1).padStart(2, '0');
+    fromStr = y + '-' + m + '-01';
+    toStr   = now.toISOString().slice(0, 10);
+  }
+  openShopDetail(phone, fromStr, toStr);
+}
+
 // Cache: { phone -> { status:'loading'|'ok'|'error', items:[], name:'' } }
 const _saAlertCache = {};
 let _saAlertLoaded = false;
@@ -3899,7 +3921,7 @@ function renderAllLowStock() {
           <div style="display:flex;gap:8px;align-items:center;">
             ${shop.outCount > 0 ? `<span style="background:#7f1d1d;color:#fca5a5;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:800;">${shop.outCount} OUT</span>` : ''}
             ${shop.lowCount > 0 ? `<span style="background:#78350f;color:#fde68a;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:800;">${shop.lowCount} LOW</span>` : ''}
-            <button onclick="openShopDetail('${shop.phone}', document.getElementById('sa-date-from')?.value||'', document.getElementById('sa-date-to')?.value||'')"
+            <button onclick="spOpenShopFromAlerts('${shop.phone}')"
               style="padding:6px 12px;background:#1a3a6a;border:1px solid #2a5aa0;border-radius:8px;color:#7ab3ff;font-size:12px;font-weight:700;cursor:pointer;">
               View Shop →
             </button>
