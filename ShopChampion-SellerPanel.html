@@ -224,6 +224,11 @@
       style="flex:1;padding:11px 10px;border-radius:10px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;">
       👥 Users &amp; Subs
     </button>
+    <button id="sp-maintab-4-btn" onclick="spSetMainTab(4)"
+      style="flex:1;padding:11px 10px;border-radius:10px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:13px;cursor:pointer;transition:all .2s;position:relative;">
+      🔔 Alerts
+      <span id="sp-alerts-badge" style="display:none;position:absolute;top:4px;right:4px;background:#ef4444;color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;font-weight:800;line-height:16px;text-align:center;"></span>
+    </button>
   </div>
 
   <!-- ═══ TAB 1: Home (Overview, Create Key, Ads, Settings) ═══ -->
@@ -647,18 +652,47 @@
 
   <!-- Shop Detail Modal -->
   <div class="modal-overlay" id="sa-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;">
-    <div class="modal-box" style="width:100%;max-width:700px;margin-top:20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div class="modal-box" style="width:100%;max-width:760px;margin-top:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
         <div id="sa-detail-title" style="font-size:17px;font-weight:800;color:#FFD700;"></div>
         <button onclick="document.getElementById('sa-detail-modal').style.display='none'" style="background:#1a2540;border:none;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:13px;font-weight:700;">✕ Close</button>
       </div>
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
-        <input type="date" id="sa-detail-from" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderShopBills()" />
-        <span style="color:#4a5a7a;">to</span>
-        <input type="date" id="sa-detail-to" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderShopBills()" />
+      <!-- Tab strip -->
+      <div style="display:flex;gap:0;margin-bottom:14px;background:#060a14;border:1px solid #1a2040;border-radius:12px;padding:3px;">
+        <button id="sa-tab-bills-btn" onclick="saSetDetailTab('bills')"
+          style="flex:1;padding:9px;border-radius:9px;border:none;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:13px;cursor:pointer;">
+          🧾 Bills
+        </button>
+        <button id="sa-tab-inv-btn" onclick="saSetDetailTab('inventory')"
+          style="flex:1;padding:9px;border-radius:9px;border:none;background:transparent;color:#4a5a7a;font-weight:700;font-size:13px;cursor:pointer;">
+          📦 Inventory
+        </button>
       </div>
-      <div id="sa-detail-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;"></div>
-      <div id="sa-detail-bills"></div>
+      <!-- Bills tab content -->
+      <div id="sa-tab-bills-content">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+          <input type="date" id="sa-detail-from" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderShopBills()" />
+          <span style="color:#4a5a7a;">to</span>
+          <input type="date" id="sa-detail-to" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderShopBills()" />
+        </div>
+        <div id="sa-detail-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;"></div>
+        <div id="sa-detail-bills"></div>
+      </div>
+      <!-- Inventory tab content -->
+      <div id="sa-tab-inv-content" style="display:none;">
+        <div id="sa-inv-search-row" style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
+          <input id="sa-inv-search" class="input" placeholder="🔍 Search items..." style="flex:1;padding:8px 12px;font-size:13px;" oninput="renderShopInventory()" />
+          <select id="sa-inv-sort" class="input" style="max-width:150px;padding:8px 10px;font-size:12px;" onchange="renderShopInventory()">
+            <option value="name">Name A-Z</option>
+            <option value="stock_low">Stock: Low first</option>
+            <option value="stock_high">Stock: High first</option>
+            <option value="value">Stock Value</option>
+            <option value="category">Category</option>
+          </select>
+        </div>
+        <div id="sa-inv-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;"></div>
+        <div id="sa-inv-list"></div>
+      </div>
     </div>
   </div>
 
@@ -743,6 +777,40 @@
   </div>
 
   </div><!-- /sp-maintab-3-content -->
+
+  <!-- ═══ TAB 4: Alerts — Low Stock across all shops ═══ -->
+  <div id="sp-maintab-4-content" style="display:none;">
+    <div class="section-title">🔔 Stock Alerts</div>
+
+    <!-- Controls bar -->
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+      <input id="sp-alerts-search" type="text" placeholder="🔍 Search shop or item…"
+        oninput="renderAllLowStock()"
+        style="flex:1;min-width:180px;padding:9px 14px;background:#0d1b2e;border:1px solid #1e2a45;border-radius:10px;color:#e8f4fd;font-size:13px;outline:none;">
+      <select id="sp-alerts-sort" onchange="renderAllLowStock()"
+        style="padding:9px 12px;background:#0d1b2e;border:1px solid #1e2a45;border-radius:10px;color:#e8f4fd;font-size:13px;cursor:pointer;">
+        <option value="shop">Sort: Shop Name</option>
+        <option value="count">Sort: Most Alerts</option>
+        <option value="out">Sort: Out of Stock First</option>
+      </select>
+      <button onclick="loadAllLowStock(true)"
+        style="padding:9px 16px;background:#1a2540;border:1px solid #2a3a5a;border-radius:10px;color:#7ab3ff;font-size:13px;font-weight:700;cursor:pointer;">
+        🔄 Refresh
+      </button>
+    </div>
+
+    <!-- Summary bar -->
+    <div id="sp-alerts-summary" style="display:none;background:linear-gradient(135deg,#1a0a00,#2a1500);border:1px solid #7c2d12;border-radius:12px;padding:14px 18px;margin-bottom:16px;gap:20px;flex-wrap:wrap;">
+    </div>
+
+    <!-- Shop cards list -->
+    <div id="sp-alerts-list">
+      <div style="text-align:center;color:#4a5a7a;padding:40px;font-size:13px;">
+        Click 🔔 Alerts tab to load stock alerts for all shops.
+      </div>
+    </div>
+  </div><!-- /sp-maintab-4-content -->
+
 </div><!-- /main-panel -->
 
 <!-- ═══════════════════════════════════════════
@@ -1005,7 +1073,7 @@ function resetSettings() {
 }
 
 function spSetMainTab(n) {
-  [1, 2, 3].forEach(i => {
+  [1, 2, 3, 4].forEach(i => {
     const content = document.getElementById('sp-maintab-' + i + '-content');
     const btn = document.getElementById('sp-maintab-' + i + '-btn');
     if (!content || !btn) return;
@@ -1026,6 +1094,10 @@ function spSetMainTab(n) {
     loadUsers();
     loadKeys();
     loadPayments();
+  }
+  // Load alerts when switching to tab 4
+  if (n === 4) {
+    loadAllLowStock();
   }
 }
 
@@ -3438,7 +3510,409 @@ function openShopDetail(phone, fromStr, toStr) {
   document.getElementById("sa-detail-from").value = fromStr;
   document.getElementById("sa-detail-to").value = toStr;
   document.getElementById("sa-detail-modal").style.display = "flex";
+  saSetDetailTab("bills");
   renderShopBills();
+  // Pre-load inventory in background so it's ready when user switches tab
+  saLoadShopInventory(phone);
+}
+
+function saSetDetailTab(tab) {
+  const isBills = tab === "bills";
+  const billsContent = document.getElementById("sa-tab-bills-content");
+  const invContent   = document.getElementById("sa-tab-inv-content");
+  const billsBtn     = document.getElementById("sa-tab-bills-btn");
+  const invBtn       = document.getElementById("sa-tab-inv-btn");
+  if (billsContent) billsContent.style.display = isBills ? "block" : "none";
+  if (invContent)   invContent.style.display   = isBills ? "none" : "block";
+  if (billsBtn) {
+    billsBtn.style.background  = isBills ? "linear-gradient(135deg,#FFD700,#FFA500)" : "transparent";
+    billsBtn.style.color       = isBills ? "#1a0a00" : "#4a5a7a";
+    billsBtn.style.fontWeight  = isBills ? "800" : "700";
+  }
+  if (invBtn) {
+    invBtn.style.background  = isBills ? "transparent" : "linear-gradient(135deg,#1a3a6a,#0f2550)";
+    invBtn.style.color       = isBills ? "#4a5a7a" : "#7ab3ff";
+    invBtn.style.fontWeight  = isBills ? "700" : "800";
+  }
+  if (!isBills) renderShopInventory();
+}
+
+// Cache inventory per phone so we don't re-fetch on tab switch
+const _saInvCache = {};
+
+async function saLoadShopInventory(phone) {
+  if (_saInvCache[phone]) return; // already loaded
+  _saInvCache[phone] = { status: "loading", items: [] };
+  try {
+    await saInitFirebase();
+    if (!saDb) { _saInvCache[phone].status = "error"; _saInvCache[phone].error = "Firebase not ready"; return; }
+    const snap = await saDb.collection("users").doc(phone).collection("inventory_data").doc("items").get();
+    if (snap.exists && Array.isArray(snap.data().items)) {
+      _saInvCache[phone] = { status: "ok", items: snap.data().items };
+    } else {
+      _saInvCache[phone] = { status: "ok", items: [] };
+    }
+  } catch(e) {
+    _saInvCache[phone] = { status: "error", items: [], error: e.message };
+  }
+  // If inventory tab is currently visible, re-render
+  const invContent = document.getElementById("sa-tab-inv-content");
+  if (invContent && invContent.style.display !== "none") renderShopInventory();
+}
+
+function renderShopInventory() {
+  if (!saCurrentShop) return;
+  const phone = saCurrentShop.phone;
+  const listEl   = document.getElementById("sa-inv-list");
+  const statsEl  = document.getElementById("sa-inv-stats");
+  const searchQ  = (document.getElementById("sa-inv-search")?.value || "").trim().toLowerCase();
+  const sortBy   = document.getElementById("sa-inv-sort")?.value || "name";
+  const cache    = _saInvCache[phone];
+
+  if (!cache || cache.status === "loading") {
+    if (listEl) listEl.innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:40px;font-size:13px;">⏳ Loading inventory...</div>`;
+    if (statsEl) statsEl.innerHTML = "";
+    // Trigger load if not already started
+    if (!cache) saLoadShopInventory(phone);
+    return;
+  }
+  if (cache.status === "error") {
+    if (listEl) listEl.innerHTML = `<div style="text-align:center;color:#f66;padding:30px;font-size:13px;">❌ ${escHtml(cache.error)}</div>`;
+    if (statsEl) statsEl.innerHTML = "";
+    return;
+  }
+
+  let items = cache.items;
+
+  // Compute current stock for each item
+  items = items.map(item => {
+    const totalIn  = (item.stock    || []).reduce((s,e) => s + Number(e.qty||0), 0);
+    const totalOut = (item.salesLog || []).reduce((s,e) => s + Number(e.qty||0), 0);
+    const stock    = Math.max(0, totalIn - totalOut);
+    const lastCost = [...(item.stock||[])].filter(e=>Number(e.costPerUnit||0)>0).slice(-1)[0]?.costPerUnit || 0;
+    const stockVal = stock * Number(lastCost||0);
+    return { ...item, _stock: stock, _stockVal: stockVal };
+  });
+
+  // Filter by search
+  const filtered = searchQ
+    ? items.filter(i =>
+        (i.name||"").toLowerCase().includes(searchQ) ||
+        (i.category||"").toLowerCase().includes(searchQ) ||
+        (i.unit||"").toLowerCase().includes(searchQ))
+    : items;
+
+  // Sort
+  let sorted = [...filtered];
+  if (sortBy === "stock_low")  sorted.sort((a,b) => a._stock - b._stock);
+  else if (sortBy === "stock_high") sorted.sort((a,b) => b._stock - a._stock);
+  else if (sortBy === "value") sorted.sort((a,b) => b._stockVal - a._stockVal);
+  else if (sortBy === "category") sorted.sort((a,b) => (a.category||"General").localeCompare(b.category||"General") || a.name.localeCompare(b.name));
+  else sorted.sort((a,b) => a.name.localeCompare(b.name)); // name A-Z
+
+  // Stats
+  const totalItems   = items.length;
+  const outOfStock   = items.filter(i => i._stock <= 0).length;
+  const lowStock     = items.filter(i => i._stock > 0 && i._stock <= (i.minStock||5)).length;
+  const totalValue   = items.reduce((s,i) => s + i._stockVal, 0);
+
+  if (statsEl) statsEl.innerHTML = `
+    <div class="stat"><div class="stat-num" style="color:#7ab3ff;">${totalItems}</div><div class="stat-label">Total Items</div></div>
+    <div class="stat"><div class="stat-num" style="color:#f66;">${outOfStock}</div><div class="stat-label">Out of Stock</div></div>
+    <div class="stat"><div class="stat-num" style="color:#FFD700;">₹${totalValue.toLocaleString("en-IN",{maximumFractionDigits:0})}</div><div class="stat-label">Stock Value</div></div>`;
+
+  if (!sorted.length) {
+    if (listEl) listEl.innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:30px;font-size:13px;">${searchQ ? "No items match your search." : "No inventory items found."}</div>`;
+    return;
+  }
+
+  const formatINR = n => "₹" + Number(n).toLocaleString("en-IN", {maximumFractionDigits:2});
+
+  const html = sorted.map(item => {
+    const stock    = item._stock;
+    const minStock = item.minStock || 5;
+    const isOut    = stock <= 0;
+    const isLow    = !isOut && stock <= minStock;
+    const stkColor = isOut ? "#f66" : isLow ? "#FFD700" : "#4f4";
+    const stkBg    = isOut ? "#1a0000" : isLow ? "#1a1400" : "#001a00";
+    const stkLabel = isOut ? "OUT" : String(stock);
+
+    const sellPrice = Number(item.sellingPrice||0);
+    const lastCost  = [...(item.stock||[])].filter(e=>Number(e.costPerUnit||0)>0).slice(-1)[0]?.costPerUnit || 0;
+    const category  = item.category || "General";
+    const gstInfo   = item.gstRate && Number(item.gstRate) > 0
+      ? `<span style="background:#0a1a0a;border:1px solid #1a3a1a;color:#4f4;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:700;">GST ${item.gstRate}%</span>` : "";
+    const expiry    = item.expiryDate
+      ? `<span style="font-size:10px;color:${new Date(item.expiryDate) < new Date() ? '#f66' : '#7a8aaa'};">Exp: ${new Date(item.expiryDate).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"})}</span>` : "";
+
+    // Last stock-in date
+    const lastStockIn = [...(item.stock||[])].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+    const lastIn = lastStockIn ? new Date(lastStockIn.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"}) : "—";
+
+    return `<div style="background:#080c18;border:1px solid #1a2040;border-radius:10px;padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px;">
+      <!-- Stock badge -->
+      <div style="min-width:54px;text-align:center;background:${stkBg};border:1px solid ${stkColor}40;border-radius:10px;padding:6px 4px;flex-shrink:0;">
+        <div style="font-size:16px;font-weight:900;color:${stkColor};line-height:1;">${stkLabel}</div>
+        <div style="font-size:9px;color:${stkColor};margin-top:1px;">${escHtml(item.unit||"unit")}</div>
+      </div>
+      <!-- Item info -->
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:800;font-size:13px;color:#e8eaf0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${escHtml(item.name)}${isLow && !isOut ? ' <span style="font-size:11px;" title="Low stock">⚠️</span>' : ""}
+        </div>
+        <div style="font-size:11px;color:#4a5a7a;margin-top:2px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
+          <span style="background:#0a0e1a;border:1px solid #1a2040;border-radius:5px;padding:1px 6px;">${escHtml(category)}</span>
+          ${gstInfo}
+          ${expiry}
+          <span style="color:#5a6a8a;">Last in: ${lastIn}</span>
+        </div>
+      </div>
+      <!-- Prices -->
+      <div style="text-align:right;flex-shrink:0;">
+        ${sellPrice > 0 ? `<div style="font-weight:800;font-size:13px;color:#4f4;">${formatINR(sellPrice)}</div><div style="font-size:9px;color:#4a5a7a;">Sell</div>` : ""}
+        ${Number(lastCost) > 0 ? `<div style="font-weight:700;font-size:11px;color:#7a8aaa;margin-top:2px;">${formatINR(lastCost)}</div><div style="font-size:9px;color:#4a5a7a;">Cost</div>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  if (listEl) listEl.innerHTML = html;
+}
+
+// ─── ALERTS TAB: Low Stock across ALL shops ────────────────────────────────
+
+// Cache: { phone -> { status:'loading'|'ok'|'error', items:[], name:'' } }
+const _saAlertCache = {};
+let _saAlertLoaded = false;
+
+async function loadAllLowStock(forceRefresh = false) {
+  const listEl    = document.getElementById('sp-alerts-list');
+  const summaryEl = document.getElementById('sp-alerts-summary');
+  if (!listEl) return;
+
+  // Get the list of phones from saAllShops (already loaded by Shop Activity)
+  // If not yet loaded, trigger a load first
+  if (!saAllShops || saAllShops.length === 0) {
+    listEl.innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:40px;font-size:13px;">
+      ⏳ Loading shop list… Please open Shop Activity tab first to load shops, then come back here.
+    </div>`;
+    // Try to auto-load shop activity then poll until saAllShops is populated
+    if (!window._spTab2Loaded) {
+      window._spTab2Loaded = true;
+      saSetThisMonth(true); // kicks off loadShopActivity async
+    }
+    listEl.innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:40px;font-size:13px;">⏳ Loading shop list…</div>`;
+    await new Promise(resolve => {
+      let waited = 0;
+      const poll = setInterval(() => {
+        waited += 200;
+        if (saAllShops.length > 0 || waited >= 10000) { clearInterval(poll); resolve(); }
+      }, 200);
+    });
+    if (!saAllShops || saAllShops.length === 0) {
+      listEl.innerHTML = `<div style="text-align:center;color:#ef4444;padding:40px;font-size:13px;">
+        ⚠️ No shops loaded. Please go to Shop Activity tab, load shops, then come back to Alerts.
+      </div>`;
+      return;
+    }
+  }
+
+  if (forceRefresh) {
+    // Clear cache for all phones
+    saAllShops.forEach(s => { delete _saAlertCache[s.phone]; });
+    _saAlertLoaded = false;
+  }
+
+  if (_saAlertLoaded && !forceRefresh) {
+    renderAllLowStock();
+    return;
+  }
+
+  await saInitFirebase();
+  if (!saDb) {
+    listEl.innerHTML = `<div style="text-align:center;color:#ef4444;padding:40px;font-size:13px;">⚠️ Firebase not ready.</div>`;
+    return;
+  }
+
+  // Show loading state
+  listEl.innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:40px;font-size:13px;">⏳ Fetching inventory for ${saAllShops.length} shops…</div>`;
+
+  // Fetch inventory for all shops in parallel
+  const fetches = saAllShops.map(async shop => {
+    if (_saAlertCache[shop.phone] && _saAlertCache[shop.phone].status === 'ok') return;
+    _saAlertCache[shop.phone] = { status: 'loading', items: [], name: shop.name || shop.phone };
+    try {
+      const snap = await saDb.collection('users').doc(shop.phone).collection('inventory_data').doc('items').get();
+      const items = (snap.exists && Array.isArray(snap.data().items)) ? snap.data().items : [];
+      _saAlertCache[shop.phone] = { status: 'ok', items, name: shop.name || shop.phone };
+      // Also sync to single-shop cache so inventory tab in detail modal is warm
+      _saInvCache[shop.phone] = { status: 'ok', items };
+    } catch(e) {
+      _saAlertCache[shop.phone] = { status: 'error', items: [], name: shop.name || shop.phone, error: e.message };
+    }
+  });
+
+  await Promise.all(fetches);
+  _saAlertLoaded = true;
+  renderAllLowStock();
+}
+
+function renderAllLowStock() {
+  const listEl    = document.getElementById('sp-alerts-list');
+  const summaryEl = document.getElementById('sp-alerts-summary');
+  if (!listEl) return;
+
+  const searchQ = (document.getElementById('sp-alerts-search')?.value || '').trim().toLowerCase();
+  const sortBy  = document.getElementById('sp-alerts-sort')?.value || 'shop';
+
+  // Build shop alert objects
+  let shopAlerts = saAllShops.map(shop => {
+    const cache = _saAlertCache[shop.phone];
+    if (!cache || cache.status !== 'ok') return null;
+    const items = cache.items;
+
+    const alertItems = items
+      .map(item => {
+        const stock = (item.stock || []).reduce((s, e) => s + (e.qty || 0), 0);
+        const soldQ = (item.salesLog || []).reduce((s, e) => s + (e.qty || 0), 0);
+        const netStock = Math.max(0, stock - soldQ);
+        const minStock = item.minStock || 5;
+        const isOut  = netStock === 0;
+        const isLow  = !isOut && netStock <= minStock;
+        return { ...item, _stock: netStock, _isOut: isOut, _isLow: isLow, _minStock: minStock };
+      })
+      .filter(i => i._isOut || i._isLow);
+
+    return {
+      phone: shop.phone,
+      name: shop.name || shop.phone,
+      alertItems,
+      outCount:  alertItems.filter(i => i._isOut).length,
+      lowCount:  alertItems.filter(i => i._isLow).length,
+      totalItems: items.length,
+    };
+  }).filter(Boolean).filter(s => s.alertItems.length > 0);
+
+  // Search filter
+  if (searchQ) {
+    shopAlerts = shopAlerts.filter(s =>
+      s.name.toLowerCase().includes(searchQ) ||
+      s.phone.includes(searchQ) ||
+      s.alertItems.some(i => (i.name||'').toLowerCase().includes(searchQ) || (i.category||'').toLowerCase().includes(searchQ))
+    );
+  }
+
+  // Sort
+  if (sortBy === 'count')  shopAlerts.sort((a, b) => (b.outCount + b.lowCount) - (a.outCount + a.lowCount));
+  else if (sortBy === 'out') shopAlerts.sort((a, b) => b.outCount - a.outCount || b.lowCount - a.lowCount);
+  else shopAlerts.sort((a, b) => a.name.localeCompare(b.name));
+
+  // Update badge
+  const badge = document.getElementById('sp-alerts-badge');
+  const totalAlertShops = shopAlerts.length;
+  if (badge) {
+    badge.style.display = totalAlertShops > 0 ? 'block' : 'none';
+    badge.textContent = totalAlertShops > 9 ? '9+' : totalAlertShops;
+  }
+
+  // Summary bar
+  const totalOut = shopAlerts.reduce((s, x) => s + x.outCount, 0);
+  const totalLow = shopAlerts.reduce((s, x) => s + x.lowCount, 0);
+  if (summaryEl) {
+    if (totalAlertShops > 0) {
+      summaryEl.style.display = 'flex';
+      summaryEl.innerHTML = `
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:#ef4444;">${totalAlertShops}</div>
+          <div style="font-size:11px;color:#9ca3af;">Shops with Alerts</div>
+        </div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:#ef4444;">${totalOut}</div>
+          <div style="font-size:11px;color:#9ca3af;">Out of Stock Items</div>
+        </div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:#f59e0b;">${totalLow}</div>
+          <div style="font-size:11px;color:#9ca3af;">Low Stock Items</div>
+        </div>
+      `;
+    } else {
+      summaryEl.style.display = 'none';
+    }
+  }
+
+  // Render shop cards
+  if (shopAlerts.length === 0) {
+    listEl.innerHTML = `<div style="text-align:center;padding:50px 20px;">
+      <div style="font-size:40px;margin-bottom:12px;">✅</div>
+      <div style="color:#4ade80;font-size:16px;font-weight:700;">All Clear!</div>
+      <div style="color:#4a5a7a;font-size:13px;margin-top:6px;">No low stock or out-of-stock items found across all shops.</div>
+    </div>`;
+    return;
+  }
+
+  const html = shopAlerts.map(shop => {
+    // Filter alert items by search if searching for an item name
+    const displayItems = searchQ
+      ? shop.alertItems.filter(i =>
+          shop.name.toLowerCase().includes(searchQ) ||
+          shop.phone.includes(searchQ) ||
+          (i.name||'').toLowerCase().includes(searchQ) ||
+          (i.category||'').toLowerCase().includes(searchQ))
+      : shop.alertItems;
+
+    const itemsHtml = displayItems
+      .sort((a, b) => a._isOut === b._isOut ? 0 : a._isOut ? -1 : 1) // out of stock first
+      .map(item => {
+        const lastCost = item.stock?.length ? (item.stock[item.stock.length-1].costPerUnit || 0) : 0;
+        const badge = item._isOut
+          ? `<span style="background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:800;">OUT</span>`
+          : `<span style="background:#78350f;color:#fde68a;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:800;">LOW ${item._stock}</span>`;
+        const catTag = item.category
+          ? `<span style="background:#0f2550;color:#7ab3ff;padding:2px 6px;border-radius:6px;font-size:10px;">${item.category}</span>`
+          : '';
+        return `
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#060d1a;border-radius:10px;border:1px solid #1e2a45;margin-bottom:6px;">
+            ${badge}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:700;color:#e8f4fd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.name || 'Unnamed'}</div>
+              <div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap;">${catTag}
+                <span style="color:#4a5a7a;font-size:11px;">Min: ${item._minStock} ${item.unit||''}</span>
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:13px;font-weight:700;color:#4ade80;">₹${(item.sellingPrice||0).toLocaleString('en-IN')}</div>
+              ${lastCost ? `<div style="font-size:11px;color:#4a5a7a;">Cost ₹${lastCost.toLocaleString('en-IN')}</div>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+
+    const headerBg = shop.outCount > 0 ? '#2a0a00' : '#1a1500';
+    const headerBorder = shop.outCount > 0 ? '#7f1d1d' : '#78350f';
+
+    return `
+      <div style="background:#0d1b2e;border:1px solid #1e2a45;border-radius:14px;overflow:hidden;margin-bottom:16px;">
+        <!-- Shop header -->
+        <div style="background:${headerBg};border-bottom:1px solid ${headerBorder};padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:800;color:#e8f4fd;">${shop.name}</div>
+            <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${shop.phone} · ${shop.totalItems} total items</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            ${shop.outCount > 0 ? `<span style="background:#7f1d1d;color:#fca5a5;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:800;">${shop.outCount} OUT</span>` : ''}
+            ${shop.lowCount > 0 ? `<span style="background:#78350f;color:#fde68a;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:800;">${shop.lowCount} LOW</span>` : ''}
+            <button onclick="openShopDetail('${shop.phone}', document.getElementById('sa-date-from')?.value||'', document.getElementById('sa-date-to')?.value||'')"
+              style="padding:6px 12px;background:#1a3a6a;border:1px solid #2a5aa0;border-radius:8px;color:#7ab3ff;font-size:12px;font-weight:700;cursor:pointer;">
+              View Shop →
+            </button>
+          </div>
+        </div>
+        <!-- Items list -->
+        <div style="padding:12px 12px 6px;">
+          ${itemsHtml}
+        </div>
+      </div>`;
+  }).join('');
+
+  listEl.innerHTML = html;
 }
 
 function renderShopBills() {
