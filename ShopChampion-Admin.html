@@ -5111,7 +5111,7 @@ function _safeRenderTabImmediate(i) {
   if (dp) {
     // If user is on a bill detail page, never wipe it via background refresh
     if (dp.type === 'txBillDetail') return;
-    const detailTab = dp.type === 'creditor' ? 6 : 7;
+    const detailTab = dp.type === 'creditor' ? 2 : 3;
     if (i === detailTab) {
       // Refresh only the running balance banner and the transaction list so
       // the user stays on the detail page.
@@ -10214,10 +10214,11 @@ function openCreditorDetail(id){
   // Record where we came from (only if not already on a detail page for same id)
   const stackTop = window._pageStack[window._pageStack.length-1];
   if(!stackTop || stackTop.id !== id){
-    window._pageStack.push({type:'tab', tabIndex:6});
+    window._pageStack.push({type:'tab', tabIndex:2});
   }
   // Guard: tell safeRenderTab we are on a detail page so it won't wipe us
   window._scDetailPage = { type: 'creditor', id };
+  currentTab = 2; renderTabs(); // keep Creditors tab highlighted while on detail page
 
   const tabEl = document.getElementById("tab-content");
   tabEl.innerHTML = `<div style="padding:16px 14px 80px;max-width:700px;margin:0 auto;">
@@ -12878,10 +12879,11 @@ function openDebtorDetail(id){
   // Record where we came from
   const stackTop = window._pageStack[window._pageStack.length-1];
   if(!stackTop || stackTop.id !== id){
-    window._pageStack.push({type:'tab', tabIndex:7});
+    window._pageStack.push({type:'tab', tabIndex:3});
   }
   // Guard: tell safeRenderTab we are on a detail page so it won't wipe us
   window._scDetailPage = { type: 'debtor', id };
+  currentTab = 3; renderTabs(); // keep Debtors tab highlighted while on detail page
 
   const tabEl = document.getElementById("tab-content");
   tabEl.innerHTML = `<div style="padding:16px 14px 80px;max-width:700px;margin:0 auto;">
