@@ -5217,8 +5217,8 @@ function _safeRenderTabImmediate(i) {
           ? `<div class="card" style="padding:28px;text-align:center;color:var(--text-dim,#4a5a7a);font-size:13px;">No items found${q ? ' for "' + q + '"' : ''}</div>`
           : filtered.map(item => {
               const stk = invGetStock(item.name);
-              const stkColor = stk <= 0 ? '#f66' : stk <= 3 ? '#FFD700' : '#4f4';
-              const stkBg = stk <= 0 ? '#2a0808' : stk <= 3 ? '#1a1400' : '#081a08';
+              const stkColor = stk < 0 ? '#ff2222' : stk === 0 ? '#f66' : stk <= 3 ? '#FFD700' : '#4f4';
+              const stkBg   = stk < 0 ? '#3a0000' : stk === 0 ? '#2a0808' : stk <= 3 ? '#1a1400' : '#081a08';
               const totalIn = (item.stock || []).reduce((s, e) => s + Number(e.qty), 0);
               const totalOut = (item.salesLog || []).reduce((s, e) => s + Number(e.qty), 0);
               const stockValue = invGetStockValue(item.name);
@@ -5231,7 +5231,7 @@ function _safeRenderTabImmediate(i) {
                   <div style="flex:1;min-width:0;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
                       <div style="font-weight:800;font-size:14px;color:var(--text-main,#e8eaf0);">${item.name}${stk <= (item.minStock||5) ? ' <span title="Low stock" style="font-size:12px;">⚠️</span>' : ''}</div>
-                      <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk <= 0 ? 'OUT' : stk} ${item.unit || 'unit'}</div>
+                      <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk < 0 ? '⚠ ' + stk : stk === 0 ? 'OUT' : stk} ${item.unit || 'unit'}</div>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
                       <div style="background:var(--bg-main,#0a0e1a);border-radius:8px;padding:7px;text-align:center;"><div style="font-size:13px;font-weight:800;color:#4f4;">+${totalIn}</div><div style="font-size:9px;color:var(--text-dim,#4a5a7a);">${t("invTotalIn")}</div></div>
@@ -7715,7 +7715,7 @@ function renderAnalytics(sorted){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
         ${outOfStock.slice(0,4).map(x=>`<div style="background:${tintBg('#0a0000','#fef2f2')};border:1px solid #991b1b;border-radius:8px;padding:7px 9px;display:flex;align-items:center;justify-content:space-between;gap:5px;">
           <span style="font-size:12px;font-weight:700;color:${tintText('#fca5a5','#b91c1c')};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🚫 ${x.name}</span>
-          <span style="font-size:10px;font-weight:800;color:#ef4444;background:${tintBg('#1a0000','#fee2e2')};border-radius:5px;padding:1px 5px;flex-shrink:0;">${t('outOfStock')||'OUT'}</span>
+          <span style="font-size:10px;font-weight:800;color:#ef4444;background:${tintBg('#1a0000','#fee2e2')};border-radius:5px;padding:1px 5px;flex-shrink:0;">${invGetStock(x.name)<0?'⚠ '+invGetStock(x.name):t('outOfStock')||'OUT'}</span>
         </div>`).join("")}
         ${lowStockItems.slice(0,6).map(x=>`<div style="background:${tintBg('#0a0800','#fffbeb')};border:1px solid #854d0e;border-radius:8px;padding:7px 9px;display:flex;align-items:center;justify-content:space-between;gap:5px;">
           <span style="font-size:12px;font-weight:700;color:${tintText('#fde68a','#92400e')};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">⚠️ ${x.name}</span>
@@ -10030,14 +10030,14 @@ function deleteCreditor(id){
   const txCount = txs.length;
 
   if(negativeItems.length > 0){
-    // Archive only — stock would go negative
+    // Warn + allow — stock would go negative, but owner can force-proceed (Tally-style)
     showModal(`
       <div style="font-family:'Nunito',sans-serif;padding:4px 0;">
-        <div style="font-size:16px;font-weight:900;color:#f87171;margin-bottom:4px;">⚠️ Cannot Delete</div>
-        <div style="font-size:13px;color:var(--text-muted,#7a8aaa);margin-bottom:14px;">${t('crDeleting')} <strong style="color:var(--text-main,#e8eaf0);">${escHtml(cr.name)}</strong> would cause stock to go negative — items from this supplier have already been sold.</div>
+        <div style="font-size:16px;font-weight:900;color:#f87171;margin-bottom:4px;">⚠️ Stock Will Go Negative</div>
+        <div style="font-size:13px;color:var(--text-muted,#7a8aaa);margin-bottom:14px;">Deleting <strong style="color:var(--text-main,#e8eaf0);">${escHtml(cr.name)}</strong> will reverse purchase stock — but these items have already been sold. Your inventory will show a negative balance.</div>
 
         <div style="background:#1a0808;border:1px solid #5a1a1a;border-radius:10px;padding:10px;margin-bottom:14px;">
-          <div style="font-size:11px;color:#f87171;font-weight:700;margin-bottom:8px;">${t('crNegativeItems')}</div>
+          <div style="font-size:11px;color:#f87171;font-weight:700;margin-bottom:8px;">Items that will go negative:</div>
           ${negativeItems.map(x=>`
             <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #2a1a1a;">
               <span style="font-size:12px;color:#fca5a5;font-weight:700;">${escHtml(x.name)}</span>
@@ -10045,11 +10045,16 @@ function deleteCreditor(id){
             </div>`).join("")}
         </div>
 
-        <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:14px;">Archive instead — the supplier is hidden from all lists but your history is preserved.</div>
+        <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:14px;">💡 <strong style="color:#fbbf24;">Recommended:</strong> Archive the supplier — it is hidden from all lists but your history is preserved.<br><br>Or force-delete if you are correcting a wrong entry and accept the negative stock display.</div>
 
-        <div style="display:flex;gap:8px;">
-          <button onclick="closeModal()" style="cursor:pointer;flex:1;padding:11px;border-radius:10px;border:1px solid var(--border-main,#1e2a45);background:var(--bg-main,#0a0e1a);color:var(--text-muted,#7a8aaa);font-size:13px;font-weight:700;">Cancel</button>
-          <button onclick="archiveCreditor('${id}')" style="cursor:pointer;flex:1;padding:11px;border-radius:10px;border:none;background:linear-gradient(135deg,#b45309,#d97706);color:#fff;font-size:13px;font-weight:800;">📦 Archive</button>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button onclick="archiveCreditor('${id}')" style="cursor:pointer;width:100%;padding:11px;border-radius:10px;border:1px solid #b45309;background:#1a0e00;color:#fbbf24;font-size:13px;font-weight:800;text-align:left;">
+            📦 Archive (Recommended) — Hide from lists, keep history
+          </button>
+          <button onclick="confirmHardDeleteCreditor('${id}')" style="cursor:pointer;width:100%;padding:11px;border-radius:10px;border:1px solid #5a1a1a;background:#1a0808;color:#f87171;font-size:13px;font-weight:800;text-align:left;">
+            🗑 Force Delete + Reverse Stock — Inventory will go negative
+          </button>
+          <button onclick="closeModal()" style="cursor:pointer;width:100%;padding:11px;border-radius:10px;border:1px solid var(--border-main,#1e2a45);background:transparent;color:var(--text-muted,#7a8aaa);font-size:13px;font-weight:700;">Cancel</button>
         </div>
       </div>
     `);
@@ -18777,7 +18782,7 @@ function _buildStockCache() {
   inventoryItems.forEach(item => {
     const total = (item.stock    || []).reduce((s, e) => s + Number(e.qty), 0);
     const sold  = (item.salesLog || []).reduce((s, e) => s + Number(e.qty), 0);
-    _invStockCache[item.name] = Math.max(0, total - sold);
+    _invStockCache[item.name] = total - sold; // allow negative (oversold / purchase deleted)
   });
 }
 
@@ -23086,15 +23091,15 @@ function renderInventoryCategoryPage(catName){
         const lastAdded = (item.stock||[]).length?new Date(item.stock[item.stock.length-1].date).toLocaleDateString("en-IN",{day:"numeric",month:"short"}):"—";
         const costEntries = (item.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);
         const avgCost = costEntries.length?(costEntries.reduce((s,e)=>s+Number(e.costPerUnit),0)/costEntries.length).toFixed(2):0;
-        const stkColor = stk<=0?"#f66":stk<=3?"#FFD700":"#4f4";
-        const stkBg = stk<=0?"#2a0808":stk<=3?"#1a1400":"#081a08";
+        const stkColor = stk<0?"#ff2222":stk===0?"#f66":stk<=3?"#FFD700":"#4f4";
+        const stkBg = stk<0?"#3a0000":stk===0?"#2a0808":stk<=3?"#1a1400":"#081a08";
         return `<div class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}')">
           <div style="display:flex;align-items:flex-start;gap:12px;">
             <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
             <div style="flex:1;min-width:0;">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
                 <div style="font-weight:800;font-size:14px;color:var(--text-main,#e8eaf0);">${item.name}${stk<=(item.minStock||5)?' <span title="'+t('invLowStockTitle')+'" style="font-size:12px;">⚠️</span>':''}</div>
-                <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk<=0?"OUT":stk} ${item.unit||"unit"}</div>
+                <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk<0?"⚠ "+stk:stk===0?"OUT":stk} ${item.unit||"unit"}</div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
                 <div style="background:var(--bg-main,#0a0e1a);border-radius:8px;padding:7px;text-align:center;">
