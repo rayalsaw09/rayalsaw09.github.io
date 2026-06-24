@@ -497,6 +497,20 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   body.day-theme [style*="background: #001a2a"] { background: #e0f0ff !important; }
   body.day-theme [style*="background:#2a1500"],
   body.day-theme [style*="background: #2a1500"] { background: #fff0d8 !important; }
+  body.day-theme [style*="background:#1e3a6e"],
+  body.day-theme [style*="background: #1e3a6e"] { background: #dbeafe !important; color: #1d4ed8 !important; }
+  body.day-theme [style*="background:#0a1020"],
+  body.day-theme [style*="background: #0a1020"] { background: #f0f4ff !important; color: #1e3a6e !important; border-color: #b0c4e8 !important; }
+  body.day-theme [style*="background:#1a2a3a"],
+  body.day-theme [style*="background: #1a2a3a"] { background: #e0ecff !important; }
+  body.day-theme [style*="color:#7ab3ff"],
+  body.day-theme [style*="color: #7ab3ff"] { color: #1d4ed8 !important; }
+  body.pro-theme [style*="background:#1e3a6e"],
+  body.pro-theme [style*="background: #1e3a6e"] { background: #dbeafe !important; color: #1d4ed8 !important; }
+  body.pro-theme [style*="background:#0a1020"],
+  body.pro-theme [style*="background: #0a1020"] { background: #f0f4ff !important; color: #1e3a6e !important; border-color: #b0c4e8 !important; }
+  body.pro-theme [style*="color:#7ab3ff"],
+  body.pro-theme [style*="color: #7ab3ff"] { color: #1d4ed8 !important; }
   body.day-theme [style*="background:#1a3a5c"],
   body.day-theme [style*="background: #1a3a5c"] { background: #d8eaff !important; }
   body.day-theme [style*="background:#1a3a1a"],
@@ -14137,7 +14151,7 @@ function renderAlertsTab(){
           <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(item.name)}</div>
           <div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${t('alCurrent')} <span style="color:#FFD700;font-weight:700;">${stk} ${escHtml(item.unit||"unit")}</span> · ${t('alMin')} ${min} ${escHtml(item.unit||"unit")}</div>
         </div>
-        <button onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}');switchTab(4)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+        <button onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
       </div>`;
     });
     html += `</div>`;
@@ -14153,7 +14167,7 @@ function renderAlertsTab(){
           <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(item.name)}</div>
           <div style="font-size:11px;color:#f66;margin-top:2px;font-weight:700;">${t('alOutOfStockLabel')} ${escHtml(item.unit||"unit")}</div>
         </div>
-        <button onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}');switchTab(4)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+        <button onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
       </div>`;
     });
     html += `</div>`;
@@ -14173,7 +14187,7 @@ function renderAlertsTab(){
             <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(e.itemName)}</div>
             <div style="font-size:11px;color:${color};margin-top:2px;">${t('alExpiry')} ${dt} · ${t('alStock')} ${e.qty} ${escHtml(e.unit||"unit")}</div>
           </div>
-          <button onclick="invShowItemDetail('${e.itemName.replace(/'/g,"\\'")}');switchTab(4)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+          <button onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${e.itemName.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
         </div>`;
       });
       out += `</div>`;
@@ -15156,7 +15170,7 @@ function renderSettings(){
     return `<div onclick="${onclick}" style="display:flex;align-items:center;gap:14px;padding:15px 18px;cursor:pointer;border-bottom:1px solid var(--border-main, #1a2035);-webkit-tap-highlight-color:transparent;" onmousedown="this.style.background='var(--bg-hover, #0d1525)'" onmouseup="this.style.background=''" onmouseleave="this.style.background=''">
       <span style="font-size:22px;flex-shrink:0;width:28px;text-align:center;">${icon}</span>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:15px;font-weight:700;color:${danger?'#f66':'#e8eaf0'};">${label}</div>
+        <div style="font-size:15px;font-weight:700;color:${danger?'#f66':'var(--text-main,#e8eaf0)'};">${label}</div>
         ${sub?`<div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-top:2px;">${sub}</div>`:""}
       </div>
       <span style="color:var(--text-dim,#4a5a7a);font-size:16px;flex-shrink:0;">${rightEl}</span>
@@ -15165,7 +15179,7 @@ function renderSettings(){
 
   function section(title, rows) {
     return `<div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1a2035);border-radius:16px;overflow:hidden;margin-bottom:16px;">
-      <div style="font-size:11px;font-weight:800;color:var(--text-sub,#4a5a7a);text-transform:uppercase;letter-spacing:1px;padding:12px 18px 8px;">${title}</div>
+      <div style="font-size:11px;font-weight:800;color:var(--text-dim,#4a5a7a);text-transform:uppercase;letter-spacing:1px;padding:12px 18px 8px;">${title}</div>
       ${rows}
     </div>`;
   }
@@ -18164,7 +18178,7 @@ function saveLicense(key, plan, status) {
 async function validateLicenseOnline() {
   if (!licenseKey || licenseStatus === "free") return;
   try {
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(licenseKey)}&select=key,plan,active,expires_at`, {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(licenseKey)}&select=key,plan,active,expires_at,customer_phone`, {
       headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
     });
     const rows = await res.json();
@@ -18172,6 +18186,25 @@ async function validateLicenseOnline() {
     const row = rows[0];
     if (!row.active) { revokeAccess("Subscription inactive"); return; }
     if (row.expires_at && new Date(row.expires_at) < new Date()) { revokeAccess("Subscription expired"); return; }
+
+    // Phone-binding enforcement
+    const currentPhone = authPhone || localStorage.getItem("sc_auth_phone") || "";
+    if (currentPhone) {
+      if (row.customer_phone && row.customer_phone !== currentPhone) {
+        // Key is bound to a different account — revoke
+        revokeAccess("Key bound to another account");
+        return;
+      }
+      if (!row.customer_phone) {
+        // Key unbound (e.g. activated before login) — bind it now
+        await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(licenseKey)}`, {
+          method: "PATCH",
+          headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+          body: JSON.stringify({ customer_phone: currentPhone })
+        }).catch(() => {});
+      }
+    }
+
     // Still valid — refresh plan
     saveLicense(licenseKey, row.plan || "pro", "pro");
   } catch (e) {
@@ -18295,7 +18328,7 @@ async function checkLicense() {
   btnTxt.textContent = "⏳ Checking...";
 
   try {
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(key)}&select=key,plan,active,expires_at`, {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(key)}&select=key,plan,active,expires_at,customer_phone`, {
       headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
     });
     const rows = await res.json();
@@ -18303,6 +18336,25 @@ async function checkLicense() {
     const row = rows[0];
     if (!row.active) { btnTxt.textContent = "✅ Activate →"; errEl.textContent = "❌ This key is inactive — contact your seller"; errEl.style.display = "block"; return; }
     if (row.expires_at && new Date(row.expires_at) < new Date()) { btnTxt.textContent = "✅ Activate →"; errEl.textContent = "❌ This key has expired — contact your seller to renew"; errEl.style.display = "block"; return; }
+
+    // Phone-binding check: if key is already bound to a different phone, reject
+    const currentPhone = authPhone || localStorage.getItem("sc_auth_phone") || "";
+    if (row.customer_phone && currentPhone && row.customer_phone !== currentPhone) {
+      btnTxt.textContent = "✅ Activate →";
+      errEl.textContent = "❌ This key is already registered to another account";
+      errEl.style.display = "block";
+      return;
+    }
+
+    // If we know the phone now and key is unbound → bind it
+    if (!row.customer_phone && currentPhone) {
+      await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(key)}`, {
+        method: "PATCH",
+        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+        body: JSON.stringify({ customer_phone: currentPhone })
+      }).catch(() => {}); // non-fatal — validateLicenseOnline will bind later if this fails
+    }
+
     // SUCCESS
     saveLicense(key, row.plan || "pro", "pro");
     document.getElementById("license-screen").style.display = "none";
@@ -18313,7 +18365,7 @@ async function checkLicense() {
       authPhone = savedPhone;
       onLoginSuccess(savedPhone);
     } else {
-      // Not logged in yet — show login screen
+      // Not logged in yet — show login screen; binding will complete in validateLicenseOnline
       document.getElementById("login-screen").style.display = "flex";
     }
   } catch(e) {
@@ -20143,7 +20195,10 @@ function scShowPushPrompt() {
       <button onclick="scDismissPushPrompt()" style="flex:1;background:var(--bg-main,#0a0e1a);color:var(--text-muted,#7a8aaa);border:1px solid var(--border-main,#1e2a45);border-radius:10px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">Not Now</button>
     </div>`;
   document.body.appendChild(card);
-  setTimeout(() => card.remove(), 20000); // auto-dismiss after 20s
+  setTimeout(() => {
+    card.remove();
+    try { localStorage.setItem(storageKey("sc_push_dismissed"), Date.now().toString()); } catch(_){} // treat auto-dismiss as "not now"
+  }, 20000); // auto-dismiss after 20s
 }
 
 async function scInitFCM(force=false) {
@@ -25899,7 +25954,7 @@ window._scGuideOpenReplay = window.scGuideOpenReplay;
     const anchor = '<div style="text-align:center;padding:20px 0;font-size:12px;color:#2a3a5a;">ShopChampion प्रो';
     const guideRow = `
       <div style="background:var(--bg-card,#0d1220);border:1px solid var(--border-main,#1a2035);border-radius:16px;overflow:hidden;margin-bottom:16px;">
-        <div style="font-size:11px;font-weight:800;color:var(--text-sub,#4a5a7a);text-transform:uppercase;letter-spacing:1px;padding:12px 18px 8px;">Help</div>
+        <div style="font-size:11px;font-weight:800;color:var(--text-dim,#4a5a7a);text-transform:uppercase;letter-spacing:1px;padding:12px 18px 8px;">Help</div>
         <div onclick="scGuideOpenReplay()" style="display:flex;align-items:center;gap:14px;padding:15px 18px;cursor:pointer;border-bottom:1px solid var(--border-main,#1a2035);-webkit-tap-highlight-color:transparent;" onmousedown="this.style.background='var(--bg-hover,#0d1525)'" onmouseup="this.style.background=''" onmouseleave="this.style.background=''">
           <span style="font-size:22px;flex-shrink:0;width:28px;text-align:center;">🎓</span>
           <div style="flex:1;min-width:0;">
