@@ -5605,7 +5605,7 @@ function _backBtn(label){
 function renderTab(i){
   const el=document.getElementById("tab-content"),s=getSorted();
   if(!el) return;
-  el.style.position="";el.style.overflow="auto";
+  el.style.position="";el.style.overflow="";el.style.overflowY="";
   if(i===0){el.innerHTML=renderPurchaseTab(s);if(getPurchaseMode()==="inventory"){const list=document.getElementById("pt-items-list");if(list&&list.children.length===0)ptAddItemRow();}
     setTimeout(scRenderPurchaseBanners, 0);
   }
