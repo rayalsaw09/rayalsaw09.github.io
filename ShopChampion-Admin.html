@@ -595,8 +595,10 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   /* Tab content background */
   body.day-theme #tab-content {
     background: #f0f2f8 !important;
-    min-height: 100vh;
     color: #1a2040 !important;
+  }
+  @media (max-width: 640px) {
+    body.day-theme #tab-content { min-height: 100vh; }
   }
 
   /* Customer full page */
@@ -3610,9 +3612,19 @@ window.addEventListener('load', () => {
       return;
     }
 
-    // Only intercept arrow keys (blocking native scroll) when a row already has focus.
-    // If nothing is focused, let the browser scroll the page normally.
-    if(!focused) return;
+    // If no row is focused, scroll the content area (desktop: #tab-content, mobile: window)
+    if(!focused){
+      e.preventDefault();
+      var scrollEl = document.getElementById('tab-content');
+      var isDesktop = scrollEl && getComputedStyle(scrollEl).overflowY === 'auto';
+      var amount = 80;
+      if(isDesktop){
+        scrollEl.scrollTop += (e.key === 'ArrowDown' ? amount : -amount);
+      } else {
+        window.scrollBy(0, e.key === 'ArrowDown' ? amount : -amount);
+      }
+      return;
+    }
 
     var list = rows();
     if(!list.length) return;
