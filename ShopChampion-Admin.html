@@ -884,7 +884,109 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
 /* Always hide bottom nav on desktop */
 #bottom-nav, #more-menu { display: none; }
 
+/* ── DESKTOP SIDEBAR LAYOUT ─────────────────────────────── */
+@media (min-width: 641px) {
+  #main-app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #main-header {
+    flex-shrink: 0;
+    z-index: 100;
+  }
+  #sync-banner {
+    flex-shrink: 0;
+    z-index: 99;
+  }
+  #desktop-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+  }
+  #tab-bar { display: none !important; }
+  #desktop-sidebar {
+    width: 200px;
+    flex-shrink: 0;
+    background: var(--bg-main, #0a0e1a);
+    border-right: 1px solid var(--border-main, #1e2a45);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0 60px;
+    scrollbar-width: thin;
+  }
+  #sidebar-kbd-hint {
+    position: absolute;
+    bottom: 0;
+    width: 200px;
+    padding: 7px 10px;
+    border-top: 1px solid var(--border-main, #1e2a45);
+    background: var(--bg-main, #0a0e1a);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+  }
+  .sc-kbd { font-size: 9px; color: var(--text-dimmer, #2a3a5a); background: var(--bg-dark, #080c18); border: 1px solid var(--border-main, #1e2a45); border-radius: 3px; padding: 1px 4px; font-family: monospace; font-weight: 700; }
+  .sc-kbd-lbl { font-size: 9px; color: var(--text-dimmer, #2a3a5a); }
+  .sb-section { padding: 10px 12px 3px; font-size: 9px; color: var(--text-dimmer, #2a3a5a); font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
+  .sb-item {
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 10px 7px 12px;
+    cursor: pointer; border-radius: 7px; margin: 1px 5px;
+    color: var(--text-muted, #7a8aaa);
+    transition: background 0.1s, color 0.1s;
+    text-decoration: none;
+  }
+  .sb-item:hover { background: var(--bg-row-hover, #111827); color: var(--text-main, #e8eaf0); }
+  .sb-item.active { background: var(--bg-dark, #0d1220); color: #FFD700; font-weight: 800; }
+  .sb-icon { font-size: 14px; width: 17px; text-align: center; flex-shrink: 0; }
+  .sb-label { flex: 1; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sb-key { font-size: 9px; color: var(--text-dimmer, #2a3a5a); background: var(--bg-dark, #080c18); border: 1px solid var(--border-main, #1e2a45); border-radius: 3px; padding: 1px 4px; font-family: monospace; font-weight: 700; flex-shrink: 0; }
+  .sb-item.active .sb-key { color: var(--text-dim, #4a5a7a); border-color: #FFD70040; }
+  .sb-badge { background: #ef4444; color: #fff; border-radius: 10px; padding: 1px 5px; font-size: 9px; font-weight: 700; min-width: 15px; text-align: center; flex-shrink: 0; }
+  .sb-divider { height: 1px; background: var(--border-main, #1e2a45); margin: 5px 10px; }
+  #tab-content {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    max-width: none !important;
+    padding: 20px !important;
+  }
+  #tab-content-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* Pro theme sidebar overrides */
+  body.pro-theme #desktop-sidebar {
+    background: #ffffff;
+    border-right: 1px solid #e2e8f0;
+  }
+  body.pro-theme #sidebar-kbd-hint { background: #ffffff; border-color: #e2e8f0; }
+  body.pro-theme .sc-kbd { background: #f1f5f9; border-color: #e2e8f0; color: #94a3b8; }
+  body.pro-theme .sc-kbd-lbl { color: #cbd5e1; }
+  body.pro-theme .sb-section { color: #cbd5e1; }
+  body.pro-theme .sb-item { color: #64748b; }
+  body.pro-theme .sb-item:hover { background: #f8fafc; color: #0f172a; }
+  body.pro-theme .sb-item.active { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
+  body.pro-theme .sb-item.active .sb-key { color: #93c5fd; border-color: #bfdbfe; }
+  body.pro-theme .sb-key { background: #f1f5f9; border-color: #e2e8f0; color: #94a3b8; }
+  body.pro-theme .sb-divider { background: #e2e8f0; }
+}
+
 @media (max-width: 640px) {
+  /* On mobile, desktop-body just stacks normally */
+  #desktop-body { display: block !important; overflow: visible !important; height: auto !important; }
+  #desktop-sidebar { display: none !important; }
+  #tab-content { overflow-y: visible !important; max-height: none !important; }
 
   /* ── HEADER — slim, clean ── */
   #main-header {
@@ -1659,9 +1761,21 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 
   </div>
 
-  <!-- Tabs (desktop horizontal scroll) -->
+  <!-- Tabs (desktop horizontal scroll — hidden on desktop, kept for mobile fallback) -->
   <div id="tab-bar" style="background:var(--bg-row-even,#0d1220);border-bottom:1px solid var(--border-main,#1e2a45);overflow-x:auto;display:flex;padding:6px 12px;gap:4px;"></div>
-  <div id="tab-content" style="padding:20px;max-width:1200px;margin:0 auto;overflow-x:hidden;"></div>
+
+  <!-- Desktop: sidebar + content wrapper -->
+  <div id="desktop-body">
+    <div id="desktop-sidebar" style="position:relative;">
+      <div id="sidebar-nav"></div>
+      <div id="sidebar-kbd-hint">
+        <span class="sc-kbd">F1–F9</span><span class="sc-kbd-lbl">jump tab</span>
+        <span class="sc-kbd" style="margin-left:4px;">Alt+S</span><span class="sc-kbd-lbl">settings</span>
+        <span class="sc-kbd" style="margin-left:4px;">Esc</span><span class="sc-kbd-lbl">close</span>
+      </div>
+    </div>
+    <div id="tab-content" style="padding:20px;max-width:1200px;margin:0 auto;overflow-x:hidden;"></div>
+  </div>
 
   <!-- More menu overlay (mobile) -->
   <div id="more-menu" onclick="event.stopPropagation()"></div>
@@ -3420,6 +3534,46 @@ window.addEventListener('load', () => {
   };
   updateBottomNav(0);
 });
+
+// ── Desktop keyboard shortcuts ─────────────────────────────────────────────
+// F1-F9 = first 9 visible tabs (in sidebar order: Sales,Creditors,Debtors,Customers,Inventory,Expenses,Analytics,Compare,Rankings)
+// Alt+M = Messages, Alt+H = History, Alt+A = Alerts, Alt+S = Settings, Alt+T = Team
+(function(){
+  const SIDEBAR_ORDER = [0,2,3,1,4,5,6,7,8,9,10,11,12,13];
+  document.addEventListener('keydown', function(e){
+    // Only fire on desktop (sidebar visible)
+    if(window.innerWidth <= 640) return;
+    // Don't fire when typing in inputs/textareas
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if(document.activeElement && document.activeElement.isContentEditable) return;
+
+    // F1–F9: jump to first 9 sidebar tabs
+    if(e.key >= 'F1' && e.key <= 'F9' && !e.altKey && !e.ctrlKey && !e.metaKey){
+      const fNum = parseInt(e.key.slice(1)) - 1; // F1=0, F2=1...
+      const TABS = getTabs();
+      const sidebarVisible = SIDEBAR_ORDER.filter(i => TABS.find(t=>t.index===i));
+      if(fNum < sidebarVisible.length){
+        e.preventDefault();
+        switchTab(sidebarVisible[fNum]);
+      }
+      return;
+    }
+
+    // Alt+key shortcuts
+    if(e.altKey && !e.ctrlKey && !e.metaKey){
+      const key = e.key.toLowerCase();
+      const map = { 'm':9, 'h':10, 'a':11, 's':12, 't':13 };
+      if(map[key] !== undefined){
+        const TABS = getTabs();
+        if(TABS.find(t=>t.index===map[key])){
+          e.preventDefault();
+          switchTab(map[key]);
+        }
+      }
+    }
+  });
+})();
 
 // ── On page load: decide which mode ──
 window.addEventListener("load", () => {
@@ -5283,7 +5437,62 @@ function _safeRenderTabImmediate(i) {
   }
 }
 // ─── TABS ─────────────────────────────────────────────────────
-function renderTabs(){const TABS=getTabs();document.getElementById("tab-bar").innerHTML=TABS.map((tab)=>`<button class="tab-btn${currentTab===tab.index?" active":""}" onclick="switchTab(${tab.index})">${tab.label}</button>`).join("");; updateBottomNavVisibility(); }
+function renderTabs(){
+  const TABS=getTabs();
+  // Horizontal tab-bar (mobile fallback — hidden on desktop via CSS)
+  document.getElementById("tab-bar").innerHTML=TABS.map((tab)=>`<button class="tab-btn${currentTab===tab.index?" active":""}" onclick="switchTab(${tab.index})">${tab.label}</button>`).join("");
+
+  // Desktop sidebar
+  const sidebar = document.getElementById("sidebar-nav");
+  if(!sidebar) { updateBottomNavVisibility(); return; }
+
+  // Keyboard shortcut map: tab index -> key label shown
+  // F1-F9 = first 9 visible tabs in order; remaining get Alt+key
+  const SHORTCUT_LABELS = {
+    0:"F1", 1:"F2", 2:"F3", 3:"F4", 4:"F5", 5:"F6", 6:"F7", 7:"F8", 8:"F9",
+    9:"Alt+M", 10:"Alt+H", 11:"Alt+A", 12:"Alt+S", 13:"Alt+T"
+  };
+
+  // Section groupings
+  const SECTIONS = [
+    { label: "Transactions", indices: [0,2,3,1] },
+    { label: "Stock & Money", indices: [4,5] },
+    { label: "Reports", indices: [6,7,8] },
+    { label: "Other", indices: [9,10,11,12,13] }
+  ];
+
+  const isPro = currentAppStyle === "pro";
+  let html = "";
+
+  SECTIONS.forEach(sec => {
+    const visibleInSection = sec.indices.filter(i => TABS.find(t=>t.index===i));
+    if(!visibleInSection.length) return;
+    html += `<div class="sb-section">${sec.label}</div>`;
+    visibleInSection.forEach(i => {
+      const tab = TABS.find(t=>t.index===i);
+      if(!tab) return;
+      const icon = TABS_ICON[i] || "";
+      const label = isPro ? (TABS_LABEL_PRO[i] || TABS_BASE[i]) : (TABS_BASE[i].charAt(0).toUpperCase()+TABS_BASE[i].slice(1));
+      const shortcut = SHORTCUT_LABELS[i] || "";
+      const isActive = currentTab === i;
+
+      // Extract badge from tab.label if present
+      const badgeMatch = tab.label.match(/<span[^>]*>(\d+)<\/span>/);
+      const badge = badgeMatch ? `<span class="sb-badge">${badgeMatch[1]}</span>` : "";
+
+      html += `<div class="sb-item${isActive?" active":""}" onclick="switchTab(${i})" title="${label} (${shortcut})">
+        <span class="sb-icon">${icon}</span>
+        <span class="sb-label">${label}</span>
+        ${badge}
+        ${shortcut ? `<span class="sb-key">${shortcut}</span>` : ""}
+      </div>`;
+    });
+    html += `<div class="sb-divider"></div>`;
+  });
+
+  sidebar.innerHTML = html;
+  updateBottomNavVisibility();
+}
 function switchTab(i){
   // Guard: members cannot switch to tabs they don't have access to
   if(currentMember && TABS_BASE[i] && !isTabVisible(TABS_BASE[i])) return;
