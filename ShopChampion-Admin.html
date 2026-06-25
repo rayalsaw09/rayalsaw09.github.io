@@ -3582,53 +3582,68 @@ window.addEventListener('load', () => {
 
 // ── Up/Down arrow key navigation (works in all tabs) ──────────────────────
 (function(){
-  function getNavigableRows(){
-    // Find rows visible in the currently active section of the page.
-    // Covers: Creditors/Debtors bill rows, Customer cards, Inventory cards,
-    //         Expense rows, Leaderboard rows, History replay rows.
-    const candidates = Array.from(document.querySelectorAll(
-      // Creditor / Debtor transaction rows
-      '.cr-bill-row, .dr-bill-row, ' +
-      // Customer list cards
-      '.cust-card, ' +
-      // Inventory item cards (cursor:pointer divs inside #inv-list)
-      '#inv-list .card[onclick], ' +
-      // Expense table rows
-      '.exp-table-row, .exp-mobile-row, ' +
-      // Leaderboard rows
-      '.lb-row, ' +
-      // History replay rows
-      '.sc-replay-row, ' +
-      // Generic: any card/div with onclick that opens a detail view
-      '[data-nav-row]'
-    )).filter(el => el.offsetParent !== null &&
-                    !el.closest('.modal, [id$="-modal"], .sc-modal, .dropdown'));
-    return candidates;
+  var _arrowFocused = null;
+
+  function isInsideModal(){
+    var el = document.activeElement;
+    if(!el) return false;
+    // Check by id suffix without attribute selector to avoid quote issues
+    var node = el;
+    while(node && node !== document.body){
+      if(!node.id && !node.className) { node = node.parentElement; continue; }
+      var id = node.id || '';
+      var cls = (typeof node.className === 'string') ? node.className : '';
+      if(cls.indexOf('modal') !== -1 || cls.indexOf('sc-modal') !== -1) return true;
+      if(id.indexOf('-modal') !== -1 || id === 'modal') return true;
+      node = node.parentElement;
+    }
+    return false;
   }
 
-  let _arrowFocused = null;
+  function getNavigableRows(){
+    var sel = '.cr-bill-row, .dr-bill-row, .cust-card, .exp-table-row, .exp-mobile-row, .lb-row, .sc-replay-row, [data-nav-row]';
+    var all = Array.from(document.querySelectorAll(sel));
+    // Also include inventory cards that have onclick
+    var invCards = Array.from(document.querySelectorAll('#inv-list .card'));
+    invCards.forEach(function(c){ if(c.getAttribute('onclick') && all.indexOf(c) === -1) all.push(c); });
+    return all.filter(function(el){
+      if(!el.offsetParent) return false;
+      // Skip if inside a modal
+      var node = el;
+      while(node && node !== document.body){
+        var cls = (typeof node.className === 'string') ? node.className : '';
+        var id = node.id || '';
+        if(cls.indexOf('modal') !== -1 || id.indexOf('-modal') !== -1) return false;
+        node = node.parentElement;
+      }
+      return true;
+    });
+  }
 
-  function focusRow(el){
+  function clearFocus(){
     if(_arrowFocused){
       _arrowFocused.classList.remove('sc-arrow-focus');
-      _arrowFocused.removeAttribute('tabindex');
+      _arrowFocused.style.outline = '';
+      _arrowFocused = null;
     }
-    if(!el){ _arrowFocused = null; return; }
-    el.setAttribute('tabindex', '-1');
+  }
+
+  function focusRow(el){
+    clearFocus();
+    if(!el) return;
     el.classList.add('sc-arrow-focus');
-    el.focus({ preventScroll: false });
     el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     _arrowFocused = el;
   }
 
   document.addEventListener('keydown', function(e){
     if(e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter') return;
-    const tag = document.activeElement ? document.activeElement.tagName : '';
+    var tag = document.activeElement ? document.activeElement.tagName : '';
     if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if(document.activeElement && document.activeElement.isContentEditable) return;
-    if(document.activeElement && document.activeElement.closest('.modal, [id$="-modal"], .sc-modal')) return;
+    if(isInsideModal()) return;
 
-    const rows = getNavigableRows();
+    var rows = getNavigableRows();
     if(!rows.length) return;
 
     if(e.key === 'Enter' && _arrowFocused){
@@ -3638,7 +3653,7 @@ window.addEventListener('load', () => {
     }
 
     e.preventDefault();
-    const idx = _arrowFocused ? rows.indexOf(_arrowFocused) : -1;
+    var idx = _arrowFocused ? rows.indexOf(_arrowFocused) : -1;
     if(e.key === 'ArrowDown'){
       focusRow(rows[idx + 1 < rows.length ? idx + 1 : 0]);
     } else {
@@ -3646,10 +3661,15 @@ window.addEventListener('load', () => {
     }
   });
 
-  // Clear arrow focus when switching tabs
+  // Clear focus when switching tabs
   document.addEventListener('click', function(e){
-    if(e.target.closest('.sb-item, .tab-btn')){
-      setTimeout(()=>focusRow(null), 50);
+    var t = e.target;
+    while(t){
+      if(t.classList && (t.classList.contains('sb-item') || t.classList.contains('tab-btn'))){
+        setTimeout(clearFocus, 50);
+        break;
+      }
+      t = t.parentElement;
     }
   });
 })();
