@@ -979,6 +979,10 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   body.pro-theme .sb-item.active { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
   body.pro-theme .sb-item.active .sb-key { color: #93c5fd; border-color: #bfdbfe; }
   body.pro-theme .sb-key { background: #f1f5f9; border-color: #e2e8f0; color: #94a3b8; }
+  /* Arrow-key navigation highlight */
+  .sc-arrow-focus { outline: 2px solid #3b82f6 !important; outline-offset: -1px; background: rgba(59,130,246,0.08) !important; }
+  body.pro-theme .sc-arrow-focus { outline-color: #2563eb !important; background: rgba(37,99,235,0.07) !important; }
+
   body.pro-theme .sb-divider { background: #e2e8f0; }
 }
 
@@ -3575,6 +3579,81 @@ window.addEventListener('load', () => {
   });
 })();
 
+
+// ── Up/Down arrow key navigation (works in all tabs) ──────────────────────
+(function(){
+  function getNavigableRows(){
+    // Find rows visible in the currently active section of the page.
+    // Covers: Creditors/Debtors bill rows, Customer cards, Inventory cards,
+    //         Expense rows, Leaderboard rows, History replay rows.
+    const candidates = Array.from(document.querySelectorAll(
+      // Creditor / Debtor transaction rows
+      '.cr-bill-row, .dr-bill-row, ' +
+      // Customer list cards
+      '.cust-card, ' +
+      // Inventory item cards (cursor:pointer divs inside #inv-list)
+      '#inv-list .card[onclick], ' +
+      // Expense table rows
+      '.exp-table-row, .exp-mobile-row, ' +
+      // Leaderboard rows
+      '.lb-row, ' +
+      // History replay rows
+      '.sc-replay-row, ' +
+      // Generic: any card/div with onclick that opens a detail view
+      '[data-nav-row]'
+    )).filter(el => el.offsetParent !== null &&
+                    !el.closest('.modal, [id$="-modal"], .sc-modal, .dropdown'));
+    return candidates;
+  }
+
+  let _arrowFocused = null;
+
+  function focusRow(el){
+    if(_arrowFocused){
+      _arrowFocused.classList.remove('sc-arrow-focus');
+      _arrowFocused.removeAttribute('tabindex');
+    }
+    if(!el){ _arrowFocused = null; return; }
+    el.setAttribute('tabindex', '-1');
+    el.classList.add('sc-arrow-focus');
+    el.focus({ preventScroll: false });
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    _arrowFocused = el;
+  }
+
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter') return;
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if(document.activeElement && document.activeElement.isContentEditable) return;
+    if(document.activeElement && document.activeElement.closest('.modal, [id$="-modal"], .sc-modal')) return;
+
+    const rows = getNavigableRows();
+    if(!rows.length) return;
+
+    if(e.key === 'Enter' && _arrowFocused){
+      e.preventDefault();
+      _arrowFocused.click();
+      return;
+    }
+
+    e.preventDefault();
+    const idx = _arrowFocused ? rows.indexOf(_arrowFocused) : -1;
+    if(e.key === 'ArrowDown'){
+      focusRow(rows[idx + 1 < rows.length ? idx + 1 : 0]);
+    } else {
+      focusRow(rows[idx - 1 >= 0 ? idx - 1 : rows.length - 1]);
+    }
+  });
+
+  // Clear arrow focus when switching tabs
+  document.addEventListener('click', function(e){
+    if(e.target.closest('.sb-item, .tab-btn')){
+      setTimeout(()=>focusRow(null), 50);
+    }
+  });
+})();
+
 // ── On page load: decide which mode ──
 window.addEventListener("load", () => {
   // Firebase config loaded from /config.js
@@ -5447,11 +5526,20 @@ function renderTabs(){
   if(!sidebar) { updateBottomNavVisibility(); return; }
 
   // Keyboard shortcut map: tab index -> key label shown
-  // F1-F9 = first 9 visible tabs in order; remaining get Alt+key
-  const SHORTCUT_LABELS = {
-    0:"F1", 1:"F2", 2:"F3", 3:"F4", 4:"F5", 5:"F6", 6:"F7", 7:"F8", 8:"F9",
-    9:"Alt+M", 10:"Alt+H", 11:"Alt+A", 12:"Alt+S", 13:"Alt+T"
-  };
+  // Built dynamically from sidebar visual order so labels match actual key bindings.
+  // SIDEBAR_ORDER mirrors the keydown handler's order: [0,2,3,1,4,5,6,7,8,9,10,11,12,13]
+  const SIDEBAR_ORDER_FOR_LABELS = [0,2,3,1,4,5,6,7,8,9,10,11,12,13];
+  const ALT_LABELS = { 9:"Alt+M", 10:"Alt+H", 11:"Alt+A", 12:"Alt+S", 13:"Alt+T" };
+  const SHORTCUT_LABELS = {};
+  let fKeyPos = 0;
+  SIDEBAR_ORDER_FOR_LABELS.forEach(tabIdx => {
+    if(ALT_LABELS[tabIdx]) {
+      SHORTCUT_LABELS[tabIdx] = ALT_LABELS[tabIdx];
+    } else if(fKeyPos < 9) {
+      SHORTCUT_LABELS[tabIdx] = "F" + (fKeyPos + 1);
+      fKeyPos++;
+    }
+  });
 
   // Section groupings
   const SECTIONS = [
