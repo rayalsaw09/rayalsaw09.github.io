@@ -3643,15 +3643,17 @@ window.addEventListener('load', () => {
     if(document.activeElement && document.activeElement.isContentEditable) return;
     if(isInsideModal()) return;
 
-    var rows = getNavigableRows();
-    if(!rows.length) return;
-
-    if(e.key === 'Enter' && _arrowFocused){
-      e.preventDefault();
-      _arrowFocused.click();
+    // Enter: only act if a row is focused
+    if(e.key === 'Enter'){
+      if(_arrowFocused){ e.preventDefault(); _arrowFocused.click(); }
       return;
     }
 
+    // Arrow keys: only act if navigable rows exist in the current view
+    var rows = getNavigableRows();
+    if(!rows.length) return; // no rows — let browser handle scroll normally
+
+    // Only block default scroll when we actually have rows to navigate
     e.preventDefault();
     var idx = _arrowFocused ? rows.indexOf(_arrowFocused) : -1;
     if(e.key === 'ArrowDown'){
