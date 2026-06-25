@@ -1775,9 +1775,12 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
     <div id="desktop-sidebar" style="position:relative;">
       <div id="sidebar-nav"></div>
       <div id="sidebar-kbd-hint">
-        <span class="sc-kbd">F1–F9</span><span class="sc-kbd-lbl">jump tab</span>
-        <span class="sc-kbd" style="margin-left:4px;">Alt+S</span><span class="sc-kbd-lbl">settings</span>
-        <span class="sc-kbd" style="margin-left:4px;">Esc</span><span class="sc-kbd-lbl">close</span>
+        <span class="sc-kbd">F1–F9</span><span class="sc-kbd-lbl">tab</span>
+        <span class="sc-kbd" style="margin-left:4px;">Ins</span><span class="sc-kbd-lbl">add new</span>
+        <span class="sc-kbd" style="margin-left:4px;">↑↓</span><span class="sc-kbd-lbl">scroll/nav</span>
+        <span class="sc-kbd" style="margin-left:4px;">PgUp/Dn</span><span class="sc-kbd-lbl">fast scroll</span>
+        <span class="sc-kbd" style="margin-left:4px;">Alt+F</span><span class="sc-kbd-lbl">search</span>
+        <span class="sc-kbd" style="margin-left:4px;">Esc</span><span class="sc-kbd-lbl">close/back</span>
       </div>
     </div>
     <div id="tab-content"></div>
@@ -3542,42 +3545,118 @@ window.addEventListener('load', () => {
 });
 
 // ── Desktop keyboard shortcuts ─────────────────────────────────────────────
-// F1-F9 = first 9 visible tabs (in sidebar order: Sales,Creditors,Debtors,Customers,Inventory,Expenses,Analytics,Compare,Rankings)
-// Alt+M = Messages, Alt+H = History, Alt+A = Alerts, Alt+S = Settings, Alt+T = Team
+// F1-F9 = first 9 visible tabs (in sidebar order)
+// Alt+M/H/A/S/T = Messages/History/Alerts/Settings/Team
+// Insert = Add new entry on current tab
+// Escape = close modal / go back
+// PgUp/PgDn = fast scroll (400px)
+// Home/End = scroll to top/bottom
+// Alt+F (or Ctrl+F) = focus search box if present
 (function(){
   const SIDEBAR_ORDER = [0,2,3,1,4,5,6,7,8,9,10,11,12,13];
-  document.addEventListener('keydown', function(e){
-    // Only fire on desktop (sidebar visible)
-    if(window.innerWidth <= 640) return;
-    // Don't fire when typing in inputs/textareas
-    const tag = document.activeElement ? document.activeElement.tagName : '';
-    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    if(document.activeElement && document.activeElement.isContentEditable) return;
 
-    // F1–F9: jump to first 9 sidebar tabs
-    if(e.key >= 'F1' && e.key <= 'F9' && !e.altKey && !e.ctrlKey && !e.metaKey){
-      const fNum = parseInt(e.key.slice(1)) - 1; // F1=0, F2=1...
-      const TABS = getTabs();
-      const sidebarVisible = SIDEBAR_ORDER.filter(i => TABS.find(t=>t.index===i));
-      if(fNum < sidebarVisible.length){
-        e.preventDefault();
-        switchTab(sidebarVisible[fNum]);
+  function getScrollEl(){
+    const tc = document.getElementById('tab-content');
+    return (tc && tc.scrollHeight > tc.clientHeight + 2) ? tc : window;
+  }
+
+  function scrollBy(amount){
+    const el = getScrollEl();
+    if(el === window) window.scrollBy(0, amount);
+    else el.scrollTop += amount;
+  }
+
+  function scrollTo(pos){
+    const el = getScrollEl();
+    if(el === window) window.scrollTo(0, pos === 'end' ? 999999 : 0);
+    else el.scrollTop = pos === 'end' ? el.scrollHeight : 0;
+  }
+
+  function triggerAddNew(){
+    // Tab-specific "add new" action
+    switch(currentTab){
+      case 0: // Add Sale — focus customer search based on active mode
+        { const mode = typeof getPurchaseMode==='function' ? getPurchaseMode() : 'standard';
+          const inp = document.getElementById(mode==='borrow' ? 'bw-search' : 'pt-search');
+          if(inp){ inp.focus(); inp.select(); } }
+        break;
+      case 1: // Customers
+        if(typeof openAddModal === 'function') openAddModal();
+        break;
+      case 2: // Creditors
+        if(typeof openAddCreditorModal === 'function') openAddCreditorModal();
+        break;
+      case 3: // Debtors
+        if(typeof openAddDebtorModal === 'function') openAddDebtorModal();
+        break;
+      case 4: // Inventory — switch to add view
+        { if(typeof invView !== 'undefined'){ invView='add'; if(typeof safeRenderTab==='function') safeRenderTab(currentTab); } }
+        break;
+      case 5: // Expenses — scroll to form
+        { const form = document.getElementById('exp-form-card');
+          if(form){ form.scrollIntoView({behavior:'smooth',block:'center'});
+            const inp = form.querySelector('input,select,textarea');
+            if(inp) setTimeout(()=>inp.focus(), 300); } }
+        break;
+    }
+  }
+
+  document.addEventListener('keydown', function(e){
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+                 || (document.activeElement && document.activeElement.isContentEditable);
+
+    // ── Escape: close modal / go back (works everywhere) ──
+    if(e.key === 'Escape'){
+      if(typeof goBack === 'function' && window._pageStack && window._pageStack.length){
+        e.preventDefault(); goBack(); return;
       }
+      // Let global closeModal handler fire (already registered separately)
       return;
     }
 
-    // Alt+key shortcuts
+    // ── Everything below: skip when typing ──
+    if(inInput) return;
+
+    // ── F1–F9: tab jump ──
+    if(e.key >= 'F1' && e.key <= 'F9' && !e.altKey && !e.ctrlKey && !e.metaKey){
+      const fNum = parseInt(e.key.slice(1)) - 1;
+      const TABS = getTabs();
+      const sidebarVisible = SIDEBAR_ORDER.filter(i => TABS.find(t=>t.index===i));
+      if(fNum < sidebarVisible.length){ e.preventDefault(); switchTab(sidebarVisible[fNum]); }
+      return;
+    }
+
+    // ── Alt+key: tab shortcuts ──
     if(e.altKey && !e.ctrlKey && !e.metaKey){
       const key = e.key.toLowerCase();
       const map = { 'm':9, 'h':10, 'a':11, 's':12, 't':13 };
       if(map[key] !== undefined){
         const TABS = getTabs();
-        if(TABS.find(t=>t.index===map[key])){
-          e.preventDefault();
-          switchTab(map[key]);
-        }
+        if(TABS.find(t=>t.index===map[key])){ e.preventDefault(); switchTab(map[key]); }
       }
+      return;
     }
+
+    // ── Insert: add new entry ──
+    if(e.key === 'Insert'){
+      e.preventDefault(); triggerAddNew(); return;
+    }
+
+    // ── Ctrl+F or Alt+F: focus search ──
+    if((e.ctrlKey || e.altKey) && e.key.toLowerCase() === 'f'){
+      const search = document.querySelector('#tab-content input[type="text"][placeholder*="earch"],#tab-content input[type="search"],#cust-search');
+      if(search){ e.preventDefault(); search.focus(); search.select(); }
+      return;
+    }
+
+    // ── PgDn / PgUp: fast scroll ──
+    if(e.key === 'PageDown'){ e.preventDefault(); scrollBy(400); return; }
+    if(e.key === 'PageUp'){   e.preventDefault(); scrollBy(-400); return; }
+
+    // ── Home / End: scroll to top/bottom ──
+    if(e.key === 'Home'){ e.preventDefault(); scrollTo('top'); return; }
+    if(e.key === 'End'){  e.preventDefault(); scrollTo('end'); return; }
   });
 })();
 
@@ -3585,6 +3664,7 @@ window.addEventListener('load', () => {
 // ── Up/Down arrow key navigation ─────────────────────────────────────────
 (function(){
   var focused = null;
+  window._scClearRowFocus = function(){ if(focused){ focused.classList.remove('sc-nav-focus'); focused=null; } };
 
   function rows(){
     return Array.prototype.slice.call(document.querySelectorAll('[data-sc-row]')).filter(function(el){
@@ -3616,9 +3696,8 @@ window.addEventListener('load', () => {
     if(!focused){
       e.preventDefault();
       var scrollEl = document.getElementById('tab-content');
-      var isDesktop = scrollEl && getComputedStyle(scrollEl).overflowY === 'auto';
       var amount = 80;
-      if(isDesktop){
+      if(scrollEl && scrollEl.scrollHeight > scrollEl.clientHeight + 2){
         scrollEl.scrollTop += (e.key === 'ArrowDown' ? amount : -amount);
       } else {
         window.scrollBy(0, e.key === 'ArrowDown' ? amount : -amount);
@@ -5587,6 +5666,7 @@ function switchTab(i){
   window._pageStack=[];window._scDetailPage=null;
   currentTab=i;renderTabs();renderTab(i);
   var _tc=document.getElementById('tab-content');if(_tc)_tc.scrollTop=0;
+  if(typeof window._scClearRowFocus==='function') window._scClearRowFocus();
 }
 
 // ─── PAGE HISTORY ENGINE ──────────────────────────────────────────────────────
