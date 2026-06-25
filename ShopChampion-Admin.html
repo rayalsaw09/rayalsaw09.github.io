@@ -979,9 +979,9 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   body.pro-theme .sb-item.active { background: #eff6ff; color: #1d4ed8; font-weight: 600; }
   body.pro-theme .sb-item.active .sb-key { color: #93c5fd; border-color: #bfdbfe; }
   body.pro-theme .sb-key { background: #f1f5f9; border-color: #e2e8f0; color: #94a3b8; }
-  /* Arrow-key navigation highlight */
-  .sc-arrow-focus { outline: 2px solid #3b82f6 !important; outline-offset: -1px; background: rgba(59,130,246,0.08) !important; }
-  body.pro-theme .sc-arrow-focus { outline-color: #2563eb !important; background: rgba(37,99,235,0.07) !important; }
+  /* Arrow-key row navigation highlight */
+  [data-sc-row].sc-nav-focus { outline: 2px solid #3b82f6 !important; outline-offset: -2px; }
+  body.pro-theme [data-sc-row].sc-nav-focus { outline-color: #2563eb !important; }
 
   body.pro-theme .sb-divider { background: #e2e8f0; }
 }
@@ -3580,60 +3580,23 @@ window.addEventListener('load', () => {
 })();
 
 
-// ── Up/Down arrow key navigation (works in all tabs) ──────────────────────
+// ── Up/Down arrow key navigation ─────────────────────────────────────────
 (function(){
-  var _arrowFocused = null;
+  var focused = null;
 
-  function isInsideModal(){
-    var el = document.activeElement;
-    if(!el) return false;
-    // Check by id suffix without attribute selector to avoid quote issues
-    var node = el;
-    while(node && node !== document.body){
-      if(!node.id && !node.className) { node = node.parentElement; continue; }
-      var id = node.id || '';
-      var cls = (typeof node.className === 'string') ? node.className : '';
-      if(cls.indexOf('modal') !== -1 || cls.indexOf('sc-modal') !== -1) return true;
-      if(id.indexOf('-modal') !== -1 || id === 'modal') return true;
-      node = node.parentElement;
-    }
-    return false;
-  }
-
-  function getNavigableRows(){
-    var sel = '.cr-bill-row, .dr-bill-row, .cust-card, .exp-table-row, .exp-mobile-row, .lb-row, .sc-replay-row, [data-nav-row]';
-    var all = Array.from(document.querySelectorAll(sel));
-    // Also include inventory cards that have onclick
-    var invCards = Array.from(document.querySelectorAll('#inv-list .card'));
-    invCards.forEach(function(c){ if(c.getAttribute('onclick') && all.indexOf(c) === -1) all.push(c); });
-    return all.filter(function(el){
-      if(!el.offsetParent) return false;
-      // Skip if inside a modal
-      var node = el;
-      while(node && node !== document.body){
-        var cls = (typeof node.className === 'string') ? node.className : '';
-        var id = node.id || '';
-        if(cls.indexOf('modal') !== -1 || id.indexOf('-modal') !== -1) return false;
-        node = node.parentElement;
-      }
-      return true;
+  function rows(){
+    return Array.prototype.slice.call(document.querySelectorAll('[data-sc-row]')).filter(function(el){
+      return el.offsetParent !== null;
     });
   }
 
-  function clearFocus(){
-    if(_arrowFocused){
-      _arrowFocused.classList.remove('sc-arrow-focus');
-      _arrowFocused.style.outline = '';
-      _arrowFocused = null;
+  function setFocus(el){
+    if(focused){ focused.classList.remove('sc-nav-focus'); }
+    focused = el || null;
+    if(focused){
+      focused.classList.add('sc-nav-focus');
+      focused.scrollIntoView({ block:'nearest', behavior:'smooth' });
     }
-  }
-
-  function focusRow(el){
-    clearFocus();
-    if(!el) return;
-    el.classList.add('sc-arrow-focus');
-    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    _arrowFocused = el;
   }
 
   document.addEventListener('keydown', function(e){
@@ -3641,35 +3604,31 @@ window.addEventListener('load', () => {
     var tag = document.activeElement ? document.activeElement.tagName : '';
     if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
     if(document.activeElement && document.activeElement.isContentEditable) return;
-    if(isInsideModal()) return;
 
-    // Enter: only act if a row is focused
+    var list = rows();
+    if(!list.length) return; // no rows — don't block scroll
+
     if(e.key === 'Enter'){
-      if(_arrowFocused){ e.preventDefault(); _arrowFocused.click(); }
+      if(focused){ e.preventDefault(); focused.click(); }
       return;
     }
 
-    // Arrow keys: only act if navigable rows exist in the current view
-    var rows = getNavigableRows();
-    if(!rows.length) return; // no rows — let browser handle scroll normally
-
-    // Only block default scroll when we actually have rows to navigate
     e.preventDefault();
-    var idx = _arrowFocused ? rows.indexOf(_arrowFocused) : -1;
+    var idx = focused ? list.indexOf(focused) : -1;
     if(e.key === 'ArrowDown'){
-      focusRow(rows[idx + 1 < rows.length ? idx + 1 : 0]);
+      setFocus(list[idx + 1 < list.length ? idx + 1 : 0]);
     } else {
-      focusRow(rows[idx - 1 >= 0 ? idx - 1 : rows.length - 1]);
+      setFocus(list[idx - 1 >= 0 ? idx - 1 : list.length - 1]);
     }
   });
 
-  // Clear focus when switching tabs
+  // Reset focus when tab switches
   document.addEventListener('click', function(e){
     var t = e.target;
-    while(t){
+    while(t && t !== document.body){
       if(t.classList && (t.classList.contains('sb-item') || t.classList.contains('tab-btn'))){
-        setTimeout(clearFocus, 50);
-        break;
+        setTimeout(function(){ setFocus(null); }, 80);
+        return;
       }
       t = t.parentElement;
     }
@@ -5480,7 +5439,7 @@ function _safeRenderTabImmediate(i) {
               const lastAdded = (item.stock || []).length ? new Date(item.stock[item.stock.length - 1].date).toLocaleDateString('en-IN', {day:'numeric',month:'short'}) : '—';
               const costEntries = (item.stock || []).filter(e => Number(e.costPerUnit || 0) > 0);
               const avgCost = costEntries.length ? (costEntries.reduce((s, e) => s + Number(e.costPerUnit), 0) / costEntries.length).toFixed(2) : 0;
-              return `<div class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${item.name.replace(/'/g, "\\'")}')">
+              return `<div data-sc-row="1" class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${item.name.replace(/'/g, "\\'")}')">
                 <div style="display:flex;align-items:flex-start;gap:12px;">
                   <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
                   <div style="flex:1;min-width:0;">
@@ -5773,7 +5732,7 @@ function renderLeaderboard(sorted){
       ? `<span style="font-size:10px;color:#3a5a4a;margin-left:4px;">(${t('allTimeBracket')} ${formatINR(c._realSpend)})</span>` : "";
     const zeroDay = isFiltered && c.totalSpend === 0;
     return `
-    <div class="lb-row" style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;align-items:center;background:${zeroDay?'rgba(0,0,0,0.25)':gi%2===0?'var(--bg-row-even,#0d1220)':'var(--bg-row-odd,#0f1628)'};border-left:1px solid var(--border-main,#1e2a45);border-right:1px solid var(--border-main,#1e2a45);border-bottom:1px solid var(--border-main,#141c30);padding:10px 16px;cursor:pointer;transition:background 0.15s;${zeroDay?'opacity:0.55':''}" onclick="openCustomerPage('${c.id}')" onmouseenter="_hoverOn(this)" onmouseleave="this.style.background=''">
+    <div data-sc-row="1" class="lb-row" style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;align-items:center;background:${zeroDay?'rgba(0,0,0,0.25)':gi%2===0?'var(--bg-row-even,#0d1220)':'var(--bg-row-odd,#0f1628)'};border-left:1px solid var(--border-main,#1e2a45);border-right:1px solid var(--border-main,#1e2a45);border-bottom:1px solid var(--border-main,#141c30);padding:10px 16px;cursor:pointer;transition:background 0.15s;${zeroDay?'opacity:0.55':''}" onclick="openCustomerPage('${c.id}')" onmouseenter="_hoverOn(this)" onmouseleave="this.style.background=''">
       ${rankBadge(c.rank)}
       <div style="display:flex;align-items:center;gap:10px;min-width:0;">
         ${avatarEl(c,34)}
@@ -5901,7 +5860,7 @@ function renderCustomers(sorted,q=""){
 
     // Clean slim card — tap to open details
     return `
-    <div class="card cust-card" style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;" onclick="openCustomerPage('${c.id}')">
+    <div data-sc-row="1" class="card cust-card" style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;" onclick="openCustomerPage('${c.id}')">
       ${avatarEl(c,44)}
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:15px;color:var(--text-main,#e8eaf0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
@@ -10080,7 +10039,7 @@ function _renderCreditorCard(cr){
   const cardBg = isArchived ? "var(--bg-main,#0a0a0a)" : isUnrec ? "#1a0e00" : "var(--bg-row-even,#0d1220)";
   const hoverBorder = isArchived ? "#3a3a3a" : isUnrec ? "#d97706" : "var(--bg-row-hover,#2a3a6a)";
 
-  return `<div style="background:${cardBg};border:1px solid ${borderColor};border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
+  return `<div data-sc-row="1" style="background:${cardBg};border:1px solid ${borderColor};border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
     onmouseenter="this.style.borderColor='${hoverBorder}'" onmouseleave="this.style.borderColor='${borderColor}'"
     onclick="openCreditorDetail('${cr.id}')">
     ${isUnrec ? `<div style="background:#92400e22;border:1px solid #92400e;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#fbbf24;font-weight:700;">⚠️ These purchases have no creditor assigned. Tap to review and link them to real suppliers.</div>` : ""}
@@ -12765,7 +12724,7 @@ ${monthTotal>0 ? `
       <div>${t('expColCatDesc')}</div><div>${t('expAmount')}</div><div>${t('expDate')}</div><div>${t('expColTags')}</div><div>${t('expColActions')}</div>
     </div>
     ${pageItems.map(e=>`
-    <div class="exp-table-row">
+    <div data-sc-row="1" class="exp-table-row">
       <div style="min-width:0;">
         <div style="font-size:13px;font-weight:700;color:#1a2236;">${expCategoryIcon(e.category)} ${e.category}</div>
         ${e.note?`<div style="font-size:11px;color:#8893a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(e.note)}</div>`:""}
@@ -12783,7 +12742,7 @@ ${monthTotal>0 ? `
 
     <!-- Mobile cards -->
     ${pageItems.map(e=>`
-    <div class="exp-mobile-row">
+    <div data-sc-row="1" class="exp-mobile-row">
       <div style="font-size:24px;line-height:1;">${expCategoryIcon(e.category)}</div>
       <div style="flex:1;min-width:0;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -13061,7 +13020,7 @@ function _renderDebtorCard(dr){
   const borderColor = isArchived ? "var(--border-main,#2a2a2a)" : "var(--border-main,#1e2a45)";
   const cardBg = isArchived ? "var(--bg-main,#0a0a0a)" : "var(--bg-row-even,#0d1220)";
 
-  return `<div style="background:${cardBg};border:1px solid ${borderColor};border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
+  return `<div data-sc-row="1" style="background:${cardBg};border:1px solid ${borderColor};border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
     onmouseenter="this.style.borderColor='${isArchived?'#3a3a3a':'#2a6a3a'}'" onmouseleave="this.style.borderColor='${borderColor}'"
     onclick="openDebtorDetail('${dr.id}')">
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
