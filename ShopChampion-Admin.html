@@ -1778,7 +1778,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
         <span class="sc-kbd" style="margin-left:4px;">Esc</span><span class="sc-kbd-lbl">close</span>
       </div>
     </div>
-    <div id="tab-content" style="padding:20px;max-width:1200px;margin:0 auto;overflow-x:hidden;"></div>
+    <div id="tab-content"></div>
   </div>
 
   <!-- More menu overlay (mobile) -->
@@ -5605,7 +5605,7 @@ function _backBtn(label){
 function renderTab(i){
   const el=document.getElementById("tab-content"),s=getSorted();
   if(!el) return;
-  el.style.position="";el.style.overflow="";
+  el.style.position="";el.style.overflow="auto";
   if(i===0){el.innerHTML=renderPurchaseTab(s);if(getPurchaseMode()==="inventory"){const list=document.getElementById("pt-items-list");if(list&&list.children.length===0)ptAddItemRow();}
     setTimeout(scRenderPurchaseBanners, 0);
   }
@@ -19022,7 +19022,6 @@ function applyLicenseOverlay(i) {
   // so switching away still works normally
   const existing = el.innerHTML;
   el.style.position = "relative";
-  el.style.overflow = "hidden";
   // Remove any old overlay first
   const old = el.querySelector(".license-overlay");
   if (old) old.remove();
