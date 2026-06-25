@@ -3544,97 +3544,306 @@ window.addEventListener('load', () => {
   updateBottomNav(0);
 });
 
-// ── Desktop keyboard shortcuts ─────────────────────────────────────────────
-// F1-F9 = first 9 visible tabs (in sidebar order)
-// Alt+M/H/A/S/T = Messages/History/Alerts/Settings/Team
-// Insert = Add new entry on current tab
-// Escape = close modal / go back
-// PgUp/PgDn = fast scroll (400px)
-// Home/End = scroll to top/bottom
-// Alt+F (or Ctrl+F) = focus search box if present
+// ── Tally-Style Keyboard Navigation System ─────────────────────────────────
+// Navigation modes:
+//   "content"  — normal tab content is active (default)
+//   "sidebar"  — sidebar is focused, Up/Down navigates tabs
+//
+// Arrow key behavior (when not in input):
+//   Right      → next sub-function within tab
+//   Left       → prev sub-function; at first sub → enter sidebar mode
+//   Up/Down    → navigate data rows OR focusable zones in tab
+//   Enter      → activate focused item / switch to highlighted sidebar tab
+//   Escape     → close modal / exit sidebar mode / go back
+//   Ctrl+F     → focus search box
+//   F1-F9      → jump to tabs
+//   Insert     → add new entry
+//   PgUp/PgDn  → fast scroll
+//   Home/End   → scroll to top/bottom
+//
+// Tab sub-functions map (Left/Right cycling):
+//   Tab 0 (Add Sale): ["purchase", "borrow"]
+//   Tab 4 (Inventory): ["stock", "add", "log"]
+//   Tab 5 (Expenses): ["list", "calendar"]
+//   All other tabs: no sub-functions (Left goes to sidebar)
+
 (function(){
-  const SIDEBAR_ORDER = [0,2,3,1,4,5,6,7,8,9,10,11,12,13];
+  // ─── State ───────────────────────────────────────────────────────────────
+  var navMode = "content"; // "content" | "sidebar"
+  var sidebarHoverIdx = -1; // index into visible sidebar tabs array
+  var rowFocused = null;    // currently focused data-sc-row element
+
+  // Sub-function definitions per tab
+  var TAB_SUBFUNCS = {
+    0: { getView: function(){ return typeof ptView !== 'undefined' ? ptView : 'purchase'; },
+         views: ['purchase', 'borrow'],
+         setView: function(v){ if(typeof ptView !== 'undefined'){ ptView = v; if(typeof safeRenderTab === 'function') safeRenderTab(0); } } },
+    4: { getView: function(){ return typeof invView !== 'undefined' ? invView : 'stock'; },
+         views: ['stock', 'add', 'log'],
+         setView: function(v){ if(typeof invView !== 'undefined'){ if(v !== 'add') window.invPrefillName = ''; invView = v; if(typeof safeRenderTab === 'function') safeRenderTab(4); } } },
+    5: { getView: function(){ return typeof _expView !== 'undefined' ? _expView : 'list'; },
+         views: ['list', 'calendar'],
+         setView: function(v){ if(typeof _expView !== 'undefined'){ window._expView = v; if(typeof safeRenderTab === 'function') safeRenderTab(5); } } }
+  };
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+  var SIDEBAR_ORDER = [0,2,3,1,4,5,6,7,8,9,10,11,12,13];
+
+  function getVisibleSidebarTabs(){
+    if(typeof getTabs !== 'function') return [];
+    var TABS = getTabs();
+    return SIDEBAR_ORDER.filter(function(i){ return TABS.find(function(t){ return t.index === i; }); });
+  }
 
   function getScrollEl(){
-    const tc = document.getElementById('tab-content');
+    var tc = document.getElementById('tab-content');
     return (tc && tc.scrollHeight > tc.clientHeight + 2) ? tc : window;
   }
 
-  function scrollBy(amount){
-    const el = getScrollEl();
+  function doScroll(amount){
+    var el = getScrollEl();
     if(el === window) window.scrollBy(0, amount);
     else el.scrollTop += amount;
   }
 
-  function scrollTo(pos){
-    const el = getScrollEl();
+  function doScrollTo(pos){
+    var el = getScrollEl();
     if(el === window) window.scrollTo(0, pos === 'end' ? 999999 : 0);
     else el.scrollTop = pos === 'end' ? el.scrollHeight : 0;
   }
 
+  function focusSearchBox(){
+    var search = document.querySelector(
+      '#tab-content input[type="text"][placeholder*="earch"],' +
+      '#tab-content input[type="search"],' +
+      '#cust-search,' +
+      '#inv-search-box,' +
+      '#exp-search,' +
+      '#pt-search,' +
+      '#bw-search'
+    );
+    if(search){ search.focus(); search.select(); return true; }
+    return false;
+  }
+
   function triggerAddNew(){
-    // Tab-specific "add new" action
-    switch(currentTab){
-      case 0: // Add Sale — focus customer search based on active mode
-        { const mode = typeof getPurchaseMode==='function' ? getPurchaseMode() : 'standard';
-          const inp = document.getElementById(mode==='borrow' ? 'bw-search' : 'pt-search');
-          if(inp){ inp.focus(); inp.select(); } }
+    switch(typeof currentTab !== 'undefined' ? currentTab : -1){
+      case 0:
+        var mode = typeof getPurchaseMode === 'function' ? getPurchaseMode() : 'standard';
+        var inp = document.getElementById(mode === 'borrow' ? 'bw-search' : 'pt-search');
+        if(inp){ inp.focus(); inp.select(); }
         break;
-      case 1: // Customers
-        if(typeof openAddModal === 'function') openAddModal();
+      case 1: if(typeof openAddModal === 'function') openAddModal(); break;
+      case 2: if(typeof openAddCreditorModal === 'function') openAddCreditorModal(); break;
+      case 3: if(typeof openAddDebtorModal === 'function') openAddDebtorModal(); break;
+      case 4:
+        if(typeof invView !== 'undefined'){ invView = 'add'; if(typeof safeRenderTab === 'function') safeRenderTab(currentTab); }
         break;
-      case 2: // Creditors
-        if(typeof openAddCreditorModal === 'function') openAddCreditorModal();
-        break;
-      case 3: // Debtors
-        if(typeof openAddDebtorModal === 'function') openAddDebtorModal();
-        break;
-      case 4: // Inventory — switch to add view
-        { if(typeof invView !== 'undefined'){ invView='add'; if(typeof safeRenderTab==='function') safeRenderTab(currentTab); } }
-        break;
-      case 5: // Expenses — scroll to form
-        { const form = document.getElementById('exp-form-card');
-          if(form){ form.scrollIntoView({behavior:'smooth',block:'center'});
-            const inp = form.querySelector('input,select,textarea');
-            if(inp) setTimeout(()=>inp.focus(), 300); } }
+      case 5:
+        var form = document.getElementById('exp-form-card');
+        if(form){ form.scrollIntoView({behavior:'smooth',block:'center'});
+          var inp2 = form.querySelector('input,select,textarea');
+          if(inp2) setTimeout(function(){ inp2.focus(); }, 300); }
         break;
     }
   }
 
-  document.addEventListener('keydown', function(e){
-    const tag = document.activeElement ? document.activeElement.tagName : '';
-    const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
-                 || (document.activeElement && document.activeElement.isContentEditable);
+  // ─── Sidebar highlight management ────────────────────────────────────────
+  function getSidebarItems(){
+    return Array.prototype.slice.call(document.querySelectorAll('#sidebar-nav .sb-item'));
+  }
 
-    // ── Escape: close modal / go back (works everywhere) ──
+  function applySidebarHighlight(idx){
+    var items = getSidebarItems();
+    items.forEach(function(el, i){
+      el.classList.toggle('sc-sidebar-hover', i === idx);
+    });
+    if(idx >= 0 && idx < items.length){
+      items[idx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+
+  function clearSidebarHighlight(){
+    getSidebarItems().forEach(function(el){
+      el.classList.remove('sc-sidebar-hover');
+    });
+    sidebarHoverIdx = -1;
+  }
+
+  function enterSidebarMode(){
+    navMode = 'sidebar';
+    // Highlight the currently active tab in sidebar
+    var visible = getVisibleSidebarTabs();
+    var activeTabIndex = typeof currentTab !== 'undefined' ? currentTab : 0;
+    var pos = visible.indexOf(activeTabIndex);
+    sidebarHoverIdx = pos >= 0 ? pos : 0;
+    applySidebarHighlight(sidebarHoverIdx);
+    // Add visual indicator to sidebar
+    var sidebar = document.getElementById('sidebar-nav');
+    if(sidebar) sidebar.classList.add('sc-sidebar-active');
+  }
+
+  function exitSidebarMode(){
+    navMode = 'content';
+    clearSidebarHighlight();
+    var sidebar = document.getElementById('sidebar-nav');
+    if(sidebar) sidebar.classList.remove('sc-sidebar-active');
+  }
+
+  function switchSidebarTab(){
+    var visible = getVisibleSidebarTabs();
+    if(sidebarHoverIdx >= 0 && sidebarHoverIdx < visible.length){
+      var tabIdx = visible[sidebarHoverIdx];
+      exitSidebarMode();
+      if(typeof switchTab === 'function') switchTab(tabIdx);
+    }
+  }
+
+  // ─── Row focus management (data-sc-row navigation) ───────────────────────
+  window._scClearRowFocus = function(){
+    if(rowFocused){ rowFocused.classList.remove('sc-nav-focus'); rowFocused = null; }
+  };
+
+  function getRows(){
+    return Array.prototype.slice.call(document.querySelectorAll('[data-sc-row]')).filter(function(el){
+      return el.offsetParent !== null;
+    });
+  }
+
+  function setRowFocus(el){
+    if(rowFocused) rowFocused.classList.remove('sc-nav-focus');
+    rowFocused = el || null;
+    if(rowFocused){
+      rowFocused.classList.add('sc-nav-focus');
+      rowFocused.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+
+  // ─── Tab sub-function navigation (Left/Right) ────────────────────────────
+  function navigateSubFunc(direction){
+    var tab = typeof currentTab !== 'undefined' ? currentTab : -1;
+    var sf = TAB_SUBFUNCS[tab];
+    if(!sf){
+      // No sub-functions on this tab
+      if(direction === -1) enterSidebarMode();
+      return;
+    }
+    var cur = sf.getView();
+    // Only navigate within known views
+    var idx = sf.views.indexOf(cur);
+    if(idx === -1) idx = 0;
+    var next = idx + direction;
+    if(next < 0){
+      enterSidebarMode();
+    } else if(next >= sf.views.length){
+      // At last sub-function, right arrow does nothing (or wrap)
+      // do nothing — stay at last
+    } else {
+      sf.setView(sf.views[next]);
+    }
+  }
+
+  // ─── Focusable zones in tab content (Down arrow when not on rows) ─────────
+  // Returns array of focusable elements in logical order for the current tab
+  function getTabFocusZones(){
+    var zones = [];
+    var tab = typeof currentTab !== 'undefined' ? currentTab : -1;
+
+    // Mode toggle button (e.g., inventory/standard mode switch in sales tab)
+    var modeToggle = document.querySelector('#tab-content button[onclick*="setPurchaseMode"], #tab-content button[onclick*="invView"], #tab-content button[onclick*="_expView"]');
+    if(modeToggle && modeToggle.offsetParent) zones.push(modeToggle);
+
+    // Search box
+    var searchSelectors = ['#pt-search','#bw-search','#cust-search','#inv-search-box','#exp-search'];
+    for(var i=0; i<searchSelectors.length; i++){
+      var el = document.querySelector(searchSelectors[i]);
+      if(el && el.offsetParent){ zones.push(el); break; }
+    }
+
+    return zones;
+  }
+
+  // ─── Main keyboard handler ────────────────────────────────────────────────
+  document.addEventListener('keydown', function(e){
+    var tag = document.activeElement ? document.activeElement.tagName : '';
+    var inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+               || (document.activeElement && document.activeElement.isContentEditable);
+
+    // ── Escape: always works ──
     if(e.key === 'Escape'){
+      if(navMode === 'sidebar'){
+        e.preventDefault(); exitSidebarMode(); return;
+      }
+      if(typeof closeModal === 'function') closeModal();
       if(typeof goBack === 'function' && window._pageStack && window._pageStack.length){
         e.preventDefault(); goBack(); return;
       }
-      // Let global closeModal handler fire (already registered separately)
       return;
     }
 
-    // ── Everything below: skip when typing ──
+    // ── Ctrl+F / Alt+F: focus search (works even from input) ──
+    if((e.ctrlKey || e.altKey) && e.key.toLowerCase() === 'f'){
+      e.preventDefault(); focusSearchBox(); return;
+    }
+
+    // ── Everything below: skip when typing in input ──
     if(inInput) return;
+
+    // ── Sidebar navigation mode ──
+    if(navMode === 'sidebar'){
+      var visible = getVisibleSidebarTabs();
+      if(e.key === 'ArrowDown'){
+        e.preventDefault();
+        sidebarHoverIdx = Math.min(sidebarHoverIdx + 1, visible.length - 1);
+        applySidebarHighlight(sidebarHoverIdx);
+        return;
+      }
+      if(e.key === 'ArrowUp'){
+        e.preventDefault();
+        sidebarHoverIdx = Math.max(sidebarHoverIdx - 1, 0);
+        applySidebarHighlight(sidebarHoverIdx);
+        return;
+      }
+      if(e.key === 'Enter' || e.key === 'ArrowRight'){
+        e.preventDefault(); switchSidebarTab(); return;
+      }
+      if(e.key === 'ArrowLeft'){
+        e.preventDefault(); exitSidebarMode(); return;
+      }
+      // Let F-keys and other shortcuts fall through below
+    }
 
     // ── F1–F9: tab jump ──
     if(e.key >= 'F1' && e.key <= 'F9' && !e.altKey && !e.ctrlKey && !e.metaKey){
-      const fNum = parseInt(e.key.slice(1)) - 1;
-      const TABS = getTabs();
-      const sidebarVisible = SIDEBAR_ORDER.filter(i => TABS.find(t=>t.index===i));
-      if(fNum < sidebarVisible.length){ e.preventDefault(); switchTab(sidebarVisible[fNum]); }
+      var fNum = parseInt(e.key.slice(1)) - 1;
+      var TABS = typeof getTabs === 'function' ? getTabs() : [];
+      var sidebarVisible = SIDEBAR_ORDER.filter(function(i){ return TABS.find(function(t){ return t.index === i; }); });
+      if(fNum < sidebarVisible.length){ e.preventDefault(); exitSidebarMode(); if(typeof switchTab === 'function') switchTab(sidebarVisible[fNum]); }
       return;
     }
 
     // ── Alt+key: tab shortcuts ──
     if(e.altKey && !e.ctrlKey && !e.metaKey){
-      const key = e.key.toLowerCase();
-      const map = { 'm':9, 'h':10, 'a':11, 's':12, 't':13 };
+      var key = e.key.toLowerCase();
+      var map = { 'm':9, 'h':10, 'a':11, 's':12, 't':13 };
       if(map[key] !== undefined){
-        const TABS = getTabs();
-        if(TABS.find(t=>t.index===map[key])){ e.preventDefault(); switchTab(map[key]); }
+        var TABS2 = typeof getTabs === 'function' ? getTabs() : [];
+        if(TABS2.find(function(t){ return t.index === map[key]; })){ e.preventDefault(); exitSidebarMode(); if(typeof switchTab === 'function') switchTab(map[key]); }
       }
+      return;
+    }
+
+    // ── Left/Right: sub-function navigation ──
+    if(e.key === 'ArrowLeft'){
+      e.preventDefault();
+      window._scClearRowFocus();
+      navigateSubFunc(-1);
+      return;
+    }
+    if(e.key === 'ArrowRight'){
+      e.preventDefault();
+      window._scClearRowFocus();
+      navigateSubFunc(1);
       return;
     }
 
@@ -3643,92 +3852,76 @@ window.addEventListener('load', () => {
       e.preventDefault(); triggerAddNew(); return;
     }
 
-    // ── Ctrl+F or Alt+F: focus search ──
-    if((e.ctrlKey || e.altKey) && e.key.toLowerCase() === 'f'){
-      const search = document.querySelector('#tab-content input[type="text"][placeholder*="earch"],#tab-content input[type="search"],#cust-search');
-      if(search){ e.preventDefault(); search.focus(); search.select(); }
-      return;
-    }
-
     // ── PgDn / PgUp: fast scroll ──
-    if(e.key === 'PageDown'){ e.preventDefault(); scrollBy(400); return; }
-    if(e.key === 'PageUp'){   e.preventDefault(); scrollBy(-400); return; }
+    if(e.key === 'PageDown'){ e.preventDefault(); doScroll(400); return; }
+    if(e.key === 'PageUp'){   e.preventDefault(); doScroll(-400); return; }
 
     // ── Home / End: scroll to top/bottom ──
-    if(e.key === 'Home'){ e.preventDefault(); scrollTo('top'); return; }
-    if(e.key === 'End'){  e.preventDefault(); scrollTo('end'); return; }
-  });
-})();
+    if(e.key === 'Home'){ e.preventDefault(); doScrollTo('top'); return; }
+    if(e.key === 'End'){  e.preventDefault(); doScrollTo('end'); return; }
 
+    // ── Up/Down: data row navigation ──
+    if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+      var list = getRows();
 
-// ── Up/Down arrow key navigation ─────────────────────────────────────────
-(function(){
-  var focused = null;
-  window._scClearRowFocus = function(){ if(focused){ focused.classList.remove('sc-nav-focus'); focused=null; } };
-
-  function rows(){
-    return Array.prototype.slice.call(document.querySelectorAll('[data-sc-row]')).filter(function(el){
-      return el.offsetParent !== null;
-    });
-  }
-
-  function setFocus(el){
-    if(focused){ focused.classList.remove('sc-nav-focus'); }
-    focused = el || null;
-    if(focused){
-      focused.classList.add('sc-nav-focus');
-      focused.scrollIntoView({ block:'nearest', behavior:'smooth' });
-    }
-  }
-
-  document.addEventListener('keydown', function(e){
-    if(e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter') return;
-    var tag = document.activeElement ? document.activeElement.tagName : '';
-    if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    if(document.activeElement && document.activeElement.isContentEditable) return;
-
-    if(e.key === 'Enter'){
-      if(focused){ e.preventDefault(); focused.click(); }
-      return;
-    }
-
-    // If no row is focused, scroll the content area (desktop: #tab-content, mobile: window)
-    if(!focused){
-      e.preventDefault();
-      var scrollEl = document.getElementById('tab-content');
-      var amount = 80;
-      if(scrollEl && scrollEl.scrollHeight > scrollEl.clientHeight + 2){
-        scrollEl.scrollTop += (e.key === 'ArrowDown' ? amount : -amount);
-      } else {
-        window.scrollBy(0, e.key === 'ArrowDown' ? amount : -amount);
+      if(list.length > 0 && rowFocused){
+        // Navigate among rows
+        e.preventDefault();
+        var idx = list.indexOf(rowFocused);
+        if(e.key === 'ArrowDown') setRowFocus(list[idx + 1 < list.length ? idx + 1 : 0]);
+        else                       setRowFocus(list[idx - 1 >= 0 ? idx - 1 : list.length - 1]);
+        return;
       }
+
+      // No rows or no row focused — try zone navigation
+      if(e.key === 'ArrowDown'){
+        // Try to focus mode toggle or search box
+        var zones = getTabFocusZones();
+        if(zones.length > 0){
+          e.preventDefault();
+          zones[0].focus();
+          if(zones[0].select) zones[0].select();
+          return;
+        }
+      }
+
+      // Fallback: scroll
+      e.preventDefault();
+      doScroll(e.key === 'ArrowDown' ? 80 : -80);
       return;
     }
 
-    var list = rows();
-    if(!list.length) return;
-
-    e.preventDefault();
-    var idx = list.indexOf(focused);
-    if(e.key === 'ArrowDown'){
-      setFocus(list[idx + 1 < list.length ? idx + 1 : 0]);
-    } else {
-      setFocus(list[idx - 1 >= 0 ? idx - 1 : list.length - 1]);
+    // ── Enter: activate focused row ──
+    if(e.key === 'Enter'){
+      if(rowFocused){ e.preventDefault(); rowFocused.click(); }
+      return;
     }
   });
 
-  // Reset focus when tab switches
+  // ─── Reset focus on tab switch ────────────────────────────────────────────
   document.addEventListener('click', function(e){
     var t = e.target;
     while(t && t !== document.body){
       if(t.classList && (t.classList.contains('sb-item') || t.classList.contains('tab-btn'))){
-        setTimeout(function(){ setFocus(null); }, 80);
+        setTimeout(function(){ window._scClearRowFocus(); exitSidebarMode(); }, 80);
         return;
       }
       t = t.parentElement;
     }
   });
+
+  // ─── Style injection for sidebar highlight ────────────────────────────────
+  var style = document.createElement('style');
+  style.textContent = [
+    '#sidebar-nav.sc-sidebar-active { outline: 2px solid #FFD70060; border-radius: 8px; }',
+    '.sb-item.sc-sidebar-hover { background: var(--bg-row-hover, #111827) !important; color: #FFD700 !important; outline: 2px solid #FFD70080; outline-offset: -2px; border-radius: 8px; }',
+    'body.pro-theme .sb-item.sc-sidebar-hover { background: #eff6ff !important; color: #1d4ed8 !important; outline-color: #3b82f680; }',
+    '.sc-nav-focus { outline: 2px solid #4af !important; outline-offset: 2px; border-radius: 6px; }'
+  ].join('\n');
+  document.head.appendChild(style);
+
 })();
+
 
 // ── On page load: decide which mode ──
 window.addEventListener("load", () => {
