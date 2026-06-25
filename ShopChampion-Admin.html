@@ -5044,7 +5044,8 @@ function onLoginSuccess(phone) {
   if(_loginSuccessFired) return;
   _loginSuccessFired = true;
   document.getElementById("login-screen").style.display = "none";
-  document.getElementById("main-app").style.display = "block";
+  var _isDesktop = window.innerWidth >= 641;
+  document.getElementById("main-app").style.display = _isDesktop ? "flex" : "block";
   // Init ShopChat
   setTimeout(()=>{
     scLoadConnections().then(()=>scLoadPendingRequests()).then(async()=>{
@@ -5585,6 +5586,7 @@ function switchTab(i){
   if(i!==2&&i!==3)invPrefillName="";
   window._pageStack=[];window._scDetailPage=null;
   currentTab=i;renderTabs();renderTab(i);
+  var _tc=document.getElementById('tab-content');if(_tc)_tc.scrollTop=0;
 }
 
 // ─── PAGE HISTORY ENGINE ──────────────────────────────────────────────────────
