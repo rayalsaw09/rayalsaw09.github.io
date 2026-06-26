@@ -938,6 +938,50 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   }
   .sc-kbd { font-size: 9px; color: var(--text-dimmer, #2a3a5a); background: var(--bg-dark, #080c18); border: 1px solid var(--border-main, #1e2a45); border-radius: 3px; padding: 1px 4px; font-family: monospace; font-weight: 700; }
   .sc-kbd-lbl { font-size: 9px; color: var(--text-dimmer, #2a3a5a); }
+  /* ── Tally-style context shortcut bar ── */
+  #sc-shortcut-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 900;
+    background: var(--bg-row-even, #0d1220);
+    border-top: 1px solid var(--border-main, #1e2a45);
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0;
+    align-items: stretch;
+    height: 28px;
+    overflow: hidden;
+    transition: opacity 0.2s;
+    user-select: none;
+  }
+  #sc-shortcut-bar.sc-sb-hidden { opacity: 0; pointer-events: none; }
+  .sc-sb-item {
+    display: flex; align-items: center; gap: 4px;
+    padding: 0 10px;
+    border-right: 1px solid var(--border-main, #1e2a45);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .sc-sb-item:hover { background: var(--bg-row-hover, #111827); }
+  .sc-sb-key {
+    font-size: 9px; font-family: monospace; font-weight: 800;
+    color: #FFD700;
+    background: #1a1500;
+    border: 1px solid #FFD70055;
+    border-radius: 3px;
+    padding: 1px 5px;
+    flex-shrink: 0;
+  }
+  .sc-sb-lbl {
+    font-size: 9px; color: var(--text-muted, #7a8aaa);
+    font-weight: 600;
+  }
+  body.pro-theme #sc-shortcut-bar { background: #f8fafc; border-color: #e2e8f0; }
+  body.pro-theme .sc-sb-item:hover { background: #f1f5f9; }
+  body.pro-theme .sc-sb-key { background: #fef9c3; border-color: #fbbf2455; color: #b45309; }
+  body.pro-theme .sc-sb-lbl { color: #94a3b8; }
+  @media (max-width: 700px) { #sc-shortcut-bar { display: none !important; } }
   .sb-section { padding: 10px 12px 3px; font-size: 9px; color: var(--text-dimmer, #2a3a5a); font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
   .sb-item {
     display: flex; align-items: center; gap: 7px;
@@ -961,6 +1005,7 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
     min-height: 0;
     max-width: none !important;
     padding: 20px !important;
+    padding-bottom: 36px !important;
   }
   #tab-content-wrap {
     max-width: 1100px;
@@ -3572,6 +3617,7 @@ window.addEventListener('load', () => {
   var navMode = "content"; // "content" | "sidebar"
   var sidebarHoverIdx = -1; // index into visible sidebar tabs array
   var rowFocused = null;    // currently focused data-sc-row element
+  var zoneIdx = -1;         // which focus zone is currently active (-1 = none)
 
   // Sub-function definitions per tab
   var TAB_SUBFUNCS = {
@@ -3613,16 +3659,41 @@ window.addEventListener('load', () => {
   }
 
   function focusSearchBox(){
-    var search = document.querySelector(
-      '#tab-content input[type="text"][placeholder*="earch"],' +
-      '#tab-content input[type="search"],' +
-      '#cust-search,' +
-      '#inv-search-box,' +
-      '#exp-search,' +
-      '#pt-search,' +
-      '#bw-search'
-    );
-    if(search){ search.focus(); search.select(); return true; }
+    // Priority 1: search inside open modal
+    var modalContainer = document.getElementById('modal-container');
+    if(modalContainer && modalContainer.innerHTML.trim().length > 0){
+      var mSearch = modalContainer.querySelector(
+        '#cp-search, input[id*="search"], input[placeholder*="earch"], input[type="search"]'
+      );
+      if(mSearch && mSearch.offsetParent !== null){ mSearch.focus(); mSearch.select(); return true; }
+    }
+
+    // Priority 2: known search box IDs by tab
+    var tab = typeof currentTab !== 'undefined' ? currentTab : -1;
+    var byId = {
+      0: typeof ptView !== 'undefined' && ptView === 'borrow' ? 'bw-search' : 'pt-search',
+      1: 'cust-search',
+      2: null, // creditor search — no fixed ID, fallback below
+      3: null, // debtor search — no fixed ID, fallback below
+      4: 'inv-search-box',
+      5: 'exp-search'
+    };
+    var knownId = byId[tab];
+    if(knownId){
+      var el = document.getElementById(knownId);
+      if(el && el.offsetParent !== null){ el.focus(); el.select(); return true; }
+    }
+
+    // Priority 3: any visible search input in tab content
+    var selectors = [
+      '#tab-content input[placeholder*="earch"]',
+      '#tab-content input[type="search"]',
+      '#tab-content input[id*="search"]'
+    ];
+    for(var i = 0; i < selectors.length; i++){
+      var found = document.querySelector(selectors[i]);
+      if(found && found.offsetParent !== null){ found.focus(); found.select(); return true; }
+    }
     return false;
   }
 
@@ -3685,6 +3756,7 @@ window.addEventListener('load', () => {
 
   function exitSidebarMode(){
     navMode = 'content';
+    zoneIdx = -1;
     clearSidebarHighlight();
     var sidebar = document.getElementById('sidebar-nav');
     if(sidebar) sidebar.classList.remove('sc-sidebar-active');
@@ -3702,6 +3774,7 @@ window.addEventListener('load', () => {
   // ─── Row focus management (data-sc-row navigation) ───────────────────────
   window._scClearRowFocus = function(){
     if(rowFocused){ rowFocused.classList.remove('sc-nav-focus'); rowFocused = null; }
+    zoneIdx = -1;
   };
 
   function getRows(){
@@ -3743,24 +3816,367 @@ window.addEventListener('load', () => {
     }
   }
 
-  // ─── Focusable zones in tab content (Down arrow when not on rows) ─────────
-  // Returns array of focusable elements in logical order for the current tab
+  // ─── Focusable zones in tab content (Down/Up arrow cycling) ──────────────
+  // Walks the actual live DOM to collect all visible, focusable form elements
+  // in the current tab in their visual top-to-bottom order.
   function getTabFocusZones(){
-    var zones = [];
     var tab = typeof currentTab !== 'undefined' ? currentTab : -1;
+    var zones = [];
 
-    // Mode toggle button (e.g., inventory/standard mode switch in sales tab)
-    var modeToggle = document.querySelector('#tab-content button[onclick*="setPurchaseMode"], #tab-content button[onclick*="invView"], #tab-content button[onclick*="_expView"]');
-    if(modeToggle && modeToggle.offsetParent) zones.push(modeToggle);
+    function isVisible(el){
+      // Element must be in the DOM, visible, and not hidden
+      if(!el) return false;
+      if(el.offsetParent === null) return false;
+      var s = window.getComputedStyle(el);
+      if(s.display === 'none' || s.visibility === 'hidden' || s.opacity === '0') return false;
+      return true;
+    }
 
-    // Search box
-    var searchSelectors = ['#pt-search','#bw-search','#cust-search','#inv-search-box','#exp-search'];
-    for(var i=0; i<searchSelectors.length; i++){
-      var el = document.querySelector(searchSelectors[i]);
-      if(el && el.offsetParent){ zones.push(el); break; }
+    function addSel(sel){
+      var el = document.querySelector(sel);
+      if(isVisible(el)) zones.push(el);
+    }
+
+    function addEl(el){
+      if(isVisible(el)) zones.push(el);
+    }
+
+    if(tab === 0){
+      var view = (typeof ptView !== 'undefined') ? ptView : 'purchase';
+
+      if(view === 'purchase'){
+        // 1. Mode toggle button (Standard ↔ Inventory)
+        var modeBtn = document.querySelector(
+          'button[onclick*="setPurchaseMode(\'inventory\')"], button[onclick*="setPurchaseMode(\'standard\')"]'
+        );
+        addEl(modeBtn);
+
+        // 2. Customer search
+        addSel('#pt-search');
+
+        // Standard mode only: Amount field
+        var ptAmt = document.getElementById('pt-amt');
+        if(isVisible(ptAmt)) addEl(ptAmt);
+
+        // 3. Scan barcode button (inventory mode only)
+        var scanBtn = document.querySelector('button[onclick*="ptScanBarcodeAddItem"]');
+        if(isVisible(scanBtn)) addEl(scanBtn);
+
+        // 4. Item rows — for each row: item-name, qty, price (sell value)
+        var itemRows = document.querySelectorAll('.pt-item-row');
+        itemRows.forEach(function(row){
+          var nameInp = row.querySelector('.pt-item-name');
+          var qtyInp  = row.querySelector('.pt-item-qty');
+          var priceInp= row.querySelector('.pt-item-price');
+          if(isVisible(nameInp))  zones.push(nameInp);
+          if(isVisible(qtyInp))   zones.push(qtyInp);
+          if(isVisible(priceInp)) zones.push(priceInp);
+        });
+
+        // 5. Add Item button
+        var addItemBtn = document.querySelector('button[onclick*="ptAddItemRow"]');
+        if(isVisible(addItemBtn)) addEl(addItemBtn);
+
+        // 6. Bill number
+        addSel('#pt-bill');
+
+        // 7. Change Date / Manual toggle button
+        addSel('#pt-manual-toggle');
+
+        // 8. Datetime input (only if visible — after clicking Change Date)
+        var ptDate = document.getElementById('pt-date');
+        if(isVisible(ptDate)) addEl(ptDate);
+
+        // 9. Notes
+        addSel('#pt-notes');
+
+        // 10. Payment mode buttons (Cash, UPI, NEFT, Cheque, Other)
+        var payBtns = document.querySelectorAll('#pt-mode-row button');
+        payBtns.forEach(function(btn){ if(isVisible(btn)) zones.push(btn); });
+
+        // 11. Add Sale submit button
+        addSel('#pt-sub');
+
+      } else {
+        // Borrow sub-view
+        addSel('#bw-search');
+
+        // Item rows in borrow (.bw-row-name, .bw-row-qty, .bw-row-price)
+        var bwRows = document.querySelectorAll('.bw-item-row');
+        bwRows.forEach(function(row){
+          var nameInp  = row.querySelector('.bw-row-name');
+          var qtyInp   = row.querySelector('.bw-row-qty');
+          var priceInp = row.querySelector('.bw-row-price');
+          if(isVisible(nameInp))  zones.push(nameInp);
+          if(isVisible(qtyInp))   zones.push(qtyInp);
+          if(isVisible(priceInp)) zones.push(priceInp);
+        });
+
+        // Add Item button
+        var bwAddBtn = document.querySelector('button[onclick*="bwAddItemRow"]');
+        if(isVisible(bwAddBtn)) addEl(bwAddBtn);
+
+        addSel('#bw-amt');
+        addSel('#bw-date');
+        addSel('#bw-due');
+        addSel('#bw-sub');
+      }
+
+    } else if(tab === 1){
+      // Customer LIST view zones (top to bottom):
+      // 1. Add Customer button
+      var addCustBtn = document.querySelector('button[onclick*="openAddModal"]');
+      addEl(addCustBtn);
+      // 2. Search bar
+      addSel('#cust-search');
+      // GST and Date pills handled separately via Left/Right + direct Up/Down logic
+      // Customer rows handled via getRows() + rowFocused
+
+      // Customer PROFILE view zones:
+      addSel('#cp-search');
+      var cpModeBtns = document.querySelectorAll('button[onclick*="cpSetMode"]');
+      cpModeBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      addSel('#cp-date-from');
+      addSel('#cp-date-to');
+      addSel('#cp-amt-exact');
+      addSel('#cp-amt-min');
+      addSel('#cp-amt-max');
+
+    } else if(tab === 2){
+      // Creditors tab — list view OR creditor detail OR tx bill detail
+      var txDetailPage = window._scDetailPage && window._scDetailPage.type === 'txBillDetail';
+      var crDetailOpen = !txDetailPage && !!document.getElementById('cr-tx-search');
+      if(txDetailPage){
+        // Tx bill detail action buttons (top to bottom)
+        var txDetailBtns = Array.from(document.querySelectorAll(
+          '#tab-content button[onclick*="openEditTxModal"], #tab-content button[onclick*="printTxBill"], #tab-content button[onclick*="openEwayBillHelper"], #tab-content button[onclick*="showEditHistoryModal"], #tab-content button[onclick*="openRequestAgainModal"], #tab-content button[onclick*="deleteCrTx"], #tab-content button[onclick*="deleteDebtTx"]'
+        ));
+        txDetailBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      } else if(crDetailOpen){
+        // Creditor detail page zones — header action buttons first, then search/nav/pills
+        // Header: Purchase, Payment, Return, WhatsApp
+        var crHdrBtns = Array.from(document.querySelectorAll('#tab-content button[onclick*="openAddTxModal"], #tab-content a[href*="wa.me"]'));
+        crHdrBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+        // Header: Print, Edit, Edit History
+        var crMgmtBtns = Array.from(document.querySelectorAll('#tab-content button[onclick*="printCreditorStatement"], #tab-content button[onclick*="openAddCreditorModal"], #tab-content button[onclick*="showEditHistoryModal"]'));
+        crMgmtBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+        // Search bar
+        addSel('#cr-tx-search');
+        // Month nav buttons and Custom button
+        var crNavBtns = Array.from(document.querySelectorAll('button[onclick*="_crTxShiftMonth"], button[onclick*="_crTxToggleCustomRange"]'));
+        crNavBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+        // Custom date range inputs
+        addSel('#cr-tx-from');
+        addSel('#cr-tx-to');
+        // Filter pills (All/Purchase/Payment/Return)
+        var crFilterBtns = Array.from(document.querySelectorAll('button[id^="cr-tf-"]'));
+        crFilterBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      } else {
+        // Creditor list view
+        var addCrBtn = document.querySelector('button[onclick*="openAddCreditorModal"]');
+        addEl(addCrBtn);
+        var crSearch = document.querySelector('#tab-content input[placeholder*="earch"]');
+        addEl(crSearch);
+        // GST pills handled via Left/Right + Up/Down logic
+      }
+
+    } else if(tab === 3){
+      // Debtors tab — list view OR debtor detail OR tx bill detail
+      var txDetailPage3 = window._scDetailPage && window._scDetailPage.type === 'txBillDetail';
+      var drDetailOpen = !txDetailPage3 && !!document.getElementById('dr-tx-search');
+      if(txDetailPage3){
+        // Tx bill detail action buttons
+        var txDetailBtns3 = Array.from(document.querySelectorAll(
+          '#tab-content button[onclick*="openEditTxModal"], #tab-content button[onclick*="printTxBill"], #tab-content button[onclick*="openEwayBillHelper"], #tab-content button[onclick*="showEditHistoryModal"], #tab-content button[onclick*="openRequestAgainModal"], #tab-content button[onclick*="deleteCrTx"], #tab-content button[onclick*="deleteDebtTx"]'
+        ));
+        txDetailBtns3.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      } else if(drDetailOpen){
+        // Debtor detail page zones — header action buttons first
+        // Header: Sale, Receipt, Return
+        var drHdrBtns = Array.from(document.querySelectorAll('#tab-content button[onclick*="openAddDebtTxModal"]'));
+        drHdrBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+        // Header: Remind (WhatsApp), Print, Edit, Edit History
+        var drMgmtBtns = Array.from(document.querySelectorAll('#tab-content a[href*="wa.me"], #tab-content button[onclick*="printDebtorStatement"], #tab-content button[onclick*="openAddDebtorModal"], #tab-content button[onclick*="showEditHistoryModal"]'));
+        drMgmtBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+        // Search bar
+        addSel('#dr-tx-search');
+        var drNavBtns = Array.from(document.querySelectorAll('button[onclick*="_drTxShiftMonth"], button[onclick*="_drTxToggleCustomRange"]'));
+        drNavBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+        addSel('#dr-tx-from');
+        addSel('#dr-tx-to');
+        var drFilterBtns = Array.from(document.querySelectorAll('button[id^="dr-tf-"]'));
+        drFilterBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      } else {
+        // Debtor list view
+        var addDrBtn = document.querySelector('button[onclick*="openAddDebtorModal"]');
+        addEl(addDrBtn);
+        var dSearch = document.querySelector('#tab-content input[placeholder*="earch"]');
+        addEl(dSearch);
+        // GST pills handled via Left/Right + Up/Down logic
+      }
+
+    } else if(tab === 4){
+      // Inventory tab — multiple sub-views
+      var iView = (typeof invView !== 'undefined') ? invView : 'stock';
+      if(iView === 'detail'){
+        // Item detail: back btn, edit div, history btn first (header area)
+        var invDetailHdrBtns = Array.from(document.querySelectorAll(
+          '#tab-content button[onclick*="invView=\'stock\'"], #tab-content div[onclick*="invEditSellPrice"], #tab-content button[onclick*="invShowItemEditHistory"]'
+        ));
+        invDetailHdrBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+        // Then sub-tab buttons (History / Customers)
+        var invDetailTabBtns = Array.from(document.querySelectorAll('button[onclick*="invDetailSwitchTab"]'));
+        invDetailTabBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+        // Then search inputs inside active sub-tab
+        addSel('#inv-hist-search');
+        addSel('#inv-cust-search');
+      } else if(iView === 'category'){
+        addSel('#inv-cat-search-box');
+      } else if(iView === 'stock'){
+        addSel('#inv-search-box');
+      } else if(iView === 'add'){
+        addSel('#inv-name');
+        addSel('#inv-category');
+        addSel('#inv-unit');
+        addSel('#inv-sell-price');
+        addSel('#inv-min-stock');
+        addSel('#inv-gst-rate');
+        addSel('#inv-hsn-add');
+        addSel('#inv-barcode-add');
+        addSel('#inv-opening-qty');
+        addSel('#inv-opening-cost');
+        var invSaveBtn = document.querySelector('#tab-content button[onclick*="invSubmitAdd"]');
+        addEl(invSaveBtn);
+      } else if(iView === 'log'){
+        var logSearch = document.querySelector('#tab-content input[placeholder*="earch"]');
+        addEl(logSearch);
+      }
+
+    } else if(tab === 5){
+      // Expenses tab — form always at top, list below
+      addSel('#exp-cat');
+      addSel('#exp-amt');
+      addSel('#exp-note');
+      addSel('#exp-date');
+      var expModeBtns = Array.from(document.querySelectorAll('#exp-mode-row button'));
+      expModeBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      var expSaveBtn = document.querySelector('#tab-content button[onclick*="expSaveFromForm"]');
+      addEl(expSaveBtn);
+      addSel('#exp-search');
+
+    } else if(tab === 6){
+      // Analytics — export buttons and date pickers
+      var anaInputs = Array.from(document.querySelectorAll(
+        '#tab-content input[type="date"], #tab-content select'
+      ));
+      anaInputs.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      var anaExportBtns = Array.from(document.querySelectorAll(
+        '#tab-content button[onclick*="xport"]'
+      ));
+      anaExportBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      if(!zones.length){
+        var anaFirst = document.querySelector('#tab-content input, #tab-content select, #tab-content button:not([disabled])');
+        addEl(anaFirst);
+      }
+
+    } else if(tab === 7){
+      // Compare — date/period selectors and export
+      var cmpInputs = Array.from(document.querySelectorAll(
+        '#tab-content input[type="date"], #tab-content select'
+      ));
+      cmpInputs.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      var cmpExportBtns = Array.from(document.querySelectorAll(
+        '#tab-content button[onclick*="xport"]'
+      ));
+      cmpExportBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      if(!zones.length){
+        var cmpFirst = document.querySelector('#tab-content input, #tab-content select, #tab-content button:not([disabled])');
+        addEl(cmpFirst);
+      }
+
+    } else if(tab === 8){
+      // Rankings (Leaderboard) — search, filter, sort
+      var rankSearch = document.querySelector('#tab-content input[type="text"], #tab-content input[type="search"]');
+      addEl(rankSearch);
+      var rankFilters = Array.from(document.querySelectorAll('#tab-content select'));
+      rankFilters.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+
+    } else if(tab === 9){
+      // Messages — message input and send button
+      addSel('#sc-msg-input');
+      var msgSendBtn = document.querySelector('#tab-content button[onclick*="scSendMessage"]');
+      addEl(msgSendBtn);
+
+    } else if(tab === 10){
+      // History — date picker and search
+      addSel('#hist-date-picker');
+      addSel('#hist-search-box');
+
+    } else if(tab === 11){
+      // Alerts — search or filter inputs
+      var alertSearch = document.querySelector('#tab-content input[type="text"], #tab-content input[type="search"]');
+      addEl(alertSearch);
+      var alertBtns = Array.from(document.querySelectorAll('#tab-content button[onclick*="invView"]'));
+      alertBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+
+    } else if(tab === 12){
+      // Settings — all text inputs, selects, textareas
+      var settingsFields = Array.from(document.querySelectorAll(
+        '#tab-content input:not([type="hidden"]):not([type="checkbox"]), #tab-content select, #tab-content textarea'
+      ));
+      settingsFields.forEach(function(f){ if(isVisible(f)) zones.push(f); });
+      var settingsBtns = Array.from(document.querySelectorAll(
+        '#tab-content button[onclick*="save"], #tab-content button[onclick*="Save"], #tab-content button[onclick*="submit"]'
+      ));
+      settingsBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+
+    } else if(tab === 13){
+      // Team — invite inputs and action buttons
+      var teamFields = Array.from(document.querySelectorAll(
+        '#tab-content input:not([type="hidden"]), #tab-content select'
+      ));
+      teamFields.forEach(function(f){ if(isVisible(f)) zones.push(f); });
+      var teamBtns = Array.from(document.querySelectorAll(
+        '#tab-content button[onclick*="nvite"], #tab-content button[onclick*="addTeam"], #tab-content button[onclick*="removeTeam"], #tab-content button[onclick*="Team"]'
+      ));
+      teamBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+
+    } else {
+      // Generic fallback
+      var genericSearch = document.querySelector(
+        '#tab-content input[type="text"][placeholder*="earch"],' +
+        '#tab-content input[type="search"],' +
+        '#cust-search,#inv-search-box,#exp-search,#pt-search,#bw-search'
+      );
+      addEl(genericSearch);
     }
 
     return zones;
+  }
+
+  // Advance zone focus by delta (+1 = down, -1 = up), wrapping not applied.
+  function advanceZone(delta){
+    var zones = getTabFocusZones();
+    if(zones.length === 0) return false;
+
+    // Find which zone is currently focused by activeElement
+    var active = document.activeElement;
+    var curIdx = zones.indexOf(active);
+
+    if(curIdx === -1){
+      // Nothing focused yet — pick first (down) or last (up)
+      zoneIdx = delta > 0 ? 0 : zones.length - 1;
+    } else {
+      zoneIdx = curIdx + delta;
+    }
+
+    if(zoneIdx < 0 || zoneIdx >= zones.length) return false; // out of bounds, let caller handle
+
+    var target = zones[zoneIdx];
+    target.focus();
+    if(target.select) target.select();
+    target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    return true;
   }
 
   // ─── Main keyboard handler ────────────────────────────────────────────────
@@ -3769,16 +4185,127 @@ window.addEventListener('load', () => {
     var inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
                || (document.activeElement && document.activeElement.isContentEditable);
 
+    // ── Detect if a modal is currently open ──
+    var modalContainer = document.getElementById('modal-container');
+    var modalOpen = modalContainer && modalContainer.innerHTML.trim().length > 0;
+
     // ── Escape: always works ──
     if(e.key === 'Escape'){
+      // 1. Sidebar mode — highest priority
       if(navMode === 'sidebar'){
         e.preventDefault(); exitSidebarMode(); return;
       }
-      if(typeof closeModal === 'function') closeModal();
+      // 2. More menu (mobile)
+      var _moreMenu = document.getElementById('more-menu');
+      if(_moreMenu && _moreMenu.classList.contains('open')){
+        e.preventDefault();
+        if(typeof closeMoreMenu === 'function') closeMoreMenu();
+        return;
+      }
+      // 3. Modal
+      if(modalOpen){
+        e.preventDefault();
+        if(typeof closeModal === 'function') closeModal();
+        return;
+      }
+      // 4. Customer page overlay
+      var _custPg = document.getElementById('customer-page');
+      if(_custPg && _custPg.style.display !== 'none' && _custPg.style.display !== ''){
+        e.preventDefault();
+        if(typeof closeCustomerPage === 'function') closeCustomerPage();
+        return;
+      }
+      // 5. Blur focused input (if inside a zone)
+      if(inInput && zoneIdx >= 0){
+        e.preventDefault();
+        document.activeElement.blur();
+        zoneIdx = -1;
+        return;
+      }
+      // 6. Inventory sub-view back navigation (uses invView state, not _pageStack)
+      if(typeof invView !== 'undefined' && typeof currentTab !== 'undefined' && currentTab === 4){
+        if(invView === 'detail' || invView === 'category'){
+          e.preventDefault();
+          invView = 'stock'; invDetailItem = null;
+          if(typeof safeRenderTab === 'function') safeRenderTab(currentTab);
+          setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 100);
+          return;
+        }
+        if(invView === 'add'){
+          e.preventDefault();
+          invView = 'stock'; window.invPrefillName = '';
+          if(typeof safeRenderTab === 'function') safeRenderTab(currentTab);
+          setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 100);
+          return;
+        }
+      }
+      // 7. Page stack back navigation (creditor/debtor detail pages)
       if(typeof goBack === 'function' && window._pageStack && window._pageStack.length){
         e.preventDefault(); goBack(); return;
       }
       return;
+    }
+
+    // ── When modal is open: scope all navigation inside modal ──
+    if(modalOpen){
+      if((e.ctrlKey || e.altKey) && e.key.toLowerCase() === 'f'){
+        e.preventDefault();
+        focusSearchBox();
+        return;
+      }
+      if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+        var isDownM = e.key === 'ArrowDown';
+        var modalRows = Array.from(modalContainer.querySelectorAll('[data-sc-row]')).filter(function(el){ return el.offsetParent !== null; });
+        if(modalRows.length > 0 && rowFocused && modalContainer.contains(rowFocused)){
+          e.preventDefault();
+          var mRIdx = modalRows.indexOf(rowFocused);
+          if(isDownM) setRowFocus(modalRows[mRIdx + 1 < modalRows.length ? mRIdx + 1 : 0]);
+          else        setRowFocus(modalRows[mRIdx - 1 >= 0 ? mRIdx - 1 : modalRows.length - 1]);
+          return;
+        }
+        var modalFocusables = Array.from(modalContainer.querySelectorAll(
+          'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
+        )).filter(function(el){ return el.offsetParent !== null; });
+        if(modalFocusables.length > 0){
+          e.preventDefault();
+          var mActive = document.activeElement;
+          var mFIdx = modalFocusables.indexOf(mActive);
+          if(mFIdx === -1) mFIdx = isDownM ? -1 : modalFocusables.length;
+          var mFNext = mFIdx + (isDownM ? 1 : -1);
+          if(mFNext >= 0 && mFNext < modalFocusables.length){
+            var mTarget = modalFocusables[mFNext];
+            mTarget.focus();
+            if(mTarget.tagName === 'INPUT' || mTarget.tagName === 'TEXTAREA') mTarget.select();
+          }
+          return;
+        }
+      }
+      if(e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
+        var isRightM = e.key === 'ArrowRight';
+        var focM = document.activeElement;
+        if(focM && focM.tagName === 'BUTTON' && modalContainer.contains(focM)){
+          var sibBtns = Array.from(focM.parentElement.querySelectorAll('button:not([disabled])')).filter(function(b){ return b.offsetParent !== null; });
+          var sibIdx = sibBtns.indexOf(focM);
+          if(sibIdx >= 0 && sibBtns.length > 1){
+            e.preventDefault();
+            var sibNext = isRightM ? Math.min(sibIdx+1, sibBtns.length-1) : Math.max(sibIdx-1, 0);
+            sibBtns[sibNext].focus();
+            sibBtns[sibNext].click();
+            return;
+          }
+        }
+        if(inInput) return;
+      }
+      if(e.key === 'Enter'){
+        var focME = document.activeElement;
+        if(focME && focME.tagName === 'BUTTON' && modalContainer.contains(focME)){
+          e.preventDefault(); focME.click(); return;
+        }
+        if(rowFocused && modalContainer.contains(rowFocused)){
+          e.preventDefault(); rowFocused.click(); return;
+        }
+      }
+      return; // block all other shortcuts when modal open
     }
 
     // ── Ctrl+F / Alt+F: focus search (works even from input) ──
@@ -3786,8 +4313,8 @@ window.addEventListener('load', () => {
       e.preventDefault(); focusSearchBox(); return;
     }
 
-    // ── Everything below: skip when typing in input ──
-    if(inInput) return;
+    // ── Everything below: skip when typing in input (EXCEPT arrow keys which handle inInput themselves) ──
+    if(inInput && e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
 
     // ── Sidebar navigation mode ──
     if(navMode === 'sidebar'){
@@ -3822,6 +4349,57 @@ window.addEventListener('load', () => {
       return;
     }
 
+    // ── Context shortcuts: Creditor/Debtor detail page ──────────────────────
+    // Unique keys — zero overlap with tab shortcuts (m,h,a,s,t) or each other
+    // Creditor/Debtor detail: Alt+N=New tx, Alt+V=Payment, Alt+R=Return,
+    //   Alt+W=WhatsApp, Alt+P=Print, Alt+E=Edit, Alt+G=History (G=log/history)
+    // Tx bill detail: Alt+E=Edit entry, Alt+B=View Bill, Alt+G=History, Alt+D=Delete
+    var _dp = window._scDetailPage;
+    if(_dp && (_dp.type === 'creditor' || _dp.type === 'debtor') && !inInput){
+      var _isCrDp = (_dp.type === 'creditor');
+      var _dpKey  = e.key.toLowerCase();
+      if(e.altKey && _dpKey === 'p'){ e.preventDefault(); var _pBtn=document.querySelector('#tab-content button[onclick*="printCreditorStatement"],#tab-content button[onclick*="printDebtorStatement"]'); if(_pBtn)_pBtn.click(); return; }
+      if(e.altKey && _dpKey === 'e'){ e.preventDefault(); var _eBtn=document.querySelector('#tab-content button[onclick*="openAddCreditorModal"],#tab-content button[onclick*="openAddDebtorModal"]'); if(_eBtn)_eBtn.click(); return; }
+      if(e.altKey && _dpKey === 'g'){ e.preventDefault(); var _hBtn=document.querySelector('#tab-content button[onclick*="showEditHistoryModal"]'); if(_hBtn)_hBtn.click(); return; }
+      if(e.altKey && _dpKey === 'w'){ e.preventDefault(); var _wLink=document.querySelector('#tab-content a[href*="wa.me"],#tab-content a[href*="whatsapp"]'); if(_wLink)_wLink.click(); return; }
+      // Creditor: Alt+N=Purchase, Alt+V=Payment, Alt+R=Return
+      if(_isCrDp){
+        if(e.altKey && _dpKey === 'n'){ e.preventDefault(); var _b1=document.querySelector('#tab-content button[onclick*="openAddTxModal"][onclick*="purchase"]'); if(_b1)_b1.click(); return; }
+        if(e.altKey && _dpKey === 'v'){ e.preventDefault(); var _b2=document.querySelector('#tab-content button[onclick*="openAddTxModal"][onclick*="payment"]'); if(_b2)_b2.click(); return; }
+        if(e.altKey && _dpKey === 'r'){ e.preventDefault(); var _b3=document.querySelector('#tab-content button[onclick*="openAddTxModal"][onclick*="return"]'); if(_b3)_b3.click(); return; }
+      }
+      // Debtor: Alt+N=Sale, Alt+V=Receipt, Alt+R=Return
+      if(!_isCrDp){
+        if(e.altKey && _dpKey === 'n'){ e.preventDefault(); var _d1=document.querySelector('#tab-content button[onclick*="openAddDebtTxModal"][onclick*="sale"]'); if(_d1)_d1.click(); return; }
+        if(e.altKey && _dpKey === 'v'){ e.preventDefault(); var _d2=document.querySelector('#tab-content button[onclick*="openAddDebtTxModal"][onclick*="payment"]'); if(_d2)_d2.click(); return; }
+        if(e.altKey && _dpKey === 'r'){ e.preventDefault(); var _d3=document.querySelector('#tab-content button[onclick*="openAddDebtTxModal"][onclick*="return"]'); if(_d3)_d3.click(); return; }
+      }
+    }
+    // ── Context shortcuts: Inventory detail page (Alt+E=Edit, Alt+R=Restock, Alt+G=History) ──
+    if(typeof currentTab !== 'undefined' && currentTab === 4 && typeof invView !== 'undefined' && invView === 'detail' && !inInput){
+      var _invKey = e.key.toLowerCase();
+      if(e.altKey && _invKey === 'e'){ e.preventDefault();
+        var _invEditBtn = document.querySelector('#tab-content button[onclick*="invEditSellPrice"], #tab-content div[onclick*="invEditSellPrice"]');
+        if(_invEditBtn) _invEditBtn.click(); return; }
+      if(e.altKey && _invKey === 'r'){ e.preventDefault();
+        // Restock = switch to add view with prefill
+        if(typeof invDetailItem !== 'undefined' && invDetailItem){ window.invPrefillName = invDetailItem; invView = 'add'; if(typeof safeRenderTab === 'function') safeRenderTab(currentTab); } return; }
+      if(e.altKey && _invKey === 'g'){ e.preventDefault();
+        var _invHBtn = document.querySelector('#tab-content button[onclick*="invShowItemEditHistory"]');
+        if(_invHBtn) _invHBtn.click(); return; }
+      if(e.altKey && _invKey === 'b'){ e.preventDefault();
+        if(typeof invView !== 'undefined'){ invView = 'stock'; invDetailItem = null; if(typeof safeRenderTab === 'function') safeRenderTab(currentTab); } return; }
+    }
+
+    // ── Context shortcuts: Tx bill detail page ───────────────────────────────
+    if(_dp && _dp.type === 'txBillDetail' && !inInput){
+      var _tdKey = e.key.toLowerCase();
+      if(e.altKey && _tdKey === 'e'){ e.preventDefault(); var _teBtn=document.querySelector('#tab-content button[onclick*="openEditTxModal"]'); if(_teBtn)_teBtn.click(); return; }
+      if(e.altKey && _tdKey === 'b'){ e.preventDefault(); var _tpBtn=document.querySelector('#tab-content button[onclick*="printTxBill"]'); if(_tpBtn)_tpBtn.click(); return; }
+      if(e.altKey && _tdKey === 'g'){ e.preventDefault(); var _thBtn=document.querySelector('#tab-content button[onclick*="showEditHistoryModal"]'); if(_thBtn)_thBtn.click(); return; }
+      if(e.altKey && _tdKey === 'd'){ e.preventDefault(); var _tdBtn=document.querySelector('#tab-content button[onclick*="deleteCrTx"],#tab-content button[onclick*="deleteDebtTx"]'); if(_tdBtn&&confirm('Delete this entry?'))_tdBtn.click(); return; }
+    }
+
     // ── Alt+key: tab shortcuts ──
     if(e.altKey && !e.ctrlKey && !e.metaKey){
       var key = e.key.toLowerCase();
@@ -3830,20 +4408,6 @@ window.addEventListener('load', () => {
         var TABS2 = typeof getTabs === 'function' ? getTabs() : [];
         if(TABS2.find(function(t){ return t.index === map[key]; })){ e.preventDefault(); exitSidebarMode(); if(typeof switchTab === 'function') switchTab(map[key]); }
       }
-      return;
-    }
-
-    // ── Left/Right: sub-function navigation ──
-    if(e.key === 'ArrowLeft'){
-      e.preventDefault();
-      window._scClearRowFocus();
-      navigateSubFunc(-1);
-      return;
-    }
-    if(e.key === 'ArrowRight'){
-      e.preventDefault();
-      window._scClearRowFocus();
-      navigateSubFunc(1);
       return;
     }
 
@@ -3860,34 +4424,472 @@ window.addEventListener('load', () => {
     if(e.key === 'Home'){ e.preventDefault(); doScrollTo('top'); return; }
     if(e.key === 'End'){  e.preventDefault(); doScrollTo('end'); return; }
 
-    // ── Up/Down: data row navigation ──
-    if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
-      var list = getRows();
+    // ── Arrow navigation: 2D grid-aware ──────────────────────────────────────
+    // Left/Right = horizontal within a row (qty ↔ price), OR sub-function if not in item row
+    // Down/Up    = vertical between rows/zones
+    // Sub-function switch ONLY when not inside any item row input
 
-      if(list.length > 0 && rowFocused){
-        // Navigate among rows
+    if(e.key === 'ArrowRight' || e.key === 'ArrowLeft'){
+      var isRight = (e.key === 'ArrowRight');
+
+      // Sidebar mode: Right exits sidebar
+      if(navMode === 'sidebar'){
         e.preventDefault();
-        var idx = list.indexOf(rowFocused);
-        if(e.key === 'ArrowDown') setRowFocus(list[idx + 1 < list.length ? idx + 1 : 0]);
-        else                       setRowFocus(list[idx - 1 >= 0 ? idx - 1 : list.length - 1]);
+        if(isRight) exitSidebarMode();
         return;
       }
 
-      // No rows or no row focused — try zone navigation
-      if(e.key === 'ArrowDown'){
-        // Try to focus mode toggle or search box
-        var zones = getTabFocusZones();
-        if(zones.length > 0){
-          e.preventDefault();
-          zones[0].focus();
-          if(zones[0].select) zones[0].select();
-          return;
+      var focEl = document.activeElement;
+
+      // Inside a pt-item-row → move horizontally
+      var ptItemR = focEl ? focEl.closest('.pt-item-row') : null;
+      if(ptItemR){
+        e.preventDefault();
+        var rName  = ptItemR.querySelector('.pt-item-name');
+        var rQty   = ptItemR.querySelector('.pt-item-qty');
+        var rPrice = ptItemR.querySelector('.pt-item-price');
+        if(isRight){
+          if(focEl === rName  && rQty)  { rQty.focus(); rQty.select(); }
+          else if(focEl === rQty && rPrice){ rPrice.focus(); rPrice.select(); }
+        } else {
+          if(focEl === rPrice && rQty){ rQty.focus(); rQty.select(); }
+          else if(focEl === rQty && rName){ rName.focus(); }
         }
+        return;
       }
 
-      // Fallback: scroll
+      // Inside a bw-item-row → move horizontally
+      var bwItemR = focEl ? focEl.closest('.bw-item-row') : null;
+      if(bwItemR){
+        e.preventDefault();
+        var bName  = bwItemR.querySelector('.bw-row-name');
+        var bQty   = bwItemR.querySelector('.bw-row-qty');
+        var bPrice = bwItemR.querySelector('.bw-row-price');
+        if(isRight){
+          if(focEl === bName && bQty)     { bQty.focus(); bQty.select(); }
+          else if(focEl === bQty && bPrice){ bPrice.focus(); bPrice.select(); }
+        } else {
+          if(focEl === bPrice && bQty){ bQty.focus(); bQty.select(); }
+          else if(focEl === bQty && bName){ bName.focus(); }
+        }
+        return;
+      }
+
+      // Payment mode buttons (Cash/UPI/NEFT/Cheque/Other) → cycle between them, never switch sub-function
+      var ptModeRow = document.getElementById('pt-mode-row');
+      if(ptModeRow && ptModeRow.contains(focEl)){
+        e.preventDefault();
+        var modeBtns = Array.from(ptModeRow.querySelectorAll('button'));
+        var mIdx = modeBtns.indexOf(focEl);
+        if(mIdx >= 0){
+          var nMIdx = isRight ? Math.min(mIdx+1, modeBtns.length-1) : Math.max(mIdx-1, 0);
+          modeBtns[nMIdx].focus();
+          modeBtns[nMIdx].click();
+        }
+        return;
+      }
+
+      // Expense payment mode buttons (Cash/UPI/NEFT/Cheque/Other) → cycle between them
+      var expModeRow = document.getElementById('exp-mode-row');
+      if(expModeRow && expModeRow.contains(focEl)){
+        e.preventDefault();
+        var expBtns = Array.from(expModeRow.querySelectorAll('button'));
+        var emIdx = expBtns.indexOf(focEl);
+        if(emIdx >= 0){
+          var nEmIdx = isRight ? Math.min(emIdx+1, expBtns.length-1) : Math.max(emIdx-1, 0);
+          expBtns[nEmIdx].focus();
+          expBtns[nEmIdx].click();
+        }
+        return;
+      }
+
+      // Filter pill rows (GST pills, date pills) → cycle Left/Right within same group
+      var allGstPills = Array.from(document.querySelectorAll('button[onclick*="setCustGstFilter"]')).filter(function(b){ return b.offsetParent !== null; });
+      var allDatePills = Array.from(document.querySelectorAll('button[onclick*="setCustDateFilter"], button[onclick*="cust-date-picker"]')).filter(function(b){ return b.offsetParent !== null; });
+      var gstPillIdx = allGstPills.indexOf(focEl);
+      if(gstPillIdx >= 0){
+        e.preventDefault();
+        var ng = isRight ? Math.min(gstPillIdx+1, allGstPills.length-1) : Math.max(gstPillIdx-1, 0);
+        allGstPills[ng].click();
+        // Re-query after re-render and focus by index
+        setTimeout(function(){
+          var fresh = Array.from(document.querySelectorAll('button[onclick*="setCustGstFilter"]')).filter(function(b){ return b.offsetParent !== null; });
+          if(fresh[ng]) fresh[ng].focus();
+        }, 50);
+        return;
+      }
+      var dtPillIdx = allDatePills.indexOf(focEl);
+      if(dtPillIdx >= 0){
+        e.preventDefault();
+        var nd = isRight ? Math.min(dtPillIdx+1, allDatePills.length-1) : Math.max(dtPillIdx-1, 0);
+        allDatePills[nd].click();
+        // Re-query after re-render and focus by index
+        setTimeout(function(){
+          var fresh = Array.from(document.querySelectorAll('button[onclick*="setCustDateFilter"], button[onclick*="cust-date-picker"]')).filter(function(b){ return b.offsetParent !== null; });
+          if(fresh[nd]) fresh[nd].focus();
+        }, 50);
+        return;
+      }
+      // Creditor GST filter pills
+      var allCrGstPills = Array.from(document.querySelectorAll('button[onclick*="_credGstFilter"]')).filter(function(b){ return b.offsetParent !== null; });
+      var crGstIdx = allCrGstPills.indexOf(focEl);
+      if(crGstIdx >= 0){
+        e.preventDefault();
+        var ncg = isRight ? Math.min(crGstIdx+1, allCrGstPills.length-1) : Math.max(crGstIdx-1, 0);
+        allCrGstPills[ncg].click();
+        setTimeout(function(){
+          var fresh = Array.from(document.querySelectorAll('button[onclick*="_credGstFilter"]')).filter(function(b){ return b.offsetParent !== null; });
+          if(fresh[ncg]) fresh[ncg].focus();
+        }, 50);
+        return;
+      }
+      // Debtor GST filter pills
+      var allDrGstPills = Array.from(document.querySelectorAll('button[onclick*="_debtGstFilter"]')).filter(function(b){ return b.offsetParent !== null; });
+      var drGstIdx = allDrGstPills.indexOf(focEl);
+      if(drGstIdx >= 0){
+        e.preventDefault();
+        var ndg = isRight ? Math.min(drGstIdx+1, allDrGstPills.length-1) : Math.max(drGstIdx-1, 0);
+        allDrGstPills[ndg].click();
+        setTimeout(function(){
+          var fresh = Array.from(document.querySelectorAll('button[onclick*="_debtGstFilter"]')).filter(function(b){ return b.offsetParent !== null; });
+          if(fresh[ndg]) fresh[ndg].focus();
+        }, 50);
+        return;
+      }
+
+      var cpModeBtnsLR = Array.from(document.querySelectorAll('button[onclick*="cpSetMode"]')).filter(function(b){ return b.offsetParent !== null; });
+      var cpModeIdxLR = cpModeBtnsLR.indexOf(focEl);
+      if(cpModeIdxLR >= 0){
+        e.preventDefault();
+        var nm = isRight ? Math.min(cpModeIdxLR+1, cpModeBtnsLR.length-1) : Math.max(cpModeIdxLR-1, 0);
+        cpModeBtnsLR[nm].focus(); cpModeBtnsLR[nm].click(); return;
+      }
+
+      // Creditor detail filter pills (All/Purchase/Payment/Return) ← →
+      var allCrTfPills = Array.from(document.querySelectorAll('button[id^="cr-tf-"]')).filter(function(b){ return b.offsetParent !== null; });
+      var crTfIdx = allCrTfPills.indexOf(focEl);
+      if(crTfIdx >= 0){
+        e.preventDefault();
+        var nct = isRight ? Math.min(crTfIdx+1, allCrTfPills.length-1) : Math.max(crTfIdx-1, 0);
+        allCrTfPills[nct].click();
+        setTimeout(function(){
+          var fresh = Array.from(document.querySelectorAll('button[id^="cr-tf-"]')).filter(function(b){ return b.offsetParent !== null; });
+          if(fresh[nct]) fresh[nct].focus();
+        }, 50);
+        return;
+      }
+
+      // Debtor detail filter pills (All/Sale/Receipt/Return) ← →
+      var allDrTfPills = Array.from(document.querySelectorAll('button[id^="dr-tf-"]')).filter(function(b){ return b.offsetParent !== null; });
+      var drTfIdx = allDrTfPills.indexOf(focEl);
+      if(drTfIdx >= 0){
+        e.preventDefault();
+        var ndt = isRight ? Math.min(drTfIdx+1, allDrTfPills.length-1) : Math.max(drTfIdx-1, 0);
+        allDrTfPills[ndt].click();
+        setTimeout(function(){
+          var fresh = Array.from(document.querySelectorAll('button[id^="dr-tf-"]')).filter(function(b){ return b.offsetParent !== null; });
+          if(fresh[ndt]) fresh[ndt].focus();
+        }, 50);
+        return;
+      }
+
+      // Not in item row → sub-function switch or sidebar (only if NOT typing in an input)
+      if(inInput) return; // let cursor move left/right inside the text field
       e.preventDefault();
-      doScroll(e.key === 'ArrowDown' ? 80 : -80);
+      window._scClearRowFocus();
+      zoneIdx = -1;
+      navigateSubFunc(isRight ? 1 : -1);
+      return;
+    }
+
+    if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+      var isDown = (e.key === 'ArrowDown');
+      var focEl2 = document.activeElement;
+
+      // Data row list navigation (sc-row)
+      var list = getRows();
+      if(list.length > 0 && rowFocused){
+        e.preventDefault();
+        var rIdx = list.indexOf(rowFocused);
+        if(isDown){
+          setRowFocus(list[rIdx + 1 < list.length ? rIdx + 1 : 0]);
+        } else {
+          if(rIdx - 1 >= 0){
+            setRowFocus(list[rIdx - 1]);
+          } else {
+            // At first row — exit rows, go up to pills/search based on current tab
+            window._scClearRowFocus();
+            var tabUp = typeof currentTab !== 'undefined' ? currentTab : -1;
+            if(tabUp === 1){
+              // Customers → date pills → GST pills → search
+              var datePillUp = document.querySelector('button[onclick*="setCustDateFilter"], button[onclick*="cust-date-picker"]');
+              if(datePillUp && datePillUp.offsetParent !== null){ datePillUp.focus(); }
+              else { var gstPillUp = document.querySelector('button[onclick*="setCustGstFilter"]'); if(gstPillUp && gstPillUp.offsetParent !== null) gstPillUp.focus(); else { var srchUp = document.getElementById('cust-search'); if(srchUp){ srchUp.focus(); srchUp.select(); } } }
+            } else if(tabUp === 2){
+              // Creditor detail → filter pills; Creditor list → GST pills → search
+              var crTfUp = document.querySelector('button[id^="cr-tf-"]');
+              if(crTfUp && crTfUp.offsetParent !== null){ crTfUp.focus(); }
+              else { var crGstUp = document.querySelector('button[onclick*="_credGstFilter"]'); if(crGstUp && crGstUp.offsetParent !== null){ crGstUp.focus(); } else { var crSUp = document.querySelector('#tab-content input[placeholder*="earch"], #cr-tx-search'); if(crSUp){ crSUp.focus(); crSUp.select(); } } }
+            } else if(tabUp === 3){
+              // Debtor detail → filter pills; Debtor list → search
+              var drTfUp = document.querySelector('button[id^="dr-tf-"]');
+              if(drTfUp && drTfUp.offsetParent !== null){ drTfUp.focus(); }
+              else { var dbSUp = document.querySelector('#tab-content input[placeholder*="earch"], #dr-tx-search'); if(dbSUp){ dbSUp.focus(); dbSUp.select(); } }
+            } else {
+              var mzUp2 = advanceZone(-1); if(!mzUp2) doScroll(-80);
+            }
+          }
+        }
+        return;
+      }
+
+      // Inside pt-item-row → move vertically
+      var ptR = focEl2 ? focEl2.closest('.pt-item-row') : null;
+      if(ptR){
+        e.preventDefault();
+        var pN = ptR.querySelector('.pt-item-name');
+        var pQ = ptR.querySelector('.pt-item-qty');
+        var pP = ptR.querySelector('.pt-item-price');
+        var allPtRows = Array.from(document.querySelectorAll('.pt-item-row'));
+        var ptRIdx = allPtRows.indexOf(ptR);
+        if(isDown){
+          // name → qty (same row)
+          if(focEl2 === pN && pQ){ pQ.focus(); pQ.select(); return; }
+          // qty or price → name of next row (or Add Item btn)
+          if(focEl2 === pQ || focEl2 === pP){
+            var nxPtRow = allPtRows[ptRIdx + 1];
+            if(nxPtRow){ var nxN = nxPtRow.querySelector('.pt-item-name'); if(nxN){ nxN.focus(); return; } }
+            var addPtBtn = document.querySelector('button[onclick*="ptAddItemRow"]');
+            if(addPtBtn){ addPtBtn.focus(); return; }
+          }
+        } else {
+          // qty → name (same row)
+          if(focEl2 === pQ && pN){ pN.focus(); return; }
+          // price → qty (same row)
+          if(focEl2 === pP && pQ){ pQ.focus(); pQ.select(); return; }
+          // name → price of prev row (or zone above)
+          if(focEl2 === pN){
+            var pvPtRow = allPtRows[ptRIdx - 1];
+            if(pvPtRow){ var pvP = pvPtRow.querySelector('.pt-item-price'); if(pvP){ pvP.focus(); pvP.select(); return; } }
+            var mz = advanceZone(-1); if(!mz) doScroll(-80);
+            return;
+          }
+        }
+        return;
+      }
+
+      // Inside bw-item-row → move vertically
+      var bwR2 = focEl2 ? focEl2.closest('.bw-item-row') : null;
+      if(bwR2){
+        e.preventDefault();
+        var bN = bwR2.querySelector('.bw-row-name');
+        var bQ = bwR2.querySelector('.bw-row-qty');
+        var bP = bwR2.querySelector('.bw-row-price');
+        var allBwR = Array.from(document.querySelectorAll('.bw-item-row'));
+        var bwRIdx2 = allBwR.indexOf(bwR2);
+        if(isDown){
+          if(focEl2 === bN && bQ){ bQ.focus(); bQ.select(); return; }
+          if(focEl2 === bQ || focEl2 === bP){
+            var nxBwR = allBwR[bwRIdx2 + 1];
+            if(nxBwR){ var nxBN = nxBwR.querySelector('.bw-row-name'); if(nxBN){ nxBN.focus(); return; } }
+            var addBwBtn = document.querySelector('button[onclick*="bwAddItemRow"]');
+            if(addBwBtn){ addBwBtn.focus(); return; }
+          }
+        } else {
+          if(focEl2 === bQ && bN){ bN.focus(); return; }
+          if(focEl2 === bP && bQ){ bQ.focus(); bQ.select(); return; }
+          if(focEl2 === bN){
+            var pvBwR = allBwR[bwRIdx2 - 1];
+            if(pvBwR){ var pvBP = pvBwR.querySelector('.bw-row-price'); if(pvBP){ pvBP.focus(); pvBP.select(); return; } }
+            var mz2 = advanceZone(-1); if(!mz2) doScroll(-80);
+            return;
+          }
+        }
+        return;
+      }
+
+      // Special case: "Add Item" button (pt) — Up → last item row's qty, Down → next zone
+      var addPtBtnFoc = document.querySelector('button[onclick*="ptAddItemRow"]');
+      if(focEl2 && focEl2 === addPtBtnFoc){
+        e.preventDefault();
+        if(!isDown){
+          var allPtR2 = Array.from(document.querySelectorAll('.pt-item-row'));
+          if(allPtR2.length > 0){
+            var lastPtRow = allPtR2[allPtR2.length - 1];
+            var lastPtQty = lastPtRow.querySelector('.pt-item-qty');
+            if(lastPtQty){ lastPtQty.focus(); lastPtQty.select(); return; }
+          }
+        }
+        var mzA = advanceZone(isDown ? 1 : -1); if(!mzA) doScroll(isDown ? 80 : -80);
+        return;
+      }
+
+      // Special case: "Add Item" button (bw) — Up → last borrow row's qty
+      var addBwBtnFoc = document.querySelector('button[onclick*="bwAddItemRow"]');
+      if(focEl2 && focEl2 === addBwBtnFoc){
+        e.preventDefault();
+        if(!isDown){
+          var allBwR3 = Array.from(document.querySelectorAll('.bw-item-row'));
+          if(allBwR3.length > 0){
+            var lastBwRow = allBwR3[allBwR3.length - 1];
+            var lastBwQty = lastBwRow.querySelector('.bw-row-qty');
+            if(lastBwQty){ lastBwQty.focus(); lastBwQty.select(); return; }
+          }
+        }
+        var mzB = advanceZone(isDown ? 1 : -1); if(!mzB) doScroll(isDown ? 80 : -80);
+        return;
+      }
+
+      // Payment mode buttons — Up/Down exits to zone above/below, not Left/Right
+      var ptModeRowUpDn = document.getElementById('pt-mode-row');
+      if(ptModeRowUpDn && ptModeRowUpDn.contains(focEl2)){
+        e.preventDefault();
+        var mzPay = advanceZone(isDown ? 1 : -1);
+        if(!mzPay) doScroll(isDown ? 80 : -80);
+        return;
+      }
+
+      // Customer list filter pills — Up/Down moves between groups
+      var onCustPill = focEl2 && focEl2.matches && (
+        focEl2.matches('button[onclick*="setCustGstFilter"]') ||
+        focEl2.matches('button[onclick*="setCustDateFilter"]') ||
+        focEl2.matches('button[onclick*="cust-date-picker"]')
+      );
+      if(onCustPill){
+        e.preventDefault();
+        var isGstPill = focEl2.matches('button[onclick*="setCustGstFilter"]');
+        if(isDown){
+          if(isGstPill){
+            var firstDtPill = document.querySelector('button[onclick*="setCustDateFilter"]');
+            if(firstDtPill) firstDtPill.focus();
+          } else {
+            var custRows2 = getRows();
+            if(custRows2.length > 0) setRowFocus(custRows2[0]);
+            else doScroll(80);
+          }
+        } else {
+          if(!isGstPill){
+            // Re-query GST pills after potential re-render
+            setTimeout(function(){
+              var fg = document.querySelector('button[onclick*="setCustGstFilter"]');
+              if(fg) fg.focus();
+            }, 50);
+          } else {
+            var srch2 = document.getElementById('cust-search');
+            if(srch2){ srch2.focus(); srch2.select(); }
+            else { var addCB2 = document.querySelector('button[onclick*="openAddModal"]'); if(addCB2) addCB2.focus(); }
+          }
+        }
+        return;
+      }
+
+      // Creditor GST filter pills Up/Down
+      var onCrGstPill = focEl2 && focEl2.matches && focEl2.matches('button[onclick*="_credGstFilter"]');
+      if(onCrGstPill){
+        e.preventDefault();
+        if(isDown){
+          var crRows = getRows();
+          if(crRows.length > 0) setRowFocus(crRows[0]); else doScroll(80);
+        } else {
+          var crSrch = document.querySelector('#tab-content input[placeholder*="earch"]');
+          if(crSrch){ crSrch.focus(); crSrch.select(); }
+          else { var addCrB = document.querySelector('button[onclick*="openAddCreditorModal"]'); if(addCrB) addCrB.focus(); }
+        }
+        return;
+      }
+      // Debtor GST filter pills Up/Down
+      var onDrGstPill = focEl2 && focEl2.matches && focEl2.matches('button[onclick*="_debtGstFilter"]');
+      if(onDrGstPill){
+        e.preventDefault();
+        if(isDown){
+          var drGstRows = getRows();
+          if(drGstRows.length > 0) setRowFocus(drGstRows[0]); else doScroll(80);
+        } else {
+          var drGstSrch = document.querySelector('#tab-content input[placeholder*="earch"]');
+          if(drGstSrch){ drGstSrch.focus(); drGstSrch.select(); }
+          else { var addDrB = document.querySelector('button[onclick*="openAddDebtorModal"]'); if(addDrB) addDrB.focus(); }
+        }
+        return;
+      }
+      var onCpMode = focEl2 && focEl2.matches && focEl2.matches('button[onclick*="cpSetMode"]');
+      if(onCpMode){
+        e.preventDefault();
+        var mzCp = advanceZone(isDown ? 1 : -1);
+        if(!mzCp) doScroll(isDown ? 80 : -80);
+        return;
+      }
+
+      // Creditor detail filter pills (All/Purchase/Payment/Return) — Up/Down between zones
+      var onCrTfPill = focEl2 && focEl2.matches && focEl2.matches('button[id^="cr-tf-"]');
+      if(onCrTfPill){
+        e.preventDefault();
+        if(isDown){
+          var crTxRows = getRows();
+          if(crTxRows.length > 0) setRowFocus(crTxRows[0]); else doScroll(80);
+        } else {
+          var crTxSrch = document.getElementById('cr-tx-search');
+          if(crTxSrch){ crTxSrch.focus(); crTxSrch.select(); }
+        }
+        return;
+      }
+
+      // Debtor detail filter pills — Up/Down between zones
+      var onDrTfPill = focEl2 && focEl2.matches && focEl2.matches('button[id^="dr-tf-"]');
+      if(onDrTfPill){
+        e.preventDefault();
+        if(isDown){
+          var drTxRows = getRows();
+          if(drTxRows.length > 0) setRowFocus(drTxRows[0]); else doScroll(80);
+        } else {
+          var drTxSrch = document.getElementById('dr-tx-search');
+          if(drTxSrch){ drTxSrch.focus(); drTxSrch.select(); }
+        }
+        return;
+      }
+
+      // Input zone cycling (when focused element is a zone input)
+      if(inInput){
+        var zones3 = getTabFocusZones();
+        var czIdx = zones3.indexOf(focEl2);
+        if(czIdx >= 0){
+          e.preventDefault();
+          var nzIdx = czIdx + (isDown ? 1 : -1);
+          if(nzIdx >= 0 && nzIdx < zones3.length){
+            zoneIdx = nzIdx;
+            var zt = zones3[zoneIdx];
+            zt.focus();
+            if(zt.tagName === 'INPUT' || zt.tagName === 'TEXTAREA') zt.select();
+            zt.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          } else if(isDown){
+            // Past last zone — go to GST pills (tab 1,2,3) or first row
+            focEl2.blur(); zoneIdx = -1;
+            var firstGst = document.querySelector('button[onclick*="setCustGstFilter"]');
+            var firstCrGst = document.querySelector('button[onclick*="_credGstFilter"]');
+            var firstDrGst = document.querySelector('button[onclick*="_debtGstFilter"]');
+            var tabDown2 = typeof currentTab !== 'undefined' ? currentTab : -1;
+            if(tabDown2 === 1 && firstGst && firstGst.offsetParent !== null){
+              firstGst.focus();
+            } else if(tabDown2 === 2 && firstCrGst && firstCrGst.offsetParent !== null){
+              firstCrGst.focus();
+            } else if(tabDown2 === 3 && firstDrGst && firstDrGst.offsetParent !== null){
+              firstDrGst.focus();
+            } else {
+              var firstRowD = getRows()[0];
+              if(firstRowD) setRowFocus(firstRowD);
+              else doScroll(80);
+            }
+          } else {
+            focEl2.blur(); zoneIdx = -1;
+          }
+          return;
+        }
+        return; // inside input but not a zone — don't interfere
+      }
+
+      // Not in any input — advance zones
+      e.preventDefault();
+      var movedZ = advanceZone(isDown ? 1 : -1);
+      if(!movedZ) doScroll(isDown ? 80 : -80);
       return;
     }
 
@@ -3903,12 +4905,152 @@ window.addEventListener('load', () => {
     var t = e.target;
     while(t && t !== document.body){
       if(t.classList && (t.classList.contains('sb-item') || t.classList.contains('tab-btn'))){
-        setTimeout(function(){ window._scClearRowFocus(); exitSidebarMode(); }, 80);
+        setTimeout(function(){ window._scClearRowFocus(); exitSidebarMode(); zoneIdx = -1; }, 80);
+        setTimeout(updateShortcutBar, 150);
         return;
       }
       t = t.parentElement;
     }
   });
+
+  // ─── Tally-style context shortcut bar ─────────────────────────────────────
+  function _sbItem(key, label, onclick){
+    return '<div class="sc-sb-item" onclick="'+onclick+'">'
+         + '<span class="sc-sb-key">Alt+'+key+'</span>'
+         + '<span class="sc-sb-lbl">'+label+'</span>'
+         + '</div>';
+  }
+  function _sbSep(){ return '<div style="width:1px;background:var(--border-main,#1e2a45);margin:4px 0;"></div>'; }
+
+  window.updateShortcutBar = function(){
+    var bar = document.getElementById('sc-shortcut-bar');
+    if(!bar) return;
+    var dp = window._scDetailPage;
+    var html = '';
+
+    if(dp && dp.type === 'txBillDetail'){
+      html += _sbItem('E','Edit Entry',  "document.querySelector('#tab-content button[onclick*=\'openEditTxModal\']')?.click()");
+      html += _sbItem('B','View Bill',   "document.querySelector('#tab-content button[onclick*=\'printTxBill\']')?.click()");
+      html += _sbItem('G','History',     "document.querySelector('#tab-content button[onclick*=\'showEditHistoryModal\']')?.click()");
+      html += _sbItem('D','Delete',      "var b=document.querySelector('#tab-content button[onclick*=\'deleteCrTx\'],#tab-content button[onclick*=\'deleteDebtTx\']');if(b&&confirm('Delete?'))b.click()");
+      html += '<div style="flex:1"></div>';
+      html += '<div class="sc-sb-item" onclick="if(typeof goBack===\'function\')goBack()"><span class="sc-sb-key">Esc</span><span class="sc-sb-lbl">Back</span></div>';
+
+    } else if(dp && dp.type === 'creditor'){
+      html += _sbItem('N','Purchase',  "document.querySelector('#tab-content button[onclick*=\'openAddTxModal\'][onclick*=\'purchase\']')?.click()");
+      html += _sbItem('V','Payment',   "document.querySelector('#tab-content button[onclick*=\'openAddTxModal\'][onclick*=\'payment\']')?.click()");
+      html += _sbItem('R','Return',    "document.querySelector('#tab-content button[onclick*=\'openAddTxModal\'][onclick*=\'return\']')?.click()");
+      html += _sbItem('W','WhatsApp',  "document.querySelector('#tab-content a[href*=\'wa.me\']')?.click()");
+      html += _sbSep();
+      html += _sbItem('P','Print',     "document.querySelector('#tab-content button[onclick*=\'printCreditorStatement\']')?.click()");
+      html += _sbItem('E','Edit',      "document.querySelector('#tab-content button[onclick*=\'openAddCreditorModal\']')?.click()");
+      html += _sbItem('G','History',   "document.querySelector('#tab-content button[onclick*=\'showEditHistoryModal\']')?.click()");
+      html += '<div style="flex:1"></div>';
+      html += '<div class="sc-sb-item" onclick="if(typeof goBack===\'function\')goBack()"><span class="sc-sb-key">Esc</span><span class="sc-sb-lbl">Back</span></div>';
+
+    } else if(dp && dp.type === 'debtor'){
+      html += _sbItem('N','Sale',      "document.querySelector('#tab-content button[onclick*=\'openAddDebtTxModal\'][onclick*=\'sale\']')?.click()");
+      html += _sbItem('V','Receipt',   "document.querySelector('#tab-content button[onclick*=\'openAddDebtTxModal\'][onclick*=\'payment\']')?.click()");
+      html += _sbItem('R','Return',    "document.querySelector('#tab-content button[onclick*=\'openAddDebtTxModal\'][onclick*=\'return\']')?.click()");
+      html += _sbItem('W','Remind',    "document.querySelector('#tab-content a[href*=\'wa.me\']')?.click()");
+      html += _sbSep();
+      html += _sbItem('P','Print',     "document.querySelector('#tab-content button[onclick*=\'printDebtorStatement\']')?.click()");
+      html += _sbItem('E','Edit',      "document.querySelector('#tab-content button[onclick*=\'openAddDebtorModal\']')?.click()");
+      html += _sbItem('G','History',   "document.querySelector('#tab-content button[onclick*=\'showEditHistoryModal\']')?.click()");
+      html += '<div style="flex:1"></div>';
+      html += '<div class="sc-sb-item" onclick="if(typeof goBack===\'function\')goBack()"><span class="sc-sb-key">Esc</span><span class="sc-sb-lbl">Back</span></div>';
+
+    } else {
+      var _sbTab = typeof currentTab !== 'undefined' ? currentTab : -1;
+      var _sbIView = typeof invView !== 'undefined' ? invView : 'stock';
+      // Tab-specific action hints
+      if(_sbTab === 0){
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Add Sale</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Tab</span><span class="sc-sb-lbl">Next Field</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">←→</span><span class="sc-sb-lbl">Qty/Price</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Ins</span><span class="sc-sb-lbl">Add Row</span></div>';
+      } else if(_sbTab === 1){
+        html += '<div class="sc-sb-item" onclick="if(typeof triggerAddNew===\'function\')triggerAddNew()"><span class="sc-sb-key">Ins</span><span class="sc-sb-lbl">Add Customer</span></div>';
+        html += '<div class="sc-sb-item" onclick="focusSearchBox()"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">←→</span><span class="sc-sb-lbl">Filter</span></div>';
+      } else if(_sbTab === 2){
+        html += '<div class="sc-sb-item" onclick="if(typeof triggerAddNew===\'function\')triggerAddNew()"><span class="sc-sb-key">Ins</span><span class="sc-sb-lbl">Add Creditor</span></div>';
+        html += '<div class="sc-sb-item" onclick="focusSearchBox()"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">←→</span><span class="sc-sb-lbl">GST Filter</span></div>';
+      } else if(_sbTab === 3){
+        html += '<div class="sc-sb-item" onclick="if(typeof triggerAddNew===\'function\')triggerAddNew()"><span class="sc-sb-key">Ins</span><span class="sc-sb-lbl">Add Debtor</span></div>';
+        html += '<div class="sc-sb-item" onclick="focusSearchBox()"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">←→</span><span class="sc-sb-lbl">GST Filter</span></div>';
+      } else if(_sbTab === 4){
+        if(_sbIView === 'add'){
+          html += '<div class="sc-sb-item"><span class="sc-sb-key">↓</span><span class="sc-sb-lbl">Next Field</span></div>';
+          html += '<div class="sc-sb-item"><span class="sc-sb-key">↑</span><span class="sc-sb-lbl">Prev Field</span></div>';
+          html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Save Item</span></div>';
+          html += '<div class="sc-sb-item"><span class="sc-sb-key">Esc</span><span class="sc-sb-lbl">Back</span></div>';
+        } else if(_sbIView === 'detail'){
+          html += _sbItem('E','Edit Item',   "document.querySelector('#tab-content button[onclick*=\'invEditSellPrice\'],#tab-content div[onclick*=\'invEditSellPrice\']')?.click()");
+          html += _sbItem('R','Restock',     "if(typeof invDetailItem!=='undefined'&&invDetailItem){window.invPrefillName=invDetailItem;invView='add';if(typeof safeRenderTab==='function')safeRenderTab(currentTab);}");
+          html += _sbItem('G','History',     "document.querySelector('#tab-content button[onclick*=\'invShowItemEditHistory\']')?.click()");
+          html += _sbItem('B','Back to List',"if(typeof invView!=='undefined'){invView='stock';invDetailItem=null;if(typeof safeRenderTab==='function')safeRenderTab(currentTab);}");
+          html += '<div style="flex:1"></div>';
+          html += '<div class="sc-sb-item" onclick="if(typeof goBack===\'function\')goBack()"><span class="sc-sb-key">Esc</span><span class="sc-sb-lbl">Back</span></div>';
+        } else {
+          html += '<div class="sc-sb-item" onclick="if(typeof triggerAddNew===\'function\')triggerAddNew()"><span class="sc-sb-key">Ins</span><span class="sc-sb-lbl">Add Item</span></div>';
+          html += '<div class="sc-sb-item" onclick="focusSearchBox()"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
+        }
+      } else if(_sbTab === 5){
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↓</span><span class="sc-sb-lbl">Next Field</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Save Expense</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">←→</span><span class="sc-sb-lbl">Pay Mode</span></div>';
+        html += '<div class="sc-sb-item" onclick="if(typeof triggerAddNew===\'function\')triggerAddNew()"><span class="sc-sb-key">Ins</span><span class="sc-sb-lbl">Add Expense</span></div>';
+      } else if(_sbTab === 10){
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Scroll</span></div>';
+      } else if(_sbTab === 9){
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Send</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Esc</span><span class="sc-sb-lbl">Back</span></div>';
+      } else if(_sbTab === 6){
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↓</span><span class="sc-sb-lbl">Date/Filter</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Export</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">PgDn/Up</span><span class="sc-sb-lbl">Scroll</span></div>';
+      } else if(_sbTab === 7){
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↓</span><span class="sc-sb-lbl">Date Field</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Export</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">←→</span><span class="sc-sb-lbl">Period</span></div>';
+      } else if(_sbTab === 8){
+        html += '<div class="sc-sb-item" onclick="focusSearchBox()"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">View Profile</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Navigate</span></div>';
+      } else if(_sbTab === 11){
+        html += '<div class="sc-sb-item" onclick="focusSearchBox()"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Scroll</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">View Item</span></div>';
+      } else if(_sbTab === 12){
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↓</span><span class="sc-sb-lbl">Next Field</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Save</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">PgDn/Up</span><span class="sc-sb-lbl">Scroll</span></div>';
+      } else if(_sbTab === 13){
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↓</span><span class="sc-sb-lbl">Next Field</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Invite/Action</span></div>';
+      } else {
+        html += '<div class="sc-sb-item" onclick="if(typeof triggerAddNew===\'function\')triggerAddNew()"><span class="sc-sb-key">Ins</span><span class="sc-sb-lbl">Add New</span></div>';
+        html += '<div class="sc-sb-item" onclick="focusSearchBox()"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
+      }
+      html += _sbSep();
+      html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Navigate</span></div>';
+      html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Open</span></div>';
+      html += '<div class="sc-sb-item"><span class="sc-sb-key">Esc</span><span class="sc-sb-lbl">Back/Close</span></div>';
+      html += '<div style="flex:1"></div>';
+      html += '<div class="sc-sb-item"><span class="sc-sb-key">F1–F9</span><span class="sc-sb-lbl">Switch Tab</span></div>';
+      html += '<div class="sc-sb-item"><span class="sc-sb-key">←</span><span class="sc-sb-lbl">Sidebar</span></div>';
+    }
+
+    bar.innerHTML = html;
+    bar.classList.remove('sc-sb-hidden');
+  };
+
+  // Call on load and after any navigation
+  setTimeout(window.updateShortcutBar, 800);
 
   // ─── Style injection for sidebar highlight ────────────────────────────────
   var style = document.createElement('style');
@@ -5856,6 +6998,7 @@ function switchTab(i){
   if(currentMember && TABS_BASE[i] && !isTabVisible(TABS_BASE[i])) return;
   if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}
   if(i!==2&&i!==3)invPrefillName="";
+  setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 150);
   window._pageStack=[];window._scDetailPage=null;
   currentTab=i;renderTabs();renderTab(i);
   var _tc=document.getElementById('tab-content');if(_tc)_tc.scrollTop=0;
@@ -5875,12 +7018,12 @@ function _pushPage(entry){
 function goBack(){
   closeModal(); // close any open modal first
   const prev = window._pageStack.pop();
-  if(!prev){ window._scDetailPage=null; renderTab(currentTab); return; }
+  if(!prev){ window._scDetailPage=null; renderTab(currentTab); setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 100); return; }
   if(prev.type === 'creditorDetail'){ openCreditorDetail(prev.id); }
   else if(prev.type === 'debtorDetail'){ openDebtorDetail(prev.id); }
   else if(prev.type === 'txBillDetail'){ openTxBillDetail(prev.parentId, prev.txId, prev.entityType); }
-  else if(prev.type === 'tab'){ window._scDetailPage=null; renderTab(prev.tabIndex); }
-  else { window._scDetailPage=null; renderTab(currentTab); }
+  else if(prev.type === 'tab'){ window._scDetailPage=null; renderTab(prev.tabIndex); setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 100); }
+  else { window._scDetailPage=null; renderTab(currentTab); setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 100); }
 }
 
 function _backBtn(label){
@@ -10829,6 +11972,7 @@ function openCreditorDetail(id){
   }
   // Guard: tell safeRenderTab we are on a detail page so it won't wipe us
   window._scDetailPage = { type: 'creditor', id };
+  setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 100);
   currentTab = 2; renderTabs(); // keep Creditors tab highlighted while on detail page
 
   const tabEl = document.getElementById("tab-content");
@@ -11058,7 +12202,7 @@ function _crTxRender(creditorId){
       tx.syncStatus==="declined"?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#7f1d1d44;color:#f87171;margin-left:4px;">⚠️Retry</span>':'';
 
     return `<div>
-      <div id="${rowId}" onclick="openTxBillDetail('${creditorId}','${tx.id||origIdx}','creditor')"
+      <div data-sc-row="1" id="${rowId}" onclick="openTxBillDetail('${creditorId}','${tx.id||origIdx}','creditor')"
         style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;" onmouseenter="this.style.background='#0a1828'" onmouseleave="this.style.background='transparent'">
         <div style="font-size:11px;color:#6a7a9a;font-family:monospace;white-space:nowrap;">${dateShort}</div>
         <div style="min-width:0;">
@@ -13519,6 +14663,7 @@ function openDebtorDetail(id){
   }
   // Guard: tell safeRenderTab we are on a detail page so it won't wipe us
   window._scDetailPage = { type: 'debtor', id };
+  setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 100);
   currentTab = 3; renderTabs(); // keep Debtors tab highlighted while on detail page
 
   const tabEl = document.getElementById("tab-content");
@@ -13731,7 +14876,7 @@ function _drTxRender(debtorId){
     const rowId="dr-row-"+tx.id;
     const detailId="dr-det-"+tx.id;
     return `<div>
-      <div id="${rowId}" onclick="openTxBillDetail('${debtorId}','${tx.id||origIdx}','debtor')"
+      <div data-sc-row="1" id="${rowId}" onclick="openTxBillDetail('${debtorId}','${tx.id||origIdx}','debtor')"
         style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;" onmouseenter="this.style.background='#08180e'" onmouseleave="this.style.background='transparent'">
         <div style="font-size:11px;color:#6a7a9a;font-family:monospace;white-space:nowrap;">${dateShort}</div>
         <div style="min-width:0;">
@@ -13802,6 +14947,7 @@ function openTxBillDetail(parentId, txId, entityType) {
   }
   // Set detail guard so safeRenderTab won't wipe this page
   window._scDetailPage = { type: 'txBillDetail', parentId, txId: tx.id, entityType };
+  setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 100);
 
   const typeCfg = isCr ? {
     purchase: {label:'Purchase / Bill', bg:'#92400e22', col:'#fbbf24', icon:'📦'},
@@ -20054,8 +21200,9 @@ function ptItemTallySearch(inp, rowId){
   if(!dd) return;
   const names = inventoryItems.map(x=>x.name);
   const filtered = q ? names.filter(n=>tallyMatch(n,q)) : names;
-  if(!filtered.length){ dd.style.display="none"; return; }
-  dd.style.display="block";
+  // Build the dropdown HTML but DON'T show it — user must press Enter to open
+  dd._filtered = filtered;
+  dd._rowId = rowId;
   dd._activeIdx = -1;
   dd.innerHTML = filtered.map((n,i)=>{
     const inv = inventoryItems.find(x=>x.name===n);
@@ -20070,6 +21217,8 @@ function ptItemTallySearch(inp, rowId){
       <span style="font-size:12px;color:${stockColor};font-weight:700;margin-left:12px;white-space:nowrap;">Stock: ${stock}${inv&&inv.unit?' '+inv.unit:''}</span>
     </div>`;
   }).join("");
+  // Keep dd hidden — shown only on Enter via ptItemDdKey
+  if(dd.style.display !== "block") dd.style.display = "none";
   ptShowItemStock(inp);
 }
 function ptToggleItemDd(inp, rowId){
@@ -20078,6 +21227,7 @@ function ptToggleItemDd(inp, rowId){
   if(dd.style.display==="block"){ dd.style.display="none"; return; }
   inp.focus();
   ptItemTallySearch(inp, rowId);
+  if(dd.innerHTML) dd.style.display = "block";
 }
 function ptHideItemDd(rowId){
   const dd = document.getElementById("ptdd-"+rowId);
@@ -20116,20 +21266,52 @@ function ptItemDdSelect(rowId, name, el){
 }
 function ptItemDdKey(e, rowId){
   const dd = document.getElementById("ptdd-"+rowId);
-  if(!dd || dd.style.display==="none") return;
-  const items = dd.querySelectorAll("div[data-idx]");
-  if(!items.length) return;
-  let idx = dd._activeIdx||0;
-  if(e.key==="ArrowDown"){ e.preventDefault(); idx=Math.min(idx+1,items.length-1); }
-  else if(e.key==="ArrowUp"){ e.preventDefault(); idx=Math.max(idx-1,0); }
-  else if(e.key==="Enter"||e.key==="Tab"){
+  if(!dd) return;
+
+  // Enter: if dropdown closed → open it; if open → select highlighted item
+  if(e.key === "Enter"){
     e.preventDefault();
-    const active = items[idx<0?0:idx];
+    e.stopPropagation();
+    if(dd.style.display !== "block"){
+      // Open the dropdown
+      if(!dd.innerHTML) ptItemTallySearch(e.target, rowId);
+      if(dd.innerHTML){ dd.style.display = "block"; dd._activeIdx = -1; }
+      return;
+    }
+    // Dropdown open — select active item
+    const items = dd.querySelectorAll("div[data-idx]");
+    const idx = (dd._activeIdx >= 0) ? dd._activeIdx : 0;
+    const active = items[idx];
     if(active) ptItemDdSelect(rowId, active.getAttribute("data-name"), active);
     return;
-  } else if(e.key==="Escape"){ ptHideItemDd(rowId); return; }
-  else return;
-  items.forEach((d,i)=>{ d.style.background = i===idx?"#eef2ff":"#fff"; });
+  }
+
+  // Arrow keys only work when dropdown is open
+  if(dd.style.display !== "block") return;
+
+  const items = dd.querySelectorAll("div[data-idx]");
+  if(!items.length) return;
+  let idx = typeof dd._activeIdx === 'number' ? dd._activeIdx : -1;
+
+  if(e.key === "ArrowDown"){
+    e.preventDefault();
+    e.stopPropagation();
+    idx = Math.min(idx + 1, items.length - 1);
+  } else if(e.key === "ArrowUp"){
+    e.preventDefault();
+    e.stopPropagation();
+    idx = Math.max(idx - 1, 0);
+  } else if(e.key === "Escape"){
+    e.preventDefault();
+    e.stopPropagation();
+    ptHideItemDd(rowId);
+    // Return focus to input, zoneIdx stays — next Down will go to next zone
+    return;
+  } else {
+    return; // let other keys (typing) work normally
+  }
+
+  items.forEach((d,i)=>{ d.style.background = i===idx ? "#eef2ff" : "#fff"; });
   dd._activeIdx = idx;
   items[idx]?.scrollIntoView({block:"nearest"});
 }
@@ -22018,6 +23200,12 @@ function _openBarcodeScanModal(onDetected) {
 
   window._bcOnDetected = onDetected;
 
+  // Auto-focus the manual input so user can type immediately
+  setTimeout(function(){
+    var inp = document.getElementById('bc-manual-input');
+    if(inp) inp.focus();
+  }, 120);
+
   // Start camera
   navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
     .then(stream => {
@@ -23805,6 +24993,7 @@ function invShowItemDetail(itemName){
   safeRenderTab(currentTab);
   setTimeout(()=>{ invHistApply(); invCustApply(); }, 80);
   setTimeout(()=>{ invHistApply(); invCustApply(); }, 400);
+  setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 150);
 }
 
 // Item-level "who added / who edited" trail — shown as a popup modal
@@ -26609,5 +27798,9 @@ window._scGuideOpenReplay = window.scGuideOpenReplay;
   };
 })();
 </script>
+
+<!-- ── Tally-style context shortcut bar ── -->
+<div id="sc-shortcut-bar" class="sc-sb-hidden"></div>
+
 </body>
 </html>
