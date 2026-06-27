@@ -3676,7 +3676,10 @@ window.addEventListener('load', () => {
       2: null, // creditor search — no fixed ID, fallback below
       3: null, // debtor search — no fixed ID, fallback below
       4: 'inv-search-box',
-      5: 'exp-search'
+      5: 'exp-search',
+      8: null, // leaderboard search — use fallback
+      9: 'sc-msg-input', // messages — focus message input
+      10: 'hist-search-box'
     };
     var knownId = byId[tab];
     if(knownId){
@@ -3701,8 +3704,23 @@ window.addEventListener('load', () => {
     switch(typeof currentTab !== 'undefined' ? currentTab : -1){
       case 0:
         var mode = typeof getPurchaseMode === 'function' ? getPurchaseMode() : 'standard';
-        var inp = document.getElementById(mode === 'borrow' ? 'bw-search' : 'pt-search');
-        if(inp){ inp.focus(); inp.select(); }
+        if(mode === 'borrow'){
+          // In borrow mode: always focus borrow search
+          var bwInp = document.getElementById('bw-search');
+          if(bwInp){ bwInp.focus(); bwInp.select(); }
+        } else {
+          // In sale/standard mode: if a sale is in progress (items already added), add a new item row
+          // Sale is "in progress" if any item row has a filled name
+          var filledRows = document.querySelectorAll('[data-row-id] .pt-item-name');
+          var saleInProgress = Array.from(filledRows).some(function(inp){ return inp.value && inp.value.trim(); });
+          if(saleInProgress){
+            if(typeof ptAddItemRow === 'function') ptAddItemRow();
+          } else {
+            // No sale in progress — focus customer/item search to start one
+            var ptInp = document.getElementById('pt-search');
+            if(ptInp){ ptInp.focus(); ptInp.select(); }
+          }
+        }
         break;
       case 1: if(typeof openAddModal === 'function') openAddModal(); break;
       case 2: if(typeof openAddCreditorModal === 'function') openAddCreditorModal(); break;
@@ -3716,6 +3734,7 @@ window.addEventListener('load', () => {
           var inp2 = form.querySelector('input,select,textarea');
           if(inp2) setTimeout(function(){ inp2.focus(); }, 300); }
         break;
+      case 13: if(typeof openAddMemberModal === 'function') openAddMemberModal(); break;
     }
   }
 
@@ -3789,6 +3808,7 @@ window.addEventListener('load', () => {
     if(rowFocused){
       rowFocused.classList.add('sc-nav-focus');
       rowFocused.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      rowFocused.focus({ preventScroll: true });
     }
   }
 
@@ -4070,6 +4090,10 @@ window.addEventListener('load', () => {
         '#tab-content input[type="date"], #tab-content select'
       ));
       anaInputs.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      var anaYearBtns = Array.from(document.querySelectorAll(
+        '#tab-content button[onclick*="setAnalyticsYear"]'
+      ));
+      anaYearBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
       var anaExportBtns = Array.from(document.querySelectorAll(
         '#tab-content button[onclick*="xport"]'
       ));
@@ -4080,7 +4104,19 @@ window.addEventListener('load', () => {
       }
 
     } else if(tab === 7){
-      // Compare — date/period selectors and export
+      // Compare — mode pills, period pickers, nav arrows, export
+      var cmpModeBtns = Array.from(document.querySelectorAll(
+        '#tab-content button[onclick*="cmpSetMode"]'
+      ));
+      cmpModeBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      var cmpNavBtns = Array.from(document.querySelectorAll(
+        '#tab-content button[onclick*="cmpNav"]'
+      ));
+      cmpNavBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      var cmpPillBtns = Array.from(document.querySelectorAll(
+        '#tab-content button[onclick*="cmpSetQuarter"], #tab-content button[onclick*="cmpSetMonthYear"], #tab-content button[onclick*="cmpSetYearA"], #tab-content button[onclick*="cmpSetYearB"]'
+      ));
+      cmpPillBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
       var cmpInputs = Array.from(document.querySelectorAll(
         '#tab-content input[type="date"], #tab-content select'
       ));
@@ -4095,51 +4131,55 @@ window.addEventListener('load', () => {
       }
 
     } else if(tab === 8){
-      // Rankings (Leaderboard) — search, filter, sort
+      // Rankings (Leaderboard) — filter pills, year buttons, date input, search
+      var lbFilterPills = Array.from(document.querySelectorAll(
+        '#tab-content button[onclick*="setLbFilter"], #tab-content button[onclick*="setLbYear"]'
+      ));
+      lbFilterPills.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      var lbDateInput = document.getElementById('lb-date-pick');
+      addEl(lbDateInput);
+      var lbApplyBtn = document.querySelector('#tab-content button[onclick*="applyCustomDate"]');
+      addEl(lbApplyBtn);
       var rankSearch = document.querySelector('#tab-content input[type="text"], #tab-content input[type="search"]');
       addEl(rankSearch);
       var rankFilters = Array.from(document.querySelectorAll('#tab-content select'));
       rankFilters.forEach(function(b){ if(isVisible(b)) zones.push(b); });
 
     } else if(tab === 9){
-      // Messages — message input and send button
+      // Messages — add-shop input (if panel open), message input, send button
+      var addShopPanel = document.getElementById('sc-add-shop-panel');
+      if(addShopPanel && addShopPanel.style.display !== 'none'){
+        addSel('#sc-add-shop-input');
+      }
       addSel('#sc-msg-input');
       var msgSendBtn = document.querySelector('#tab-content button[onclick*="scSendMessage"]');
       addEl(msgSendBtn);
 
     } else if(tab === 10){
-      // History — date picker and search
+      // History — type filter pills, date picker, search
+      var histTypePills = Array.from(document.querySelectorAll(
+        '#tab-content button[onclick*="_histTypeFilter"]'
+      ));
+      histTypePills.forEach(function(b){ if(isVisible(b)) zones.push(b); });
       addSel('#hist-date-picker');
       addSel('#hist-search-box');
 
     } else if(tab === 11){
-      // Alerts — search or filter inputs
-      var alertSearch = document.querySelector('#tab-content input[type="text"], #tab-content input[type="search"]');
-      addEl(alertSearch);
-      var alertBtns = Array.from(document.querySelectorAll('#tab-content button[onclick*="invView"]'));
+      // Alerts — capture Inventory buttons (switchTab(4)) and creditor/debtor jump buttons
+      var alertBtns = Array.from(document.querySelectorAll('#tab-content button[onclick*="switchTab(4)"], #tab-content button[onclick*="switchTab(2)"], #tab-content button[onclick*="switchTab(3)"]'));
       alertBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
 
     } else if(tab === 12){
-      // Settings — all text inputs, selects, textareas
-      var settingsFields = Array.from(document.querySelectorAll(
-        '#tab-content input:not([type="hidden"]):not([type="checkbox"]), #tab-content select, #tab-content textarea'
+      // Settings — rows use data-sc-row (handled by getRows/rowFocused).
+      // Only add any directly-visible inputs (e.g. search inside a settings section if any).
+      var settingsInputs = Array.from(document.querySelectorAll(
+        '#tab-content input:not([type="hidden"]):not([type="checkbox"]):not([style*="display:none"]), #tab-content select'
       ));
-      settingsFields.forEach(function(f){ if(isVisible(f)) zones.push(f); });
-      var settingsBtns = Array.from(document.querySelectorAll(
-        '#tab-content button[onclick*="save"], #tab-content button[onclick*="Save"], #tab-content button[onclick*="submit"]'
-      ));
-      settingsBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      settingsInputs.forEach(function(f){ if(isVisible(f)) zones.push(f); });
 
     } else if(tab === 13){
-      // Team — invite inputs and action buttons
-      var teamFields = Array.from(document.querySelectorAll(
-        '#tab-content input:not([type="hidden"]), #tab-content select'
-      ));
-      teamFields.forEach(function(f){ if(isVisible(f)) zones.push(f); });
-      var teamBtns = Array.from(document.querySelectorAll(
-        '#tab-content button[onclick*="nvite"], #tab-content button[onclick*="addTeam"], #tab-content button[onclick*="removeTeam"], #tab-content button[onclick*="Team"]'
-      ));
-      teamBtns.forEach(function(b){ if(isVisible(b)) zones.push(b); });
+      // Team — member cards are data-sc-row; no direct inputs outside modals.
+      // Zone is intentionally empty so getRows() handles ↑↓ navigation.
 
     } else {
       // Generic fallback
@@ -4178,6 +4218,16 @@ window.addEventListener('load', () => {
     target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     return true;
   }
+
+  // ─── Sync rowFocused when browser focus lands on a data-sc-row element ──────
+  document.addEventListener('focusin', function(e){
+    var t = e.target;
+    if(t && t.hasAttribute && t.hasAttribute('data-sc-row')){
+      if(rowFocused && rowFocused !== t) rowFocused.classList.remove('sc-nav-focus');
+      rowFocused = t;
+      rowFocused.classList.add('sc-nav-focus');
+    }
+  });
 
   // ─── Main keyboard handler ────────────────────────────────────────────────
   document.addEventListener('keydown', function(e){
@@ -4349,12 +4399,18 @@ window.addEventListener('load', () => {
       return;
     }
 
-    // ── Context shortcuts: Creditor/Debtor detail page ──────────────────────
-    // Unique keys — zero overlap with tab shortcuts (m,h,a,s,t) or each other
-    // Creditor/Debtor detail: Alt+N=New tx, Alt+V=Payment, Alt+R=Return,
-    //   Alt+W=WhatsApp, Alt+P=Print, Alt+E=Edit, Alt+G=History (G=log/history)
-    // Tx bill detail: Alt+E=Edit entry, Alt+B=View Bill, Alt+G=History, Alt+D=Delete
+    // ── Context shortcuts: detail pages ──────────────────────────────────────
     var _dp = window._scDetailPage;
+    // Customer profile page (Alt+E=Edit, Alt+G=History, Alt+W=WhatsApp)
+    if(_dp && _dp.type === 'customerProfile' && !inInput){
+      var _cpKey = e.key.toLowerCase();
+      if(e.altKey && _cpKey === 'e'){ e.preventDefault(); var _cpEBtn=document.querySelector('#customer-page button[onclick*="openEditModal"]'); if(_cpEBtn)_cpEBtn.click(); return; }
+      if(e.altKey && _cpKey === 'g'){ e.preventDefault(); var _cpGBtn=document.querySelector('#customer-page button[onclick*="showEditHistoryModal"]'); if(_cpGBtn)_cpGBtn.click(); return; }
+      if(e.altKey && _cpKey === 'w'){ e.preventDefault(); var _cpWLink=document.querySelector('#customer-page a[href*="wa.me"]'); if(_cpWLink)_cpWLink.click(); return; }
+    }
+    // Creditor/Debtor detail: Alt+N=New tx, Alt+V=Payment, Alt+R=Return,
+    //   Alt+W=WhatsApp, Alt+P=Print, Alt+E=Edit, Alt+G=History
+    // Tx bill detail: Alt+E=Edit entry, Alt+B=View Bill, Alt+G=History, Alt+D=Delete
     if(_dp && (_dp.type === 'creditor' || _dp.type === 'debtor') && !inInput){
       var _isCrDp = (_dp.type === 'creditor');
       var _dpKey  = e.key.toLowerCase();
@@ -4565,6 +4621,52 @@ window.addEventListener('load', () => {
         cpModeBtnsLR[nm].focus(); cpModeBtnsLR[nm].click(); return;
       }
 
+      // History (Tab 10) — type filter pills ← →
+      var histTypePillsLR = Array.from(document.querySelectorAll('button[onclick*="_histTypeFilter"]')).filter(function(b){ return b.offsetParent !== null; });
+      var histTypePillIdx = histTypePillsLR.indexOf(focEl);
+      if(histTypePillIdx >= 0){
+        e.preventDefault();
+        var nhtp = isRight ? Math.min(histTypePillIdx+1, histTypePillsLR.length-1) : Math.max(histTypePillIdx-1, 0);
+        histTypePillsLR[nhtp].focus(); histTypePillsLR[nhtp].click(); return;
+      }
+
+      // Leaderboard (Tab 8) — filter/year pills ← →
+      var lbPillsLR = Array.from(document.querySelectorAll('button[onclick*="setLbFilter"], button[onclick*="setLbYear"]')).filter(function(b){ return b.offsetParent !== null; });
+      var lbPillIdx = lbPillsLR.indexOf(focEl);
+      if(lbPillIdx >= 0){
+        e.preventDefault();
+        var nlb = isRight ? Math.min(lbPillIdx+1, lbPillsLR.length-1) : Math.max(lbPillIdx-1, 0);
+        lbPillsLR[nlb].focus(); lbPillsLR[nlb].click(); return;
+      }
+
+      // Compare tab (Tab 7) — cmpSetMode period pills ← →
+      var cmpModePillsLR = Array.from(document.querySelectorAll('button[onclick*="cmpSetMode"]')).filter(function(b){ return b.offsetParent !== null; });
+      var cmpModeIdxLR = cmpModePillsLR.indexOf(focEl);
+      if(cmpModeIdxLR >= 0){
+        e.preventDefault();
+        var ncm = isRight ? Math.min(cmpModeIdxLR+1, cmpModePillsLR.length-1) : Math.max(cmpModeIdxLR-1, 0);
+        cmpModePillsLR[ncm].focus(); cmpModePillsLR[ncm].click(); return;
+      }
+
+      // Compare tab — cmpNav prev/next arrows ← →
+      var onCmpNav = focEl && focEl.matches && focEl.matches('button[onclick*="cmpNav"]');
+      if(onCmpNav){
+        e.preventDefault();
+        if(isRight){ var nb = document.querySelector('button[onclick*="cmpNav(1)"]'); if(nb && nb.offsetParent !== null){ nb.focus(); nb.click(); } }
+        else { var pb = document.querySelector('button[onclick*="cmpNav(-1)"]'); if(pb && pb.offsetParent !== null){ pb.focus(); pb.click(); } }
+        return;
+      }
+
+      // Compare tab — quarter/year sub-pills ← →
+      var cmpSubPillSelectors = 'button[onclick*="cmpSetQuarter"], button[onclick*="cmpSetMonthYear"], button[onclick*="cmpSetYearA"], button[onclick*="cmpSetYearB"]';
+      var cmpSubPillsLR = Array.from(document.querySelectorAll(cmpSubPillSelectors)).filter(function(b){ return b.offsetParent !== null; });
+      var cmpSubPillIdx = cmpSubPillsLR.indexOf(focEl);
+      if(cmpSubPillIdx >= 0){
+        e.preventDefault();
+        var nsp = isRight ? Math.min(cmpSubPillIdx+1, cmpSubPillsLR.length-1) : Math.max(cmpSubPillIdx-1, 0);
+        cmpSubPillsLR[nsp].focus(); cmpSubPillsLR[nsp].click(); return;
+      }
+
       // Creditor detail filter pills (All/Purchase/Payment/Return) ← →
       var allCrTfPills = Array.from(document.querySelectorAll('button[id^="cr-tf-"]')).filter(function(b){ return b.offsetParent !== null; });
       var crTfIdx = allCrTfPills.indexOf(focEl);
@@ -4631,10 +4733,42 @@ window.addEventListener('load', () => {
               if(crTfUp && crTfUp.offsetParent !== null){ crTfUp.focus(); }
               else { var crGstUp = document.querySelector('button[onclick*="_credGstFilter"]'); if(crGstUp && crGstUp.offsetParent !== null){ crGstUp.focus(); } else { var crSUp = document.querySelector('#tab-content input[placeholder*="earch"], #cr-tx-search'); if(crSUp){ crSUp.focus(); crSUp.select(); } } }
             } else if(tabUp === 3){
-              // Debtor detail → filter pills; Debtor list → search
+              // Debtor detail → filter pills; Debtor list → GST pills → search
               var drTfUp = document.querySelector('button[id^="dr-tf-"]');
               if(drTfUp && drTfUp.offsetParent !== null){ drTfUp.focus(); }
-              else { var dbSUp = document.querySelector('#tab-content input[placeholder*="earch"], #dr-tx-search'); if(dbSUp){ dbSUp.focus(); dbSUp.select(); } }
+              else { var drGstUp = document.querySelector('button[onclick*="_debtGstFilter"]'); if(drGstUp && drGstUp.offsetParent !== null){ drGstUp.focus(); } else { var dbSUp = document.querySelector('#tab-content input[placeholder*="earch"], #dr-tx-search'); if(dbSUp){ dbSUp.focus(); dbSUp.select(); } } }
+            } else if(tabUp === 4){
+              // Inventory: go to active search box (category view or stock view)
+              var invCatSUp = document.getElementById('inv-cat-search-box');
+              if(invCatSUp && invCatSUp.offsetParent !== null){ invCatSUp.focus(); invCatSUp.select(); }
+              else { var invSUp = document.getElementById('inv-search-box'); if(invSUp && invSUp.offsetParent !== null){ invSUp.focus(); invSUp.select(); } else { var mzUpInv = advanceZone(-1); if(!mzUpInv) doScroll(-80); } }
+            } else if(tabUp === 5){
+              // Expenses: go to search box
+              var expSUp = document.getElementById('exp-search');
+              if(expSUp && expSUp.offsetParent !== null){ expSUp.focus(); expSUp.select(); } else { var mzUpExp = advanceZone(-1); if(!mzUpExp) doScroll(-80); }
+            } else if(tabUp === 8){
+              // Leaderboard: go to first visible filter pill
+              var lbPillUp = document.querySelector('button[onclick*="setLbFilter"], button[onclick*="setLbYear"]');
+              if(lbPillUp && lbPillUp.offsetParent !== null){ lbPillUp.focus(); } else { var mzUpLb = advanceZone(-1); if(!mzUpLb) doScroll(-80); }
+            } else if(tabUp === 9){
+              // Messages: go to message input or add-shop input
+              var msgInpUp = document.getElementById('sc-msg-input') || document.getElementById('sc-add-shop-input');
+              if(msgInpUp && msgInpUp.offsetParent !== null){ msgInpUp.focus(); msgInpUp.select(); } else { var mzUpMsg = advanceZone(-1); if(!mzUpMsg) doScroll(-80); }
+            } else if(tabUp === 10){
+              // History: go to first type filter pill or search box
+              var histPillUp = document.querySelector('button[onclick*="_histTypeFilter"]');
+              if(histPillUp && histPillUp.offsetParent !== null){ histPillUp.focus(); }
+              else { var histSrchUp = document.getElementById('hist-search-box'); if(histSrchUp && histSrchUp.offsetParent !== null){ histSrchUp.focus(); histSrchUp.select(); } else { var mzUpHist = advanceZone(-1); if(!mzUpHist) doScroll(-80); } }
+            } else if(tabUp === 11){
+              // Alerts: go to first visible Inventory/Creditor/Debtor button
+              var alertBtnUp = document.querySelector('#tab-content button[onclick*="switchTab(4)"], #tab-content button[onclick*="switchTab(2)"], #tab-content button[onclick*="switchTab(3)"]');
+              if(alertBtnUp && alertBtnUp.offsetParent !== null){ alertBtnUp.focus(); } else { var mzUpAl = advanceZone(-1); if(!mzUpAl) doScroll(-80); }
+            } else if(tabUp === 12){
+              // Settings: no pills or search — just scroll to top
+              doScroll(-9999);
+            } else if(tabUp === 13){
+              // Team: no pills or search — scroll to top
+              doScroll(-9999);
             } else {
               var mzUp2 = advanceZone(-1); if(!mzUp2) doScroll(-80);
             }
@@ -4893,9 +5027,12 @@ window.addEventListener('load', () => {
       return;
     }
 
-    // ── Enter: activate focused row ──
+    // ── Enter: activate focused row or zone button ──
     if(e.key === 'Enter'){
-      if(rowFocused){ e.preventDefault(); rowFocused.click(); }
+      if(rowFocused){ e.preventDefault(); rowFocused.click(); return; }
+      // If a zone button has focus, let the browser fire its native click naturally
+      var focEnter = document.activeElement;
+      if(focEnter && focEnter.tagName === 'BUTTON' && !inInput){ return; }
       return;
     }
   });
@@ -4928,7 +5065,14 @@ window.addEventListener('load', () => {
     var dp = window._scDetailPage;
     var html = '';
 
-    if(dp && dp.type === 'txBillDetail'){
+    if(dp && dp.type === 'customerProfile'){
+      html += _sbItem('E','Edit',      "document.querySelector('#customer-page button[onclick*=\"openEditModal\"]')?.click()");
+      html += _sbItem('G','History',   "document.querySelector('#customer-page button[onclick*=\"showEditHistoryModal\"]')?.click()");
+      html += _sbItem('W','WhatsApp',  "document.querySelector('#customer-page a[href*=\"wa.me\"]')?.click()");
+      html += '<div style="flex:1"></div>';
+      html += '<div class="sc-sb-item" onclick="if(typeof closeCustomerPage===\'function\')closeCustomerPage()"><span class="sc-sb-key">Esc</span><span class="sc-sb-lbl">Back</span></div>';
+
+    } else if(dp && dp.type === 'txBillDetail'){
       html += _sbItem('E','Edit Entry',  "document.querySelector('#tab-content button[onclick*=\'openEditTxModal\']')?.click()");
       html += _sbItem('B','View Bill',   "document.querySelector('#tab-content button[onclick*=\'printTxBill\']')?.click()");
       html += _sbItem('G','History',     "document.querySelector('#tab-content button[onclick*=\'showEditHistoryModal\']')?.click()");
@@ -5003,12 +5147,15 @@ window.addEventListener('load', () => {
         html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Save Expense</span></div>';
         html += '<div class="sc-sb-item"><span class="sc-sb-key">←→</span><span class="sc-sb-lbl">Pay Mode</span></div>';
         html += '<div class="sc-sb-item" onclick="if(typeof triggerAddNew===\'function\')triggerAddNew()"><span class="sc-sb-key">Ins</span><span class="sc-sb-lbl">Add Expense</span></div>';
+        html += '<div class="sc-sb-item" onclick="focusSearchBox()"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
       } else if(_sbTab === 10){
-        html += '<div class="sc-sb-item"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
-        html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Scroll</span></div>';
+        html += '<div class="sc-sb-item" onclick="focusSearchBox()"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">←→</span><span class="sc-sb-lbl">Filter</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Navigate</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">View Details</span></div>';
       } else if(_sbTab === 9){
-        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Send</span></div>';
-        html += '<div class="sc-sb-item"><span class="sc-sb-key">Esc</span><span class="sc-sb-lbl">Back</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Contacts</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Open / Send</span></div>';
       } else if(_sbTab === 6){
         html += '<div class="sc-sb-item"><span class="sc-sb-key">↓</span><span class="sc-sb-lbl">Date/Filter</span></div>';
         html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Export</span></div>';
@@ -5018,28 +5165,38 @@ window.addEventListener('load', () => {
         html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Export</span></div>';
         html += '<div class="sc-sb-item"><span class="sc-sb-key">←→</span><span class="sc-sb-lbl">Period</span></div>';
       } else if(_sbTab === 8){
-        html += '<div class="sc-sb-item" onclick="focusSearchBox()"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
-        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">View Profile</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">←→</span><span class="sc-sb-lbl">Filter</span></div>';
         html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Navigate</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">View Profile</span></div>';
       } else if(_sbTab === 11){
-        html += '<div class="sc-sb-item" onclick="focusSearchBox()"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
-        html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Scroll</span></div>';
-        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">View Item</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Navigate</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">View in Inventory</span></div>';
       } else if(_sbTab === 12){
-        html += '<div class="sc-sb-item"><span class="sc-sb-key">↓</span><span class="sc-sb-lbl">Next Field</span></div>';
-        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Save</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Navigate</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Open Setting</span></div>';
         html += '<div class="sc-sb-item"><span class="sc-sb-key">PgDn/Up</span><span class="sc-sb-lbl">Scroll</span></div>';
       } else if(_sbTab === 13){
-        html += '<div class="sc-sb-item"><span class="sc-sb-key">↓</span><span class="sc-sb-lbl">Next Field</span></div>';
-        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Invite/Action</span></div>';
+        html += '<div class="sc-sb-item" onclick="if(typeof openAddMemberModal===\'function\')openAddMemberModal()"><span class="sc-sb-key">Ins</span><span class="sc-sb-lbl">Add Member</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Navigate</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Edit Member</span></div>';
       } else {
         html += '<div class="sc-sb-item" onclick="if(typeof triggerAddNew===\'function\')triggerAddNew()"><span class="sc-sb-key">Ins</span><span class="sc-sb-lbl">Add New</span></div>';
         html += '<div class="sc-sb-item" onclick="focusSearchBox()"><span class="sc-sb-key">Alt+F</span><span class="sc-sb-lbl">Search</span></div>';
       }
+      // Only append generic ↑↓/Enter/Esc footer for tabs whose specific block doesn't already cover them.
+      // Tabs with self-contained nav hints: 4(add), 4(detail), 8, 9, 10, 11, 12, 13.
+      var _sbFullNav = (_sbTab === 0 || _sbTab === 1 || _sbTab === 2 || _sbTab === 3 ||
+                        (_sbTab === 4 && _sbIView === 'stock') ||
+                        (_sbTab === 4 && _sbIView === 'log')   ||
+                        _sbTab === 5 || _sbTab === 6 || _sbTab === 7);
       html += _sbSep();
-      html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Navigate</span></div>';
-      html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Open</span></div>';
-      html += '<div class="sc-sb-item"><span class="sc-sb-key">Esc</span><span class="sc-sb-lbl">Back/Close</span></div>';
+      if(_sbFullNav){
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">↑↓</span><span class="sc-sb-lbl">Navigate</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Enter</span><span class="sc-sb-lbl">Open</span></div>';
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Esc</span><span class="sc-sb-lbl">Back/Close</span></div>';
+      } else {
+        html += '<div class="sc-sb-item"><span class="sc-sb-key">Esc</span><span class="sc-sb-lbl">Back/Close</span></div>';
+      }
       html += '<div style="flex:1"></div>';
       html += '<div class="sc-sb-item"><span class="sc-sb-key">F1–F9</span><span class="sc-sb-lbl">Switch Tab</span></div>';
       html += '<div class="sc-sb-item"><span class="sc-sb-key">←</span><span class="sc-sb-lbl">Sidebar</span></div>';
@@ -6829,7 +6986,7 @@ function _safeRenderTabImmediate(i) {
               const catVal = catItems.reduce((s, x) => s + invGetStockValue(x.name), 0);
               const catOOS = catItems.filter(x => invGetStock(x.name) <= 0).length;
               const catLow = catItems.filter(x => invGetStock(x.name) > 0 && invGetStock(x.name) <= 3).length;
-              return `<div class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #FFD70030;"
+              return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #FFD70030;"
                 onclick="invCatPageName='${cat.replace(/'/g, "\\'")}';invCatPageSearch=${tallyMatch(cat,q)?"''":`'${q.replace(/'/g,"\\'")}'`};invView='category';invSearchQuery='';safeRenderTab(currentTab)">
                 <div><div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
                 <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:4px;">${catItems.length} item${catItems.length !== 1 ? 's' : ''}${catLow > 0 ? ` &nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} low</span>` : ''}${catOOS > 0 ? ` &nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} out</span>` : ''}</div></div>
@@ -6843,7 +7000,7 @@ function _safeRenderTabImmediate(i) {
             const catVal = catItems.reduce((s, x) => s + invGetStockValue(x.name), 0);
             const catOOS = catItems.filter(x => invGetStock(x.name) <= 0).length;
             const catLow = catItems.filter(x => invGetStock(x.name) > 0 && invGetStock(x.name) <= 3).length;
-            return `<div class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
+            return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
               onclick="invCatPageName='${cat.replace(/'/g, "\\'")}';invCatPageSearch='';invView='category';safeRenderTab(currentTab)">
               <div><div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
               <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:4px;">${catItems.length} item${catItems.length !== 1 ? 's' : ''}${catLow > 0 ? `&nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} low</span>` : ''}${catOOS > 0 ? `&nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} out</span>` : ''}</div></div>
@@ -6870,7 +7027,7 @@ function _safeRenderTabImmediate(i) {
               const lastAdded = (item.stock || []).length ? new Date(item.stock[item.stock.length - 1].date).toLocaleDateString('en-IN', {day:'numeric',month:'short'}) : '—';
               const costEntries = (item.stock || []).filter(e => Number(e.costPerUnit || 0) > 0);
               const avgCost = costEntries.length ? (costEntries.reduce((s, e) => s + Number(e.costPerUnit), 0) / costEntries.length).toFixed(2) : 0;
-              return `<div data-sc-row="1" class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${item.name.replace(/'/g, "\\'")}')">
+              return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${item.name.replace(/'/g, "\\'")}')">
                 <div style="display:flex;align-items:flex-start;gap:12px;">
                   <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
                   <div style="flex:1;min-width:0;">
@@ -7166,7 +7323,7 @@ function renderLeaderboard(sorted){
       ? `<span style="font-size:10px;color:#3a5a4a;margin-left:4px;">(${t('allTimeBracket')} ${formatINR(c._realSpend)})</span>` : "";
     const zeroDay = isFiltered && c.totalSpend === 0;
     return `
-    <div data-sc-row="1" class="lb-row" style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;align-items:center;background:${zeroDay?'rgba(0,0,0,0.25)':gi%2===0?'var(--bg-row-even,#0d1220)':'var(--bg-row-odd,#0f1628)'};border-left:1px solid var(--border-main,#1e2a45);border-right:1px solid var(--border-main,#1e2a45);border-bottom:1px solid var(--border-main,#141c30);padding:10px 16px;cursor:pointer;transition:background 0.15s;${zeroDay?'opacity:0.55':''}" onclick="openCustomerPage('${c.id}')" onmouseenter="_hoverOn(this)" onmouseleave="this.style.background=''">
+    <div data-sc-row="1" tabindex="-1" class="lb-row" style="display:grid;grid-template-columns:48px 1fr 160px 110px 130px;align-items:center;background:${zeroDay?'rgba(0,0,0,0.25)':gi%2===0?'var(--bg-row-even,#0d1220)':'var(--bg-row-odd,#0f1628)'};border-left:1px solid var(--border-main,#1e2a45);border-right:1px solid var(--border-main,#1e2a45);border-bottom:1px solid var(--border-main,#141c30);padding:10px 16px;cursor:pointer;transition:background 0.15s;${zeroDay?'opacity:0.55':''}" onclick="openCustomerPage('${c.id}')" onmouseenter="_hoverOn(this)" onmouseleave="this.style.background=''">
       ${rankBadge(c.rank)}
       <div style="display:flex;align-items:center;gap:10px;min-width:0;">
         ${avatarEl(c,34)}
@@ -7294,7 +7451,7 @@ function renderCustomers(sorted,q=""){
 
     // Clean slim card — tap to open details
     return `
-    <div data-sc-row="1" class="card cust-card" style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;" onclick="openCustomerPage('${c.id}')">
+    <div data-sc-row="1" tabindex="-1" class="card cust-card" style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;" onclick="openCustomerPage('${c.id}')">
       ${avatarEl(c,44)}
       <div style="flex:1;min-width:0;">
         <div style="font-weight:700;font-size:15px;color:var(--text-main,#e8eaf0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
@@ -8023,7 +8180,15 @@ function bwItemDdSelect(rowId, name, el){
 }
 function bwItemDdKey(e, rowId){
   const dd = document.getElementById("bwdd-"+rowId);
-  if(!dd||dd.style.display==="none") return;
+  // If dropdown is closed and user presses Enter/ArrowDown, re-trigger search to open it
+  if(!dd||dd.style.display==="none"){
+    if(e.key==="Enter"||e.key==="ArrowDown"){
+      e.preventDefault();
+      const inp = document.getElementById("bwitem-"+rowId);
+      if(inp){ inp.dispatchEvent(new Event("input",{bubbles:true})); }
+    }
+    return;
+  }
   const items = dd.querySelectorAll("div[data-idx]");
   if(!items.length) return;
   let idx = dd._activeIdx||0;
@@ -11473,7 +11638,7 @@ function _renderCreditorCard(cr){
   const cardBg = isArchived ? "var(--bg-main,#0a0a0a)" : isUnrec ? "#1a0e00" : "var(--bg-row-even,#0d1220)";
   const hoverBorder = isArchived ? "#3a3a3a" : isUnrec ? "#d97706" : "var(--bg-row-hover,#2a3a6a)";
 
-  return `<div data-sc-row="1" style="background:${cardBg};border:1px solid ${borderColor};border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
+  return `<div data-sc-row="1" tabindex="-1" style="background:${cardBg};border:1px solid ${borderColor};border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
     onmouseenter="this.style.borderColor='${hoverBorder}'" onmouseleave="this.style.borderColor='${borderColor}'"
     onclick="openCreditorDetail('${cr.id}')">
     ${isUnrec ? `<div style="background:#92400e22;border:1px solid #92400e;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#fbbf24;font-weight:700;">⚠️ These purchases have no creditor assigned. Tap to review and link them to real suppliers.</div>` : ""}
@@ -12202,7 +12367,7 @@ function _crTxRender(creditorId){
       tx.syncStatus==="declined"?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:#7f1d1d44;color:#f87171;margin-left:4px;">⚠️Retry</span>':'';
 
     return `<div>
-      <div data-sc-row="1" id="${rowId}" onclick="openTxBillDetail('${creditorId}','${tx.id||origIdx}','creditor')"
+      <div data-sc-row="1" tabindex="-1" id="${rowId}" onclick="openTxBillDetail('${creditorId}','${tx.id||origIdx}','creditor')"
         style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;" onmouseenter="this.style.background='#0a1828'" onmouseleave="this.style.background='transparent'">
         <div style="font-size:11px;color:#6a7a9a;font-family:monospace;white-space:nowrap;">${dateShort}</div>
         <div style="min-width:0;">
@@ -14159,7 +14324,7 @@ ${monthTotal>0 ? `
       <div>${t('expColCatDesc')}</div><div>${t('expAmount')}</div><div>${t('expDate')}</div><div>${t('expColTags')}</div><div>${t('expColActions')}</div>
     </div>
     ${pageItems.map(e=>`
-    <div data-sc-row="1" class="exp-table-row">
+    <div data-sc-row="1" tabindex="-1" class="exp-table-row" onclick="_expEditId='${e.id}';safeRenderTab(currentTab);setTimeout(()=>{var f=document.getElementById('exp-form-card');if(f)f.scrollIntoView({behavior:'smooth'});},80);">
       <div style="min-width:0;">
         <div style="font-size:13px;font-weight:700;color:#1a2236;">${expCategoryIcon(e.category)} ${e.category}</div>
         ${e.note?`<div style="font-size:11px;color:#8893a8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(e.note)}</div>`:""}
@@ -14177,7 +14342,7 @@ ${monthTotal>0 ? `
 
     <!-- Mobile cards -->
     ${pageItems.map(e=>`
-    <div data-sc-row="1" class="exp-mobile-row">
+    <div data-sc-row="1" tabindex="-1" class="exp-mobile-row" onclick="_expEditId='${e.id}';safeRenderTab(currentTab);setTimeout(()=>{var f=document.getElementById('exp-form-card');if(f)f.scrollIntoView({behavior:'smooth'});},80);">
       <div style="font-size:24px;line-height:1;">${expCategoryIcon(e.category)}</div>
       <div style="flex:1;min-width:0;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -14455,7 +14620,7 @@ function _renderDebtorCard(dr){
   const borderColor = isArchived ? "var(--border-main,#2a2a2a)" : "var(--border-main,#1e2a45)";
   const cardBg = isArchived ? "var(--bg-main,#0a0a0a)" : "var(--bg-row-even,#0d1220)";
 
-  return `<div data-sc-row="1" style="background:${cardBg};border:1px solid ${borderColor};border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
+  return `<div data-sc-row="1" tabindex="-1" style="background:${cardBg};border:1px solid ${borderColor};border-radius:14px;padding:16px;cursor:pointer;transition:border-color 0.2s;"
     onmouseenter="this.style.borderColor='${isArchived?'#3a3a3a':'#2a6a3a'}'" onmouseleave="this.style.borderColor='${borderColor}'"
     onclick="openDebtorDetail('${dr.id}')">
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
@@ -14876,7 +15041,7 @@ function _drTxRender(debtorId){
     const rowId="dr-row-"+tx.id;
     const detailId="dr-det-"+tx.id;
     return `<div>
-      <div data-sc-row="1" id="${rowId}" onclick="openTxBillDetail('${debtorId}','${tx.id||origIdx}','debtor')"
+      <div data-sc-row="1" tabindex="-1" id="${rowId}" onclick="openTxBillDetail('${debtorId}','${tx.id||origIdx}','debtor')"
         style="display:grid;grid-template-columns:52px 1fr 54px 54px 62px 28px;align-items:center;gap:4px;padding:7px 10px;border-bottom:1px solid #0d1525;cursor:pointer;transition:background .15s;background:transparent;" onmouseenter="this.style.background='#08180e'" onmouseleave="this.style.background='transparent'">
         <div style="font-size:11px;color:#6a7a9a;font-family:monospace;white-space:nowrap;">${dateShort}</div>
         <div style="min-width:0;">
@@ -15912,12 +16077,12 @@ function renderAlertsTab(){
     lowStockItems.forEach(item=>{
       const stk = invGetStock(item.name);
       const min = item.minStock || 5;
-      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      html += `<div class="card" data-sc-row="1" tabindex="-1" onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(item.name)}</div>
           <div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${t('alCurrent')} <span style="color:#FFD700;font-weight:700;">${stk} ${escHtml(item.unit||"unit")}</span> · ${t('alMin')} ${min} ${escHtml(item.unit||"unit")}</div>
         </div>
-        <button onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+        <button onclick="event.stopPropagation();switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
       </div>`;
     });
     html += `</div>`;
@@ -15933,12 +16098,12 @@ function renderAlertsTab(){
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     negativeStockItems.forEach(item=>{
       const stk = invGetStock(item.name);
-      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-left:3px solid #ef4444;">
+      html += `<div class="card" data-sc-row="1" tabindex="-1" onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-left:3px solid #ef4444;cursor:pointer;">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(item.name)}</div>
           <div style="font-size:11px;color:#ff2222;margin-top:2px;font-weight:800;">⚠ Stock: ${stk} ${escHtml(item.unit||"unit")}</div>
         </div>
-        <button onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+        <button onclick="event.stopPropagation();switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
       </div>`;
     });
     html += `</div>`;
@@ -15948,12 +16113,12 @@ function renderAlertsTab(){
     html += sectionHeader("❌",t('alOutOfStock'),"#f66");
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     zeroStockItems.forEach(item=>{
-      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      html += `<div class="card" data-sc-row="1" tabindex="-1" onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(item.name)}</div>
           <div style="font-size:11px;color:#f66;margin-top:2px;font-weight:700;">${t('alOutOfStockLabel')} ${escHtml(item.unit||"unit")}</div>
         </div>
-        <button onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+        <button onclick="event.stopPropagation();switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
       </div>`;
     });
     html += `</div>`;
@@ -15968,12 +16133,12 @@ function renderAlertsTab(){
       out += `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px;">`;
       items.forEach(e=>{
         const dt = new Date(e.expiryDate+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
-        out += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        out += `<div class="card" data-sc-row="1" tabindex="-1" onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${e.itemName.replace(/'/g,"\\'")}'),50)" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;">
           <div style="flex:1;min-width:0;">
             <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(e.itemName)}</div>
             <div style="font-size:11px;color:${color};margin-top:2px;">${t('alExpiry')} ${dt} · ${t('alStock')} ${e.qty} ${escHtml(e.unit||"unit")}</div>
           </div>
-          <button onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${e.itemName.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+          <button onclick="event.stopPropagation();switchTab(4);setTimeout(()=>invShowItemDetail('${e.itemName.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
         </div>`;
       });
       out += `</div>`;
@@ -15989,7 +16154,7 @@ function renderAlertsTab(){
     html += sectionHeader("🏦",t('alCreditorOverdue'),"#fbbf24");
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     creditorOverdue.forEach(c=>{
-      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="switchTab(2);setTimeout(()=>openCreditorDetail('${c.id}'),50)">
+      html += `<div class="card" data-sc-row="1" tabindex="-1" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="switchTab(2);setTimeout(()=>openCreditorDetail('${c.id}'),50)">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(c.name)}</div>
           <div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${t('alOldestUnpaidBill')} <span style="color:#f59e0b;font-weight:700;">${c.days} ${t('alDaysAgo')}</span></div>
@@ -16005,7 +16170,7 @@ function renderAlertsTab(){
     html += sectionHeader("🧾",t('alDebtorOverdue'),"#4ade80");
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     debtorOverdue.forEach(d=>{
-      html += `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="switchTab(3);setTimeout(()=>openDebtorDetail('${d.id}'),50)">
+      html += `<div class="card" data-sc-row="1" tabindex="-1" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;" onclick="switchTab(3);setTimeout(()=>openDebtorDetail('${d.id}'),50)">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(d.name)}</div>
           <div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${t('alOldestUnpaidSale')} <span style="color:#4ade80;font-weight:700;">${d.days} ${t('alDaysAgo')}</span></div>
@@ -16197,7 +16362,7 @@ async function renderTeamTab(el) {
         const lastSeenMs = m.last_seen_at ? Date.now() - new Date(m.last_seen_at).getTime() : Infinity;
         const isOnline = lastSeenMs < 25 * 1000; // offline after 25s with no heartbeat
         console.log(`[Team] ${m.username} last_seen_at:`, m.last_seen_at, "| ms ago:", lastSeenMs === Infinity ? "never" : Math.round(lastSeenMs/1000)+"s", "| online:", isOnline);
-        return `<div style="background:var(--bg-main,#0a0e1a);border:1px solid ${m.blocked?"#5a1a1a":"#1e2a45"};border-radius:12px;padding:14px;margin-bottom:10px;">
+        return `<div data-sc-row="1" tabindex="-1" onclick="openEditMemberModal('${m.id}')" style="background:var(--bg-main,#0a0e1a);border:1px solid ${m.blocked?"#5a1a1a":"#1e2a45"};border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
             <div style="width:38px;height:38px;border-radius:10px;background:#1a0a3a;border:1px solid #3a1a7a;display:flex;align-items:center;justify-content:center;font-size:18px;">👤</div>
             <div style="flex:1;">
@@ -16738,7 +16903,7 @@ function renderHistoryTab(){
         const actor = e.actor || "Owner";
         const actorColor = actor === "Owner" ? "#FFD700" : "#a78bfa";
         const groupCount = e.groupId ? entries.filter(x=>x.groupId===e.groupId).length : 1;
-        return `<div onclick="showHistoryGroup('${e.id}','${dayKey}')" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border-main);cursor:pointer;" onmouseover="_hoverOn(this)" onmouseout="_hoverOff(this)">
+        return `<div data-sc-row="1" tabindex="-1" onclick="showHistoryGroup('${e.id}','${dayKey}')" style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border-main);cursor:pointer;" onmouseover="_hoverOn(this)" onmouseout="_hoverOff(this)">
           <div style="width:38px;height:38px;border-radius:10px;background:${meta.color}22;border:1px solid ${meta.color}55;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">${meta.icon}</div>
           <div style="flex:1;min-width:0;">
             <div style="font-size:13px;font-weight:800;color:var(--text-main);">${escHtml(e.action)}</div>
@@ -16953,7 +17118,7 @@ function renderSettings(){
       </div>`;
 
   function row(icon, label, sub, onclick, rightEl="›", danger=false) {
-    return `<div onclick="${onclick}" style="display:flex;align-items:center;gap:14px;padding:15px 18px;cursor:pointer;border-bottom:1px solid var(--border-main, #1a2035);-webkit-tap-highlight-color:transparent;" onmousedown="this.style.background='var(--bg-hover, #0d1525)'" onmouseup="this.style.background=''" onmouseleave="this.style.background=''">
+    return `<div data-sc-row="1" tabindex="-1" onclick="${onclick}" style="display:flex;align-items:center;gap:14px;padding:15px 18px;cursor:pointer;border-bottom:1px solid var(--border-main, #1a2035);-webkit-tap-highlight-color:transparent;" onmousedown="this.style.background='var(--bg-hover, #0d1525)'" onmouseup="this.style.background=''" onmouseleave="this.style.background=''">
       <span style="font-size:22px;flex-shrink:0;width:28px;text-align:center;">${icon}</span>
       <div style="flex:1;min-width:0;">
         <div style="font-size:15px;font-weight:700;color:${danger?'#f66':'var(--text-main,#e8eaf0)'};">${label}</div>
@@ -19292,6 +19457,8 @@ document.addEventListener("DOMContentLoaded", () => {
 function closeCustomerPage(){
   const pg=document.getElementById("customer-page");
   if(pg){pg.style.animation="cpSlideIn 0.2s ease reverse";setTimeout(()=>{pg.style.display="none";pg.style.animation="";},180);}
+  window._scDetailPage = null;
+  if(typeof updateShortcutBar === 'function') updateShortcutBar();
 }
 
 function openCustomerPage(id){
@@ -19419,6 +19586,8 @@ function openCustomerPage(id){
   // Store data for filter functions
   window._cpData={custId:c.id,purchases:reversedPurchases,totalVisits:visits};
   window._cpMode="date";
+  window._scDetailPage = { type: 'customerProfile', id: c.id };
+  if(typeof updateShortcutBar === 'function') updateShortcutBar();
 
   pg.style.display="block";
   pg.style.animation="cpSlideIn 0.25s ease";
@@ -21738,7 +21907,7 @@ function renderInventoryTab(){
             const catVal   = catItems.reduce((s,x)=>s+invGetStockValue(x.name),0);
             const catOOS   = catItems.filter(x=>invGetStock(x.name)<=0).length;
             const catLow   = catItems.filter(x=>invGetStock(x.name)>0&&invGetStock(x.name)<=3).length;
-            return `<div class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #FFD70030;"
+            return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #FFD70030;"
               onclick="invCatPageName='${cat.replace(/'/g,"\\'")}';invCatPageSearch=${tallyMatch(cat,q)?"''":`'${q.replace(/'/g,"\\'")}'`};invView='category';invSearchQuery='';safeRenderTab(currentTab)">
               <div>
                 <div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
@@ -21767,7 +21936,7 @@ function renderInventoryTab(){
           const catVal   = catItems.reduce((s,x)=>s+invGetStockValue(x.name),0);
           const catOOS   = catItems.filter(x=>invGetStock(x.name)<=0).length;
           const catLow   = catItems.filter(x=>invGetStock(x.name)>0&&invGetStock(x.name)<=3).length;
-          return `<div class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
+          return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
             onclick="invCatPageName='${cat.replace(/'/g,"\\'")}';invCatPageSearch='';invView='category';safeRenderTab(currentTab)">
             <div>
               <div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
@@ -24641,8 +24810,8 @@ function renderMessagesTab(){
         const ledgerBtn = scLedgerSharedToMe(conn)
           ? `<button onclick="event.stopPropagation();scRenderSharedLedger('${conn.id}')"
               style="display:inline-block;background:#1e2a45;border:1px solid #3a4a6a;color:#a78bfa;font-size:10px;font-weight:800;border-radius:6px;padding:2px 8px;cursor:pointer;margin-top:3px;margin-right:4px;">${t('msgViewLedger')}</button>` : "";
-        return `<div style="display:flex;align-items:center;gap:12px;padding:14px 12px;border-bottom:1px solid var(--border-main,#0d1220);">
-          <div onclick="scOpenChat('${peer}','${conn.id}')" style="display:flex;align-items:center;gap:12px;flex:1;cursor:pointer;min-width:0;">
+        return `<div data-sc-row="1" tabindex="-1" style="display:flex;align-items:center;gap:12px;padding:14px 12px;border-bottom:1px solid var(--border-main,#0d1220);cursor:pointer;" onclick="scOpenChat('${peer}','${conn.id}')">
+          <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">
             <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#1e3a6e,#2a5aaa);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#fff;flex-shrink:0;position:relative;">
               ${initials}
               ${unread>0?`<div style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;">${unread}</div>`:""}
@@ -24915,7 +25084,7 @@ function renderInventoryCategoryPage(catName){
         const avgCost = costEntries.length?(costEntries.reduce((s,e)=>s+Number(e.costPerUnit),0)/costEntries.length).toFixed(2):0;
         const stkColor = stk<0?"#ff2222":stk===0?"#f66":stk<=3?"#FFD700":"#4f4";
         const stkBg = stk<0?"#3a0000":stk===0?"#2a0808":stk<=3?"#1a1400":"#081a08";
-        return `<div class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}')">
+        return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}')">
           <div style="display:flex;align-items:flex-start;gap:12px;">
             <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
             <div style="flex:1;min-width:0;">
