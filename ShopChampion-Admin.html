@@ -3031,6 +3031,8 @@ var custFilteredIds = [];     // IDs of currently filtered/visible customers (fo
 var fbUnsubscribe = null; // real-time listener handle
 var _prefsUnsubscribe = null; // prefs/license onSnapshot handle
 var _firstSnapshotDone = false; // true after first Firestore customer snapshot
+var _creditorsCloudLoaded = false; // true after loadCreditorsFromCloud() resolves
+var _debtorsCloudLoaded   = false; // true after loadDebtorsFromCloud() resolves
 
 // ── Firebase init ──
 function initFirebase(cfg) {
@@ -3345,6 +3347,7 @@ function startFirestoreListener() {
   }
   if (fbUnsubscribe) fbUnsubscribe();
   _firstSnapshotDone = false;
+  _creditorsCloudLoaded = false; _debtorsCloudLoaded = false;
   fbUnsubscribe = userCol().onSnapshot(snap => {
     customers = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
     customers.forEach(c=>{ if(!c.photo)c.photo=""; if(!c.purchases)c.purchases=[]; if(!c.borrows)c.borrows=[]; });
@@ -6840,6 +6843,7 @@ function doLogout() {
   authPhone = ""; // clear in-memory phone so storageKey() resets
   _loginSuccessFired = false; // allow next login to proceed
   _firstSnapshotDone = false; // reset so customers tab shows loader on next login
+  _creditorsCloudLoaded = false; _debtorsCloudLoaded = false;
   authHash = "";             // clear credential hash
   // Unsubscribe all Firestore real-time listeners
   if(fbUnsubscribe){ try{ fbUnsubscribe(); } catch(e){} fbUnsubscribe=null; }
@@ -7160,6 +7164,12 @@ function switchTab(i){
   currentTab=i;renderTabs();renderTab(i);
   var _tc=document.getElementById('tab-content');if(_tc)_tc.scrollTop=0;
   if(typeof window._scClearRowFocus==='function') window._scClearRowFocus();
+  // If cloud data arrived while the user was on another tab, the dirty flag was set.
+  // Re-render now that the user has actually navigated here so they see fresh data.
+  var dirty = window._scCloudLoadDirty || 0;
+  if(i === 2 && (dirty & 1)){ window._scCloudLoadDirty &= ~1; safeRenderTab(2); }
+  else if(i === 3 && (dirty & 2)){ window._scCloudLoadDirty &= ~2; safeRenderTab(3); }
+  else if(i === 5 && (dirty & 4)){ window._scCloudLoadDirty &= ~4; safeRenderTab(5); }
 }
 
 // ─── PAGE HISTORY ENGINE ──────────────────────────────────────────────────────
@@ -11471,12 +11481,17 @@ function loadCreditorsFromCloud(){
   if(!db || !authPhone) return;
   db.collection("users").doc(authPhone).collection("app_data").doc("creditors")
     .get().then(doc=>{
+      _creditorsCloudLoaded = true;
       if(doc && doc.exists){
         const data = doc.data();
         if(data.list) try { localStorage.setItem(creditorsKey(), JSON.stringify(data.list)); } catch {}
         if(currentTab === 2) safeRenderTab(2);
+        else window._scCloudLoadDirty = (window._scCloudLoadDirty || 0) | 1;
+      } else {
+        // Doc doesn't exist yet (new shop) — still mark loaded so spinner clears
+        if(currentTab === 2) safeRenderTab(2);
       }
-    }).catch(()=>{});
+    }).catch(()=>{ _creditorsCloudLoaded = true; if(currentTab===2) safeRenderTab(2); });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -11512,6 +11527,14 @@ function newCreditorId(){ return "CR" + Date.now() + Math.random().toString(36).
 // ── Main Render ───────────────────────────────────────────────────────────────
 function renderCreditorsTab(){
   const creditors = getCreditors();
+
+  // Show spinner on new-device login while cloud fetch is still in flight
+  if(!_creditorsCloudLoaded && creditors.length === 0 && db && authPhone && !useLocalOnly){
+    return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;color:#7a8aaa;">
+      <div style="width:32px;height:32px;border:3px solid #1e3a6e;border-top-color:#f59e0b;border-radius:50%;animation:spin .8s linear infinite;"></div>
+      <div style="font-size:13px;">Loading creditors...</div>
+    </div>`;
+  }
   const totalOwed = creditors.filter(c=>c.id!=="CR_UNRECONCILED"&&!c._archived).reduce((s,c)=>s+Math.max(0,credBalance(c)),0);
   const totalCount = creditors.filter(c=>c.id!=="CR_UNRECONCILED"&&!c._archived).length;
   const unrecEntry = creditors.find(c=>c.id==="CR_UNRECONCILED");
@@ -13586,12 +13609,16 @@ function loadDebtorsFromCloud(){
   if(!db || !authPhone) return;
   db.collection("users").doc(authPhone).collection("app_data").doc("debtors")
     .get().then(doc=>{
+      _debtorsCloudLoaded = true;
       if(doc && doc.exists){
         const data = doc.data();
         if(data.list) try { localStorage.setItem(debtorsKey(), JSON.stringify(data.list)); } catch {}
         if(currentTab === 3) safeRenderTab(3);
+        else window._scCloudLoadDirty = (window._scCloudLoadDirty || 0) | 2;
+      } else {
+        if(currentTab === 3) safeRenderTab(3);
       }
-    }).catch(()=>{});
+    }).catch(()=>{ _debtorsCloudLoaded = true; if(currentTab===3) safeRenderTab(3); });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -13623,6 +13650,7 @@ function loadExpensesFromCloud(){
         const data = doc.data();
         if(data.list) try { localStorage.setItem(expensesKey(), JSON.stringify(data.list)); } catch {}
         if(currentTab === 5) safeRenderTab(5);
+        else window._scCloudLoadDirty = (window._scCloudLoadDirty || 0) | 4;
       }
     }).catch(()=>{});
 }
@@ -14515,6 +14543,14 @@ function newDebtorId(){ return "DR" + Date.now() + Math.random().toString(36).sl
 // ── Main Render ───────────────────────────────────────────────────────────────
 function renderDebtorsTab(){
   const debtors = getDebtors();
+
+  // Show spinner on new-device login while cloud fetch is still in flight
+  if(!_debtorsCloudLoaded && debtors.length === 0 && db && authPhone && !useLocalOnly){
+    return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;color:#7a8aaa;">
+      <div style="width:32px;height:32px;border:3px solid #1e3a6e;border-top-color:#60a5fa;border-radius:50%;animation:spin .8s linear infinite;"></div>
+      <div style="font-size:13px;">Loading debtors...</div>
+    </div>`;
+  }
   const totalOwed   = debtors.filter(d=>!d._archived).reduce((s,d)=>s+Math.max(0,debtBalance(d)),0);
   const totalCount  = debtors.filter(d=>!d._archived).length;
   const searchVal   = window._debtSearch || "";
