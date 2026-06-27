@@ -1812,6 +1812,17 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 
   </div>
 
+  <!-- Brave/Blocker Warning Banner -->
+  <div id="sc-blocker-banner" style="display:none;background:linear-gradient(135deg,#2a1500,#1a0e00);border-bottom:2px solid #f97316;padding:10px 16px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span style="font-size:18px;">🦁</span>
+    <div style="flex:1;min-width:200px;">
+      <div style="font-size:13px;font-weight:800;color:#fb923c;">Browser is blocking Firebase sync</div>
+      <div style="font-size:11px;color:#9a6a4a;margin-top:2px;" id="sc-blocker-msg">Your browser or an extension is blocking cloud sync. Data may not save or load.</div>
+    </div>
+    <button onclick="document.getElementById('sc-blocker-banner').style.display='none';" style="background:#3a1a00;border:1px solid #f97316;border-radius:8px;color:#fb923c;font-size:11px;font-weight:700;cursor:pointer;padding:5px 10px;white-space:nowrap;">✕ Dismiss</button>
+    <button onclick="showBlockerHelp()" style="background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:8px;color:#fff;font-size:11px;font-weight:800;cursor:pointer;padding:6px 12px;white-space:nowrap;">Fix This →</button>
+  </div>
+
   <!-- Tabs (desktop horizontal scroll — hidden on desktop, kept for mobile fallback) -->
   <div id="tab-bar" style="background:var(--bg-row-even,#0d1220);border-bottom:1px solid var(--border-main,#1e2a45);overflow-x:auto;display:flex;padding:6px 12px;gap:4px;"></div>
 
@@ -3247,7 +3258,7 @@ function saveSettingsToCloud(extraFields) {
     ...(extraFields || {})
   };
   userSettingsDoc().set(data, { merge: true })
-    .catch(e => console.warn("Settings cloud save error:", e));
+    .catch(e => { console.warn("Settings cloud save error:", e); _scCheckIfBlocked(e.message||String(e)); });
 
   // ── Also update public shop profile so other shops can find this shop ──
   _savePublicShopProfile();
@@ -3355,7 +3366,10 @@ function startFirestoreListener() {
   }, err => {
     _firstSnapshotDone = true; // allow render even on error
     updateDbStatus("⚠️ Firebase error: " + err.message, "#f84");
+    _scCheckIfBlocked(err.message); // show blocker banner if network-blocked
   });
+  // Silently probe Firebase reachability once per login
+  setTimeout(_scProbeFirebaseReachability, 3000);
   // Always load creditors/debtors/expenses unconditionally on every login
   // (not inside !invUnsubscribe guard — so they fire even on re-login or second device)
   loadCreditorsFromCloud();
@@ -3419,6 +3433,87 @@ function startFirestoreListener() {
 function updateDbStatus(msg, color) {
   const el = document.getElementById("db-status-text");
   if (el) { el.textContent = msg; el.style.color = color || "#4f4"; }
+}
+
+// ── Brave / ad-blocker detection ──────────────────────────────
+var _scBlockerShown = false;
+function _scCheckIfBlocked(errorMsg) {
+  if (_scBlockerShown) return;
+  const msg = (errorMsg || "").toLowerCase();
+  // Detect network-level block (ERR_BLOCKED_BY_CLIENT shows as failed fetch)
+  // or Firestore permission errors caused by blocked auth token exchange
+  const isBlocked = msg.includes("failed to fetch")
+    || msg.includes("network error")
+    || msg.includes("err_blocked")
+    || msg.includes("could not reach cloud firestore")
+    || msg.includes("websocket")
+    || msg.includes("transport");
+  if (!isBlocked) return;
+  _scBlockerShown = true;
+  const banner = document.getElementById("sc-blocker-banner");
+  const msgEl = document.getElementById("sc-blocker-msg");
+  if (!banner) return;
+  // Try to detect Brave specifically
+  const isBrave = navigator.brave && typeof navigator.brave.isBrave === "function";
+  if (isBrave) {
+    if (msgEl) msgEl.textContent = "Brave Shields is blocking Firebase. Click Fix This for step-by-step instructions.";
+  } else {
+    if (msgEl) msgEl.textContent = "An extension or browser setting is blocking Firebase cloud sync. Click Fix This to learn how to fix it.";
+  }
+  banner.style.display = "flex";
+}
+
+function showBlockerHelp() {
+  var isBrave = !!(navigator.brave && typeof navigator.brave.isBrave === "function");
+  var modal = document.getElementById("modal-overlay");
+  var body = document.getElementById("modal-body");
+  if (!modal || !body) return;
+  var braveHtml = '<div style="font-size:22px;margin-bottom:12px;">&#x1F981; Brave Shields Fix</div>'
+    + '<div style="font-size:13px;color:#9ca3af;margin-bottom:18px;">Brave Shields is blocking Firebase. Follow these steps:</div>'
+    + '<div style="display:flex;flex-direction:column;gap:12px;text-align:left;">'
+    + '<div style="background:#1a2a1a;border:1px solid #2a4a2a;border-radius:10px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;">'
+    + '<span style="font-size:20px;min-width:28px;">1&#xFE0F;&#x20E3;</span>'
+    + '<div><div style="font-weight:800;color:#4ade80;font-size:13px;">Click the Brave Lion icon</div>'
+    + '<div style="font-size:12px;color:#6a7a6a;margin-top:3px;">It is in the top-right of your browser address bar</div></div></div>'
+    + '<div style="background:#1a2a1a;border:1px solid #2a4a2a;border-radius:10px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;">'
+    + '<span style="font-size:20px;min-width:28px;">2&#xFE0F;&#x20E3;</span>'
+    + '<div><div style="font-weight:800;color:#4ade80;font-size:13px;">Toggle Shields to OFF</div>'
+    + '<div style="font-size:12px;color:#6a7a6a;margin-top:3px;">For this site only - your other sites stay protected</div></div></div>'
+    + '<div style="background:#1a2a1a;border:1px solid #2a4a2a;border-radius:10px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;">'
+    + '<span style="font-size:20px;min-width:28px;">3&#xFE0F;&#x20E3;</span>'
+    + '<div><div style="font-weight:800;color:#4ade80;font-size:13px;">Reload the page</div>'
+    + '<div style="font-size:12px;color:#6a7a6a;margin-top:3px;">Cloud sync will start working immediately</div></div></div>'
+    + '</div>'
+    + '<div style="margin-top:18px;padding:10px 14px;background:#0a1a2a;border:1px solid #1e3a5a;border-radius:8px;font-size:11px;color:#4a6a8a;">'
+    + '&#x1F4A1; ShopChampion only uses Firebase for your shop data - no ads, no tracking.</div>';
+  var otherHtml = '<div style="font-size:22px;margin-bottom:12px;">&#x1F512; Browser Blocking Fix</div>'
+    + '<div style="font-size:13px;color:#9ca3af;margin-bottom:18px;">An extension is blocking Firebase. Try these steps:</div>'
+    + '<div style="display:flex;flex-direction:column;gap:10px;text-align:left;">'
+    + '<div style="background:#1a1a2a;border:1px solid #2a2a4a;border-radius:10px;padding:12px 14px;">'
+    + '<div style="font-weight:800;color:#a78bfa;font-size:13px;">Option A - Disable extensions temporarily</div>'
+    + '<div style="font-size:12px;color:#6a6a8a;margin-top:3px;">Go to browser Extensions menu and disable ad-blockers or VPNs for this site</div></div>'
+    + '<div style="background:#1a1a2a;border:1px solid #2a2a4a;border-radius:10px;padding:12px 14px;">'
+    + '<div style="font-weight:800;color:#a78bfa;font-size:13px;">Option B - Use Chrome browser</div>'
+    + '<div style="font-size:12px;color:#6a6a8a;margin-top:3px;">Open ShopChampion in Chrome without extensions - works perfectly</div></div>'
+    + '<div style="background:#1a1a2a;border:1px solid #2a2a4a;border-radius:10px;padding:12px 14px;">'
+    + '<div style="font-weight:800;color:#a78bfa;font-size:13px;">Option C - Whitelist this site</div>'
+    + '<div style="font-size:12px;color:#6a6a8a;margin-top:3px;">In your ad-blocker settings, add rayalsaw09.github.io to the whitelist</div></div>'
+    + '</div>';
+  body.innerHTML = '<div style="text-align:center;max-width:420px;margin:0 auto;">'
+    + (isBrave ? braveHtml : otherHtml)
+    + '<button onclick="closeModal()" style="margin-top:20px;background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;padding:12px 28px;width:100%;">Got it</button>'
+    + '</div>';
+  modal.style.display = "flex";
+}
+
+// Probe Firebase reachability silently on login (not on every error — just once)
+function _scProbeFirebaseReachability() {
+  if (_scBlockerShown) return;
+  // Try a lightweight fetch to Firebase to see if it's reachable
+  const probe = "https://firestore.googleapis.com/";
+  fetch(probe, { method: "HEAD", mode: "no-cors" })
+    .then(() => { /* reachable — no action needed */ })
+    .catch(err => { _scCheckIfBlocked(err.message || "network error"); });
 }
 
 // ── Save / mutate helpers ──
@@ -6680,6 +6775,7 @@ function onLoginSuccess(phone) {
   if (!db) { try { initFirebase(SC_FIREBASE_CONFIG); } catch {} }
 
   // Load from localStorage first (fast render on same-origin), then Firestore overwrites
+  loadLocalCustomers(); // populate customers[] from localStorage immediately — Firestore will overwrite
   loadInventory();
 
   if (db && phone) {
@@ -6873,6 +6969,8 @@ function doLogout() {
   _histFetchedDays.clear();
   // Reset cloud dirty flags
   window._scCloudLoadDirty = 0;
+  // Reset blocker detection so it can re-trigger on next login
+  _scBlockerShown = false;
   appSettings = { shopName:"ShopChampion", currency:"₹", pointsPerRupee:1, redeemRate:100, welcomeBonus:0 };
   voiceSettings = { enabled:false, voiceLang:"en", voiceName:"", template:"", templateHi:"", rate:1, pitch:1, volume:1 };
   document.getElementById("main-app").style.display = "none";
@@ -7221,7 +7319,7 @@ function renderTab(i){
     setTimeout(scRenderPurchaseBanners, 0);
   }
   else if(i===1){
-    if(!_firstSnapshotDone && db && authPhone && !useLocalOnly){
+    if(!_firstSnapshotDone && db && authPhone && !useLocalOnly && customers.length === 0){
       el.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;color:#7a8aaa;">
         <div style="width:32px;height:32px;border:3px solid #1e3a6e;border-top-color:#60a5fa;border-radius:50%;animation:spin .8s linear infinite;"></div>
         <div style="font-size:13px;">Loading customers...</div>
@@ -20863,6 +20961,7 @@ function loadInventoryFromFirestore(cb){
     console.error("[Inv] onSnapshot error:", err.code, err.message);
     if(err.code === "permission-denied"){
       updateDbStatus("⚠️ Inventory: Firestore permission denied — check rules", "#f84");
+      _scCheckIfBlocked("permission-denied");
     }
   });
 }
@@ -25979,6 +26078,7 @@ async function saveBillToFirebase(billObj) {
     await ref.add({ ...billObj, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
   } catch (e) {
     console.warn("Bill save error:", e.message);
+    _scCheckIfBlocked(e.message);
     // Also save locally as fallback
     try {
       const stored = JSON.parse(localStorage.getItem(storageKey("bills")) || "[]");
