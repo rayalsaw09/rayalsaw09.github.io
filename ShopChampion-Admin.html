@@ -3356,14 +3356,17 @@ function startFirestoreListener() {
     _firstSnapshotDone = true; // allow render even on error
     updateDbStatus("⚠️ Firebase error: " + err.message, "#f84");
   });
+  // Always load creditors/debtors/expenses unconditionally on every login
+  // (not inside !invUnsubscribe guard — so they fire even on re-login or second device)
+  loadCreditorsFromCloud();
+  loadDebtorsFromCloud();
+  loadExpensesFromCloud();
+  loadCashLedgerFromCloud();
+  initCustomExpCats();
+
   // Always start inventory listener together with customer listener
   if(authPhone && !invUnsubscribe){
     loadInventoryFromFirestore(null);
-    loadCreditorsFromCloud();
-    loadDebtorsFromCloud();
-    loadExpensesFromCloud();
-    loadCashLedgerFromCloud();
-    initCustomExpCats();
     // Load shop connection requests (messages inbox)
     loadShopRequests();
     // Live listener: get notified when other shops accept our connect requests
