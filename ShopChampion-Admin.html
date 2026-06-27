@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Shop Champion — Admin</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
 <meta name="app-version" content="v5.3" />
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="manifest" href="manifest.json" />
@@ -3509,11 +3510,16 @@ function showBlockerHelp() {
 // Probe Firebase reachability silently on login (not on every error — just once)
 function _scProbeFirebaseReachability() {
   if (_scBlockerShown) return;
-  // Try a lightweight fetch to Firebase to see if it's reachable
-  const probe = "https://firestore.googleapis.com/";
-  fetch(probe, { method: "HEAD", mode: "no-cors" })
-    .then(() => { /* reachable — no action needed */ })
-    .catch(err => { _scCheckIfBlocked(err.message || "network error"); });
+  // Instead of an external HEAD request (creates console noise),
+  // watch silently: if Firestore snapshot hasn't arrived within 8s
+  // AND customers array is still empty → almost certainly blocked.
+  setTimeout(() => {
+    if (_scBlockerShown) return;
+    if (!db || !authPhone || useLocalOnly) return;
+    if (!_firstSnapshotDone && customers.length === 0) {
+      _scCheckIfBlocked("network error"); // timed out — likely blocked
+    }
+  }, 8000);
 }
 
 // ── Save / mutate helpers ──
