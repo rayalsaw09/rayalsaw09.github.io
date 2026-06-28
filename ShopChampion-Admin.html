@@ -3135,18 +3135,10 @@ function useDemoMode() {
 }
 
 function loadLocalCustomers() {
-  const SEED = [
-    {id:"SC001",name:"Rahul Sharma",phone:"9876543210",photo:"",totalSpend:85000,purchases:[{bill:"B001",amount:85000,date:new Date().toISOString(),notes:"Festival purchase"}]},
-    {id:"SC002",name:"Priya Mehta", phone:"9765432109",photo:"",totalSpend:62000,purchases:[]},
-    {id:"SC003",name:"Amit Kumar",  phone:"",           photo:"",totalSpend:34000,purchases:[]},
-    {id:"SC004",name:"Sunita Rao",  phone:"9543210987",photo:"",totalSpend:18000,purchases:[]},
-    {id:"SC005",name:"Vikram Singh",phone:"",           photo:"",totalSpend:7500, purchases:[]},
-    {id:"SC006",name:"Anita Joshi", phone:"9321098765",photo:"",totalSpend:2200, purchases:[]},
-  ];
   try {
     const s = localStorage.getItem(storageKey("customers_v2"));
-    customers = s ? JSON.parse(s) : JSON.parse(JSON.stringify(SEED));
-  } catch { customers = JSON.parse(JSON.stringify(SEED)); }
+    customers = s ? JSON.parse(s) : [];
+  } catch { customers = []; }
   customers.forEach(c=>{ if(!c.photo)c.photo=""; if(!c.purchases)c.purchases=[]; if(!c.borrows)c.borrows=[]; });
 }
 
@@ -3627,7 +3619,7 @@ document.addEventListener('DOMContentLoaded', () => {
         _deferredInstallPrompt = null;
       } else {
         // Fallback instructions
-        alert('To install:\n\n1. Tap the 3-dot menu in Chrome\n2. Tap "Add to Home Screen"\n3. Tap "Add"');
+        notify('To install: Tap the 3-dot menu → "Add to Home Screen" → "Add"', 'info');
       }
     });
   }
@@ -6025,7 +6017,7 @@ function openPrintWindow(html, width, height) {
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const w = window.open(url, '_blank', width && height ? `width=${width},height=${height}` : '');
-  if (!w) { alert("Please allow popups for this site to print."); URL.revokeObjectURL(url); return; }
+  if (!w) { notify("⚠️ Please allow popups for this site to print.", "error"); URL.revokeObjectURL(url); return; }
   w.addEventListener('load', () => { setTimeout(() => URL.revokeObjectURL(url), 5000); });
 }
 
@@ -7273,9 +7265,10 @@ function doLogout() {
   _firstSnapshotDone = false; // reset so customers tab shows loader on next login
   authHash = "";             // clear credential hash
   // Unsubscribe all Firestore real-time listeners
-  if (_fbListenerRetryTimer) { clearTimeout(_fbListenerRetryTimer); _fbListenerRetryTimer = null; }
+  if (_fbListenerRetryTimer) { clearTimeout(_fbListenerRetryTimer); _fbListenerRetryTimer = null; } _fbListenerRetryDelay=3000;
   if(fbUnsubscribe){ try{ fbUnsubscribe(); } catch(e){} fbUnsubscribe=null; }
   if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); } catch(e){} _prefsUnsubscribe=null; }
+  if(_invListenerRetryTimer){ clearTimeout(_invListenerRetryTimer); _invListenerRetryTimer=null; } _invListenerRetryDelay=3000;
   if(invUnsubscribe){ try{ invUnsubscribe(); } catch(e){} invUnsubscribe=null; }
   stopAllLinkedLedgerListeners();
   // Unsubscribe shop-connect listeners
@@ -11548,7 +11541,7 @@ function renderFestivals(sorted){
   </div>`;
 }
 function toggleFestWinner(id){const i=festWinners.indexOf(id);if(i>-1)festWinners.splice(i,1);else festWinners.push(id);safeRenderTab(currentTab);}
-function announceWinners(){const ev=document.getElementById("fest-event").value,rw=document.getElementById("fest-reward").value,s=getSorted(),ws=s.filter(c=>festWinners.includes(c.id));festAnnounced.unshift({event:ev,reward:rw,winners:ws.map(c=>c.name),date:new Date().toLocaleDateString()});festWinners=[];startConfetti();alert(`🎉 ${ws.map(c=>c.name).join(", ")} win ${rw} for ${ev}!`);safeRenderTab(currentTab);}
+function announceWinners(){const ev=document.getElementById("fest-event").value,rw=document.getElementById("fest-reward").value,s=getSorted(),ws=s.filter(c=>festWinners.includes(c.id));festAnnounced.unshift({event:ev,reward:rw,winners:ws.map(c=>c.name),date:new Date().toLocaleDateString()});festWinners=[];startConfetti();notify(`🎉 ${ws.map(c=>c.name).join(", ")} win ${rw} for ${ev}!`,"success");safeRenderTab(currentTab);}
 
 // ─── FIREBASE SETTINGS MODAL ─────────────────────────────────
 function showFirebaseSettings(){
@@ -21337,6 +21330,8 @@ function loadInventory(){
 
 // Called after login to pull latest from Firestore and keep in sync
 var invUnsubscribe = null; // Firestore real-time listener for inventory
+var _invListenerRetryTimer = null;
+var _invListenerRetryDelay = 3000;
 
 function loadInventoryFromFirestore(cb){
   if(!db || !authPhone){ console.warn("[Inv] loadInventoryFromFirestore: db=",!!db,"authPhone=",authPhone); if(cb) cb(); return; }
@@ -21345,6 +21340,7 @@ function loadInventoryFromFirestore(cb){
 
   const docRef = db.collection("users").doc(authPhone).collection("inventory_data").doc("items");
   console.log("[Inv] Starting listener on users/"+authPhone+"/inventory_data/items");
+  if(_invListenerRetryTimer){ clearTimeout(_invListenerRetryTimer); _invListenerRetryTimer=null; } _invListenerRetryDelay=3000;
 
   // First do a one-time GET for instant load, then start real-time listener
   docRef.get().then(snap=>{
@@ -21385,6 +21381,17 @@ function loadInventoryFromFirestore(cb){
       updateDbStatus("⚠️ Inventory: Firestore permission denied — check rules", "#f84");
       _scCheckIfBlocked("permission-denied");
     }
+    // Auto-restart inventory listener after WebChannel drop (same pattern as customer listener)
+    invUnsubscribe = null;
+    if(!_invListenerRetryDelay) _invListenerRetryDelay = 3000;
+    else _invListenerRetryDelay = Math.min(_invListenerRetryDelay * 2, 30000);
+    if(_invListenerRetryTimer) clearTimeout(_invListenerRetryTimer);
+    _invListenerRetryTimer = setTimeout(()=>{
+      if(authPhone && db){
+        console.log("[Inv] Restarting inventory listener after error (backoff:", _invListenerRetryDelay, "ms)");
+        loadInventoryFromFirestore(null);
+      }
+    }, _invListenerRetryDelay);
   });
 }
 
