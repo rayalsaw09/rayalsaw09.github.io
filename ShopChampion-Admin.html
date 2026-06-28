@@ -24634,26 +24634,39 @@ async function sendShopConnectRequest(targetProfile, myRoleForThem, theirRoleFor
 }
 
 function _showFirestoreRulesError(errMsg){
-  const rules = `// ShopChampion — Firestore Security Rules v6
-// CRIT-06 hardened: each shop can only read/write its own data.
+  const rules = `// ShopChampion — Firestore Security Rules v7
+// v7: Added isShopMember() so team members can read/write shop data.
 // Apply in Firebase Console -> Firestore -> Rules -> Publish
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // Helper: is the caller the authenticated owner of this phone slot?
-    // Each shop writes its Firebase uid into shop_profiles on login,
-    // so we resolve uid -> phone here.
     function isOwner(phone) {
       return request.auth != null
         && exists(/databases/$(database)/documents/shop_profiles/$(phone))
         && get(/databases/$(database)/documents/shop_profiles/$(phone)).data.uid == request.auth.uid;
     }
 
+    // Helper: is the caller a registered team member of this shop?
+    // Members sign in anonymously and register their UID in member_auth_uids subcollection.
+    function isShopMember(phone) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(phone)/member_auth_uids/$(request.auth.uid));
+    }
+
+    // Team member UID registration — member writes their own anon UID on login
+    // so isShopMember() can verify them on subsequent reads/writes.
+    // Allow any authenticated user to write their OWN UID entry (not others').
+    match /users/{phone}/member_auth_uids/{uid} {
+      allow write: if request.auth != null && request.auth.uid == uid;
+      allow read: if isOwner(phone);
+    }
+
     // Private shop data (customers, inventory, settings, expenses, etc.)
-    // Only the owning shop can read or write its own subtree.
+    // Both the shop owner AND any registered team member can read/write.
     match /users/{phone}/{document=**} {
-      allow read, write: if isOwner(phone);
+      allow read, write: if isOwner(phone) || isShopMember(phone);
     }
 
     // Public shop profiles
