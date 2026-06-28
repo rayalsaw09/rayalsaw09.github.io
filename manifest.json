@@ -1,14 +1,13 @@
 {
-  "name": "ShopChampion Pro",
+  "name": "ShopChampion Admin",
   "short_name": "ShopChampion",
-  "description": "Loyalty points & leaderboard app for your shop",
+  "description": "Retail management for Indian shop owners",
   "start_url": "/ShopChampion-Admin.html",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
-  "orientation": "portrait",
-  "background_color": "#0a0e1a",
-  "theme_color": "#FFD700",
+  "background_color": "#0a1628",
+  "theme_color": "#1d4ed8",
+  "orientation": "any",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -34,7 +33,5 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ],
-  "categories": ["business", "shopping"],
-  "lang": "en"
+  ]
 }
