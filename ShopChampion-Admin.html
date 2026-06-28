@@ -6824,14 +6824,38 @@ function onLoginSuccess(phone) {
       setTimeout(checkLowStockAndNotify, 4000);
     };
     try {
-      const _cu = firebase.auth().currentUser;
-      if (_cu) {
-        _afterAuth();
-      } else {
-        firebase.auth().signInAnonymously()
-          .then(_afterAuth)
-          .catch(e => { console.warn("[SC] anon auth failed, trying anyway:", e); _afterAuth(); });
-      }
+      // Set LOCAL persistence so the same anonymous UID survives page refreshes.
+      // Without this, every reload creates a new UID — shop_profiles.uid goes stale
+      // and isOwner() fails with permission-denied for everyone including the admin.
+      const _doAuth = () => {
+        const _cu = firebase.auth().currentUser;
+        if (_cu) {
+          // Re-save shop_profiles with the current UID on every login to keep it fresh
+          // (handles the case where UID changed due to browser clearing IndexedDB)
+          if (!currentMember) {
+            db.collection("shop_profiles").doc(phone).set({ uid: _cu.uid, phone: phone, updatedAt: Date.now() }, { merge: true })
+              .then(() => console.log("[SC] shop_profiles uid refreshed:", _cu.uid))
+              .catch(e => console.warn("[SC] shop_profiles uid refresh failed:", e.message));
+          }
+          _afterAuth();
+        } else {
+          firebase.auth().signInAnonymously()
+            .then(cred => {
+              // Save UID immediately after getting it
+              if (!currentMember && cred && cred.user) {
+                db.collection("shop_profiles").doc(phone).set({ uid: cred.user.uid, phone: phone, updatedAt: Date.now() }, { merge: true })
+                  .then(() => console.log("[SC] shop_profiles uid saved:", cred.user.uid))
+                  .catch(e => console.warn("[SC] shop_profiles uid save failed:", e.message));
+              }
+              _afterAuth();
+            })
+            .catch(e => { console.warn("[SC] anon auth failed, trying anyway:", e); _afterAuth(); });
+        }
+      };
+      // Use LOCAL persistence so UID survives page refresh (default is SESSION which resets on reload)
+      firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+        .then(_doAuth)
+        .catch(() => _doAuth()); // if setPersistence fails, proceed anyway
     } catch(e) {
       _afterAuth(); // Firebase Auth not available — proceed anyway
     }
@@ -6861,8 +6885,23 @@ function onLoginSuccess(phone) {
         };
         try {
           const _cu2 = firebase.auth().currentUser;
-          if (_cu2) { _afterAuth2(); }
-          else { firebase.auth().signInAnonymously().then(_afterAuth2).catch(()=>_afterAuth2()); }
+          if (_cu2) {
+            if (!currentMember) {
+              db.collection("shop_profiles").doc(phone).set({ uid: _cu2.uid, phone: phone, updatedAt: Date.now() }, { merge: true }).catch(()=>{});
+            }
+            _afterAuth2();
+          } else {
+            firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{}).finally(() => {
+              firebase.auth().signInAnonymously()
+                .then(cred => {
+                  if (!currentMember && cred && cred.user) {
+                    db.collection("shop_profiles").doc(phone).set({ uid: cred.user.uid, phone: phone, updatedAt: Date.now() }, { merge: true }).catch(()=>{});
+                  }
+                  _afterAuth2();
+                })
+                .catch(() => _afterAuth2());
+            });
+          }
         } catch(e) { _afterAuth2(); }
       } else if(attempts > 0){
         setTimeout(()=>retrySync(attempts-1), 1000);
