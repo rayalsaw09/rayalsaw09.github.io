@@ -6773,6 +6773,11 @@ function _startOwnerSessionWatcher(phone) {
         // Another device logged in and replaced our token
         console.warn('[Owner] Session superseded by another device — logging out');
         _stopOwnerSessionWatcher();
+        // Unsubscribe all Firestore listeners BEFORE alert so they don't fire during the modal
+        if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
+        if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
+        if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
+        try{ stopAllLinkedLedgerListeners(); }catch(_){}
         alert(currentLang === 'hi'
           ? '⚠️ आपका अकाउंट किसी और डिवाइस पर लॉगिन हो गया है। यहाँ लॉगआउट हो रहे हैं।'
           : '⚠️ Your account was logged in on another device. You have been logged out here.');
