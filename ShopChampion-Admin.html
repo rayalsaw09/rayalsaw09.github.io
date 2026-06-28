@@ -6733,10 +6733,13 @@ async function setNewPassword() {
 }
 
 // ─── Owner Single-Session System ────────────────────────────────────────────
+// When the owner logs in on Device B, Device A detects the new session token
+// and kicks itself out within 10 seconds. Members are NOT affected.
 var _ownerSessionToken = null;
 var _ownerSessionWatcher = null;
 
 function _generateOwnerToken() {
+  // Cryptographically random 32-char hex token
   const arr = new Uint8Array(16);
   crypto.getRandomValues(arr);
   return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -6748,10 +6751,14 @@ async function _registerOwnerSession(phone) {
   _ownerSessionToken = token;
   try {
     await db.collection('users').doc(phone).collection('owner_session').doc('current').set({
-      token: token, loginAt: Date.now(), ua: navigator.userAgent.slice(0, 100)
+      token: token,
+      loginAt: Date.now(),
+      ua: navigator.userAgent.slice(0, 100)
     });
     console.log('[Owner] Session token registered:', token.slice(0, 8) + '...');
-  } catch(e) { console.warn('[Owner] Could not register session token:', e.message); }
+  } catch(e) {
+    console.warn('[Owner] Could not register session token:', e.message);
+  }
 }
 
 function _startOwnerSessionWatcher(phone) {
@@ -6760,11 +6767,13 @@ function _startOwnerSessionWatcher(phone) {
     if (!authPhone || currentMember) { _stopOwnerSessionWatcher(); return; }
     try {
       const doc = await db.collection('users').doc(phone).collection('owner_session').doc('current').get();
-      if (!doc.exists) return;
+      if (!doc.exists) return; // no session doc — first login ever, ignore
       const remoteToken = doc.data().token;
       if (remoteToken && _ownerSessionToken && remoteToken !== _ownerSessionToken) {
+        // Another device logged in and replaced our token
         console.warn('[Owner] Session superseded by another device — logging out');
         _stopOwnerSessionWatcher();
+        // Unsubscribe all Firestore listeners BEFORE alert so they don't fire during the modal
         if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
         if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
         if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
@@ -6774,19 +6783,15 @@ function _startOwnerSessionWatcher(phone) {
           : '⚠️ Your account was logged in on another device. You have been logged out here.');
         doLogout();
       }
-    } catch(e) {}
-  }, 10000);
+    } catch(e) {
+      // Firestore error (offline, etc.) — ignore, keep watching
+    }
+  }, 10000); // check every 10s
   console.log('[Owner] Session watcher started');
 }
 
 function _stopOwnerSessionWatcher() {
   if (_ownerSessionWatcher) { clearInterval(_ownerSessionWatcher); _ownerSessionWatcher = null; }
-}
-
-function stopAllLinkedLedgerListeners() {
-  if (!_linkedLedgerListeners) return;
-  Object.keys(_linkedLedgerListeners).forEach(phone => { try { _linkedLedgerListeners[phone](); } catch(_) {} });
-  _linkedLedgerListeners = {};
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -6798,37 +6803,28 @@ function _forceLogoutAllMembers(shopPhone) {
 
   // Strategy: call force_logout_all_members RPC (runs as SECURITY DEFINER, bypasses RLS).
   // Fallback: direct PATCH (works if RLS policy allow_owner_manage_members permits it).
-  fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/force_logout_all_members`, {
+  // Try RPC with p_shop_phone param, then fallback to shop_phone, then direct PATCH
+  const _tryRpc = (paramName) => fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/force_logout_all_members`, {
     method: "POST",
-    headers: {
-      "apikey": SC_SUPABASE_ANON,
-      "Authorization": "Bearer " + SC_SUPABASE_ANON,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ p_shop_phone: shopPhone })
-  })
-  .then(r => {
-    if (r.ok) {
-      console.log("[Owner] All member sessions cleared via RPC");
-    } else {
-      // RPC not created yet — fall back to direct PATCH
-      console.warn("[Owner] RPC force_logout_all_members not found, trying direct PATCH");
+    headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+    body: JSON.stringify({ [paramName]: shopPhone })
+  });
+  _tryRpc("p_shop_phone").then(r => {
+    if (r.ok) { console.log("[Owner] All member sessions cleared via RPC (p_shop_phone)"); return; }
+    return _tryRpc("shop_phone").then(r2 => {
+      if (r2.ok) { console.log("[Owner] All member sessions cleared via RPC (shop_phone)"); return; }
+      // Both RPC attempts failed — log actual error then try direct PATCH
+      r2.text().then(t => console.warn("[Owner] RPC failed:", r2.status, t));
       return fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?shop_phone=eq.${encodeURIComponent(shopPhone)}`, {
         method: "PATCH",
-        headers: {
-          "apikey": SC_SUPABASE_ANON,
-          "Authorization": "Bearer " + SC_SUPABASE_ANON,
-          "Content-Type": "application/json",
-          "Prefer": "return=minimal"
-        },
+        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
         body: JSON.stringify({ active_session_token: null, last_seen_at: null })
-      }).then(r2 => {
-        if (r2.ok) console.log("[Owner] All member sessions cleared via direct PATCH");
-        else console.warn("[Owner] Direct PATCH also failed:", r2.status, "— add force_logout_all_members RPC in Supabase");
+      }).then(r3 => {
+        if (r3.ok) console.log("[Owner] All member sessions cleared via direct PATCH");
+        else r3.text().then(t => console.warn("[Owner] Direct PATCH also failed:", r3.status, t));
       });
-    }
-  })
-  .catch(e => console.warn("[Owner] Member session clear error:", e.message));
+    });
+  }).catch(e => console.warn("[Owner] Member session clear error:", e.message));
 }
 
 function onLoginSuccess(phone) {
@@ -6920,6 +6916,7 @@ function onLoginSuccess(phone) {
             .catch(e => console.warn("[Member] UID register in _afterAuth failed:", e.message));
         }
       } else if (!currentMember && phone) {
+        // Owner login — register session token + start watcher for single-session enforcement
         _registerOwnerSession(phone).then(() => _startOwnerSessionWatcher(phone));
       }
       startFirestoreListener();
@@ -6986,19 +6983,12 @@ function onLoginSuccess(phone) {
     } catch(e) {
       _afterAuth(); // Firebase Auth not available — proceed anyway
     }
-    // Check Firestore — if doc doesn't exist but we have local data, push it up (first-time migration)
-    loadInventoryFromFirestore((docExists)=>{
-      if(!docExists && inventoryItems.length > 0){
-        console.log("[Inv] Migrating", inventoryItems.length, "items from localStorage to Firestore");
-        saveInventory();
-      }
-      safeRenderTab(currentTab);
-    });
   } else if (phone) {
     shopId = phone;
     const retrySync = (attempts) => {
       if(db && authPhone){
         const _afterAuth2 = () => {
+          // Owner login via retrySync path — register session token too
           if (!currentMember && phone) {
             _registerOwnerSession(phone).then(() => _startOwnerSessionWatcher(phone));
           }
@@ -7105,7 +7095,7 @@ function doLogout() {
   if (window._ptLiveTimer) { clearInterval(window._ptLiveTimer); window._ptLiveTimer = null; }
   if (window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
   scStopPolling();
-  _stopOwnerSessionWatcher();
+  _stopOwnerSessionWatcher(); // stop single-session polling
   _ownerSessionToken = null;
   const adState = window._scAdState;
   if (adState) {
@@ -7153,7 +7143,7 @@ function doLogout() {
   if(fbUnsubscribe){ try{ fbUnsubscribe(); } catch(e){} fbUnsubscribe=null; }
   if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); } catch(e){} _prefsUnsubscribe=null; }
   if(invUnsubscribe){ try{ invUnsubscribe(); } catch(e){} invUnsubscribe=null; }
-  stopAllLinkedLedgerListeners();
+  stopAllLinkedLedgerListeners(); // stop cross-shop ledger listeners before clearing authPhone
   // Unsubscribe shop-connect listeners
   if(_payReqListener){ try{ _payReqListener(); } catch(e){} _payReqListener=null; }
   if(_autoAcceptedListener){ try{ _autoAcceptedListener(); } catch(e){} _autoAcceptedListener=null; }
@@ -13489,6 +13479,14 @@ function stopLinkedLedgerListener(theirPhone) {
   }
 }
 
+function stopAllLinkedLedgerListeners() {
+  if (!_linkedLedgerListeners) return;
+  Object.keys(_linkedLedgerListeners).forEach(phone => {
+    try { _linkedLedgerListeners[phone](); } catch(_) {}
+  });
+  _linkedLedgerListeners = {};
+}
+
 // ─── Start listeners for all linked creditors ────────────────────────────────
 // When Shop B (creditor) cross-writes into my ledger, I see it live
 // This is for CUSTOMER VIEW — Shop A is a customer, linked shops cross-write
@@ -17116,6 +17114,7 @@ function _startMemberHeartbeat() {
       const valid = await res.json();
       if(!valid) {
         notify("⚠️ You've been logged out by the shop owner.", "error");
+        // Unsubscribe Firestore listeners immediately so they don't error during the 2s delay
         if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
         if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
         if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
@@ -24845,30 +24844,41 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper: is the caller the authenticated owner of this phone slot?
     function isOwner(phone) {
       return request.auth != null
         && exists(/databases/$(database)/documents/shop_profiles/$(phone))
         && get(/databases/$(database)/documents/shop_profiles/$(phone)).data.uid == request.auth.uid;
     }
 
+    // Helper: is the caller a registered team member of this shop?
     function isShopMember(phone) {
       return request.auth != null
         && exists(/databases/$(database)/documents/users/$(phone)/member_auth_uids/$(request.auth.uid));
     }
 
+    // Team member UID registration — member writes their own anon UID on login
     match /users/{phone}/member_auth_uids/{uid} {
       allow write: if request.auth != null && request.auth.uid == uid;
       allow read: if isOwner(phone);
     }
 
+    // Owner single-session token — only the owner can read/write their own session doc.
+    // Also allows any authenticated user to write their own session (needed on first login
+    // before shop_profiles is updated with the new UID).
     match /users/{phone}/owner_session/current {
       allow read, write: if isOwner(phone) || request.auth != null;
     }
 
+    // Private shop data (customers, inventory, settings, expenses, etc.)
     match /users/{phone}/{document=**} {
       allow read, write: if isOwner(phone) || isShopMember(phone);
     }
 
+    // Public shop profiles
+    // Anyone can read. Any authenticated user can write their own phone slot
+    // (needed on first login when uid in shop_profiles is stale/missing).
+    // isOwner check is not used here because it reads shop_profiles — circular.
     match /shop_profiles/{phone} {
       allow read: if true;
       allow write: if request.auth != null;
