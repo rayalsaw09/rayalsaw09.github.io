@@ -1652,6 +1652,12 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 </div>
 
 <!-- LOGIN -->
+<!-- SC Login Loading Overlay -->
+<div id="sc-login-loading" style="display:none;position:fixed;inset:0;z-index:99998;background:var(--bg-main,#0a1628);flex-direction:column;align-items:center;justify-content:center;gap:20px;">
+  <div style="width:48px;height:48px;border:4px solid #1e3a5a;border-top-color:#6366f1;border-radius:50%;animation:scSpin 0.8s linear infinite;"></div>
+  <div style="color:#94a3b8;font-size:15px;font-weight:600;" id="sc-login-loading-msg">Loading your shop...</div>
+</div>
+<style>@keyframes scSpin{to{transform:rotate(360deg)}}</style>
 <div id="login-screen">
   <div style="background:var(--bg-card,#0f1628);border:1px solid var(--border-main,#1e2a45);border-radius:20px;padding:32px 28px;width:360px;text-align:center;">
     <div id="login-shop-icon" style="font-size:52px;margin-bottom:10px;">🏆</div>
@@ -6761,26 +6767,31 @@ async function _registerOwnerSession(phone) {
 function _startOwnerSessionWatcher(phone) {
   if (!phone || !db) return;
   _stopOwnerSessionWatcher(); // ensure no duplicate watcher
+  // Grace period: wait 20s before first check so our own token write can settle in Firestore.
+  // Without this, the watcher can read a stale token from a previous device and self-kick.
+  let _graceDone = false;
+  const _graceTimer = setTimeout(() => { _graceDone = true; }, 20000);
   _ownerSessionWatcher = setInterval(async () => {
-    if (!authPhone || currentMember) { _stopOwnerSessionWatcher(); return; }
+    if (!authPhone || currentMember) { clearTimeout(_graceTimer); _stopOwnerSessionWatcher(); return; }
+    if (!_graceDone) return; // still in grace period — skip this tick
     try {
       const doc = await db.collection('users').doc(phone).collection('owner_session').doc('current').get();
       if (!doc.exists) return;
       const remoteToken = doc.data().token;
       if (remoteToken && _ownerSessionToken && remoteToken !== _ownerSessionToken) {
         console.warn('[Owner] Session superseded by another device — logging out');
+        clearTimeout(_graceTimer);
         _stopOwnerSessionWatcher();
-        // Stop ALL listeners before alert() blocks the thread
+        // Stop ALL listeners immediately
         if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
         if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
         if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
         if(_payReqListener){ try{ _payReqListener(); }catch(_){} _payReqListener=null; }
         if(_autoAcceptedListener){ try{ _autoAcceptedListener(); }catch(_){} _autoAcceptedListener=null; }
         try{ stopAllLinkedLedgerListeners(); }catch(_){}
-        alert(currentLang === 'hi'
-          ? '⚠️ आपका अकाउंट किसी और डिवाइस पर लॉगिन हो गया है। यहाँ लॉगआउट हो रहे हैं।'
-          : '⚠️ Your account was logged in on another device. You have been logged out here.');
-        doLogout();
+        // Show non-blocking overlay instead of alert() (alert blocks on mobile)
+        _showSessionKickedOverlay();
+        setTimeout(() => doLogout(), 2500);
       }
     } catch(e) {}
   }, 10000);
@@ -6789,6 +6800,36 @@ function _startOwnerSessionWatcher(phone) {
 
 function _stopOwnerSessionWatcher() {
   if (_ownerSessionWatcher) { clearInterval(_ownerSessionWatcher); _ownerSessionWatcher = null; }
+}
+
+function _scHideLoginLoading() {
+  const el = document.getElementById('sc-login-loading');
+  if (el) el.style.display = 'none';
+  const kicked = document.getElementById('_sc_kicked_overlay');
+  if (kicked) kicked.style.display = 'none';
+  const _isDesktop = window.innerWidth >= 641;
+  const mainApp = document.getElementById('main-app');
+  if (mainApp && mainApp.style.display === 'none') {
+    mainApp.style.display = _isDesktop ? 'flex' : 'block';
+  }
+}
+
+function _showSessionKickedOverlay() {
+  let ov = document.getElementById('_sc_kicked_overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = '_sc_kicked_overlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(10,22,40,0.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+    ov.innerHTML = '<div style="font-size:48px;">📱</div>'
+      + '<div style="color:#fff;font-size:18px;font-weight:700;text-align:center;padding:0 24px;">'
+      + (currentLang === 'hi' ? 'आपका अकाउंट किसी और डिवाइस पर लॉगिन हो गया है।' : 'Logged in on another device.')
+      + '</div>'
+      + '<div style="color:#94a3b8;font-size:14px;text-align:center;">'
+      + (currentLang === 'hi' ? 'यहाँ से लॉगआउट हो रहे हैं...' : 'Logging out here...')
+      + '</div>';
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
 }
 
 function stopAllLinkedLedgerListeners() {
@@ -6850,9 +6891,17 @@ function onLoginSuccess(phone) {
     setTimeout(() => _forceLogoutAllMembers(phone), 1500); // slight delay so Firebase auth settles first
   }
 
+  // Show loading screen while Firebase auth + data loads
   document.getElementById("login-screen").style.display = "none";
+  const _loadingEl = document.getElementById("sc-login-loading");
+  const _loadingMsg = document.getElementById("sc-login-loading-msg");
+  if (_loadingEl) {
+    if (_loadingMsg) _loadingMsg.textContent = currentLang === 'hi' ? 'दुकान लोड हो रही है...' : 'Loading your shop...';
+    _loadingEl.style.display = "flex";
+  }
   var _isDesktop = window.innerWidth >= 641;
-  document.getElementById("main-app").style.display = _isDesktop ? "flex" : "block";
+  // main-app stays hidden until _scHideLoginLoading() is called after first data render
+  document.getElementById("main-app").style.display = "none";
   // Init ShopChat
   setTimeout(()=>{
     scLoadConnections().then(()=>scLoadPendingRequests()).then(async()=>{
@@ -6947,6 +6996,7 @@ function onLoginSuccess(phone) {
             currentTab = firstAllowed[0].index;
           }
         }
+        _scHideLoginLoading(); // show main app now that data is ready
         safeRenderTab(currentTab);
       });
       loadShopRequests();
@@ -7019,7 +7069,7 @@ function onLoginSuccess(phone) {
             }
           });
           setTimeout(startPaymentRequestListener, 2000);
-          loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
+          loadSettingsFromCloud(()=>{ _scHideLoginLoading(); safeRenderTab(currentTab); });
         };
         try {
           const _cu2 = firebase.auth().currentUser;
@@ -7150,6 +7200,11 @@ function doLogout() {
   const pill = document.getElementById("header-member-pill");
   if(pill) pill.style.display = "none";
 
+  // Hide any loading/kicked overlays
+  const _ll = document.getElementById('sc-login-loading');
+  if (_ll) _ll.style.display = 'none';
+  const _ko = document.getElementById('_sc_kicked_overlay');
+  if (_ko) _ko.style.display = 'none';
   try { firebase.auth().signOut(); } catch{}
   localStorage.removeItem("sc_auth_phone");
   localStorage.removeItem("sc_auth_uid");
