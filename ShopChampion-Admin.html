@@ -6732,9 +6732,58 @@ async function setNewPassword() {
   onLoginSuccess(authPhone);
 }
 
+function _forceLogoutAllMembers(shopPhone) {
+  // Called when owner logs in — clears session_token for ALL members of this shop.
+  // Each member's heartbeat (every 10s) calls verify_member_session which returns false
+  // → member sees "You've been logged out by the shop owner" and is kicked out automatically.
+  if (!shopPhone) return;
+
+  // Strategy: call force_logout_all_members RPC (runs as SECURITY DEFINER, bypasses RLS).
+  // Fallback: direct PATCH (works if RLS policy allow_owner_manage_members permits it).
+  fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/force_logout_all_members`, {
+    method: "POST",
+    headers: {
+      "apikey": SC_SUPABASE_ANON,
+      "Authorization": "Bearer " + SC_SUPABASE_ANON,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ p_shop_phone: shopPhone })
+  })
+  .then(r => {
+    if (r.ok) {
+      console.log("[Owner] All member sessions cleared via RPC");
+    } else {
+      // RPC not created yet — fall back to direct PATCH
+      console.warn("[Owner] RPC force_logout_all_members not found, trying direct PATCH");
+      return fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?shop_phone=eq.${encodeURIComponent(shopPhone)}`, {
+        method: "PATCH",
+        headers: {
+          "apikey": SC_SUPABASE_ANON,
+          "Authorization": "Bearer " + SC_SUPABASE_ANON,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({ session_token: null, last_seen_at: null })
+      }).then(r2 => {
+        if (r2.ok) console.log("[Owner] All member sessions cleared via direct PATCH");
+        else console.warn("[Owner] Direct PATCH also failed:", r2.status, "— add force_logout_all_members RPC in Supabase");
+      });
+    }
+  })
+  .catch(e => console.warn("[Owner] Member session clear error:", e.message));
+}
+
 function onLoginSuccess(phone) {
   if(_loginSuccessFired) return;
   _loginSuccessFired = true;
+
+  // When owner logs in — invalidate ALL active member sessions for this shop.
+  // Members will be kicked out within 10s (next heartbeat detects null session_token).
+  // Skip this if the login is a member session (currentMember is set before onLoginSuccess).
+  if (!currentMember && phone) {
+    setTimeout(() => _forceLogoutAllMembers(phone), 1500); // slight delay so Firebase auth settles first
+  }
+
   document.getElementById("login-screen").style.display = "none";
   var _isDesktop = window.innerWidth >= 641;
   document.getElementById("main-app").style.display = _isDesktop ? "flex" : "block";
