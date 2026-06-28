@@ -6770,9 +6770,12 @@ function _startOwnerSessionWatcher(phone) {
       if (remoteToken && _ownerSessionToken && remoteToken !== _ownerSessionToken) {
         console.warn('[Owner] Session superseded by another device — logging out');
         _stopOwnerSessionWatcher();
+        // Stop ALL listeners before alert() blocks the thread
         if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
         if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
         if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
+        if(_payReqListener){ try{ _payReqListener(); }catch(_){} _payReqListener=null; }
+        if(_autoAcceptedListener){ try{ _autoAcceptedListener(); }catch(_){} _autoAcceptedListener=null; }
         try{ stopAllLinkedLedgerListeners(); }catch(_){}
         alert(currentLang === 'hi'
           ? '⚠️ आपका अकाउंट किसी और डिवाइस पर लॉगिन हो गया है। यहाँ लॉगआउट हो रहे हैं।'
@@ -7189,6 +7192,11 @@ function doLogout() {
   _scBlockerShown = false;
   appSettings = { shopName:"ShopChampion", currency:"₹", pointsPerRupee:1, redeemRate:100, welcomeBonus:0 };
   voiceSettings = { enabled:false, voiceLang:"en", voiceName:"", template:"", templateHi:"", rate:1, pitch:1, volume:1 };
+  // Immediately blank out visible data so stale records don't show during the login→reload gap
+  try {
+    const tc = document.getElementById("tab-content");
+    if (tc) tc.innerHTML = "";
+  } catch(_) {}
   document.getElementById("main-app").style.display = "none";
   document.getElementById("login-screen").style.display = "flex";
   // Reset auth UI to phone step
