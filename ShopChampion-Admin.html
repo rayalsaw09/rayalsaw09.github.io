@@ -6798,37 +6798,28 @@ function _forceLogoutAllMembers(shopPhone) {
 
   // Strategy: call force_logout_all_members RPC (runs as SECURITY DEFINER, bypasses RLS).
   // Fallback: direct PATCH (works if RLS policy allow_owner_manage_members permits it).
-  fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/force_logout_all_members`, {
+  // Try RPC with p_shop_phone param, then fallback to shop_phone, then direct PATCH
+  const _tryRpc = (paramName) => fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/force_logout_all_members`, {
     method: "POST",
-    headers: {
-      "apikey": SC_SUPABASE_ANON,
-      "Authorization": "Bearer " + SC_SUPABASE_ANON,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ p_shop_phone: shopPhone })
-  })
-  .then(r => {
-    if (r.ok) {
-      console.log("[Owner] All member sessions cleared via RPC");
-    } else {
-      // RPC not created yet — fall back to direct PATCH
-      console.warn("[Owner] RPC force_logout_all_members not found, trying direct PATCH");
+    headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+    body: JSON.stringify({ [paramName]: shopPhone })
+  });
+  _tryRpc("p_shop_phone").then(r => {
+    if (r.ok) { console.log("[Owner] All member sessions cleared via RPC (p_shop_phone)"); return; }
+    return _tryRpc("shop_phone").then(r2 => {
+      if (r2.ok) { console.log("[Owner] All member sessions cleared via RPC (shop_phone)"); return; }
+      // Both RPC attempts failed — log actual error then try direct PATCH
+      r2.text().then(t => console.warn("[Owner] RPC failed:", r2.status, t));
       return fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?shop_phone=eq.${encodeURIComponent(shopPhone)}`, {
         method: "PATCH",
-        headers: {
-          "apikey": SC_SUPABASE_ANON,
-          "Authorization": "Bearer " + SC_SUPABASE_ANON,
-          "Content-Type": "application/json",
-          "Prefer": "return=minimal"
-        },
+        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
         body: JSON.stringify({ session_token: null, last_seen_at: null })
-      }).then(r2 => {
-        if (r2.ok) console.log("[Owner] All member sessions cleared via direct PATCH");
-        else console.warn("[Owner] Direct PATCH also failed:", r2.status, "— add force_logout_all_members RPC in Supabase");
+      }).then(r3 => {
+        if (r3.ok) console.log("[Owner] All member sessions cleared via direct PATCH");
+        else r3.text().then(t => console.warn("[Owner] Direct PATCH also failed:", r3.status, t));
       });
-    }
-  })
-  .catch(e => console.warn("[Owner] Member session clear error:", e.message));
+    });
+  }).catch(e => console.warn("[Owner] Member session clear error:", e.message));
 }
 
 function onLoginSuccess(phone) {
