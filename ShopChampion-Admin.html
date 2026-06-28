@@ -6988,44 +6988,76 @@ function onLoginSuccess(phone) {
     // Firestore rules use request.auth != null — must be signed in first.
     const _afterAuth = () => {
       // If this is a member session, register their Firebase UID NOW (auth is ready)
-      // This must happen before startFirestoreListener() so rules pass immediately
+      // CRITICAL: startFirestoreListener must only run AFTER the UID write resolves.
+      // Firestore rules use isShopMember() which checks member_auth_uids/{uid}.
+      // If we start the listener before the UID is written, every read gets permission-denied.
       if (currentMember && phone) {
         const uid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
+        const _startListenerAfterUid = () => {
+          startFirestoreListener();
+          loadInventoryFromFirestore((docExists) => {
+            if (!docExists && inventoryItems.length > 0) {
+              console.log("[Inv] Migrating", inventoryItems.length, "items from localStorage to Firestore");
+              saveInventory();
+            }
+          });
+          loadSettingsFromCloud(()=>{
+            if (currentMember) {
+              const firstAllowed = getTabs();
+              if (firstAllowed.length > 0 && !isTabVisible(TABS_BASE[currentTab])) {
+                currentTab = firstAllowed[0].index;
+              }
+            }
+            _scHideLoginLoading();
+            safeRenderTab(currentTab);
+          });
+          loadShopRequests();
+          setTimeout(startPaymentRequestListener, 2000);
+          setTimeout(sweepAcceptedPaymentSyncRequests, 3000);
+          setTimeout(cleanupStaleSentRequests, 5000);
+          setTimeout(checkLowStockAndNotify, 4000);
+        };
         if (uid && db) {
           db.collection("users").doc(phone)
             .collection("member_auth_uids").doc(uid)
             .set({ registeredAt: Date.now(), memberId: currentMember.id || "" }, { merge: true })
-            .then(() => console.log("[Member] UID registered in _afterAuth:", uid))
-            .catch(e => console.warn("[Member] UID register in _afterAuth failed:", e.message));
+            .then(() => {
+              console.log("[Member] UID registered in _afterAuth:", uid);
+              _startListenerAfterUid();
+            })
+            .catch(e => {
+              console.warn("[Member] UID register in _afterAuth failed:", e.message);
+              _startListenerAfterUid(); // start anyway — don't block app on Firestore write error
+            });
+        } else {
+          _startListenerAfterUid(); // no uid yet — start anyway, rules may still pass
         }
       } else if (!currentMember && phone) {
         _registerOwnerSession(phone).then(() => _startOwnerSessionWatcher(phone));
+        startFirestoreListener();
+      } else {
+        startFirestoreListener();
       }
-      startFirestoreListener();
-      // Migration: if Firestore doc doesn't exist yet but we have local data, push it up.
-      // Must run AFTER startFirestoreListener (auth is settled, isOwner() passes).
-      loadInventoryFromFirestore((docExists) => {
-        if (!docExists && inventoryItems.length > 0) {
-          console.log("[Inv] Migrating", inventoryItems.length, "items from localStorage to Firestore");
-          saveInventory();
-        }
-      });
-      loadSettingsFromCloud(()=>{
-        // For members: redirect to their first allowed tab
-        if (currentMember) {
-          const firstAllowed = getTabs();
-          if (firstAllowed.length > 0 && !isTabVisible(TABS_BASE[currentTab])) {
-            currentTab = firstAllowed[0].index;
+      // Note: loadInventoryFromFirestore, loadSettingsFromCloud, and related calls
+      // are handled inside _startListenerAfterUid (for members) or directly above (for owner).
+      // For owner path they still need to run — handled below.
+      if (!currentMember) {
+        loadInventoryFromFirestore((docExists) => {
+          if (!docExists && inventoryItems.length > 0) {
+            console.log("[Inv] Migrating", inventoryItems.length, "items from localStorage to Firestore");
+            saveInventory();
           }
-        }
-        _scHideLoginLoading(); // show main app now that data is ready
-        safeRenderTab(currentTab);
-      });
-      loadShopRequests();
-      setTimeout(startPaymentRequestListener, 2000);
-      setTimeout(sweepAcceptedPaymentSyncRequests, 3000);
-      setTimeout(cleanupStaleSentRequests, 5000);
-      setTimeout(checkLowStockAndNotify, 4000);
+        });
+        loadSettingsFromCloud(()=>{
+          _scHideLoginLoading();
+          safeRenderTab(currentTab);
+        });
+        loadShopRequests();
+        setTimeout(startPaymentRequestListener, 2000);
+        setTimeout(sweepAcceptedPaymentSyncRequests, 3000);
+        setTimeout(cleanupStaleSentRequests, 5000);
+        setTimeout(checkLowStockAndNotify, 4000);
+      }
     };
     try {
       // Set LOCAL persistence so the same anonymous UID survives page refreshes.
