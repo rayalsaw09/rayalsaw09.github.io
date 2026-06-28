@@ -3245,6 +3245,7 @@ function userSettingsDoc() {
 // ── Cloud settings: save all user prefs to Firestore ──
 function saveSettingsToCloud(extraFields) {
   if (!db || !authPhone) return;
+  if (currentMember) return; // members cannot write shop settings — owner only
   const data = {
     display_settings:  displaySettings,
     app_settings:      appSettings,
@@ -3269,6 +3270,7 @@ function saveSettingsToCloud(extraFields) {
 // CRIT-06: Includes Firebase uid so Firestore Rules can verify ownership via isOwner()
 function _savePublicShopProfile(){
   if(!db || !authPhone) return;
+  if(currentMember) return; // members must not write shop_profiles — owner only
   const shopId = "SC-" + String(authPhone).slice(-6);
   const profile = {
     shopId,
@@ -3443,12 +3445,17 @@ function _scCheckIfBlocked(errorMsg) {
   const msg = (errorMsg || "").toLowerCase();
   // Detect network-level block (ERR_BLOCKED_BY_CLIENT shows as failed fetch)
   // or Firestore permission errors caused by blocked auth token exchange
+  // Detect Brave/extension blocking: shows as network errors OR as permission-denied
+  // (Brave blocks firestore.googleapis.com so auth token never arrives → Firebase reports permission-denied)
+  const isBraveBlocking = !!(navigator.brave && typeof navigator.brave.isBrave === "function");
   const isBlocked = msg.includes("failed to fetch")
     || msg.includes("network error")
     || msg.includes("err_blocked")
     || msg.includes("could not reach cloud firestore")
     || msg.includes("websocket")
-    || msg.includes("transport");
+    || msg.includes("transport")
+    || (msg.includes("permission-denied") && isBraveBlocking)
+    || (msg.includes("missing or insufficient permissions") && isBraveBlocking);
   if (!isBlocked) return;
   _scBlockerShown = true;
   const banner = document.getElementById("sc-blocker-banner");
