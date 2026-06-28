@@ -6744,6 +6744,10 @@ function _generateOwnerToken() {
 
 async function _registerOwnerSession(phone) {
   if (!phone || !db) return;
+  // Stop any existing watcher BEFORE writing a new token.
+  // If an old watcher is running with the old token, it will see the new token
+  // as a mismatch and kick the user out of their own fresh login.
+  _stopOwnerSessionWatcher();
   const token = _generateOwnerToken();
   _ownerSessionToken = token;
   try {
@@ -6755,7 +6759,8 @@ async function _registerOwnerSession(phone) {
 }
 
 function _startOwnerSessionWatcher(phone) {
-  if (!phone || !db || _ownerSessionWatcher) return;
+  if (!phone || !db) return;
+  _stopOwnerSessionWatcher(); // ensure no duplicate watcher
   _ownerSessionWatcher = setInterval(async () => {
     if (!authPhone || currentMember) { _stopOwnerSessionWatcher(); return; }
     try {
