@@ -6983,14 +6983,6 @@ function onLoginSuccess(phone) {
     } catch(e) {
       _afterAuth(); // Firebase Auth not available — proceed anyway
     }
-    // Check Firestore — if doc doesn't exist but we have local data, push it up (first-time migration)
-    loadInventoryFromFirestore((docExists)=>{
-      if(!docExists && inventoryItems.length > 0){
-        console.log("[Inv] Migrating", inventoryItems.length, "items from localStorage to Firestore");
-        saveInventory();
-      }
-      safeRenderTab(currentTab);
-    });
   } else if (phone) {
     shopId = phone;
     const retrySync = (attempts) => {
