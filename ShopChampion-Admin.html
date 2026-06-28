@@ -6813,7 +6813,7 @@ function _forceLogoutAllMembers(shopPhone) {
       return fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?shop_phone=eq.${encodeURIComponent(shopPhone)}`, {
         method: "PATCH",
         headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
-        body: JSON.stringify({ session_token: null, last_seen_at: null })
+        body: JSON.stringify({ active_session_token: null, last_seen_at: null })
       }).then(r3 => {
         if (r3.ok) console.log("[Owner] All member sessions cleared via direct PATCH");
         else r3.text().then(t => console.warn("[Owner] Direct PATCH also failed:", r3.status, t));
