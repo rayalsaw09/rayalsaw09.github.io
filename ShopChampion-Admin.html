@@ -7155,6 +7155,7 @@ function doLogout() {
   if(fbUnsubscribe){ try{ fbUnsubscribe(); } catch(e){} fbUnsubscribe=null; }
   if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); } catch(e){} _prefsUnsubscribe=null; }
   if(invUnsubscribe){ try{ invUnsubscribe(); } catch(e){} invUnsubscribe=null; }
+  stopAllLinkedLedgerListeners(); // stop cross-shop ledger listeners before clearing authPhone
   // Unsubscribe shop-connect listeners
   if(_payReqListener){ try{ _payReqListener(); } catch(e){} _payReqListener=null; }
   if(_autoAcceptedListener){ try{ _autoAcceptedListener(); } catch(e){} _autoAcceptedListener=null; }
@@ -13488,6 +13489,14 @@ function stopLinkedLedgerListener(theirPhone) {
     _linkedLedgerListeners[theirPhone]();
     delete _linkedLedgerListeners[theirPhone];
   }
+}
+
+function stopAllLinkedLedgerListeners() {
+  if (!_linkedLedgerListeners) return;
+  Object.keys(_linkedLedgerListeners).forEach(phone => {
+    try { _linkedLedgerListeners[phone](); } catch(_) {}
+  });
+  _linkedLedgerListeners = {};
 }
 
 // ─── Start listeners for all linked creditors ────────────────────────────────
