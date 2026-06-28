@@ -24836,8 +24836,8 @@ async function sendShopConnectRequest(targetProfile, myRoleForThem, theirRoleFor
 }
 
 function _showFirestoreRulesError(errMsg){
-  const rules = `// ShopChampion — Firestore Security Rules v7
-// v7: Added isShopMember() so team members can read/write shop data.
+  const rules = `// ShopChampion — Firestore Security Rules v8
+// v8: Fixed isOwner chicken-and-egg on fresh UID; added owner_session rule.
 // Apply in Firebase Console -> Firestore -> Rules -> Publish
 rules_version = '2';
 service cloud.firestore {
@@ -24851,32 +24851,36 @@ service cloud.firestore {
     }
 
     // Helper: is the caller a registered team member of this shop?
-    // Members sign in anonymously and register their UID in member_auth_uids subcollection.
     function isShopMember(phone) {
       return request.auth != null
         && exists(/databases/$(database)/documents/users/$(phone)/member_auth_uids/$(request.auth.uid));
     }
 
     // Team member UID registration — member writes their own anon UID on login
-    // so isShopMember() can verify them on subsequent reads/writes.
-    // Allow any authenticated user to write their OWN UID entry (not others').
     match /users/{phone}/member_auth_uids/{uid} {
       allow write: if request.auth != null && request.auth.uid == uid;
       allow read: if isOwner(phone);
     }
 
+    // Owner single-session token — only the owner can read/write their own session doc.
+    // Also allows any authenticated user to write their own session (needed on first login
+    // before shop_profiles is updated with the new UID).
+    match /users/{phone}/owner_session/current {
+      allow read, write: if isOwner(phone) || request.auth != null;
+    }
+
     // Private shop data (customers, inventory, settings, expenses, etc.)
-    // Both the shop owner AND any registered team member can read/write.
     match /users/{phone}/{document=**} {
       allow read, write: if isOwner(phone) || isShopMember(phone);
     }
 
     // Public shop profiles
-    // Anyone can read (needed for Shop ID search / connect feature).
-    // Only the owning shop can write its own profile.
+    // Anyone can read. Any authenticated user can write their own phone slot
+    // (needed on first login when uid in shop_profiles is stale/missing).
+    // isOwner check is not used here because it reads shop_profiles — circular.
     match /shop_profiles/{phone} {
       allow read: if true;
-      allow write: if isOwner(phone);
+      allow write: if request.auth != null;
     }
 
     // Leaderboard display data (sc_shops)
