@@ -3358,14 +3358,20 @@ function loadSettingsFromCloud(cb) {
 }
 
 // ── Real-time Firestore listener ──
+var _fbListenerRetryTimer = null;
+var _fbListenerRetryDelay = 3000;
+
 function startFirestoreListener() {
   if (!authPhone) {
     console.warn("[SC] startFirestoreListener called with no authPhone — skipping");
     return;
   }
   if (fbUnsubscribe) fbUnsubscribe();
+  if (_fbListenerRetryTimer) { clearTimeout(_fbListenerRetryTimer); _fbListenerRetryTimer = null; }
   _firstSnapshotDone = false;
+  _fbListenerRetryDelay = 3000; // reset backoff on fresh start
   fbUnsubscribe = userCol().onSnapshot(snap => {
+    _fbListenerRetryDelay = 3000; // reset backoff on successful snapshot
     customers = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
     customers.forEach(c=>{ if(!c.photo)c.photo=""; if(!c.purchases)c.purchases=[]; if(!c.borrows)c.borrows=[]; });
     _invalidateAnalyticsCache(); // MED-05: rebuild cache on live data change
@@ -3376,6 +3382,17 @@ function startFirestoreListener() {
     _firstSnapshotDone = true; // allow render even on error
     updateDbStatus("⚠️ Firebase error: " + err.message, "#f84");
     _scCheckIfBlocked(err.message); // show blocker banner if network-blocked
+    // Auto-restart listener after WebChannel drop — Firebase does NOT do this automatically
+    if (authPhone && !currentMember) { // only owner restarts (members handled by heartbeat)
+      fbUnsubscribe = null;
+      _fbListenerRetryTimer = setTimeout(() => {
+        if (authPhone && db) {
+          console.log("[SC] Restarting customer listener after error (retry in", _fbListenerRetryDelay, "ms)");
+          _fbListenerRetryDelay = Math.min(_fbListenerRetryDelay * 2, 30000); // cap at 30s
+          startFirestoreListener();
+        }
+      }, _fbListenerRetryDelay);
+    }
   });
   // Silently probe Firebase reachability once per login
   setTimeout(_scProbeFirebaseReachability, 3000);
@@ -6425,6 +6442,7 @@ async function verifyPasswordOnline(phone, pass) {
         localStorage.setItem("sc_auth_phone", phone);
         localStorage.setItem("sc_user_" + phone, hashed);
         localStorage.setItem("sc_session_type", "admin");
+        localStorage.setItem("sc_fresh_owner_login", "1"); // signals onLoginSuccess to kick members
         authHash = hashed;
         onLoginSuccess(phone);
         return;
@@ -6447,6 +6465,7 @@ async function verifyPasswordOnline(phone, pass) {
       localStorage.setItem("sc_auth_phone", phone);
       localStorage.setItem("sc_user_" + phone, hashed);
       localStorage.setItem("sc_session_type", "admin");
+      localStorage.setItem("sc_fresh_owner_login", "1");
       authHash = hashed;
       onLoginSuccess(phone);
       return;
@@ -6782,6 +6801,7 @@ function _startOwnerSessionWatcher(phone) {
         console.warn('[Owner] Session superseded by another device — logging out');
         clearTimeout(_graceTimer);
         _stopOwnerSessionWatcher();
+        if (_fbListenerRetryTimer) { clearTimeout(_fbListenerRetryTimer); _fbListenerRetryTimer = null; }
         // Stop ALL listeners immediately
         if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
         if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
@@ -6884,11 +6904,13 @@ function onLoginSuccess(phone) {
   if(_loginSuccessFired) return;
   _loginSuccessFired = true;
 
-  // When owner logs in — invalidate ALL active member sessions for this shop.
+  // When owner logs in via password — invalidate ALL active member sessions for this shop.
   // Members will be kicked out within 10s (next heartbeat detects null session_token).
-  // Skip this if the login is a member session (currentMember is set before onLoginSuccess).
-  if (!currentMember && phone) {
-    setTimeout(() => _forceLogoutAllMembers(phone), 1500); // slight delay so Firebase auth settles first
+  // Only fires on fresh password login (sc_fresh_owner_login flag), NOT on page refresh/auto-login.
+  // This prevents B and C being kicked every time the admin refreshes the page.
+  if (!currentMember && phone && localStorage.getItem("sc_fresh_owner_login") === "1") {
+    localStorage.removeItem("sc_fresh_owner_login"); // consume immediately — one-shot
+    setTimeout(() => _forceLogoutAllMembers(phone), 1500);
   }
 
   // Show loading screen while Firebase auth + data loads
@@ -7213,6 +7235,7 @@ function doLogout() {
   _firstSnapshotDone = false; // reset so customers tab shows loader on next login
   authHash = "";             // clear credential hash
   // Unsubscribe all Firestore real-time listeners
+  if (_fbListenerRetryTimer) { clearTimeout(_fbListenerRetryTimer); _fbListenerRetryTimer = null; }
   if(fbUnsubscribe){ try{ fbUnsubscribe(); } catch(e){} fbUnsubscribe=null; }
   if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); } catch(e){} _prefsUnsubscribe=null; }
   if(invUnsubscribe){ try{ invUnsubscribe(); } catch(e){} invUnsubscribe=null; }
@@ -7639,7 +7662,13 @@ function renderTab(i){
       return Promise.all(loads);
     }).then(()=>{ el.innerHTML = renderMessagesTab(); });
   }
-  else if(i===10)el.innerHTML=renderHistoryTab();
+  else if(i===10){
+    // Clear today's fetch-done flag so member-written entries are always re-pulled from Firestore
+    const _todayKey = _histDayKey(Date.now());
+    _histFetchedDays.delete(_todayKey);
+    _histFetchingDays.delete(_todayKey);
+    el.innerHTML=renderHistoryTab();
+  }
   else if(i===11)el.innerHTML=renderAlertsTab();
   else if(i===12)el.innerHTML=renderSettings();
   else if(i===13)renderTeamTab(el);
