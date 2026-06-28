@@ -7,8 +7,8 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
 <meta name="app-version" content="v5.3" />
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<link rel="manifest" href="manifest.json" />
-<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="manifest" href="data:application/manifest+json,%7B%0A%20%20%22name%22%3A%20%22ShopChampion%20Admin%22%2C%0A%20%20%22short_name%22%3A%20%22ShopChampion%22%2C%0A%20%20%22description%22%3A%20%22Retail%20management%20for%20Indian%20shop%20owners%22%2C%0A%20%20%22start_url%22%3A%20%22.%2FShopChampion-Admin.html%22%2C%0A%20%20%22display%22%3A%20%22standalone%22%2C%0A%20%20%22background_color%22%3A%20%22%230a1628%22%2C%0A%20%20%22theme_color%22%3A%20%22%231d4ed8%22%2C%0A%20%20%22orientation%22%3A%20%22any%22%2C%0A%20%20%22icons%22%3A%20%5B%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%22src%22%3A%20%22data%3Aimage%2Fsvg%2Bxml%2C%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20192%20192%27%3E%3Crect%20width%3D%27192%27%20height%3D%27192%27%20fill%3D%27%25231d4ed8%27%20rx%3D%2724%27%2F%3E%3Ctext%20x%3D%2796%27%20y%3D%27130%27%20font-size%3D%27110%27%20text-anchor%3D%27middle%27%3E%F0%9F%8F%86%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%0A%20%20%20%20%20%20%22sizes%22%3A%20%22192x192%22%2C%0A%20%20%20%20%20%20%22type%22%3A%20%22image%2Fsvg%2Bxml%22%2C%0A%20%20%20%20%20%20%22purpose%22%3A%20%22any%20maskable%22%0A%20%20%20%20%7D%2C%0A%20%20%20%20%7B%0A%20%20%20%20%20%20%22src%22%3A%20%22data%3Aimage%2Fsvg%2Bxml%2C%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20512%20512%27%3E%3Crect%20width%3D%27512%27%20height%3D%27512%27%20fill%3D%27%25231d4ed8%27%20rx%3D%2764%27%2F%3E%3Ctext%20x%3D%27256%27%20y%3D%27340%27%20font-size%3D%27290%27%20text-anchor%3D%27middle%27%3E%F0%9F%8F%86%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%0A%20%20%20%20%20%20%22sizes%22%3A%20%22512x512%22%2C%0A%20%20%20%20%20%20%22type%22%3A%20%22image%2Fsvg%2Bxml%22%2C%0A%20%20%20%20%20%20%22purpose%22%3A%20%22any%20maskable%22%0A%20%20%20%20%7D%0A%20%20%5D%0A%7D" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%231d4ed8' rx='24'/><text x='96' y='130' font-size='110' text-anchor='middle'>🏆</text></svg>" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="ShopChampion" />
@@ -18,11 +18,47 @@
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', async () => {
       try {
+        // Inline SW as blob URL — no separate sw.js file needed for single-file deployment
+        const swCode = `
+const CACHE = 'sc-admin-v5';
+const PRECACHE = [];
+self.addEventListener('install', e => { self.skipWaiting(); });
+self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  // Network-first for HTML, cache-first for assets
+  const url = new URL(e.request.url);
+  if (url.pathname.endsWith('.html') || url.hostname !== location.hostname) return;
+  e.respondWith(
+    caches.open(CACHE).then(cache =>
+      cache.match(e.request).then(cached => {
+        const net = fetch(e.request).then(res => { cache.put(e.request, res.clone()); return res; });
+        return cached || net;
+      })
+    )
+  );
+});
+self.addEventListener('push', e => {
+  const d = e.data ? e.data.json() : {};
+  e.waitUntil(self.registration.showNotification(d.title || 'ShopChampion', {
+    body: d.body || '', icon: d.icon || '', data: d.data || {}
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({ type: 'window' }).then(cs => {
+    if (cs.length) { cs[0].focus(); cs[0].postMessage({ type: 'NOTIF_CLICK', data: e.notification.data }); }
+    else clients.openWindow('/');
+  }));
+});
+        `;
+        const swBlob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(swBlob);
         // Force update all registered SWs
         const regs = await navigator.serviceWorker.getRegistrations();
         for (const reg of regs) await reg.update();
-        // Register latest SW
-        const reg = await navigator.serviceWorker.register('./sw.js');
+        // Register inline SW
+        const reg = await navigator.serviceWorker.register(swUrl);
         window._swRegistration = reg; // store for FCM use
         // When a new SW activates, show a non-intrusive update banner
         reg.addEventListener('updatefound', () => {
@@ -22777,8 +22813,7 @@ async function scInitFCM(force=false) {
       try {
         reg = await navigator.serviceWorker.ready; // waits until SW is active
       } catch(e) {
-        reg = await navigator.serviceWorker.getRegistration()
-           || await navigator.serviceWorker.register('./sw.js');
+        reg = await navigator.serviceWorker.ready; // use already-registered inline SW
       }
     }
     if (!reg) { console.warn("[FCM] No SW registration available"); return; }
