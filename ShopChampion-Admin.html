@@ -6794,6 +6794,18 @@ function onLoginSuccess(phone) {
     // ── Ensure Firebase Anonymous Auth before any Firestore read ──
     // Firestore rules use request.auth != null — must be signed in first.
     const _afterAuth = () => {
+      // If this is a member session, register their Firebase UID NOW (auth is ready)
+      // This must happen before startFirestoreListener() so rules pass immediately
+      if (currentMember && phone) {
+        const uid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
+        if (uid && db) {
+          db.collection("users").doc(phone)
+            .collection("member_auth_uids").doc(uid)
+            .set({ registeredAt: Date.now(), memberId: currentMember.id || "" }, { merge: true })
+            .then(() => console.log("[Member] UID registered in _afterAuth:", uid))
+            .catch(e => console.warn("[Member] UID register in _afterAuth failed:", e.message));
+        }
+      }
       startFirestoreListener();
       loadSettingsFromCloud(()=>{
         // For members: redirect to their first allowed tab
@@ -6954,6 +6966,11 @@ function doLogout() {
   const pill = document.getElementById("header-member-pill");
   if(pill) pill.style.display = "none";
 
+  // Capture authPhone and member UID BEFORE clearing state — needed for Firestore cleanup below
+  const _logoutPhone = authPhone;
+  const _logoutUid = (() => { try { return firebase.auth().currentUser && firebase.auth().currentUser.uid; } catch(_) { return null; } })();
+  const _logoutWasMember = !!currentMember;
+
   try { firebase.auth().signOut(); } catch{}
   localStorage.removeItem("sc_auth_phone");
   localStorage.removeItem("sc_auth_uid");
@@ -6976,12 +6993,14 @@ function doLogout() {
   syncBinId = ""; syncApiKey = "";
   displaySettings = { showCount:10 }; // reset to safe default with correct key
   // Cleanup member Firebase UID registration from Firestore on logout
+  // Uses captured values — authPhone is already "" at this point so we use _logoutPhone
   try {
-    const uid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
-    if (uid && db && authPhone && currentMember) {
-      db.collection("users").doc(authPhone)
-        .collection("member_auth_uids").doc(uid)
-        .delete().catch(() => {});
+    if (_logoutUid && db && _logoutPhone && _logoutWasMember) {
+      db.collection("users").doc(_logoutPhone)
+        .collection("member_auth_uids").doc(_logoutUid)
+        .delete()
+        .then(() => console.log("[Member] Firebase UID unregistered on logout"))
+        .catch(() => {});
     }
   } catch(_) {}
   // Reset history fetch-tracking sets so next login re-fetches from cloud
@@ -16868,31 +16887,41 @@ async function memberLogin() {
     // Start heartbeat
     _startMemberHeartbeat();
 
-    // Register member's Firebase anon UID in Firestore so rules can verify access
-    // This allows isShopMember() rule to pass for this session
-    _registerMemberFirebaseUID(data.shop_phone);
-
     btn.disabled = false; btnTxt.textContent = "Login as Member →";
     onLoginSuccess(data.shop_phone);
+
+    // Register member's Firebase anon UID AFTER onLoginSuccess so Firebase auth is ready
+    // (onLoginSuccess calls signInAnonymously; we must wait for that before writing member_auth_uids)
+    // This allows isShopMember() rule to pass for this session
+    _registerMemberFirebaseUID(data.shop_phone, data.id);
   } catch(e) {
     errEl.textContent = "Network error. Try again."; errEl.style.display = "block";
     btn.disabled = false; btnTxt.textContent = "Login as Member →";
   }
 }
 
-function _registerMemberFirebaseUID(shopPhone) {
-  // Write this member session's Firebase UID into Firestore so rules can verify
-  // Path: users/{shopPhone}/member_auth_uids/{uid} — checked by isShopMember() rule
+function _registerMemberFirebaseUID(shopPhone, memberId) {
+  // Write this member session's Firebase UID into Firestore so isShopMember() rule can verify access.
+  // Path: users/{shopPhone}/member_auth_uids/{uid}
+  // IMPORTANT: must be called AFTER onLoginSuccess() so Firebase anonymous auth is already active.
+  memberId = memberId || (currentMember ? currentMember.id : "");
+  const attempt = (retries) => {
+    const cu = firebase.auth().currentUser;
+    const uid = cu && cu.uid;
+    if (!uid || !db || !shopPhone) {
+      // Auth not ready yet — retry up to 5 times with 500ms delay
+      if (retries > 0) setTimeout(() => attempt(retries - 1), 500);
+      else console.warn("[Member] UID register: Firebase auth never became ready");
+      return;
+    }
+    db.collection("users").doc(shopPhone)
+      .collection("member_auth_uids").doc(uid)
+      .set({ registeredAt: Date.now(), memberId: memberId }, { merge: true })
+      .then(() => console.log("[Member] Firebase UID registered:", uid, "shop:", shopPhone))
+      .catch(e => console.warn("[Member] UID register failed:", e.message));
+  };
   try {
-    const doRegister = () => {
-      const uid = firebase.auth().currentUser && firebase.auth().currentUser.uid;
-      if (!uid || !db || !shopPhone) return;
-      db.collection("users").doc(shopPhone)
-        .collection("member_auth_uids").doc(uid)
-        .set({ registeredAt: Date.now(), memberId: currentMember ? currentMember.id : "" }, { merge: true })
-        .then(() => console.log("[Member] Firebase UID registered for Firestore access"))
-        .catch(e => console.warn("[Member] UID register failed:", e.message));
-    };
+    const doRegister = () => attempt(5);
     const cu = firebase.auth().currentUser;
     if (cu) { doRegister(); }
     else {
