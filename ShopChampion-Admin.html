@@ -6732,6 +6732,64 @@ async function setNewPassword() {
   onLoginSuccess(authPhone);
 }
 
+// ─── Owner Single-Session System ────────────────────────────────────────────
+// When the owner logs in on Device B, Device A detects the new session token
+// and kicks itself out within 10 seconds. Members are NOT affected.
+var _ownerSessionToken = null;
+var _ownerSessionWatcher = null;
+
+function _generateOwnerToken() {
+  // Cryptographically random 32-char hex token
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function _registerOwnerSession(phone) {
+  if (!phone || !db) return;
+  const token = _generateOwnerToken();
+  _ownerSessionToken = token;
+  try {
+    await db.collection('users').doc(phone).collection('owner_session').doc('current').set({
+      token: token,
+      loginAt: Date.now(),
+      ua: navigator.userAgent.slice(0, 100)
+    });
+    console.log('[Owner] Session token registered:', token.slice(0, 8) + '...');
+  } catch(e) {
+    console.warn('[Owner] Could not register session token:', e.message);
+  }
+}
+
+function _startOwnerSessionWatcher(phone) {
+  if (!phone || !db || _ownerSessionWatcher) return;
+  _ownerSessionWatcher = setInterval(async () => {
+    if (!authPhone || currentMember) { _stopOwnerSessionWatcher(); return; }
+    try {
+      const doc = await db.collection('users').doc(phone).collection('owner_session').doc('current').get();
+      if (!doc.exists) return; // no session doc — first login ever, ignore
+      const remoteToken = doc.data().token;
+      if (remoteToken && _ownerSessionToken && remoteToken !== _ownerSessionToken) {
+        // Another device logged in and replaced our token
+        console.warn('[Owner] Session superseded by another device — logging out');
+        _stopOwnerSessionWatcher();
+        alert(currentLang === 'hi'
+          ? '⚠️ आपका अकाउंट किसी और डिवाइस पर लॉगिन हो गया है। यहाँ लॉगआउट हो रहे हैं।'
+          : '⚠️ Your account was logged in on another device. You have been logged out here.');
+        doLogout();
+      }
+    } catch(e) {
+      // Firestore error (offline, etc.) — ignore, keep watching
+    }
+  }, 10000); // check every 10s
+  console.log('[Owner] Session watcher started');
+}
+
+function _stopOwnerSessionWatcher() {
+  if (_ownerSessionWatcher) { clearInterval(_ownerSessionWatcher); _ownerSessionWatcher = null; }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function _forceLogoutAllMembers(shopPhone) {
   // Called when owner logs in — clears session_token for ALL members of this shop.
   // Each member's heartbeat (every 10s) calls verify_member_session which returns false
@@ -6861,6 +6919,9 @@ function onLoginSuccess(phone) {
             .then(() => console.log("[Member] UID registered in _afterAuth:", uid))
             .catch(e => console.warn("[Member] UID register in _afterAuth failed:", e.message));
         }
+      } else if (!currentMember && phone) {
+        // Owner login — register session token + start watcher for single-session enforcement
+        _registerOwnerSession(phone).then(() => _startOwnerSessionWatcher(phone));
       }
       startFirestoreListener();
       loadSettingsFromCloud(()=>{
@@ -6885,25 +6946,36 @@ function onLoginSuccess(phone) {
       // and isOwner() fails with permission-denied for everyone including the admin.
       const _doAuth = () => {
         const _cu = firebase.auth().currentUser;
-        if (_cu) {
-          // Re-save shop_profiles with the current UID on every login to keep it fresh
-          // (handles the case where UID changed due to browser clearing IndexedDB)
+        const uid = _cu && _cu.uid;
+        if (uid) {
           if (!currentMember) {
-            db.collection("shop_profiles").doc(phone).set({ uid: _cu.uid, phone: phone, updatedAt: Date.now() }, { merge: true })
-              .then(() => console.log("[SC] shop_profiles uid refreshed:", _cu.uid))
-              .catch(e => console.warn("[SC] shop_profiles uid refresh failed:", e.message));
+            // CRITICAL: wait for shop_profiles uid write to complete BEFORE starting
+            // Firestore listener. If we start listener first, isOwner() checks the OLD uid
+            // in shop_profiles → permission-denied on first snapshot.
+            console.log("[SC] Refreshing shop_profiles uid before starting listener:", uid);
+            db.collection("shop_profiles").doc(phone)
+              .set({ uid: uid, phone: phone, updatedAt: Date.now() }, { merge: true })
+              .then(() => { console.log("[SC] shop_profiles uid saved:", uid); _afterAuth(); })
+              .catch(e => {
+                console.warn("[SC] shop_profiles uid save failed:", e.message, "— proceeding anyway");
+                _afterAuth(); // don't block the app if this fails
+              });
+          } else {
+            _afterAuth();
           }
-          _afterAuth();
         } else {
           firebase.auth().signInAnonymously()
             .then(cred => {
-              // Save UID immediately after getting it
-              if (!currentMember && cred && cred.user) {
-                db.collection("shop_profiles").doc(phone).set({ uid: cred.user.uid, phone: phone, updatedAt: Date.now() }, { merge: true })
-                  .then(() => console.log("[SC] shop_profiles uid saved:", cred.user.uid))
-                  .catch(e => console.warn("[SC] shop_profiles uid save failed:", e.message));
+              const newUid = cred && cred.user && cred.user.uid;
+              if (!currentMember && newUid) {
+                console.log("[SC] New anon UID, saving to shop_profiles:", newUid);
+                db.collection("shop_profiles").doc(phone)
+                  .set({ uid: newUid, phone: phone, updatedAt: Date.now() }, { merge: true })
+                  .then(() => { console.log("[SC] shop_profiles uid saved:", newUid); _afterAuth(); })
+                  .catch(e => { console.warn("[SC] shop_profiles uid save failed:", e.message); _afterAuth(); });
+              } else {
+                _afterAuth();
               }
-              _afterAuth();
             })
             .catch(e => { console.warn("[SC] anon auth failed, trying anyway:", e); _afterAuth(); });
         }
@@ -6928,6 +7000,10 @@ function onLoginSuccess(phone) {
     const retrySync = (attempts) => {
       if(db && authPhone){
         const _afterAuth2 = () => {
+          // Owner login via retrySync path — register session token too
+          if (!currentMember && phone) {
+            _registerOwnerSession(phone).then(() => _startOwnerSessionWatcher(phone));
+          }
           startFirestoreListener();
           setTimeout(startPaymentRequestListener, 2000);
           loadSettingsFromCloud(()=>{ safeRenderTab(currentTab); });
@@ -7031,6 +7107,8 @@ function doLogout() {
   if (window._ptLiveTimer) { clearInterval(window._ptLiveTimer); window._ptLiveTimer = null; }
   if (window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
   scStopPolling();
+  _stopOwnerSessionWatcher(); // stop single-session polling
+  _ownerSessionToken = null;
   const adState = window._scAdState;
   if (adState) {
     if (adState.bannerTimer) { clearInterval(adState.bannerTimer); adState.bannerTimer = null; }
@@ -7052,6 +7130,11 @@ function doLogout() {
       body: JSON.stringify({ last_seen_at: null })
     }).catch(()=>{});
   }
+  // Capture state BEFORE clearing — needed for Firestore cleanup below
+  const _logoutPhone = authPhone;
+  const _logoutUid = (() => { try { return firebase.auth().currentUser && firebase.auth().currentUser.uid; } catch(_) { return null; } })();
+  const _logoutWasMember = !!currentMember; // must capture before currentMember = null
+
   if(_memberSessionTimer) { clearInterval(_memberSessionTimer); _memberSessionTimer = null; }
   currentMember = null; _memberSessionToken = null;
   sessionStorage.removeItem("sc_member_token"); sessionStorage.removeItem("sc_member_id"); sessionStorage.removeItem("sc_member_shop_phone");
@@ -7060,11 +7143,6 @@ function doLogout() {
   // Hide member pill
   const pill = document.getElementById("header-member-pill");
   if(pill) pill.style.display = "none";
-
-  // Capture authPhone and member UID BEFORE clearing state — needed for Firestore cleanup below
-  const _logoutPhone = authPhone;
-  const _logoutUid = (() => { try { return firebase.auth().currentUser && firebase.auth().currentUser.uid; } catch(_) { return null; } })();
-  const _logoutWasMember = !!currentMember;
 
   try { firebase.auth().signOut(); } catch{}
   localStorage.removeItem("sc_auth_phone");
