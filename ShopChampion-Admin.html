@@ -1657,8 +1657,6 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 <div id="sc-login-loading" style="display:none;position:fixed;inset:0;z-index:99998;background:var(--bg-main,#0a1628);flex-direction:column;align-items:center;justify-content:center;gap:20px;">
   <div style="width:48px;height:48px;border:4px solid #1e3a5a;border-top-color:#6366f1;border-radius:50%;animation:scSpin 0.8s linear infinite;"></div>
   <div style="color:#94a3b8;font-size:15px;font-weight:600;" id="sc-login-loading-msg">Loading your shop...</div>
-  <button id="sc-loading-logout-btn" onclick="doLogout()" style="display:none;margin-top:8px;background:transparent;border:1px solid #5a1a1a;color:#f87171;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;">⏻ Logout &amp; Try Again</button>
-  <script>setTimeout(function(){var b=document.getElementById('sc-loading-logout-btn');if(b)b.style.display='inline-block';},8000);</script>
 </div>
 <style>@keyframes scSpin{to{transform:rotate(360deg)}}</style>
 <div id="login-screen">
@@ -6924,26 +6922,6 @@ function onLoginSuccess(phone) {
   var _isDesktop = window.innerWidth >= 641;
   // main-app stays hidden until _scHideLoginLoading() is called after first data render
   document.getElementById("main-app").style.display = "none";
-
-  // ── Safety watchdog: if loading screen still showing after 12s, force-show the app ──
-  // Prevents permanent stuck screen caused by silent Firebase/Firestore hangs.
-  setTimeout(function() {
-    var _ll = document.getElementById('sc-login-loading');
-    if (_ll && _ll.style.display !== 'none') {
-      console.warn('[SC] Loading watchdog fired — 12s timeout, forcing app visible');
-      var _msgEl = document.getElementById('sc-login-loading-msg');
-      if (_msgEl) _msgEl.textContent = currentLang === 'hi' ? 'थोड़ी देरी हो रही है...' : 'Taking longer than usual...';
-      setTimeout(function() {
-        var _ll2 = document.getElementById('sc-login-loading');
-        if (_ll2 && _ll2.style.display !== 'none') {
-          console.warn('[SC] Loading watchdog forcing _scHideLoginLoading()');
-          _scHideLoginLoading();
-          safeRenderTab(currentTab);
-          notify(currentLang === 'hi' ? '\u26a0\ufe0f Firebase धीमा है — cached data दिख रहा है' : '\u26a0\ufe0f Firebase slow — showing cached data', 'warning');
-        }
-      }, 3000);
-    }
-  }, 12000);
   // Init ShopChat
   setTimeout(()=>{
     scLoadConnections().then(()=>scLoadPendingRequests()).then(async()=>{
@@ -28024,8 +28002,8 @@ history.pushState({sc:true}, '');
 #sc-guide-replay-card {
   background:linear-gradient(135deg,#0d1830,#0a1020);
   border:2px solid #1e3060;border-radius:24px;
-  padding:24px;max-width:360px;width:92%;
-  max-height:90vh;overflow-y:auto;
+  padding:24px 24px 24px 24px;max-width:360px;width:92%;
+  max-height:90vh;overflow-y:auto;position:relative;
 }
 #sc-guide-replay-card h2 {
   font-size:18px;font-weight:800;color:var(--text-main,#e8eaf0);margin:0 0 16px;
@@ -28093,6 +28071,7 @@ history.pushState({sc:true}, '');
 <!-- Replay menu -->
 <div id="sc-guide-replay" style="display:none;align-items:center;justify-content:center;">
   <div id="sc-guide-replay-card">
+    <button onclick="scGuideCloseReplay()" title="Close" style="position:absolute;top:12px;right:14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:50%;width:30px;height:30px;color:#94a3b8;font-size:16px;font-weight:700;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;z-index:1;">✕</button>
     <h2>🎓 Introduction Guide</h2>
     <div class="sc-replay-section-title" id="sc-rp-lang-title">Language</div>
     <div class="sc-replay-row" onclick="scGuideStartLang('hi')">
