@@ -2035,7 +2035,7 @@ var TRANSLATIONS = {
     anTopItems:"🏆 Top Items", anLossItems:"⚠️ Loss Items",
     anSellingBelow:"Selling below cost",
     anMoneyFlow:"Money Flow", anAllTimeBalance:"All-time balances",
-    anYouOwe:"📤 YOU OWE", anOwedToYou:"📥 OWED TO YOU", anNet:"🏦 NET",
+    anYouOwe:"📤 PAYABLE", anOwedToYou:"📥 RECEIVABLE", anNet:"🏦 NET",
     anCashInHand:"Cash in Hand", anLiveBalance:"live balance",
     anViewCashLedger:"📜 View Cash Flow Ledger",
     anViewBalanceSheet:"📊 View Balance Sheet",
@@ -3489,6 +3489,9 @@ function _scCheckIfBlocked(errorMsg) {
 
 function showBlockerHelp() {
   var isBrave = !!(navigator.brave && typeof navigator.brave.isBrave === "function");
+  var modal = document.getElementById("modal-overlay");
+  var body = document.getElementById("modal-body");
+  if (!modal || !body) return;
   var braveHtml = '<div style="font-size:22px;margin-bottom:12px;">&#x1F981; Brave Shields Fix</div>'
     + '<div style="font-size:13px;color:#9ca3af;margin-bottom:18px;">Brave Shields is blocking Firebase. Follow these steps:</div>'
     + '<div style="display:flex;flex-direction:column;gap:12px;text-align:left;">'
@@ -3520,10 +3523,11 @@ function showBlockerHelp() {
     + '<div style="font-weight:800;color:#a78bfa;font-size:13px;">Option C - Whitelist this site</div>'
     + '<div style="font-size:12px;color:#6a6a8a;margin-top:3px;">In your ad-blocker settings, add rayalsaw09.github.io to the whitelist</div></div>'
     + '</div>';
-  showModal('<div style="text-align:center;max-width:420px;margin:0 auto;">'
+  body.innerHTML = '<div style="text-align:center;max-width:420px;margin:0 auto;">'
     + (isBrave ? braveHtml : otherHtml)
     + '<button onclick="closeModal()" style="margin-top:20px;background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;padding:12px 28px;width:100%;">Got it</button>'
-    + '</div>');
+    + '</div>';
+  modal.style.display = "flex";
 }
 
 // Probe Firebase reachability silently on login (not on every error — just once)
@@ -9903,7 +9907,7 @@ function renderAnalytics(sorted){
       <div style="background:var(--bg-card);border:1px solid ${netPos>=0?'#1a3a1a':'#3a1a1a'};border-radius:14px;padding:12px;">
         <div style="font-size:10px;color:var(--text-dim);font-weight:700;margin-bottom:5px;">${t('anNetFlow')}</div>
         <div style="font-size:19px;font-weight:900;color:${netPos>=0?'#22c55e':'#ef4444'};line-height:1;">${netPos>=0?'+':''}${fmt(netPos)}</div>
-        <div style="font-size:10px;color:var(--text-dimmer);margin-top:4px;">↑${fmt(totalDebtorOwed)} owed to you · ↓${fmt(totalCreditorOwed)} you owe</div>
+        <div style="font-size:10px;color:var(--text-dimmer);margin-top:4px;">↑${fmt(totalDebtorOwed)} Receivable · ↓${fmt(totalCreditorOwed)} Payable</div>
       </div>
     </div>
 
@@ -12614,7 +12618,7 @@ function openCreditorDetail(id){
       <!-- Balance banner -->
       <div style="background:${bal>0?"#1a0e00":"#001a0e"};border:2px solid ${balColor};border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
         <div>
-          <div style="font-size:12px;color:var(--text-muted,#7a8aaa);font-weight:700;">${bal>0?"AMOUNT YOU OWE":bal<0?"THEY OWE YOU":"FULLY SETTLED"}</div>
+          <div style="font-size:12px;color:var(--text-muted,#7a8aaa);font-weight:700;">${bal>0?"PAYABLE (You Owe)":bal<0?"RECEIVABLE (Overpaid)":"FULLY SETTLED"}</div>
           <div id="sc-cr-bal-amt" style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
         </div>
         ${!isUnrec ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -15314,7 +15318,7 @@ function openDebtorDetail(id){
       <!-- Balance banner -->
       <div style="background:${bal>0?"#001a0e":"#1a0e00"};border:2px solid ${balColor};border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
         <div>
-          <div style="font-size:12px;color:var(--text-muted,#7a8aaa);font-weight:700;">${bal>0?"THEY OWE YOU":bal<0?"YOU OWE THEM":"FULLY SETTLED"}</div>
+          <div style="font-size:12px;color:var(--text-muted,#7a8aaa);font-weight:700;">${bal>0?"RECEIVABLE (To Collect)":bal<0?"PAYABLE (Overpaid)":"FULLY SETTLED"}</div>
           <div id="sc-dr-bal-amt" style="font-size:26px;font-weight:800;color:${balColor};margin-top:2px;">${formatINR(Math.abs(bal))}</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -25008,14 +25012,6 @@ service cloud.firestore {
 
     match /users/{phone}/owner_session/current {
       allow read, write: if isOwner(phone) || request.auth != null;
-    }
-
-    // ShopConnect shared ledger: any authenticated user may read app_data docs
-    // (creditors, debtors) so linked shops can view the ledger their partner shared.
-    // Writes remain restricted to owner/member only.
-    match /users/{phone}/app_data/{doc} {
-      allow read: if request.auth != null;
-      allow write: if isOwner(phone) || isShopMember(phone);
     }
 
     match /users/{phone}/{document=**} {
