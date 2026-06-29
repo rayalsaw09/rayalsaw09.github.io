@@ -3489,9 +3489,6 @@ function _scCheckIfBlocked(errorMsg) {
 
 function showBlockerHelp() {
   var isBrave = !!(navigator.brave && typeof navigator.brave.isBrave === "function");
-  var modal = document.getElementById("modal-overlay");
-  var body = document.getElementById("modal-body");
-  if (!modal || !body) return;
   var braveHtml = '<div style="font-size:22px;margin-bottom:12px;">&#x1F981; Brave Shields Fix</div>'
     + '<div style="font-size:13px;color:#9ca3af;margin-bottom:18px;">Brave Shields is blocking Firebase. Follow these steps:</div>'
     + '<div style="display:flex;flex-direction:column;gap:12px;text-align:left;">'
@@ -3523,11 +3520,10 @@ function showBlockerHelp() {
     + '<div style="font-weight:800;color:#a78bfa;font-size:13px;">Option C - Whitelist this site</div>'
     + '<div style="font-size:12px;color:#6a6a8a;margin-top:3px;">In your ad-blocker settings, add rayalsaw09.github.io to the whitelist</div></div>'
     + '</div>';
-  body.innerHTML = '<div style="text-align:center;max-width:420px;margin:0 auto;">'
+  showModal('<div style="text-align:center;max-width:420px;margin:0 auto;">'
     + (isBrave ? braveHtml : otherHtml)
     + '<button onclick="closeModal()" style="margin-top:20px;background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;padding:12px 28px;width:100%;">Got it</button>'
-    + '</div>';
-  modal.style.display = "flex";
+    + '</div>');
 }
 
 // Probe Firebase reachability silently on login (not on every error — just once)
@@ -25012,6 +25008,14 @@ service cloud.firestore {
 
     match /users/{phone}/owner_session/current {
       allow read, write: if isOwner(phone) || request.auth != null;
+    }
+
+    // ShopConnect shared ledger: any authenticated user may read app_data docs
+    // (creditors, debtors) so linked shops can view the ledger their partner shared.
+    // Writes remain restricted to owner/member only.
+    match /users/{phone}/app_data/{doc} {
+      allow read: if request.auth != null;
+      allow write: if isOwner(phone) || isShopMember(phone);
     }
 
     match /users/{phone}/{document=**} {
