@@ -3492,9 +3492,6 @@ function _scCheckIfBlocked(errorMsg) {
 
 function showBlockerHelp() {
   var isBrave = !!(navigator.brave && typeof navigator.brave.isBrave === "function");
-  var modal = document.getElementById("modal-overlay");
-  var body = document.getElementById("modal-body");
-  if (!modal || !body) return;
   var braveHtml = '<div style="font-size:22px;margin-bottom:12px;">&#x1F981; Brave Shields Fix</div>'
     + '<div style="font-size:13px;color:#9ca3af;margin-bottom:18px;">Brave Shields is blocking Firebase. Follow these steps:</div>'
     + '<div style="display:flex;flex-direction:column;gap:12px;text-align:left;">'
@@ -3526,11 +3523,10 @@ function showBlockerHelp() {
     + '<div style="font-weight:800;color:#a78bfa;font-size:13px;">Option C - Whitelist this site</div>'
     + '<div style="font-size:12px;color:#6a6a8a;margin-top:3px;">In your ad-blocker settings, add rayalsaw09.github.io to the whitelist</div></div>'
     + '</div>';
-  body.innerHTML = '<div style="text-align:center;max-width:420px;margin:0 auto;">'
+  showModal('<div style="text-align:center;max-width:420px;margin:0 auto;">'
     + (isBrave ? braveHtml : otherHtml)
     + '<button onclick="closeModal()" style="margin-top:20px;background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;padding:12px 28px;width:100%;">Got it</button>'
-    + '</div>';
-  modal.style.display = "flex";
+    + '</div>');
 }
 
 // Probe Firebase reachability silently on login (not on every error — just once)
@@ -6180,6 +6176,7 @@ function loadHistoryFromCloud(dayKey){
   // Mark as fetching SYNCHRONOUSLY before the async call so renderHistoryTab()
   // sees it immediately on the same tick and shows the spinner correctly.
   _histFetchingDays.add(dayKey);
+  delete _histFetchErrors[dayKey];
   db.collection("users").doc(authPhone).collection("history_log").doc(dayKey)
     .get().then(doc=>{
       _histFetchingDays.delete(dayKey);
@@ -6196,7 +6193,8 @@ function loadHistoryFromCloud(dayKey){
       _histFetchingDays.delete(dayKey);
       // Do NOT add to _histFetchedDays on error — allow retry when user revisits the tab.
       // But throttle: wait 5s before allowing a retry to avoid hammering Firestore.
-      console.warn('[SC] History cloud fetch failed for', dayKey, err && err.code);
+      console.warn('[SC] History cloud fetch failed for', dayKey, err && err.code, err && err.message);
+      _histFetchErrors[dayKey] = (err && err.code) || (err && err.message) || 'unknown error';
       setTimeout(()=>{ _histFetchingDays.delete(dayKey); }, 5000);
       if(currentTab===10) safeRenderTab(10);
     });
@@ -16689,6 +16687,7 @@ function renderAlertsTab(){
 var historySelectedDate = ""; // "" = today; else "YYYY-MM-DD"
 var _histFetchingDays = new Set(); // tracks which day-keys are currently being fetched from cloud
 var _histFetchedDays = new Set();  // tracks which day-keys have already completed a cloud fetch
+var _histFetchErrors = {};         // dayKey -> error message, for showing retry UI
 var _histMemberFilter = "all"; // "all" or actor name string
 var _histTextSearch = ""; // free-text search
 
@@ -17398,7 +17397,6 @@ function renderHistoryTab(){
 
   // Try loading from cloud if local is empty (helps after re-login / new device)
   let entries = getHistoryForDay(dayKey);
-  const _histIsLoading = entries.length===0 && db && authPhone && !_histFetchedDays.has(dayKey);
   if(entries.length===0 && db && authPhone) loadHistoryFromCloud(dayKey);
   // While cloud fetch is in-flight, show a loading spinner instead of "No activity"
   if(_histFetchingDays.has(dayKey)){
@@ -17406,6 +17404,17 @@ function renderHistoryTab(){
       <div style="font-size:36px;margin-bottom:14px;">⏳</div>
       <div style="font-size:15px;font-weight:700;color:var(--text-muted,#7a8aaa);">${currentLang==='hi'?'इतिहास लोड हो रहा है...':'Loading history...'}</div>
       <div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-top:6px;">${currentLang==='hi'?'कृपया प्रतीक्षा करें':'Please wait'}</div>
+    </div>`;
+  }
+  // If the last cloud fetch failed, show the real error + a Retry button instead of
+  // silently looking empty or stuck.
+  if(entries.length===0 && _histFetchErrors[dayKey]){
+    const errMsg = _histFetchErrors[dayKey];
+    return `<div style="padding:60px 20px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:14px;">⚠️</div>
+      <div style="font-size:15px;font-weight:700;color:#f87171;">${currentLang==='hi'?'इतिहास लोड नहीं हो सका':'Could not load history'}</div>
+      <div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-top:6px;font-family:monospace;">${errMsg}</div>
+      <button onclick="delete _histFetchErrors['${dayKey}'];_histFetchedDays.delete('${dayKey}');safeRenderTab(10);" style="margin-top:16px;background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:800;cursor:pointer;padding:10px 24px;">🔄 ${currentLang==='hi'?'फिर कोशिश करें':'Retry'}</button>
     </div>`;
   }
 
