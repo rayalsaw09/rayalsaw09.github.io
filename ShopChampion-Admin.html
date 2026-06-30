@@ -6177,11 +6177,13 @@ function loadHistoryFromCloud(dayKey){
   if(!db || !authPhone) return;
   if(_histFetchingDays.has(dayKey)) return; // already in flight
   if(_histFetchedDays.has(dayKey)) return;  // already completed, genuinely empty
+  // Mark as fetching SYNCHRONOUSLY before the async call so renderHistoryTab()
+  // sees it immediately on the same tick and shows the spinner correctly.
   _histFetchingDays.add(dayKey);
   db.collection("users").doc(authPhone).collection("history_log").doc(dayKey)
     .get().then(doc=>{
       _histFetchingDays.delete(dayKey);
-      _histFetchedDays.add(dayKey);
+      _histFetchedDays.add(dayKey); // mark done only on success
       if(doc && doc.exists){
         const data = doc.data();
         if(data && data.list){
@@ -6190,9 +6192,12 @@ function loadHistoryFromCloud(dayKey){
       }
       // Always re-render after fetch (shows real data or confirmed empty state)
       if(currentTab===10) safeRenderTab(10);
-    }).catch(()=>{
+    }).catch(err=>{
       _histFetchingDays.delete(dayKey);
-      _histFetchedDays.add(dayKey); // mark done even on error to avoid infinite retries
+      // Do NOT add to _histFetchedDays on error — allow retry when user revisits the tab.
+      // But throttle: wait 5s before allowing a retry to avoid hammering Firestore.
+      console.warn('[SC] History cloud fetch failed for', dayKey, err && err.code);
+      setTimeout(()=>{ _histFetchingDays.delete(dayKey); }, 5000);
       if(currentTab===10) safeRenderTab(10);
     });
 }
@@ -17396,7 +17401,7 @@ function renderHistoryTab(){
   const _histIsLoading = entries.length===0 && db && authPhone && !_histFetchedDays.has(dayKey);
   if(entries.length===0 && db && authPhone) loadHistoryFromCloud(dayKey);
   // While cloud fetch is in-flight, show a loading spinner instead of "No activity"
-  if(_histIsLoading && _histFetchingDays.has(dayKey)){
+  if(_histFetchingDays.has(dayKey)){
     return `<div style="padding:60px 20px;text-align:center;">
       <div style="font-size:36px;margin-bottom:14px;">⏳</div>
       <div style="font-size:15px;font-weight:700;color:var(--text-muted,#7a8aaa);">${currentLang==='hi'?'इतिहास लोड हो रहा है...':'Loading history...'}</div>
