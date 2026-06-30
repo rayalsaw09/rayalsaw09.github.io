@@ -6170,15 +6170,21 @@ function getHistoryForDay(dayKey){
   catch{ return []; }
 }
 function loadHistoryFromCloud(dayKey){
-  if(!db || !authPhone) return;
-  if(_histFetchingDays.has(dayKey)) return; // already in flight
-  if(_histFetchedDays.has(dayKey)) return;  // already completed, genuinely empty
+  console.log('[Hist] loadHistoryFromCloud called for', dayKey, 'db=', !!db, 'authPhone=', authPhone, 'fetching=', _histFetchingDays.has(dayKey), 'fetched=', _histFetchedDays.has(dayKey));
+  if(!db || !authPhone) { console.log('[Hist] aborted: no db or authPhone'); return; }
+  if(_histFetchingDays.has(dayKey)) { console.log('[Hist] aborted: already fetching'); return; } // already in flight
+  if(_histFetchedDays.has(dayKey)) { console.log('[Hist] aborted: already fetched'); return; }  // already completed, genuinely empty
   // Mark as fetching SYNCHRONOUSLY before the async call so renderHistoryTab()
   // sees it immediately on the same tick and shows the spinner correctly.
   _histFetchingDays.add(dayKey);
   delete _histFetchErrors[dayKey];
-  db.collection("users").doc(authPhone).collection("history_log").doc(dayKey)
-    .get().then(doc=>{
+  console.log('[Hist] starting Firestore .get() for', dayKey);
+  const _histTimeoutGuard = new Promise((_,reject)=>setTimeout(()=>reject({code:'client-timeout',message:'No response from Firestore after 10s'}), 10000));
+  Promise.race([
+    db.collection("users").doc(authPhone).collection("history_log").doc(dayKey).get(),
+    _histTimeoutGuard
+  ]).then(doc=>{
+      console.log('[Hist] .get() resolved for', dayKey, 'exists=', doc && doc.exists);
       _histFetchingDays.delete(dayKey);
       _histFetchedDays.add(dayKey); // mark done only on success
       if(doc && doc.exists){
