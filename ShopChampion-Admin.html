@@ -6948,6 +6948,25 @@ function onLoginSuccess(phone) {
           console.warn('[SC] Loading watchdog forcing app visible');
           _scHideLoginLoading();
           safeRenderTab(currentTab);
+          notify(currentLang === 'hi' ? '\u26a0\ufe0f Firebase धीमा है — cached data दिख रहा है' : '\u26a0\ufe0f Firebase slow — showing cached data', 'warning');
+        }
+      }, 3000);
+    }
+  }, 12000);
+
+  // Safety watchdog: force-show app if loading hangs beyond 12s
+  setTimeout(function() {
+    var _ll = document.getElementById('sc-login-loading');
+    if (_ll && _ll.style.display !== 'none') {
+      console.warn('[SC] Loading watchdog: 12s timeout hit');
+      var _msgEl = document.getElementById('sc-login-loading-msg');
+      if (_msgEl) _msgEl.textContent = currentLang === 'hi' ? 'थोड़ी देरी हो रही है...' : 'Taking longer than usual...';
+      setTimeout(function() {
+        var _ll2 = document.getElementById('sc-login-loading');
+        if (_ll2 && _ll2.style.display !== 'none') {
+          console.warn('[SC] Loading watchdog forcing app visible');
+          _scHideLoginLoading();
+          safeRenderTab(currentTab);
           notify(currentLang === 'hi' ? '⚠️ Firebase धीमा है — cached data दिख रहा है' : '⚠️ Firebase slow — showing cached data', 'warning');
         }
       }, 3000);
@@ -25047,6 +25066,13 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/users/$(phone)/member_auth_uids/$(request.auth.uid));
     }
 
+    // Helper: is the caller a registered Seller Panel admin session?
+    // The Seller Panel writes its anon UID to seller_admins/{uid} on login.
+    function isSellerAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/seller_admins/$(request.auth.uid));
+    }
+
     match /users/{phone}/member_auth_uids/{uid} {
       allow write: if request.auth != null && request.auth.uid == uid;
       allow read: if isOwner(phone);
@@ -25056,8 +25082,22 @@ service cloud.firestore {
       allow read, write: if isOwner(phone) || request.auth != null;
     }
 
+    // ShopConnect shared ledger: any authenticated shop can read app_data
+    // (creditors/debtors) so linked shops can view the shared ledger.
+    match /users/{phone}/app_data/{doc} {
+      allow read: if request.auth != null;
+      allow write: if isOwner(phone) || isShopMember(phone);
+    }
+
+    // Seller Panel reads bills, customers, inventory for Shop Activity tab.
+    // The Seller Panel registers its anon UID in seller_admins on login.
     match /users/{phone}/{document=**} {
-      allow read, write: if isOwner(phone) || isShopMember(phone);
+      allow read, write: if isOwner(phone) || isShopMember(phone) || isSellerAdmin();
+    }
+
+    // Seller Panel registers its anon UID here so isSellerAdmin() works.
+    match /seller_admins/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
     match /shop_profiles/{phone} {
