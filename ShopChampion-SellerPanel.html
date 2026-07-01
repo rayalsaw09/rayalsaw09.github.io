@@ -3246,23 +3246,23 @@ let saAllShops = [];       // [{phone, name, purchases:[]}]
 let saCurrentShop = null;  // shop being viewed in modal
 let _saAuthReady = null;   // Promise that resolves when anon auth is complete
 
+// FIXED: awaits seller_admins registration before any Firestore reads
 async function saInitFirebase() {
   try {
     if (!firebase.apps.length) firebase.initializeApp(SC_FIREBASE_CONFIG);
     if (!saDb) saDb = firebase.firestore();
-    // Sign in anonymously so Firestore rules (request.auth != null) pass.
-    // Cache the promise so concurrent callers all wait on the same auth attempt.
     if (!_saAuthReady) {
       const auth = firebase.auth();
       if (auth.currentUser) {
-        _saAuthReady = Promise.resolve();
-        // Register existing UID as seller admin if not already done
-        _saRegisterSellerAdmin(auth.currentUser.uid);
+        // Already signed in — register UID and wait for it before resolving
+        _saAuthReady = _saRegisterSellerAdmin(auth.currentUser.uid);
       } else {
         _saAuthReady = auth.signInAnonymously()
-          .then(cred => {
-            // Register this UID in seller_admins so Firestore rules can verify it's the real seller
-            _saRegisterSellerAdmin(cred.user.uid);
+          .then(async cred => {
+            // AWAIT the registration so seller_admins/{uid} exists before
+            // loadShopActivity() fires its first Firestore .get() calls.
+            await _saRegisterSellerAdmin(cred.user.uid);
+            console.log("[ShopActivity] Seller UID registered:", cred.user.uid.slice(0,8));
           })
           .catch(e => { console.warn("[ShopActivity] Anon auth failed:", e.message); });
       }
@@ -3273,17 +3273,20 @@ async function saInitFirebase() {
   }
 }
 
-// Write seller UID to Firestore so rules can verify it's a real seller session
+// Write seller UID to seller_admins so isSellerAdmin() Firestore rule passes.
+// Uses Date.now() instead of serverTimestamp() to avoid auth bootstrap issue.
+// MUST complete before any shop data reads.
 async function _saRegisterSellerAdmin(uid) {
   if (!uid || !saDb) return;
   try {
     await saDb.collection("seller_admins").doc(uid).set({
-      registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+      registeredAt: Date.now(),
       panel: "SellerPanel"
     }, { merge: true });
+    console.log("[ShopActivity] seller_admins OK for", uid.slice(0,8));
   } catch(e) {
-    // Silently ignore — rules may not allow write yet on first deploy
-    console.warn("[ShopActivity] Could not register seller UID:", e.message);
+    console.warn("[ShopActivity] seller_admins write failed:", e.code, e.message);
+    // Reads will get permission-denied if rules haven't been published yet
   }
 }
 
@@ -3324,7 +3327,7 @@ async function loadShopActivity() {
   // Set default date range to today if empty
   const fromEl = document.getElementById("sa-date-from");
   const toEl = document.getElementById("sa-date-to");
-  if (!fromEl.value) { saSetThisMonth(true); return; } // saSetThisMonth(true) calls loadShopActivity
+  if (!fromEl.value) { saSetThisMonth(true); return; }
 
   document.getElementById("sa-shop-list").innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:40px;font-size:14px;">⏳ Loading shop data from Firebase...</div>`;
 
@@ -3992,8 +3995,9 @@ function renderShopBills() {
 const _origOpenMain = openMain;
 openMain = function() {
   _origOpenMain();
-  saInitFirebase(); // fire-and-forget early init; loadShopActivity properly awaits it later
-  // saSetThisMonth is NOT called here — shop activity loads lazily when Tab 2 is opened
+  // Pre-init Firebase in background so seller_admins UID is registered
+  // before user clicks Shop Activity tab (reduces wait time)
+  saInitFirebase().catch(e => console.warn('[SP] Early Firebase init failed:', e.message));
   // Pre-populate shop list for banner tab (after allUsers is loaded)
   setTimeout(renderBannerShopList, 1500);
 };
