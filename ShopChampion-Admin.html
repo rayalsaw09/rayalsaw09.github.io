@@ -6210,7 +6210,7 @@ function loadHistoryFromCloud(dayKey){
     _histFetchingDays.delete(dayKey);
     _histFetchErrors[dayKey] = (syncErr && syncErr.message) || 'unknown error';
     setTimeout(()=>{ _histFetchingDays.delete(dayKey); }, 5000);
-    if(currentTab===10) safeRenderTab(10);
+    _histRepaintIfActive();
     return;
   }
   Promise.race([
@@ -6226,8 +6226,14 @@ function loadHistoryFromCloud(dayKey){
           try{ localStorage.setItem(historyLogKey(dayKey), JSON.stringify(data.list)); }catch{}
         }
       }
-      // Always re-render after fetch (shows real data or confirmed empty state)
-      if(currentTab===10) safeRenderTab(10);
+      // Always re-render after fetch (shows real data or confirmed empty state).
+      // IMPORTANT: repaint directly instead of calling safeRenderTab(10) — that goes
+      // through renderTab()'s tab-SWITCH handler, which deliberately clears today's
+      // fetched/fetching flags on every call (so re-opening the tab re-pulls team
+      // members' entries). Calling it from here would immediately undo the flag we
+      // just set above and re-trigger this same fetch forever on any day with zero
+      // entries (exists=false), which is exactly what was happening.
+      _histRepaintIfActive();
     }).catch(err=>{
       _histFetchingDays.delete(dayKey);
       // Do NOT add to _histFetchedDays on error — allow retry when user revisits the tab.
@@ -6235,8 +6241,17 @@ function loadHistoryFromCloud(dayKey){
       console.warn('[SC] History cloud fetch failed for', dayKey, err && err.code, err && err.message);
       _histFetchErrors[dayKey] = (err && err.code) || (err && err.message) || 'unknown error';
       setTimeout(()=>{ _histFetchingDays.delete(dayKey); }, 5000);
-      if(currentTab===10) safeRenderTab(10);
+      _histRepaintIfActive();
     });
+}
+
+// Repaint just the History tab's content directly (no tab-switch side effects).
+// Used after a background cloud fetch completes/fails, so we don't re-trigger
+// renderTab()'s "clear today's fetch flag" logic meant for actual tab switches.
+function _histRepaintIfActive(){
+  if(currentTab!==10) return;
+  const el = document.getElementById("tab-content");
+  if(el) el.innerHTML = renderHistoryTab();
 }
 
 // Scan every stored history day-bucket and return all entries that mention
