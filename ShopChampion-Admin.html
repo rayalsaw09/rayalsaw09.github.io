@@ -813,7 +813,7 @@ const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
   .avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; border: 2px solid #334; overflow: hidden; }
   .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
   .rank-circle { border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-weight: 700; }
-  #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  #login-screen { display: flex; align-items: center; justify-content: center; position: fixed; inset: 0; width: 100%; height: 100%; overflow-y: auto; z-index: 99997; background: var(--bg-main, #0a1628); }
   #main-app { display: none; }
   .progress-bar-track { height: 8px; background:var(--bg-main,#0a0e1a); border-radius: 4px; overflow: hidden; }
   .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s; }
@@ -2120,7 +2120,24 @@ var TRANSLATIONS = {
     stChangesApply:"Changes apply immediately",
     stProPlan:"Pro Plan Active", stFullAccess:"Full access to all features",
     stFreePlan:"Free Plan",
-    stUnlimited:"Unlimited customers · All features · Ad-free display",
+    stUnlimited:"Unlimited customers · All features",
+    stBasicFeatures:"Basic features — upgrade to unlock everything",
+    stFreePlanUsage:"Free plan usage:",
+    stTrialActive:"Pro Trial Active",
+    stTrialUsage:"This trial's usage:",
+    stTrialCustomers:"/ ∞ customers",
+    stTrialItems:"/ ∞ items",
+    stBuyBeforeTrial:"💳 Buy Pro before your trial ends — ₹299/mo",
+    stDaysLeft:"days left",
+    stKeyLabel:"License key:",
+    stActiveLabel:"✅ Active",
+    stYouHave:"🆓 You have",
+    stProUnlocks:"⭐ Pro unlocks",
+    stUpgradeToPro:"⭐ Upgrade to Pro",
+    stUpgradeDesc:"₹299/month or ₹3,499/year · No more limits · Team members · Priority support",
+    stUpgradeNow:"💳 Upgrade Now →",
+    stHaveKey:"Already have a key?",
+    stEnterHere:"Enter it here →",
     stProFeature:"Pro Feature",
     stPasteCSV:"Paste CSV/spreadsheet data below, or upload a CSV file.",
     stExpectedCols:"Expected columns:", stName:"Name", stPhoneOptional:"Phone (optional)",
@@ -2627,7 +2644,7 @@ var TRANSLATIONS = {
     stYouHave:"🆓 आपके पास है",
     stProUnlocks:"⭐ Pro अनलॉक करता है",
     stUpgradeToPro:"⭐ Pro में अपग्रेड करें",
-    stUpgradeDesc:"₹299/माह या ₹3,499/वर्ष · सभी सुविधाएं · विज्ञापन-मुक्त डिस्प्ले",
+    stUpgradeDesc:"₹299/माह या ₹3,499/वर्ष · कोई लिमिट नहीं · टीम मेंबर्स · प्राथमिकता सहायता",
     stUpgradeNow:"💳 अभी अपग्रेड करें →",
     stHaveKey:"पहले से कुंजी है?",
     stEnterHere:"यहां दर्ज करें →",
@@ -6778,19 +6795,46 @@ function _generateOwnerToken() {
 }
 
 async function _registerOwnerSession(phone) {
-  if (!phone || !db) return;
-  // Stop any existing watcher BEFORE writing a new token.
+  if (!phone || !db) return false;
+  // Stop any existing watcher BEFORE writing/resuming a token.
   // If an old watcher is running with the old token, it will see the new token
   // as a mismatch and kick the user out of their own fresh login.
   _stopOwnerSessionWatcher();
-  const token = _generateOwnerToken();
-  _ownerSessionToken = token;
+  const localToken = localStorage.getItem(storageKey('owner_session_token'));
   try {
+    const doc = await db.collection('users').doc(phone).collection('owner_session').doc('current').get();
+    const remoteToken = doc.exists ? doc.data().token : null;
+
+    if (remoteToken && localToken && remoteToken === localToken) {
+      // This device's own session is still the one on record — this call is just a
+      // page refresh / silent auto-login restoring a still-valid session. Resume it
+      // WITHOUT writing a new token, so we don't accidentally steal the session back
+      // from another device that legitimately logged in after us.
+      _ownerSessionToken = localToken;
+      console.log('[Owner] Resumed existing session on this device (refresh)');
+      return true;
+    }
+    if (remoteToken && localToken && remoteToken !== localToken) {
+      // Another device has since taken over the session (e.g. while this device was
+      // reloading or offline). Don't reclaim it — this device should stay logged out.
+      console.warn('[Owner] Session was superseded elsewhere — not reclaiming');
+      _ownerSessionToken = null;
+      localStorage.removeItem(storageKey('owner_session_token'));
+      _showSessionKickedOverlay();
+      setTimeout(() => doLogout(), 2500);
+      return false;
+    }
+    // No existing token, or no local record of ever holding one (this is a fresh,
+    // explicit login) — claim the session for this device.
+    const token = _generateOwnerToken();
+    _ownerSessionToken = token;
+    localStorage.setItem(storageKey('owner_session_token'), token);
     await db.collection('users').doc(phone).collection('owner_session').doc('current').set({
       token: token, loginAt: Date.now(), ua: navigator.userAgent.slice(0, 100)
     });
     console.log('[Owner] Session token registered:', token.slice(0, 8) + '...');
-  } catch(e) { console.warn('[Owner] Could not register session token:', e.message); }
+    return true;
+  } catch(e) { console.warn('[Owner] Could not register session token:', e.message); return true; }
 }
 
 function _startOwnerSessionWatcher(phone) {
@@ -7051,6 +7095,17 @@ function onLoginSuccess(phone) {
           });
           loadSettingsFromCloud(()=>{
             if (currentMember) {
+              // Team Members is Pro-only. If the shop's plan has lapsed (trial ended,
+              // subscription expired, or downgraded), existing members should be
+              // signed out immediately rather than silently keep working.
+              if (!_hasFullAccess()) {
+                _scHideLoginLoading();
+                notify(currentLang==='hi'
+                  ? '🔒 इस दुकान का Pro प्लान समाप्त हो गया है। टीम मेंबर एक्सेस Pro प्लान पर ही उपलब्ध है। दुकान मालिक से संपर्क करें।'
+                  : '🔒 This shop\'s Pro plan has expired. Team member access requires Pro — please contact the shop owner.', 'error');
+                setTimeout(doLogout, 2500);
+                return;
+              }
               const firstAllowed = getTabs();
               if (firstAllowed.length > 0 && !isTabVisible(TABS_BASE[currentTab])) {
                 currentTab = firstAllowed[0].index;
@@ -7081,7 +7136,7 @@ function onLoginSuccess(phone) {
           _startListenerAfterUid(); // no uid yet — start anyway, rules may still pass
         }
       } else if (!currentMember && phone) {
-        _registerOwnerSession(phone).then(() => _startOwnerSessionWatcher(phone));
+        _registerOwnerSession(phone).then((ok) => { if (ok) _startOwnerSessionWatcher(phone); });
         startFirestoreListener();
       } else {
         startFirestoreListener();
@@ -7160,7 +7215,7 @@ function onLoginSuccess(phone) {
       if(db && authPhone){
         const _afterAuth2 = () => {
           if (!currentMember && phone) {
-            _registerOwnerSession(phone).then(() => _startOwnerSessionWatcher(phone));
+            _registerOwnerSession(phone).then((ok) => { if (ok) _startOwnerSessionWatcher(phone); });
           }
           startFirestoreListener();
           // Migration: run AFTER startFirestoreListener so isOwner() passes
@@ -7266,6 +7321,7 @@ function doLogout() {
   if (window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
   scStopPolling();
   _stopOwnerSessionWatcher();
+  if (authPhone) { try { localStorage.removeItem(storageKey('owner_session_token')); } catch(_) {} }
   _ownerSessionToken = null;
   const adState = window._scAdState;
   if (adState) {
@@ -15154,7 +15210,10 @@ function _renderDebtorCard(dr){
         </div>
         ${lastTx?`<div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-top:3px;">Last: ${debtTxIcon(lastTx.type)} ${escHtml(lastTx.note||lastTx.type)} · ${new Date(lastTx.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})}</div>`:""}
         ${dr._fromShopConnect?`<div style="margin-top:4px;"><span style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:#16653444;color:#4ade80;border:1px solid #22c55e44;">🔗 Linked Shop</span></div>`:""}
-        ${(!isArchived&&dr.phone&&bal>0)?`<div style="margin-top:6px;"><a href="${_debtWAReminder(dr)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:#4ade80;background:#052a14;border:1px solid #16a34a;border-radius:8px;padding:4px 10px;text-decoration:none;">${t('dbWAReminder')}</a></div>`:""}
+        ${(!isArchived&&dr.phone&&bal>0)?(_hasFullAccess()
+          ? `<div style="margin-top:6px;"><a href="${_debtWAReminder(dr)}" target="_blank" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:#4ade80;background:#052a14;border:1px solid #16a34a;border-radius:8px;padding:4px 10px;text-decoration:none;">${t('dbWAReminder')}</a></div>`
+          : `<div style="margin-top:6px;"><span onclick="event.stopPropagation();_showUpgradePrompt('WhatsApp Reminders सिर्फ Pro प्लान पर उपलब्ध हैं · WhatsApp Reminders is a Pro feature')" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:#7a8aaa;background:#0a0f1a;border:1px solid #1e2a45;border-radius:8px;padding:4px 10px;cursor:pointer;">🔒 ${t('dbWAReminder')}</span></div>`
+        ):""}
       
       </div>
       <!-- Balance / Archive badge -->
@@ -15392,7 +15451,10 @@ function openDebtorDetail(id){
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
           <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);">${t('crTxHistory')}</div>
           <div style="display:flex;gap:8px;">
-            ${dr.phone&&bal>0?`<a href="${_debtWAReminder(dr)}" target="_blank" style="cursor:pointer;background:#052a14;border:1px solid #16a34a;border-radius:8px;color:#4ade80;font-size:11px;font-weight:800;padding:6px 12px;text-decoration:none;">💬 Remind</a>`:''}
+            ${dr.phone&&bal>0?(_hasFullAccess()
+              ? `<a href="${_debtWAReminder(dr)}" target="_blank" style="cursor:pointer;background:#052a14;border:1px solid #16a34a;border-radius:8px;color:#4ade80;font-size:11px;font-weight:800;padding:6px 12px;text-decoration:none;">💬 Remind</a>`
+              : `<span onclick="_showUpgradePrompt('WhatsApp Reminders सिर्फ Pro प्लान पर उपलब्ध हैं · WhatsApp Reminders is a Pro feature')" style="cursor:pointer;background:#0a0f1a;border:1px solid #1e2a45;border-radius:8px;color:#7a8aaa;font-size:11px;font-weight:800;padding:6px 12px;">🔒 Remind</span>`
+            ):''}
             <button onclick="printDebtorStatement('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">🖨 Print</button>
             <button onclick="openAddDebtorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>
             <button onclick="showEditHistoryModal('${id}','${dr.name.replace(/'/g,"\\'")}','debtor')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#FFD700;font-size:11px;font-weight:700;padding:6px 12px;white-space:nowrap;">📝 Edit History</button>
@@ -16871,6 +16933,25 @@ function collectPermissions(prefix) {
 }
 
 async function renderTeamTab(el) {
+  // Team Members is a Pro-only feature (see PRO_FEATURES in Settings). Free plan
+  // users — and users whose trial has expired — should not be able to view or
+  // manage team members at all; show an upgrade prompt instead.
+  if (!_hasFullAccess()) {
+    if (window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
+    const daysLeft = _trialDaysLeft();
+    const trialMsg = _trialActive
+      ? `<div style="background:#1a2a1a;border:1px solid #2a5a2a;border-radius:8px;padding:10px 14px;margin:0 auto 18px;max-width:360px;font-size:12px;color:#4f4;">⏳ Trial: <strong>${daysLeft} days left</strong></div>`
+      : ``;
+    el.innerHTML = `<div style="padding:60px 20px;text-align:center;max-width:420px;margin:0 auto;">
+      <div style="font-size:42px;margin-bottom:14px;">🔒</div>
+      <div style="font-size:18px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:8px;">${currentLang==='hi'?'टीम मेंबर्स — Pro फीचर':'Team Members is a Pro feature'}</div>
+      <div style="font-size:13px;color:var(--text-muted,#7a8aaa);margin-bottom:18px;line-height:1.6;">${currentLang==='hi'?'टीम मेंबर जोड़ने और मैनेज करने के लिए Pro प्लान खरीदें। Free प्लान पर यह फीचर उपलब्ध नहीं है.':'Adding and managing team members requires the Pro plan. Upgrade to invite staff, set permissions, and track their activity.'}</div>
+      ${trialMsg}
+      <button onclick="openPaymentModal()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-size:14px;font-weight:800;padding:12px 28px;">💳 ${currentLang==='hi'?'Pro खरीदें — ₹299/महीना':'Upgrade to Pro — ₹299/month'}</button>
+    </div>`;
+    return;
+  }
+
   // Clear any existing auto-refresh timer
   if (window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
 
@@ -17423,8 +17504,11 @@ function renderHistoryTab(){
   // Try loading from cloud if local is empty (helps after re-login / new device)
   let entries = getHistoryForDay(dayKey);
   if(entries.length===0 && db && authPhone) loadHistoryFromCloud(dayKey);
-  // While cloud fetch is in-flight, show a loading spinner instead of "No activity"
-  if(_histFetchingDays.has(dayKey)){
+  // While cloud fetch is in-flight, show a loading spinner instead of "No activity" —
+  // but only if we have no local entries yet. If local data already exists (e.g. the
+  // user just logged an activity after opening this tab), show it immediately instead
+  // of hiding it behind a leftover/slow background fetch from before.
+  if(entries.length===0 && _histFetchingDays.has(dayKey)){
     return `<div style="padding:60px 20px;text-align:center;">
       <div style="font-size:36px;margin-bottom:14px;">⏳</div>
       <div style="font-size:15px;font-weight:700;color:var(--text-muted,#7a8aaa);">${currentLang==='hi'?'इतिहास लोड हो रहा है...':'Loading history...'}</div>
@@ -17609,20 +17693,18 @@ function renderSettings(){
     ["📦", "Inventory Items", `Up to ${FREE_MAX_INV_ITEMS}`],
     ["💬", "Shop Messaging", "Included"],
     ["🏆", "Rankings / Leaderboard", "Included"],
+    ["📊", "Analytics & Compare", "Included"],
+    ["🧾", "GST Billing", "Included"],
     ["📱", "WhatsApp Reminders", "Pro only"],
-    ["📺", "Display Screen", "With ads"],
+    ["👤", "Team Members", "Pro only"],
   ];
   const PRO_FEATURES = [
     ["👥", "Customers", "Unlimited"],
     ["💳", "Creditors & Debtors", "Unlimited"],
     ["📦", "Inventory", "Unlimited"],
-    ["📊", "Analytics", "Full access"],
-    ["⚖️", "Compare Periods", "Full access"],
-    ["🧾", "GST Bills & Export", "Included"],
-    ["🏷️", "GSTIN Auto-lookup", "Included"],
+    ["📱", "WhatsApp Reminders", "Included"],
     ["👤", "Team Members", "Included"],
     ["🔔", "Push Notifications", "Included"],
-    ["📺", "Display Screen", "Ad-free"],
   ];
 
   const trialDaysLeft = _trialDaysLeft();
@@ -17697,26 +17779,47 @@ function renderSettings(){
           </div>
         </div>
 
+        <!-- Usage-based urgency nudge -->
+        ${(()=>{
+          const pcts = [
+            [customers.length/FREE_MAX_CUSTOMERS, "👥", "customers"],
+            [inventoryItems.length/FREE_MAX_INV_ITEMS, "📦", "inventory items"],
+            [getCreditors().filter(c=>!c._archived).length/FREE_MAX_CREDITORS, "🏦", "creditors"],
+            [getDebtors().filter(d=>!d._archived).length/FREE_MAX_DEBTORS, "🧾", "debtors"],
+          ].sort((a,b)=>b[0]-a[0]);
+          const [topPct, topIcon, topLabel] = pcts[0];
+          if (topPct >= 0.8) {
+            const pctDisp = Math.min(100, Math.round(topPct*100));
+            return `<div style="background:#2a1000;border:1px solid #7a3010;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#ffb380;text-align:center;">
+              ⚠️ You're at <strong>${pctDisp}%</strong> of your free ${topIcon} ${topLabel} limit — upgrade now so you never get blocked mid-sale.
+            </div>`;
+          }
+          return "";
+        })()}
+
         <!-- Side-by-side comparison -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
           <!-- Free column -->
           <div style="background:#0a0f1a;border:1px solid #1a2540;border-radius:12px;padding:12px;">
             <div style="font-size:12px;font-weight:900;color:#88aaff;margin-bottom:10px;text-align:center;">${t('stYouHave')}</div>
-            ${FREE_FEATURES.map(([icon,label,val])=>`
-              <div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:8px;">
-                <span style="font-size:13px;flex-shrink:0;">${icon}</span>
+            ${FREE_FEATURES.map(([icon,label,val])=>{
+              const locked = val === "Pro only";
+              return `
+              <div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:8px;${locked?'opacity:.85;':''}">
+                <span style="font-size:13px;flex-shrink:0;">${locked?'🔒':icon}</span>
                 <div>
                   <div style="font-size:11px;color:#4a6a8a;line-height:1.3;">${label}</div>
-                  <div style="font-size:11px;font-weight:800;color:#88aaff;">${val}</div>
+                  <div style="font-size:11px;font-weight:800;color:${locked?'#f59e0b':'#88aaff'};">${val}</div>
                 </div>
-              </div>`).join("")}
+              </div>`;}).join("")}
           </div>
           <!-- Pro column -->
-          <div style="background:#0a130a;border:1px solid #1a3a1a;border-radius:12px;padding:12px;">
-            <div style="font-size:12px;font-weight:900;color:#4f4;margin-bottom:10px;text-align:center;">${t('stProUnlocks')}</div>
+          <div style="background:#0a130a;border:2px solid #2a6a2a;border-radius:12px;padding:12px;position:relative;">
+            <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-size:9px;font-weight:900;padding:2px 10px;border-radius:20px;white-space:nowrap;letter-spacing:.5px;">⭐ RECOMMENDED</div>
+            <div style="font-size:12px;font-weight:900;color:#4f4;margin-bottom:10px;text-align:center;margin-top:2px;">${t('stProUnlocks')}</div>
             ${PRO_FEATURES.map(([icon,label,val])=>`
               <div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:8px;">
-                <span style="font-size:13px;flex-shrink:0;">${icon}</span>
+                <span style="font-size:13px;flex-shrink:0;">✅</span>
                 <div>
                   <div style="font-size:11px;color:#2a5a2a;line-height:1.3;">${label}</div>
                   <div style="font-size:11px;font-weight:800;color:#4f4;">${val}</div>
@@ -17726,11 +17829,12 @@ function renderSettings(){
         </div>
 
         <!-- Upgrade CTA -->
-        <div style="background:linear-gradient(135deg,#1a0e00,#2a1800);border:1px solid #4a3000;border-radius:12px;padding:14px;text-align:center;">
-          <div style="font-size:13px;font-weight:800;color:#FFD700;margin-bottom:4px;">${t('stUpgradeToPro')}</div>
-          <div style="font-size:12px;color:#7a5a2a;margin-bottom:12px;">${t('stUpgradeDesc')}</div>
-          <button onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:900;cursor:pointer;width:100%;">${t('stUpgradeNow')}</button>
-          <div style="font-size:11px;color:#4a3a1a;margin-top:8px;">${t('stHaveKey')} <span onclick="showRenewPrompt()" style="color:#FFD700;cursor:pointer;font-weight:700;">${t('stEnterHere')}</span></div>
+        <div style="background:linear-gradient(135deg,#1a0e00,#2a1800);border:2px solid #FFD700;border-radius:14px;padding:18px 16px;text-align:center;box-shadow:0 0 20px rgba(255,215,0,0.12);">
+          <div style="font-size:15px;font-weight:900;color:#FFD700;margin-bottom:4px;">${t('stUpgradeToPro')}</div>
+          <div style="font-size:12px;color:#c9a35a;margin-bottom:4px;">${t('stUpgradeDesc')}</div>
+          <div style="font-size:11px;color:#7a5a2a;margin-bottom:14px;">≈ ₹10/day on the monthly plan · or save ₹89 with yearly</div>
+          <button onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;border:none;border-radius:10px;padding:13px 24px;font-size:15px;font-weight:900;cursor:pointer;width:100%;box-shadow:0 4px 14px rgba(255,165,0,0.35);">${t('stUpgradeNow')}</button>
+          <div style="font-size:11px;color:#4a3a1a;margin-top:10px;">${t('stHaveKey')} <span onclick="showRenewPrompt()" style="color:#FFD700;cursor:pointer;font-weight:700;text-decoration:underline;">${t('stEnterHere')}</span></div>
         </div>
       </div>`;
 
@@ -17774,10 +17878,12 @@ function renderSettings(){
     )}
 
     ${section("Notifications",
-      row("🔔","Enable Push Notifications",
-        _scFcmToken ? "✅ Active on this device" : (Notification.permission==="denied" ? "❌ Blocked — enable in browser settings" : "Tap to allow notifications on this device"),
+      row("🔔",_hasFullAccess()?"Enable Push Notifications":"🔒 Push Notifications",
+        _hasFullAccess()
+          ? (_scFcmToken ? "✅ Active on this device" : (Notification.permission==="denied" ? "❌ Blocked — enable in browser settings" : "Tap to allow notifications on this device"))
+          : "Pro feature — tap to upgrade",
         "scRequestPushPermission()",
-        _scFcmToken ? "✓" : "›"
+        (_hasFullAccess()&&_scFcmToken) ? "✓" : "›"
       )
     )}
 
@@ -22776,6 +22882,7 @@ var _scFcmToken         = null; // FCM push token for this browser/device
 
 // ── FCM: initialise messaging and save token to Supabase ─────────────────────
 async function scRequestPushPermission() {
+  if (!_hasFullAccess()) { _showUpgradePrompt("Push Notifications सिर्फ Pro प्लान पर उपलब्ध हैं · Push Notifications is a Pro feature"); return; }
   if (!("Notification" in window)) { notify("❌ Notifications not supported on this browser","error"); return; }
   if (Notification.permission === "denied") {
     notify("❌ Notifications blocked. Go to browser Settings → Site Settings → Notifications → Allow for this site. Works best on Chrome/Edge.", "error");
