@@ -6197,8 +6197,24 @@ function loadHistoryFromCloud(dayKey){
   delete _histFetchErrors[dayKey];
   console.log('[Hist] starting Firestore .get() for', dayKey);
   const _histTimeoutGuard = new Promise((_,reject)=>setTimeout(()=>reject({code:'client-timeout',message:'No response from Firestore after 10s'}), 10000));
+  // Wrap the Firestore call itself in try/catch: if db.collection(...).get() throws
+  // SYNCHRONOUSLY (bad doc path, SDK not fully initialized, etc.), that exception
+  // happens before .then()/.catch() below even attach — so without this guard,
+  // _histFetchingDays would never get cleaned up and the spinner would be stuck
+  // forever with no way to recover.
+  let _histFetchPromise;
+  try {
+    _histFetchPromise = db.collection("users").doc(authPhone).collection("history_log").doc(dayKey).get();
+  } catch(syncErr) {
+    console.warn('[Hist] Firestore .get() threw synchronously for', dayKey, syncErr && syncErr.message);
+    _histFetchingDays.delete(dayKey);
+    _histFetchErrors[dayKey] = (syncErr && syncErr.message) || 'unknown error';
+    setTimeout(()=>{ _histFetchingDays.delete(dayKey); }, 5000);
+    if(currentTab===10) safeRenderTab(10);
+    return;
+  }
   Promise.race([
-    db.collection("users").doc(authPhone).collection("history_log").doc(dayKey).get(),
+    _histFetchPromise,
     _histTimeoutGuard
   ]).then(doc=>{
       console.log('[Hist] .get() resolved for', dayKey, 'exists=', doc && doc.exists);
@@ -7998,7 +8014,7 @@ function renderCustomers(sorted,q=""){
     const lastVisit=lastP?timeSince(lastP.date):t("never");
     const daysSince=lastP?Math.floor((Date.now()-new Date(lastP.date))/86400000):9999;
     const visitColor=daysSince<=7?"#4f4":daysSince<=30?"#FFD700":daysSince<=60?"#f84":"#f66";
-    const _isProPlan = licensePlan === "pro" && licenseStatus === "pro";
+    const _isProPlan = _hasFullAccess();
     const waMsg=(_isProPlan && c.phone)?`https://wa.me/91${c.phone}?text=${encodeURIComponent(`Hi ${c.name.split(" ")[0]}! 👋\nYou are ranked #${c.rank} at ${appSettings.shopName}.\nYour total spend: ${formatINR(c.totalSpend)} 🏆\nVisit us again to climb the leaderboard!`)}`:"";
     const isSel = custSelected.has(c.id);
     const isPro = typeof isSubFeatureAllowed==="function";
@@ -17495,6 +17511,24 @@ function showHistoryGroup(entryId, dayKey){
 }
 
 function renderHistoryTab(){
+  try {
+    return _renderHistoryTabInner();
+  } catch(e) {
+    // If anything above throws unexpectedly (bad data, SDK not ready, etc.), never
+    // leave a stale "Loading..." screen frozen on-screen forever — show a recoverable
+    // error state with a way to retry instead.
+    console.error('[Hist] renderHistoryTab crashed:', e);
+    const dayKeyForRetry = (typeof historySelectedDate !== 'undefined' && historySelectedDate) || _histDayKey(Date.now());
+    return `<div style="padding:60px 20px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:14px;">⚠️</div>
+      <div style="font-size:15px;font-weight:700;color:#f87171;">${currentLang==='hi'?'कुछ गलत हो गया':'Something went wrong'}</div>
+      <div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-top:6px;font-family:monospace;">${escHtml((e && e.message) || 'unknown error')}</div>
+      <button onclick="_histFetchingDays.delete('${dayKeyForRetry}');delete _histFetchErrors['${dayKeyForRetry}'];safeRenderTab(10);" style="margin-top:16px;background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:800;cursor:pointer;padding:10px 24px;">🔄 ${currentLang==='hi'?'फिर कोशिश करें':'Retry'}</button>
+    </div>`;
+  }
+}
+
+function _renderHistoryTabInner(){
   const todayKey = _histDayKey(Date.now());
   // Members without date filter permission are locked to today
   const effectiveDateKey = (currentMember && !hasPermission('history_date_filter')) ? "" : historySelectedDate;
@@ -17503,7 +17537,11 @@ function renderHistoryTab(){
 
   // Try loading from cloud if local is empty (helps after re-login / new device)
   let entries = getHistoryForDay(dayKey);
-  if(entries.length===0 && db && authPhone) loadHistoryFromCloud(dayKey);
+  if(entries.length===0 && db && authPhone){
+    // Call site is also defensive: even with the internal guard in loadHistoryFromCloud,
+    // never let a call here throw and abort the whole render, leaving stale HTML on screen.
+    try { loadHistoryFromCloud(dayKey); } catch(e){ console.warn('[Hist] loadHistoryFromCloud call failed:', e && e.message); }
+  }
   // While cloud fetch is in-flight, show a loading spinner instead of "No activity" —
   // but only if we have no local entries yet. If local data already exists (e.g. the
   // user just logged an activity after opening this tab), show it immediately instead
@@ -17513,6 +17551,7 @@ function renderHistoryTab(){
       <div style="font-size:36px;margin-bottom:14px;">⏳</div>
       <div style="font-size:15px;font-weight:700;color:var(--text-muted,#7a8aaa);">${currentLang==='hi'?'इतिहास लोड हो रहा है...':'Loading history...'}</div>
       <div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-top:6px;">${currentLang==='hi'?'कृपया प्रतीक्षा करें':'Please wait'}</div>
+      <button onclick="_histFetchingDays.delete('${dayKey}');delete _histFetchErrors['${dayKey}'];safeRenderTab(10);" style="margin-top:18px;background:none;border:1px solid var(--border-main,#1e2a45);border-radius:10px;color:var(--text-dim,#4a5a7a);font-size:12px;font-weight:700;cursor:pointer;padding:8px 20px;">${currentLang==='hi'?'रुका हुआ है? यहाँ टैप करें':'Stuck? Tap here'}</button>
     </div>`;
   }
   // If the last cloud fetch failed, show the real error + a Retry button instead of
@@ -17696,13 +17735,16 @@ function renderSettings(){
     ["📊", "Analytics & Compare", "Included"],
     ["🧾", "GST Billing", "Included"],
     ["📱", "WhatsApp Reminders", "Pro only"],
+    ["📲", "WhatsApp Bill Send", "Pro only"],
     ["👤", "Team Members", "Pro only"],
+    ["🔔", "Push Notifications", "Pro only"],
   ];
   const PRO_FEATURES = [
     ["👥", "Customers", "Unlimited"],
     ["💳", "Creditors & Debtors", "Unlimited"],
     ["📦", "Inventory", "Unlimited"],
     ["📱", "WhatsApp Reminders", "Included"],
+    ["📲", "WhatsApp Bill Send", "Included"],
     ["👤", "Team Members", "Included"],
     ["🔔", "Push Notifications", "Included"],
   ];
@@ -20217,7 +20259,7 @@ function openCustomerPage(id){
       <button onclick="closeCustomerPage()" style="background:#1a2540;border:1px solid var(--border-input,#2a3560);color:#aaa;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;font-weight:700;display:flex;align-items:center;gap:6px;">${t('back')}</button>
       <div style="font-size:18px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">${t('customerProfile')}</div>
       <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
-        ${(licensePlan === "pro" && licenseStatus === "pro") && c.phone?`<a href="https://wa.me/91${c.phone}?text=${encodeURIComponent('Hi '+c.name.split(' ')[0]+'! 👋 You are ranked #'+c.rank+' at '+appSettings.shopName+'. Total spend: '+formatINR(c.totalSpend)+' 🏆 Visit us again!')}" target="_blank" class="btn" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px 12px;font-size:12px;font-weight:800;text-decoration:none;">💬 WA</a>`:''}
+        ${_hasFullAccess() && c.phone?`<a href="https://wa.me/91${c.phone}?text=${encodeURIComponent('Hi '+c.name.split(' ')[0]+'! 👋 You are ranked #'+c.rank+' at '+appSettings.shopName+'. Total spend: '+formatINR(c.totalSpend)+' 🏆 Visit us again!')}" target="_blank" class="btn" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px 12px;font-size:12px;font-weight:800;text-decoration:none;">💬 WA</a>`:''}
         <button class="btn" onclick="closeCustomerPage();openEditModal('${c.id}')" style="background:#1a2540;color:#aaa;border:1px solid var(--border-input,#2a3560);padding:8px 12px;font-size:12px;">✏️</button>
         <button class="btn" onclick="showEditHistoryModal('${c.id}','${c.name.replace(/'/g,"\\'")}','customer')" style="background:#1a2540;color:#FFD700;border:1px solid var(--border-input,#2a3560);padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;">📝 Edit History</button>
       </div>
@@ -20753,7 +20795,13 @@ function _loadTrial() {
 }
 
 function _initTrial() {
-  // Only start a trial if never started and user is on free plan
+  // Only start a trial for a genuinely new/free account that has never held a
+  // paid Pro license before. An account whose Pro subscription has lapsed
+  // (licenseStatus === "expired") must NOT be re-granted a fresh trial just
+  // because this particular device/browser has no local trial record yet
+  // (e.g. a new device, or one that went straight to Pro without ever trialing).
+  // Otherwise every subscription renewal cycle could reset into another free month.
+  if (licenseStatus === "expired") return;
   const existing = localStorage.getItem(storageKey("trial"));
   if (existing) return; // already initialised (active or expired)
   const end = Date.now() + 14 * 24 * 60 * 60 * 1000; // 14 days
@@ -20899,6 +20947,7 @@ function revokeAccess(reason) {
 }
 
 function updateLicenseUI() {
+  _loadTrial(); // ensure _trialActive is fresh before pill/banner logic below use it
   const banner = document.getElementById("sub-expired-banner");
   // Only show subscription banner to the shop owner, not to team members
   if (licenseStatus === "expired" && !currentMember) {
@@ -20910,10 +20959,15 @@ function updateLicenseUI() {
   const pill = document.getElementById("header-plan-pill");
   if (pill) {
     const isPro = licensePlan === "pro" && licenseStatus === "pro";
-    pill.textContent = isPro ? ("⭐ " + (currentLang==="hi"?"प्रो":"Pro")) : ("🆓 " + t("freePlan").replace("मुफ्त प्लान","फ्री").replace("Free Plan","Free"));
-    pill.style.background = isPro ? "linear-gradient(135deg,#1a3a1a,#0a2a0a)" : "#0a1a3a";
-    pill.style.color       = isPro ? "#4f4" : "#88aaff";
-    pill.style.border      = isPro ? "1px solid #2a5a2a" : "1px solid #1a2a5a";
+    const onTrial = !isPro && _trialActive;
+    pill.textContent = isPro
+      ? ("⭐ " + (currentLang==="hi"?"प्रो":"Pro"))
+      : onTrial
+      ? ("🎁 " + (currentLang==="hi"?"ट्रायल":"Trial"))
+      : ("🆓 " + t("freePlan").replace("मुफ्त प्लान","फ्री").replace("Free Plan","Free"));
+    pill.style.background = isPro ? "linear-gradient(135deg,#1a3a1a,#0a2a0a)" : onTrial ? "linear-gradient(135deg,#2a2200,#1a1600)" : "#0a1a3a";
+    pill.style.color       = isPro ? "#4f4" : onTrial ? "#FFD700" : "#88aaff";
+    pill.style.border      = isPro ? "1px solid #2a5a2a" : onTrial ? "1px solid #7a6a1a" : "1px solid #1a2a5a";
     if (!_hasFullAccess()) pill.title = `Customers: ${customers.length}/${FREE_MAX_CUSTOMERS} · Inventory: ${inventoryItems.length}/${FREE_MAX_INV_ITEMS}`;
   }
   // Show trial banner if trial is active and not paid pro
@@ -26848,8 +26902,8 @@ function createBillObject({ custId, soldItems, amount, billNum, notes, date }) {
 
 // ─── WHATSAPP SEND ────────────────────────────────────────────
 function sendBillWhatsApp(bill) {
-  // Pro-only feature
-  if (!(licensePlan === "pro" && licenseStatus === "pro")) {
+  // Pro-only feature (trial counts as full access too)
+  if (!_hasFullAccess()) {
     _showUpgradePrompt("WhatsApp bill send is a Pro feature · Upgrade to send bills via WhatsApp");
     return;
   }
@@ -27304,7 +27358,7 @@ async function addPurchase(custId, { amount, bill, date, notes, soldItems, payMo
   if (billObj) {
     saveBillToFirebase(billObj); // fire-and-forget; don't block UI
     // Auto-send WhatsApp if enabled (Pro only)
-    if (getBillSetting("billAutoWhatsApp") && c.phone && (licensePlan === "pro" && licenseStatus === "pro")) {
+    if (getBillSetting("billAutoWhatsApp") && c.phone && _hasFullAccess()) {
       setTimeout(() => sendBillWhatsApp(billObj), 500);
     }
     // Show bill modal (unless auto-print, in which case also print)
