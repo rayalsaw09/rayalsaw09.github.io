@@ -7841,6 +7841,16 @@ function renderTab(i){
   else if(i===12)el.innerHTML=renderSettings();
   else if(i===13)renderTeamTab(el);
   if(typeof applyLicenseOverlay==="function") applyLicenseOverlay(i);
+  // BUGFIX: renderTab() writes fresh (English) HTML directly. Previously only
+  // safeRenderTab() (used for background/cloud-triggered re-renders) re-applied
+  // Hindi translations afterward. Direct callers of renderTab() — switchTab()
+  // when clicking a sidebar tab, and goBack() when closing a detail page —
+  // never got translated, so the tab appeared to "revert to English" even
+  // though currentLang was still 'hi'. Apply the same translation pass here.
+  if (currentLang !== "en" && typeof applyUITranslations === "function") {
+    setTimeout(applyUITranslations, 50);
+    setTimeout(applyUITranslations, 300); // second pass for slower-rendering tabs (e.g. Messages)
+  }
 }
 
 // ─── LEADERBOARD ─────────────────────────────────────────────
