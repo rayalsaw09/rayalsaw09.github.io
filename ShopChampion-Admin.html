@@ -82,6 +82,11 @@ const SC_SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 // Replace the string below with your actual VAPID key after enabling Cloud Messaging in Firebase Console
 const SC_FCM_VAPID_KEY = "BEKJDBufmyfEAGYMrd05gtDMOAPbzvUaF6gCPFXtvGvc16HPLT7eWYBpppxnZ8Hfmr8HX76gVIRkjGXvRdal4js";
 const SC_FCM_PUSH_URL  = "https://morning-water-23d1.rayalsaw.workers.dev";
+// Support WhatsApp number for extra-seat requests, in international format
+// with no + or spaces (e.g. "919876543210"). REPLACE THIS with your real
+// WhatsApp support number before this goes live — left blank on purpose so
+// it's obvious if it's still unset.
+const SC_SUPPORT_WHATSAPP = "918744943038";
 </script>
 <!-- Firebase v9 compat (CDN) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -3348,7 +3353,7 @@ function loadSettingsFromCloud(cb) {
           // Apply license to memory variables AND localStorage (not just localStorage)
           const lic = d.license;
           if (lic.plan === "pro" && lic.status === "pro") {
-            saveLicense(lic.key || "", "pro", "pro");
+            saveLicense(lic.key || "", "pro", "pro", lic.extraSeats);
           } else {
             try { localStorage.setItem(storageKey("license"), JSON.stringify(lic)); } catch {}
           }
@@ -3437,10 +3442,35 @@ function startFirestoreListener() {
         const d = snap.data();
         if (d && d.license && d.license.plan === "pro" && d.license.status === "pro") {
           const alreadyPro = (licensePlan === "pro" && licenseStatus === "pro");
-          if (alreadyPro) return;
+          if (alreadyPro) {
+            // Already Pro — the only thing that could still change here live is
+            // the extra-seats add-on (granted from Seller Panel). Verify against
+            // Supabase before trusting it, same as a fresh Pro activation, since
+            // Firestore rules let the owner write to their own prefs doc and we
+            // don't want a self-granted seat count bypassing the ₹50/seat charge.
+            const newExtraSeats = Number(d.license.extraSeats) || 0;
+            if (newExtraSeats === licenseExtraSeats) return; // no real change
+            const keyToCheck2 = d.license.key || licenseKey || "";
+            fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(keyToCheck2)}&select=key,plan,active,expires_at,extra_seats`,
+              { headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON } }
+            ).then(r => r.json()).then(rows => {
+              if (!rows || !rows.length) return;
+              const row = rows[0];
+              if (!row.active || row.plan !== "pro") return;
+              if (row.expires_at && new Date(row.expires_at) < new Date()) return;
+              const verifiedSeats = Number(row.extra_seats) || 0;
+              saveLicense(licenseKey, "pro", "pro", verifiedSeats);
+              try { renderTabs(); if (currentTab === 13) safeRenderTab(currentTab); } catch {}
+              notify(verifiedSeats > licenseExtraSeats
+                ? `✅ ${verifiedSeats} extra team seat${verifiedSeats===1?"":"s"} added!`
+                : "ℹ️ Team seat count updated.", "success");
+              console.log("[SC] Prefs listener: extra seats verified & applied:", verifiedSeats);
+            }).catch(() => {}); // silent if offline
+            return;
+          }
           // Verify with Supabase that this license is actually active before applying
           const keyToCheck = d.license.key || "";
-          fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(keyToCheck)}&select=key,plan,active,expires_at`,
+          fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(keyToCheck)}&select=key,plan,active,expires_at,extra_seats`,
             { headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON } }
           ).then(r => r.json()).then(rows => {
             if (!rows || !rows.length) return; // no valid license in Supabase
@@ -3448,7 +3478,7 @@ function startFirestoreListener() {
             if (!row.active || row.plan !== "pro") return; // not active pro
             if (row.expires_at && new Date(row.expires_at) < new Date()) return; // expired
             // Confirmed valid — now activate
-            saveLicense(row.key, "pro", "pro");
+            saveLicense(row.key, "pro", "pro", row.extra_seats);
             updateLicenseUI();
             try { renderTabs(); safeRenderTab(currentTab); } catch {}
             // Update payment modal if it was waiting
@@ -7618,7 +7648,7 @@ function _safeRenderTabImmediate(i) {
                   <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
                   <div style="flex:1;min-width:0;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-                      <div style="font-weight:800;font-size:14px;color:var(--text-main,#e8eaf0);">${item.name}${stk <= (item.minStock||5) ? ' <span title="Low stock" style="font-size:12px;">⚠️</span>' : ''}</div>
+                      <div style="font-weight:800;font-size:14px;color:var(--text-main,#e8eaf0);">${escHtml(item.name)}${stk <= (item.minStock||5) ? ' <span title="Low stock" style="font-size:12px;">⚠️</span>' : ''}</div>
                       <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk < 0 ? '⚠ ' + stk : stk === 0 ? 'OUT' : stk} ${item.unit || 'unit'}</div>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
@@ -7936,7 +7966,7 @@ function renderLeaderboard(sorted){
       <div style="display:flex;align-items:center;gap:10px;min-width:0;">
         ${avatarEl(c,34)}
         <div style="min-width:0;">
-          <div style="font-weight:700;font-size:14px;color:var(--text-main,#e8eaf0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
+          <div style="font-weight:700;font-size:14px;color:var(--text-main,#e8eaf0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(c.name)}</div>
           <div style="font-size:11px;color:var(--text-dim,#4a5a7a);">${c.phone?"📞 "+c.phone:"<em style='color:#2a3a5a;'>"+t('noPhone')+"</em>"} · <span style="font-family:monospace;">${c.id}</span> · 🚶 ${(c.purchases||[]).length} ${t('visits')}</div>
         </div>
       </div>
@@ -8052,7 +8082,7 @@ function renderCustomers(sorted,q=""){
       <div style="flex-shrink:0;width:22px;height:22px;border-radius:5px;border:2px solid ${isSel?'#a060ff':'#3a4a6a'};background:${isSel?'#a060ff':'transparent'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;">${isSel?'✓':''}</div>
       ${avatarEl(c,42)}
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:700;font-size:15px;color:var(--text-main,#e8eaf0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
+        <div style="font-weight:700;font-size:15px;color:var(--text-main,#e8eaf0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(c.name)}</div>
         <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${c.phone?`📞 ${c.phone}`:t("noPhone")} · ${formatINR(c.totalSpend)}</div>
       </div>
     </div>`;
@@ -8062,7 +8092,7 @@ function renderCustomers(sorted,q=""){
     <div data-sc-row="1" tabindex="-1" class="card cust-card" style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;" onclick="openCustomerPage('${c.id}')">
       ${avatarEl(c,44)}
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:700;font-size:15px;color:var(--text-main,#e8eaf0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
+        <div style="font-weight:700;font-size:15px;color:var(--text-main,#e8eaf0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(c.name)}</div>
         <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.phone?`📞 ${c.phone}`:t("noPhone")} ${showVisits?`· 🧾 ${(c.purchases||[]).length}`:""} ${c.gstin?`· <span style="color:#a78bfa;font-size:11px;font-weight:700;">GST ✓</span>`:""}</div>
         ${showLastVisit&&lastP?`<div style="font-size:11px;margin-top:2px;color:${visitColor};">🕐 ${lastVisit}</div>`:""}
       </div>
@@ -8264,7 +8294,7 @@ function renderPurchaseTab(sorted){
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
             ${avatarEl(c,36)}
             <div style="flex:1;">
-              <div style="font-weight:700;color:var(--text-main,#e8eaf0);font-size:13px;">${c.name}</div>
+              <div style="font-weight:700;color:var(--text-main,#e8eaf0);font-size:13px;">${escHtml(c.name)}</div>
               <div style="font-size:11px;color:var(--text-muted,#7a8aaa);">${c.phone?"📞 "+c.phone+" · ":""}${pending.length} item${pending.length>1?"s":""} · ${t("owesLabel")} <span style="color:#f84;font-weight:700;">${formatINR(owed)}</span></div>
             </div>
             <button onclick="showBorrowDetails('${c.id}')" style="cursor:pointer;padding:5px 12px;border-radius:8px;border:1px solid var(--border-input,#2a3560);background:var(--bg-main,#0a0e1a);color:#5af;font-size:12px;font-weight:700;">${t("detailsBtn")}</button>
@@ -17028,12 +17058,17 @@ async function renderTeamTab(el) {
       }).join("");
 
   el.innerHTML = `<div style="padding:16px 14px 80px;max-width:760px;margin:0 auto;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
       <div style="font-size:18px;font-weight:800;color:#a78bfa;">👤 Team Members</div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button onclick="renderTab(13)" class="btn" style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);color:var(--text-muted,#7a8aaa);font-size:13px;font-weight:800;padding:9px 12px;" title="Refresh">🔄</button>
-        <button onclick="openAddMemberModal()" class="btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:13px;font-weight:800;padding:9px 16px;">${t('tmAddMember')}</button>
+        ${members.length >= maxTeamMembers()
+          ? `<button onclick="openSeatLimitModal()" class="btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:13px;font-weight:800;padding:9px 16px;opacity:0.85;">🔒 ${t('tmAddMember')}</button>`
+          : `<button onclick="openAddMemberModal()" class="btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:13px;font-weight:800;padding:9px 16px;">${t('tmAddMember')}</button>`}
       </div>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:16px;">
+      👥 ${members.length} / ${maxTeamMembers()} seats used${licenseExtraSeats > 0 ? ` (3 included + ${licenseExtraSeats} extra)` : ""}
     </div>
     ${memberCards}
   </div>`;
@@ -17052,7 +17087,56 @@ async function renderTeamTab(el) {
   }, 10000); // refresh every 10s — matches heartbeat interval
 }
 
+// Shown when a shop tries to add a team member beyond their current seat cap
+// (3 included with Pro, or more if extra seats were granted via Seller Panel).
+function openSeatLimitModal() {
+  const extra = licenseExtraSeats || 0;
+  const body = `
+    <div style="text-align:center;padding:10px 6px;">
+      <div style="font-size:42px;margin-bottom:12px;">👥🔒</div>
+      <div style="font-size:17px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:8px;">
+        ${currentLang==='hi' ? `टीम सीमा पूरी हो गई (${maxTeamMembers()})` : `Team limit reached (${maxTeamMembers()})`}
+      </div>
+      <div style="font-size:13px;color:var(--text-muted,#7a8aaa);margin-bottom:20px;line-height:1.6;">
+        ${currentLang==='hi'
+          ? `आपकी योजना में ${maxTeamMembers()} टीम मेंबर शामिल हैं${extra>0?` (3 शामिल + ${extra} अतिरिक्त)`:''}। और मेंबर जोड़ने के लिए ₹50/माह प्रति सीट में अतिरिक्त सीटें जोड़ें।`
+          : `Your plan includes ${maxTeamMembers()} team member${maxTeamMembers()===1?'':'s'}${extra>0?` (3 included + ${extra} extra)`:''}. Add more seats for ₹50/month per seat to invite additional staff.`}
+      </div>
+      <button onclick="closeModal();_requestExtraSeats();" class="btn" style="width:100%;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:14px;font-weight:800;padding:13px;margin-bottom:10px;">
+        ➕ ${currentLang==='hi' ? 'अतिरिक्त सीटें माँगें — ₹50/सीट' : 'Request Extra Seats — ₹50/seat'}
+      </button>
+      <button onclick="closeModal()" class="btn" style="width:100%;background:#1a2540;border:1px solid var(--border-input,#2a3560);color:var(--text-muted,#7a8aaa);font-size:13px;font-weight:700;padding:12px;">
+        ${currentLang==='hi' ? 'बंद करें' : 'Close'}
+      </button>
+    </div>`;
+  showWideModal(body);
+}
+
+// Opens a WhatsApp message to the shop owner's registered support contact so
+// they can request N extra seats — matches the existing manual-approval
+// pattern (UPI payment + WhatsApp/UTR review) rather than a fully automated
+// checkout, since that's how Pro purchases already work in this app.
+function _requestExtraSeats() {
+  const n = parseInt(prompt(
+    (currentLang==='hi' ? "कितनी अतिरिक्त सीटें चाहिए? (₹50/माह प्रति सीट)" : "How many extra seats do you need? (₹50/month per seat)"),
+    "2"
+  ), 10);
+  if (!n || n <= 0) return;
+  if (!SC_SUPPORT_WHATSAPP) {
+    notify("⚠️ Support WhatsApp number not configured — set SC_SUPPORT_WHATSAPP in the code.", "error");
+    return;
+  }
+  const msg = encodeURIComponent(
+    `Hi! I'd like to add ${n} extra team seat${n===1?'':'s'} to my ShopChampion Pro plan (+₹${n*50}/month).\n\nShop: ${appSettings.shopName||''}\nPhone: ${authPhone||''}`
+  );
+  window.open(`https://wa.me/${SC_SUPPORT_WHATSAPP||''}?text=${msg}`, "_blank");
+}
+
 function openAddMemberModal() {
+  // Defense-in-depth: re-check the cap here too (not just at the button level)
+  // in case this is ever called from elsewhere. Uses the cache fetchTeamMembers()
+  // already populates, so this stays synchronous.
+  if ((_teamMembers || []).length >= maxTeamMembers()) { openSeatLimitModal(); return; }
   const body = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div style="font-size:16px;font-weight:800;color:var(--text-main,#e8eaf0);">${t('alAddTeam')}</div>
@@ -17083,6 +17167,17 @@ function openAddMemberModal() {
 }
 
 async function saveNewMember() {
+  // Re-check the cap with a fresh fetch (not the cache) right before creating —
+  // narrows the window where someone could add a member between opening this
+  // modal and submitting it. Full protection still requires the Supabase RPC
+  // itself to enforce this (see note below) since this check alone can be
+  // bypassed via devtools by a technically savvy user.
+  const freshMembers = await fetchTeamMembers();
+  if (freshMembers.length >= maxTeamMembers()) {
+    closeModal();
+    openSeatLimitModal();
+    return;
+  }
   const username = (document.getElementById("nm_username").value||"").trim();
   const display = (document.getElementById("nm_display").value||"").trim();
   const pass = document.getElementById("nm_pass").value;
@@ -18157,7 +18252,7 @@ function _showHistManager(){
       <div id="hm-chk-${c.id}" style="width:20px;height:20px;border-radius:6px;border:2px solid #2a3560;background:var(--bg-main,#0a0e1a);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;"></div>
       ${avatarEl(c,32)}
       <div style="flex:1;min-width:0;">
-        <div style="font-size:14px;font-weight:700;color:var(--text-main,#e8eaf0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text-main,#e8eaf0);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(c.name)}</div>
         <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-top:1px;">${pCount} purchase${pCount!==1?'s':''} · ${pCount>0?formatINR(total):'No history'}</div>
       </div>
       ${pCount>0?`<div style="font-size:11px;background:#1a0a0a;border:1px solid #4a1a1a;border-radius:6px;padding:2px 7px;color:#f66;font-weight:700;">${pCount}</div>`:`<div style="font-size:11px;color:#2a3a5a;">—</div>`}
@@ -19300,9 +19395,9 @@ function openEditModal(id){
       </div>
     </div>
     <label style="display:block;font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:6px;">${t("modalFullName")} <span style="color:#f66;">*</span></label>
-    <input class="input" id="m-name" value="${c.name}" style="margin-bottom:14px;" />
+    <input class="input" id="m-name" value="${escHtml(c.name)}" style="margin-bottom:14px;" />
     <label style="display:block;font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:6px;">${t("modalPhoneNumber")} <span style="color:#556;font-weight:400;">(${t("modalOptional")})</span></label>
-    <input class="input" id="m-phone" value="${c.phone||""}" placeholder="${t('modalLeaveBlank')}" style="margin-bottom:14px;" />
+    <input class="input" id="m-phone" value="${escHtml(c.phone||"")}" placeholder="${t('modalLeaveBlank')}" style="margin-bottom:14px;" />
     <label style="display:block;font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:6px;">${t("modalCustomerId")}</label>
     <input class="input" id="m-id" value="${c.id}" style="margin-bottom:4px;font-family:monospace;" />
     <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:16px;">Only change the ID if needed — it must be unique.</div>
@@ -20604,10 +20699,10 @@ function cpPurchaseCard(p,custId){
       </div>
       <div style="font-size:12px;color:#556;margin-top:4px;">${isBorrow?'📦 Borrow':'Bill'}: <strong style="color:var(--text-muted,#7a8aaa);">${p.bill}</strong>${isSubFeatureAllowed(13)?` &nbsp;·&nbsp; 📅 ${new Date(p.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} <span style="font-size:11px;color:var(--text-dim,#4a5a7a);">⏱ ${new Date(p.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true})}</span>`:" "}</div>
       ${isBorrow&&p.due?`<div style="font-size:11px;color:${isOverdue?'#f44':'#7a8aaa'};margin-top:2px;">Due: ${new Date(p.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${isOverdue?' ⚠️':''}</div>`:''}
-      ${p.notes&&!isBorrow?`<div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:3px;">📝 ${p.notes}</div>`:''}
-      ${isBorrow&&p.notes?`<div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:3px;">Item: ${p.notes}</div>`:''}
+      ${p.notes&&!isBorrow?`<div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:3px;">📝 ${escHtml(p.notes)}</div>`:''}
+      ${isBorrow&&p.notes?`<div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:3px;">Item: ${escHtml(p.notes)}</div>`:''}
       ${p.actor?`<div style="margin-top:4px;"><span style="font-size:10px;padding:2px 7px;border-radius:8px;background:${p.actor==='Owner'?'#FFD70022':'#a78bfa22'};color:${p.actor==='Owner'?'#FFD700':'#a78bfa'};border:1px solid ${p.actor==='Owner'?'#FFD70044':'#a78bfa44'};font-weight:700;">👤 ${escHtml(p.actor)}</span></div>`:''}
-      ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${p.soldItems.map(si=>si._deleted?`<span style="background:#1a0a0a;border:1px solid #4a2020;border-radius:6px;padding:2px 8px;font-size:11px;color:#884444;text-decoration:line-through;">📦 ${si.qty} ${si.name}</span><span style="background:#2a0a0a;border:1px solid #4a1a1a;border-radius:6px;padding:2px 6px;font-size:10px;color:#f66;">🗑 deleted from inventory</span>`:`<span style="background:var(--bg-card,#0a1628);border:1px solid var(--border-input,#2a3560);border-radius:6px;padding:2px 8px;font-size:11px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||"unit"} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
+      ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${p.soldItems.map(si=>si._deleted?`<span style="background:#1a0a0a;border:1px solid #4a2020;border-radius:6px;padding:2px 8px;font-size:11px;color:#884444;text-decoration:line-through;">📦 ${si.qty} ${escHtml(si.name)}</span><span style="background:#2a0a0a;border:1px solid #4a1a1a;border-radius:6px;padding:2px 6px;font-size:10px;color:#f66;">🗑 deleted from inventory</span>`:`<span style="background:var(--bg-card,#0a1628);border:1px solid var(--border-input,#2a3560);border-radius:6px;padding:2px 8px;font-size:11px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||"unit"} ${escHtml(si.name)}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
     </div>
     <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:12px;" onclick="event.stopPropagation()">
       ${isBorrow
@@ -20648,10 +20743,10 @@ function phPurchaseCardHTML(p,custId){
       <div style="font-size:11px;color:#556;margin-top:2px;">${isBorrow?'📦 Borrow':'Bill'}: ${p.bill}${isSubFeatureAllowed(13)?` · ${new Date(p.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})} <span style="font-size:10px;color:var(--text-dim,#4a5a7a);">⏱ ${new Date(p.date).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:true})}</span>`:" "}</div>
       ${isBorrow&&p.due?`<div style="font-size:10px;color:${isOverdue?'#f44':'#7a8aaa'};">Due: ${new Date(p.due+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})}${isOverdue?' ⚠️':''}</div>`:''}
       ${isSubFeatureAllowed(11)?`<div style="font-size:11px;color:#5af;">Visit #${p.visitNum}</div>`:""}
-      ${p.notes&&!isBorrow?`<div style="font-size:11px;color:var(--text-muted,#7a8aaa);">${p.notes}</div>`:''}
-      ${isBorrow&&p.notes?`<div style="font-size:11px;color:var(--text-muted,#7a8aaa);">Item: ${p.notes}</div>`:''}
+      ${p.notes&&!isBorrow?`<div style="font-size:11px;color:var(--text-muted,#7a8aaa);">${escHtml(p.notes)}</div>`:''}
+      ${isBorrow&&p.notes?`<div style="font-size:11px;color:var(--text-muted,#7a8aaa);">Item: ${escHtml(p.notes)}</div>`:''}
       ${p.actor?`<div style="margin-top:3px;"><span style="font-size:10px;padding:2px 7px;border-radius:8px;background:${p.actor==='Owner'?'#FFD70022':'#a78bfa22'};color:${p.actor==='Owner'?'#FFD700':'#a78bfa'};border:1px solid ${p.actor==='Owner'?'#FFD70044':'#a78bfa44'};font-weight:700;">👤 ${escHtml(p.actor)}</span></div>`:''}
-      ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;">${p.soldItems.map(si=>si._deleted?`<span style="background:#1a0a0a;border:1px solid #4a2020;border-radius:5px;padding:2px 7px;font-size:10px;color:#884444;text-decoration:line-through;">📦 ${si.qty} ${si.name}</span><span style="background:#2a0a0a;border:1px solid #4a1a1a;border-radius:5px;padding:2px 5px;font-size:10px;color:#f66;">🗑 deleted from inventory</span>`:`<span style="background:var(--bg-card,#0a1628);border:1px solid var(--border-input,#2a3560);border-radius:5px;padding:2px 7px;font-size:10px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||""} ${si.name}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
+      ${(!isBorrow&&p.soldItems&&p.soldItems.length)?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px;">${p.soldItems.map(si=>si._deleted?`<span style="background:#1a0a0a;border:1px solid #4a2020;border-radius:5px;padding:2px 7px;font-size:10px;color:#884444;text-decoration:line-through;">📦 ${si.qty} ${escHtml(si.name)}</span><span style="background:#2a0a0a;border:1px solid #4a1a1a;border-radius:5px;padding:2px 5px;font-size:10px;color:#f66;">🗑 deleted from inventory</span>`:`<span style="background:var(--bg-card,#0a1628);border:1px solid var(--border-input,#2a3560);border-radius:5px;padding:2px 7px;font-size:10px;color:#7ab3ff;">📦 ${si.qty} ${(inventoryItems.find(x=>x.name===si.name)||{}).unit||""} ${escHtml(si.name)}${si.pricePerUnit>0?" @ ₹"+si.pricePerUnit:""}</span>`).join("")}</div>`:""}
     </div>
     <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;" onclick="event.stopPropagation()">
       ${isBorrow
@@ -20847,6 +20942,12 @@ function _hasFullAccess() {
   return false;
 }
 
+// Pro includes 3 team seats; +1 extra seat = +₹50/mo, granted via Seller Panel.
+// Trial users get the same allowance as Pro so they can evaluate the feature.
+function maxTeamMembers() {
+  return 3 + (Number(licenseExtraSeats) || 0);
+}
+
 // Show trial-expired modal once per session (not every page load)
 var _trialExpiredShown = false;
 function _maybeShowTrialExpiredModal() {
@@ -20903,6 +21004,7 @@ setInterval(loadFreeTabs, 60000); // FIX: was 5000ms — reduced to 60s to avoid
 var licenseStatus = null; // null | "pro" | "free" | "expired"
 var licensePlan   = "free";
 var licenseKey    = null;
+var licenseExtraSeats = 0; // extra team seats beyond Pro's included 3 (₹50/mo each, granted via Seller Panel)
 
 function loadLicense() {
   _loadTrial(); // load trial state before checking license
@@ -20913,16 +21015,20 @@ function loadLicense() {
       licenseKey    = d.key    || null;
       licensePlan   = d.plan   || "free";
       licenseStatus = d.status || "free";
+      licenseExtraSeats = Number(d.extraSeats) || 0;
     }
   } catch {}
 }
 
-function saveLicense(key, plan, status) {
+function saveLicense(key, plan, status, extraSeats) {
   licenseKey    = key;
   licensePlan   = plan;
   licenseStatus = status;
-  try { localStorage.setItem(storageKey("license"), JSON.stringify({key, plan, status})); } catch {}
-  saveSettingsToCloud({ license: {key, plan, status} });
+  // Only overwrite extraSeats when explicitly passed (most callers just
+  // re-validate plan/status and don't know the seat count — don't reset it).
+  if (extraSeats !== undefined) licenseExtraSeats = Number(extraSeats) || 0;
+  try { localStorage.setItem(storageKey("license"), JSON.stringify({key, plan, status, extraSeats: licenseExtraSeats})); } catch {}
+  saveSettingsToCloud({ license: {key, plan, status, extraSeats: licenseExtraSeats} });
 }
 
 // Called on every app load — re-validates key against Supabase
@@ -25941,7 +26047,7 @@ function renderInventoryCategoryPage(catName){
             <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
             <div style="flex:1;min-width:0;">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-                <div style="font-weight:800;font-size:14px;color:var(--text-main,#e8eaf0);">${item.name}${stk<=(item.minStock||5)?' <span title="'+t('invLowStockTitle')+'" style="font-size:12px;">⚠️</span>':''}</div>
+                <div style="font-weight:800;font-size:14px;color:var(--text-main,#e8eaf0);">${escHtml(item.name)}${stk<=(item.minStock||5)?' <span title="'+t('invLowStockTitle')+'" style="font-size:12px;">⚠️</span>':''}</div>
                 <div style="background:${stkBg};border:1px solid ${stkColor}40;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;color:${stkColor};">${stk<0?"⚠ "+stk:stk===0?"OUT":stk} ${item.unit||"unit"}</div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-top:9px;">
@@ -26266,7 +26372,7 @@ function invHistApply(){
         </div>
         <div style="font-size:12px;font-weight:700;color:var(--text-main,#e8eaf0);">${dt} <span style="color:var(--text-dim,#4a5a7a);font-size:11px;">· ${tm}</span></div>
         ${!isRestock&&e.custName?`<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">👤 ${e.custName}</div>`:''}
-        ${isRestock&&e.notes?`<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">📝 ${e.notes}</div>`:''}
+        ${isRestock&&e.notes?`<div style="font-size:11px;color:#7ab3ff;margin-top:1px;">📝 ${escHtml(e.notes)}</div>`:''}
         ${e.actor?`<div style="font-size:10px;color:var(--text-dim,#4a5a7a);margin-top:1px;">👤 ${escHtml(e.actor)}</div>`:''}
       </div>
       <div style="text-align:right;flex-shrink:0;">${rightHtml}</div>
@@ -26892,13 +26998,9 @@ function createBillObject({ custId, soldItems, amount, billNum, notes, date }) {
   const subtotal = items.reduce((s, i) => s + i.amount, 0) || amount;
   const taxTotal = items.reduce((s, i) => s + (i.taxAmt || 0), 0);
   const taxableTotal = items.reduce((s, i) => s + (i.taxableAmt || 0), 0);
-  // subtotal is already the correct customer-facing total in both cases:
-  // - inclusive items: item.amount = lineAmt (price already includes GST)
-  // - exclusive items: item.amount = lineAmt + taxAmt (base + GST added on top)
-  // BUGFIX: previously this added taxTotal a second time whenever any item was
-  // "exclusive", double-counting GST (e.g. ₹3,540 line total became ₹4,080 on
-  // the printed bill while the cash ledger correctly recorded ₹3,540).
-  const total = parseFloat(subtotal.toFixed(2));
+  // For exclusive GST items, customer pays base + tax; for inclusive, total = subtotal (tax already inside)
+  const hasExclusive = items.some(i => (i.gstIncluded || "inclusive") === "exclusive" && (i.taxAmt || 0) > 0);
+  const total = parseFloat((subtotal + (hasExclusive ? taxTotal : 0)).toFixed(2));
 
   // Build GST summary by rate
   const gstSummary = {};
@@ -27101,7 +27203,7 @@ function renderBillHTML(bill) {
       return `
         <tr>
           ${hsnEnabled ? `<td style="padding:4px 6px;font-size:12px;color:#333;">${item.hsn||""}</td>` : ""}
-          <td style="padding:4px 6px;font-size:12px;color:#333;">${item.name}</td>
+          <td style="padding:4px 6px;font-size:12px;color:#333;">${escHtml(item.name)}</td>
           <td style="padding:4px 6px;font-size:12px;color:#333;text-align:center;">${item.qty} ${item.unit||""}</td>
           <td style="padding:4px 6px;font-size:12px;color:#333;text-align:right;">₹${(item.rate||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
           <td style="padding:4px 6px;font-size:12px;color:#333;text-align:right;">₹${(item.taxableAmt||item.baseAmount||item.amount).toLocaleString("en-IN",{minimumFractionDigits:2})}</td>
@@ -27115,7 +27217,7 @@ function renderBillHTML(bill) {
     // Thermal: compact
     return `
       <tr>
-        <td style="padding:3px 0;font-size:13px;color:#111;vertical-align:top;">${item.name}${hasRate ? `<br><span style="font-size:10px;color:#666;">${item.qty} ${item.unit} × ₹${item.rate}</span>` : ""}${hasGST&&item.gstRate&&item.gstIncluded==="exclusive" ? `<br><span style="font-size:10px;color:#888;">Base: ₹${(item.baseAmount||0).toLocaleString("en-IN",{minimumFractionDigits:2})} + GST ${item.gstRate}%: ₹${(item.taxAmt||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</span>` : hasGST&&item.gstRate ? `<br><span style="font-size:10px;color:#888;">GST ${item.gstRate}% (incl.): ₹${(item.taxAmt||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</span>` : ""}</td>
+        <td style="padding:3px 0;font-size:13px;color:#111;vertical-align:top;">${escHtml(item.name)}${hasRate ? `<br><span style="font-size:10px;color:#666;">${item.qty} ${item.unit} × ₹${item.rate}</span>` : ""}${hasGST&&item.gstRate&&item.gstIncluded==="exclusive" ? `<br><span style="font-size:10px;color:#888;">Base: ₹${(item.baseAmount||0).toLocaleString("en-IN",{minimumFractionDigits:2})} + GST ${item.gstRate}%: ₹${(item.taxAmt||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</span>` : hasGST&&item.gstRate ? `<br><span style="font-size:10px;color:#888;">GST ${item.gstRate}% (incl.): ₹${(item.taxAmt||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</span>` : ""}</td>
         <td style="padding:3px 0;font-size:13px;color:#111;text-align:right;vertical-align:top;white-space:nowrap;">₹${item.amount.toLocaleString("en-IN")}</td>
       </tr>`;
   }).join("");

@@ -1833,6 +1833,21 @@ function renderPhSubCard(key, now, phone) {
   } else {
     html += `<button onclick="switchPlanFromModal('${key.id}','free')" class="reset-sub-btn" style="background:#0a1a3a;color:#88aaff;border-color:#1a2a5a;">🆓 Move to Free</button>`;
   }
+  // ── Extra team seats (Pro includes 3; ₹50/mo per seat beyond that) ──
+  // Always clear any previous seats-display node first — renderPhSubCard can
+  // run multiple times (refresh, plan switch, seat edit) and insertAdjacentHTML
+  // would otherwise stack duplicate elements on every call.
+  const existingSeatsEl = document.getElementById("ph-seats-display");
+  if (existingSeatsEl) existingSeatsEl.remove();
+  if (!isFree) {
+    const extraSeats = Number(key.extra_seats) || 0;
+    const totalSeats = 3 + extraSeats;
+    statusEl.insertAdjacentHTML("afterend", `
+      <div id="ph-seats-display" style="font-size:12px;color:#7a8aaa;margin-top:6px;">
+        👥 Team seats: <strong style="color:#e8eaf0;">${totalSeats}</strong> (3 included${extraSeats > 0 ? ` + ${extraSeats} extra · +₹${extraSeats*50}/mo` : ""})
+      </div>`);
+    html += `<button onclick="editExtraSeatsFromModal('${key.id}',${extraSeats},'${phone}')" class="reset-sub-btn" style="background:#2a1a3a;color:#c084fc;border-color:#3a2a5a;">👥 Edit Extra Seats</button>`;
+  }
   actEl.innerHTML = html;
 }
 
@@ -1903,6 +1918,41 @@ async function switchPlanFromModal(id, newPlan) {
         console.warn("[SP] Firestore plan push failed (non-fatal):", fbErr.message);
       }
     }
+  } catch(e) { alert("❌ Error: " + e.message); }
+}
+
+// ── Grant/adjust extra team seats beyond Pro's included 3 (₹50/mo each) ──
+async function editExtraSeatsFromModal(keyId, currentSeats, phone) {
+  const val = prompt(
+    `How many EXTRA team seats beyond the included 3?\n(0 = just the standard 3, no add-on charge)\n\nEach extra seat is ₹50/month.`,
+    String(currentSeats || 0)
+  );
+  if (val === null) return; // cancelled
+  const n = parseInt(val, 10);
+  if (isNaN(n) || n < 0) { alert("❌ Enter a whole number (0 or more)."); return; }
+
+  try {
+    await sbFetch(`/rest/v1/licenses?id=eq.${keyId}`, {
+      method: "PATCH", prefer: "return=minimal",
+      body: JSON.stringify({ extra_seats: n })
+    });
+    // Mirror to Firestore so the Admin app's team-member cap updates immediately
+    if (phone && saDb) {
+      try {
+        await saDb.collection("users").doc(String(phone))
+          .collection("settings").doc("prefs")
+          .set({ license: { extraSeats: n } }, { merge: true });
+        console.log("[SP] Extra seats pushed to Firestore for", phone, "=", n);
+      } catch(fbErr) {
+        console.warn("[SP] Extra seats Firestore push failed (non-fatal):", fbErr.message);
+      }
+    }
+    await loadKeys();
+    spNotify(n > 0
+      ? `✅ ${n} extra seat${n===1?"":"s"} granted (+₹${n*50}/mo) — total ${3+n} team members allowed.`
+      : `✅ Extra seats removed — back to the standard 3 team members.`);
+    const key = allKeys.find(k => k.customer_phone === phone) || null;
+    renderPhSubCard(key, new Date(), phone);
   } catch(e) { alert("❌ Error: " + e.message); }
 }
 
@@ -2424,7 +2474,7 @@ function renderFeatureToggles() {
         <div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:3px;left:${isFree?'19px':'3px'};transition:left 0.2s;"></div>
       </div>
       <div>
-        <div style="font-size:13px;font-weight:700;color:${isFree?'#e8eaf0':'#7a8aaa'};">${f.name}</div>
+        <div style="font-size:13px;font-weight:700;color:${isFree?'#e8eaf0':'#7a8aaa'};">${escHtml(f.name)}</div>
         <div style="font-size:11px;color:${isFree?'#4f4':'#4a5a7a'};">${isFree?'✅ Free':'🔒 Pro only'} — ${f.desc}</div>
       </div>
     </div>`;
@@ -3012,7 +3062,7 @@ async function pushAdToDisplay(adId) {
           <input type="checkbox" value="${s.phone}" ${currentShopIds.includes(s.phone)?'checked':''} 
             style="width:16px;height:16px;accent-color:#FFD700;" />
           <div>
-            <div style="font-weight:700;color:#e8eaf0;font-size:13px;">${s.name}</div>
+            <div style="font-weight:700;color:#e8eaf0;font-size:13px;">${escHtml(s.name)}</div>
             <div style="font-size:11px;color:#4a5a7a;">📞 ${s.phone}</div>
           </div>
         </label>`).join('')
@@ -3245,7 +3295,6 @@ let saDb = null;           // Firebase Firestore instance
 let saAllShops = [];       // [{phone, name, purchases:[]}]
 let saCurrentShop = null;  // shop being viewed in modal
 let _saAuthReady = null;   // Promise that resolves when anon auth is complete
-let _saAuthFailed = false; // true if anon sign-in or seller_admins registration failed
 
 // FIXED: awaits seller_admins registration before any Firestore reads
 async function saInitFirebase() {
@@ -3265,7 +3314,7 @@ async function saInitFirebase() {
             await _saRegisterSellerAdmin(cred.user.uid);
             console.log("[ShopActivity] Seller UID registered:", cred.user.uid.slice(0,8));
           })
-          .catch(e => { _saAuthFailed = true; console.warn("[ShopActivity] Anon auth failed:", e.message); });
+          .catch(e => { console.warn("[ShopActivity] Anon auth failed:", e.message); });
       }
     }
     await _saAuthReady;
@@ -3286,7 +3335,6 @@ async function _saRegisterSellerAdmin(uid) {
     }, { merge: true });
     console.log("[ShopActivity] seller_admins OK for", uid.slice(0,8));
   } catch(e) {
-    _saAuthFailed = true;
     console.warn("[ShopActivity] seller_admins write failed:", e.code, e.message);
     // Reads will get permission-denied if rules haven't been published yet
   }
@@ -3356,7 +3404,6 @@ async function loadShopActivity() {
     }
 
     saAllShops = [];
-    let _saPermDeniedCount = 0;
     const promises = shopPhones.map(async phone => {
       let shopName = phone;
       // PRIMARY: Read shopName from Firebase shop_profiles/{phone} (set by Admin app on registration)
@@ -3398,7 +3445,6 @@ async function loadShopActivity() {
           });
         });
       } catch(billErr) {
-        if (billErr.code === "permission-denied") _saPermDeniedCount++;
         console.warn("[ShopActivity] bills read error for", phone, billErr.message);
       }
 
@@ -3421,7 +3467,6 @@ async function loadShopActivity() {
           });
         });
       } catch(custErr) {
-        if (custErr.code === "permission-denied") _saPermDeniedCount++;
         console.warn("[ShopActivity] customers read error for", phone, custErr.message);
       }
 
@@ -3429,29 +3474,6 @@ async function loadShopActivity() {
     });
 
     await Promise.all(promises);
-
-    // If almost every shop's bills/customers read was denied, this isn't "no data" —
-    // it's a broken Firestore rules / anon-auth setup. Say so plainly instead of
-    // silently rendering 0 cust / 0 bills for every shop.
-    if (shopPhones.length > 0 && _saPermDeniedCount >= shopPhones.length) {
-      const reason = _saAuthFailed
-        ? "Your Seller Panel session could not authenticate (anonymous sign-in or seller_admins registration failed)."
-        : "Firestore is rejecting these reads as the registered seller admin — the security rules likely need to be (re)published.";
-      document.getElementById("sa-shop-list").innerHTML = `
-        <div style="color:#f66;text-align:center;padding:30px;font-size:13px;line-height:1.6;">
-          🔒 <b>Permission denied reading shop data for all ${shopPhones.length} shops.</b><br>
-          ${reason}<br><br>
-          <span style="color:#9ca3af;font-size:12px;">
-            Fix: In the <b>Admin</b> app, open the <b>"View &amp; Copy Firestore Security Rules"</b> button,
-            copy the rules, and paste + Publish them under
-            Firebase Console → Firestore Database → Rules.<br>
-            Also confirm <b>Authentication → Sign-in method → Anonymous</b> is enabled.
-          </span>
-        </div>`;
-      console.error("[ShopActivity] Systemic permission-denied across all shops — rules not published or anon auth failing.");
-      return;
-    }
-
     renderShopList();
   } catch(e) {
     document.getElementById("sa-shop-list").innerHTML = `<div style="color:#f66;text-align:center;padding:30px;font-size:13px;">❌ Error: ${escHtml(e.message)}<br><span style="color:#4a5a7a;font-size:11px;margin-top:6px;display:block;">Make sure Firebase is configured in config.js and Firestore rules allow reading the <code>users</code> collection and its subcollections.</span></div>`;
@@ -3808,20 +3830,6 @@ async function loadAllLowStock(forceRefresh = false) {
 
   await Promise.all(fetches);
   _saAlertLoaded = true;
-
-  const deniedCount = saAllShops.filter(s =>
-    _saAlertCache[s.phone] && _saAlertCache[s.phone].status === 'error'
-    && /permission-denied/i.test(_saAlertCache[s.phone].error || '')
-  ).length;
-  if (saAllShops.length > 0 && deniedCount >= saAllShops.length) {
-    listEl.innerHTML = `
-      <div style="color:#f66;text-align:center;padding:30px;font-size:13px;line-height:1.6;">
-        🔒 <b>Permission denied reading inventory for all ${saAllShops.length} shops.</b><br>
-        This is the same Firestore rules / anon-auth issue affecting Shop Activity — see that tab for the fix.
-      </div>`;
-    return;
-  }
-
   renderAllLowStock();
 }
 
@@ -3962,7 +3970,7 @@ function renderAllLowStock() {
         <!-- Shop header -->
         <div style="background:${headerBg};border-bottom:1px solid ${headerBorder};padding:14px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
           <div style="flex:1;min-width:0;">
-            <div style="font-size:15px;font-weight:800;color:#e8f4fd;">${shop.name}</div>
+            <div style="font-size:15px;font-weight:800;color:#e8f4fd;">${escHtml(shop.name)}</div>
             <div style="font-size:11px;color:#4a5a7a;margin-top:2px;">${shop.phone} · ${shop.totalItems} total items</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
@@ -4698,7 +4706,7 @@ async function scPushAd(adId) {
     <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;cursor:pointer;">
       <input type="checkbox" value="${s.phone}" checked style="width:16px;height:16px;accent-color:#FFD700;" />
       <div>
-        <div style="font-weight:700;color:#e8eaf0;font-size:13px;">${s.name}</div>
+        <div style="font-weight:700;color:#e8eaf0;font-size:13px;">${escHtml(s.name)}</div>
         <div style="font-size:11px;color:#4a5a7a;">📞 ${s.phone}</div>
       </div>
     </label>`).join('');
