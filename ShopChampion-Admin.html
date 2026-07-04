@@ -26892,9 +26892,13 @@ function createBillObject({ custId, soldItems, amount, billNum, notes, date }) {
   const subtotal = items.reduce((s, i) => s + i.amount, 0) || amount;
   const taxTotal = items.reduce((s, i) => s + (i.taxAmt || 0), 0);
   const taxableTotal = items.reduce((s, i) => s + (i.taxableAmt || 0), 0);
-  // For exclusive GST items, customer pays base + tax; for inclusive, total = subtotal (tax already inside)
-  const hasExclusive = items.some(i => (i.gstIncluded || "inclusive") === "exclusive" && (i.taxAmt || 0) > 0);
-  const total = parseFloat((subtotal + (hasExclusive ? taxTotal : 0)).toFixed(2));
+  // subtotal is already the correct customer-facing total in both cases:
+  // - inclusive items: item.amount = lineAmt (price already includes GST)
+  // - exclusive items: item.amount = lineAmt + taxAmt (base + GST added on top)
+  // BUGFIX: previously this added taxTotal a second time whenever any item was
+  // "exclusive", double-counting GST (e.g. ₹3,540 line total became ₹4,080 on
+  // the printed bill while the cash ledger correctly recorded ₹3,540).
+  const total = parseFloat(subtotal.toFixed(2));
 
   // Build GST summary by rate
   const gstSummary = {};
