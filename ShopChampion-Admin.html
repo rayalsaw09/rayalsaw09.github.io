@@ -3385,6 +3385,13 @@ function loadSettingsFromCloud(cb) {
           } else {
             try { localStorage.setItem(storageKey("license"), JSON.stringify(lic)); } catch {}
           }
+          // FIX (fix114): saveLicense() above updates licensePlan/licenseStatus in memory,
+          // but the header pill DOM element only reflects that when updateLicenseUI() runs.
+          // Without this, Pro Lite (and plan changes in general) synced from the cloud kept
+          // showing the stale "Free"/previous pill until some unrelated code path happened
+          // to call updateLicenseUI() later. Refresh it here, once, for every caller.
+          if (typeof updateLicenseUI === "function") updateLicenseUI();
+          if (typeof checkSeatOverLimit === "function") checkSeatOverLimit();
         }
         // Read GSTIN proxy URL from global settings (set by SellerPanel)
         db.collection("global_settings").doc("gstin_proxy").get()
@@ -3491,6 +3498,7 @@ function startFirestoreListener() {
               const planChanged = row.plan !== licensePlan;
               saveLicense(licenseKey, row.plan, "pro", verifiedSeats);
               try { renderTabs(); if (currentTab === 13) safeRenderTab(currentTab); } catch {}
+              checkSeatOverLimit(); // downgrade or seat cut may need locking members
               if (planChanged) {
                 notify(row.plan === "pro_lite"
                   ? "⚡ Plan changed to Pro Lite — team member access is now disabled."
@@ -3517,6 +3525,7 @@ function startFirestoreListener() {
             saveLicense(row.key, row.plan, "pro", row.extra_seats);
             updateLicenseUI();
             try { renderTabs(); safeRenderTab(currentTab); } catch {}
+            checkSeatOverLimit();
             // Update payment modal if it was waiting
             try {
               const pmModal = document.getElementById("payment-modal");
@@ -17190,6 +17199,7 @@ async function renderTeamTab(el) {
 
   el.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-dim,#4a5a7a);">⏳ Loading members...</div>`;
   const members = await fetchTeamMembers();
+  const unlockedMembers = members.filter(m => !m.seat_locked);
 
   const memberCards = members.length === 0
     ? `<div style="text-align:center;padding:40px;color:var(--text-dim,#4a5a7a);font-size:14px;">${t('alNoTeamMembers')}</div>`
@@ -17197,7 +17207,8 @@ async function renderTeamTab(el) {
         const lastLogin = m.last_login_at ? new Date(m.last_login_at).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "Never";
         const lastSeenMs = m.last_seen_at ? Date.now() - new Date(m.last_seen_at).getTime() : Infinity;
         const isOnline = lastSeenMs < 35 * 1000; // offline after 35s (heartbeat every 10s, allow 2 missed + margin)
-        return `<div data-sc-row="1" tabindex="-1" onclick="openEditMemberModal('${m.id}')" style="background:var(--bg-main,#0a0e1a);border:1px solid ${m.blocked?"#5a1a1a":"#1e2a45"};border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;">
+        const locked = !!m.seat_locked;
+        return `<div data-sc-row="1" tabindex="-1" onclick="${locked?"":`openEditMemberModal('${m.id}')`}" style="background:var(--bg-main,#0a0e1a);border:1px solid ${locked?"#3a3a1a":m.blocked?"#5a1a1a":"#1e2a45"};border-radius:12px;padding:14px;margin-bottom:10px;cursor:${locked?"default":"pointer"};opacity:${locked?"0.75":"1"};">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
             <div style="width:38px;height:38px;border-radius:10px;background:#1a0a3a;border:1px solid #3a1a7a;display:flex;align-items:center;justify-content:center;font-size:18px;">👤</div>
             <div style="flex:1;">
@@ -17205,16 +17216,20 @@ async function renderTeamTab(el) {
               <div style="font-size:12px;color:var(--text-muted,#7a8aaa);">@${escHtml(m.username)}</div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-              ${m.blocked ? `<span style="background:#3a0808;color:#f66;border:1px solid #5a1a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🔴 Blocked</span>` : `<span style="background:#0a1a0a;color:#4f4;border:1px solid #1a3a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🟢 Active</span>`}
-              <span id="member-status-${m.id}" style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?t('tmOnline'):(m.last_seen_at?t('tmLastSeen')+" "+_memberTimeAgo(m.last_seen_at):t('tmOffline'))}</span>
+              ${locked ? `<span style="background:#2a2200;color:#fbbf24;border:1px solid #3a3a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🔒 ${currentLang==='hi'?'सीट लॉक':'Seat locked'}</span>` : m.blocked ? `<span style="background:#3a0808;color:#f66;border:1px solid #5a1a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🔴 Blocked</span>` : `<span style="background:#0a1a0a;color:#4f4;border:1px solid #1a3a1a;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:800;">🟢 Active</span>`}
+              ${locked ? "" : `<span id="member-status-${m.id}" style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?t('tmOnline'):(m.last_seen_at?t('tmLastSeen')+" "+_memberTimeAgo(m.last_seen_at):t('tmOffline'))}</span>`}
             </div>
           </div>
-          <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:10px;">${t('tmLastLogin')} ${lastLogin}</div>
+          <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:10px;">${t('tmLastLogin')} ${lastLogin}${locked?(currentLang==='hi'?' · डेटा सुरक्षित है, लॉगिन अस्थायी रूप से बंद':' · Data untouched — login is disabled until unlocked'):''}</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button onclick="openEditMemberModal('${m.id}')" class="btn" style="flex:1;background:#1a2a4a;border:1px solid #2a3a6a;color:#88aaff;font-size:12px;padding:7px 10px;font-weight:700;">✏️ Edit</button>
-            <button onclick="event.stopPropagation();toggleMemberBlock('${m.id}',${!m.blocked})" class="btn" style="flex:1;background:${m.blocked?"#0a1a0a":"#1a0a0a"};border:1px solid ${m.blocked?"#1a3a1a":"#3a1a1a"};color:${m.blocked?"#4f4":"#f66"};font-size:12px;padding:7px 10px;font-weight:700;">${m.blocked?"✅ Unblock":"🚫 Block"}</button>
-            <button onclick="event.stopPropagation();forceLogoutMember('${m.id}')" class="btn" style="background:#1a1a0a;border:1px solid #3a3a1a;color:#fbbf24;font-size:12px;padding:7px 10px;font-weight:700;" title="Force Logout">⏏</button>
-            <button onclick="event.stopPropagation();deleteMember('${m.id}')" class="btn" style="background:#1a0808;border:1px solid #3a1a1a;color:#f66;font-size:12px;padding:7px 10px;font-weight:700;">🗑</button>
+            ${locked
+              ? `<button onclick="event.stopPropagation();toggleMemberSeatLock('${m.id}',false)" class="btn" style="flex:1;background:#0a1a0a;border:1px solid #1a3a1a;color:#4f4;font-size:12px;padding:7px 10px;font-weight:700;">🔓 ${currentLang==='hi'?'अनलॉक करें':'Unlock'}</button>
+                 <button onclick="event.stopPropagation();deleteMember('${m.id}')" class="btn" style="background:#1a0808;border:1px solid #3a1a1a;color:#f66;font-size:12px;padding:7px 10px;font-weight:700;">🗑</button>`
+              : `<button onclick="openEditMemberModal('${m.id}')" class="btn" style="flex:1;background:#1a2a4a;border:1px solid #2a3a6a;color:#88aaff;font-size:12px;padding:7px 10px;font-weight:700;">✏️ Edit</button>
+                 <button onclick="event.stopPropagation();toggleMemberBlock('${m.id}',${!m.blocked})" class="btn" style="flex:1;background:${m.blocked?"#0a1a0a":"#1a0a0a"};border:1px solid ${m.blocked?"#1a3a1a":"#3a1a1a"};color:${m.blocked?"#4f4":"#f66"};font-size:12px;padding:7px 10px;font-weight:700;">${m.blocked?"✅ Unblock":"🚫 Block"}</button>
+                 <button onclick="event.stopPropagation();toggleMemberSeatLock('${m.id}',true)" class="btn" style="background:#1a1a0a;border:1px solid #3a3a1a;color:#fbbf24;font-size:12px;padding:7px 10px;font-weight:700;" title="${currentLang==='hi'?'सीट लॉक करें':'Lock seat'}">🔒</button>
+                 <button onclick="event.stopPropagation();forceLogoutMember('${m.id}')" class="btn" style="background:#1a1a0a;border:1px solid #3a3a1a;color:#fbbf24;font-size:12px;padding:7px 10px;font-weight:700;" title="Force Logout">⏏</button>
+                 <button onclick="event.stopPropagation();deleteMember('${m.id}')" class="btn" style="background:#1a0808;border:1px solid #3a1a1a;color:#f66;font-size:12px;padding:7px 10px;font-weight:700;">🗑</button>`}
           </div>
         </div>`;
       }).join("");
@@ -17224,16 +17239,21 @@ async function renderTeamTab(el) {
       <div style="font-size:18px;font-weight:800;color:#a78bfa;">👤 Team Members</div>
       <div style="display:flex;gap:8px;align-items:center;">
         <button onclick="renderTab(13)" class="btn" style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);color:var(--text-muted,#7a8aaa);font-size:13px;font-weight:800;padding:9px 12px;" title="Refresh">🔄</button>
-        ${members.length >= maxTeamMembers()
+        ${unlockedMembers.length >= maxTeamMembers()
           ? `<button onclick="openSeatLimitModal()" class="btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:13px;font-weight:800;padding:9px 16px;opacity:0.85;">🔒 ${t('tmAddMember')}</button>`
           : `<button onclick="openAddMemberModal()" class="btn" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:13px;font-weight:800;padding:9px 16px;">${t('tmAddMember')}</button>`}
       </div>
     </div>
     <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:16px;">
-      👥 ${members.length} / ${maxTeamMembers()} seats used${licenseExtraSeats > 0 ? ` (3 included + ${licenseExtraSeats} extra)` : ""}
+      👥 ${unlockedMembers.length} / ${maxTeamMembers()} seats used${licenseExtraSeats > 0 ? ` (3 included + ${licenseExtraSeats} extra)` : ""}
     </div>
     ${memberCards}
   </div>`;
+
+  // Safety net: if this shop somehow has more unlocked members than its
+  // current plan allows (e.g. seat check missed a realtime update while the
+  // tab wasn't open), resolve it now that the owner is looking at Team tab.
+  checkSeatOverLimit();
 
   // Auto-refresh online status every 20s while Team tab is open
   window._teamRefreshTimer = setInterval(async () => {
@@ -17247,6 +17267,210 @@ async function renderTeamTab(el) {
       if (statusEl) statusEl.innerHTML = `<span style="font-size:10px;color:${isOnline?"#4ade80":"#4a5a7a"};">${isOnline?t('tmOnline'):(m.last_seen_at?t('tmLastSeen')+" "+_memberTimeAgo(m.last_seen_at):t('tmOffline'))}</span>`;
     });
   }, 10000); // refresh every 10s — matches heartbeat interval
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// SEAT-LOCK / DOWNGRADE HANDLING (fix114)
+// Two scenarios that can put a shop's active (unlocked) member count above
+// what their current plan allows:
+//   A) Pro → Pro Lite switch — Pro Lite allows ZERO team seats, so every
+//      member gets locked, no picking needed.
+//   B) Pro seat count reduced (fewer extra seats) while still on full Pro —
+//      the owner must choose which members to keep; the rest get locked.
+// "Locked" NEVER deletes data — history/attribution stays intact, the member
+// just can't log in until the owner unlocks them (or re-adds a seat).
+// ══════════════════════════════════════════════════════════════════════════
+
+function allowedTeamSeats() {
+  return hasTeamAccess() ? maxTeamMembers() : 0;
+}
+
+// Call this any time the license (plan or extra_seats) changes, and as a
+// safety-net whenever the Team tab is opened. Fetches fresh member data and,
+// if the shop now has more unlocked members than seats allowed, forces
+// resolution (auto-lock-all for Pro Lite, or a picker modal for seat cuts).
+var _seatCheckInFlight = false;
+async function checkSeatOverLimit() {
+  if (currentMember) return; // only the owner resolves this
+  if (!authPhone || !db || _seatCheckInFlight) return;
+  _seatCheckInFlight = true;
+  try {
+    const members = await fetchTeamMembers();
+    const unlocked = members.filter(m => !m.seat_locked);
+    const allowed = allowedTeamSeats();
+    if (unlocked.length <= allowed) return; // within limit, nothing to do
+
+    if (allowed === 0) {
+      await _autoLockAllForLite(unlocked);
+    } else {
+      _openSeatSelectionModal(unlocked, allowed);
+    }
+  } catch (e) {
+    console.warn("[SeatCheck] failed:", e.message);
+  } finally {
+    _seatCheckInFlight = false;
+  }
+}
+
+// Scenario A — Pro Lite has zero team seats. Lock everyone, force-logout
+// anyone currently online, and zero out any extra-seat billing since Pro
+// Lite doesn't have a seat add-on at all.
+async function _autoLockAllForLite(unlockedMembers) {
+  try {
+    await Promise.all(unlockedMembers.map(m =>
+      fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?id=eq.${encodeURIComponent(m.id)}`, {
+        method: "PATCH",
+        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+        body: JSON.stringify({ seat_locked: true, active_session_token: null })
+      }).catch(() => {})
+    ));
+    if (licenseExtraSeats > 0) await _autoAdjustExtraSeatsDown(0, "Pro Lite has no seat add-on");
+    notify(currentLang === "hi"
+      ? `🔒 Pro Lite में टीम मेंबर एक्सेस शामिल नहीं है — ${unlockedMembers.length} मेंबर लॉक कर दिए गए (डेटा सुरक्षित है)।`
+      : `🔒 Pro Lite doesn't include team seats — ${unlockedMembers.length} member${unlockedMembers.length===1?"":"s"} locked out (their data is untouched). Upgrade to full Pro to restore access.`,
+      "error");
+    if (currentTab === 13) safeRenderTab(13);
+  } catch (e) { console.warn("[SeatCheck] auto-lock-for-lite failed:", e.message); }
+}
+
+// Scenario B — still on Pro, but paid-seat count dropped below current
+// active member count. Owner must pick exactly `allowed` members to keep;
+// everyone else gets locked (not deleted).
+function _openSeatSelectionModal(unlockedMembers, allowed) {
+  const rows = unlockedMembers.map(m => `
+    <label style="display:flex;align-items:center;gap:10px;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;">
+      <input type="checkbox" class="sc-seat-pick" value="${m.id}" onchange="_updateSeatPickCounter(${allowed})" style="width:17px;height:17px;accent-color:#7c3aed;"/>
+      <div style="width:32px;height:32px;border-radius:8px;background:#1a0a3a;border:1px solid #3a1a7a;display:flex;align-items:center;justify-content:center;font-size:15px;">👤</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);">${escHtml(m.display_name)}</div>
+        <div style="font-size:11px;color:var(--text-muted,#7a8aaa);">@${escHtml(m.username)}</div>
+      </div>
+    </label>`).join("");
+
+  const body = `
+    <div style="padding:10px 6px;">
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:38px;margin-bottom:8px;">👥⚠️</div>
+        <div style="font-size:16px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:6px;">
+          ${currentLang === "hi" ? "अपने प्लान के अनुसार मेंबर चुनें" : "Your plan now allows fewer seats"}
+        </div>
+        <div style="font-size:13px;color:var(--text-muted,#7a8aaa);line-height:1.6;">
+          ${currentLang === "hi"
+            ? `आपका प्लान अब ${allowed} टीम मेंबर की अनुमति देता है, लेकिन ${unlockedMembers.length} मेंबर एक्टिव हैं। ${allowed} चुनें जिन्हें रखना है — बाकी लॉक हो जाएंगे (उनका डेटा सुरक्षित रहेगा)।`
+            : `Your plan allows ${allowed} team member${allowed===1?"":"s"}, but you currently have ${unlockedMembers.length} active. Select ${allowed} to keep — the rest will be locked out of login (their past data stays intact).`}
+        </div>
+      </div>
+      <div id="sc-seat-pick-counter" style="text-align:center;font-size:13px;font-weight:800;color:#fbbf24;margin-bottom:10px;">
+        ${currentLang === "hi" ? "चुने गए" : "Selected"}: 0 / ${allowed}
+      </div>
+      <div style="max-height:320px;overflow-y:auto;margin-bottom:14px;">${rows}</div>
+      <button id="sc-seat-pick-save" onclick="_confirmSeatSelection(${allowed})" class="btn" disabled style="width:100%;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:14px;font-weight:800;padding:13px;opacity:0.5;">
+        ${currentLang === "hi" ? "सहेजें" : "Save"}
+      </button>
+    </div>`;
+  // Built directly (not showWideModal) — no backdrop-close, this needs resolving.
+  document.getElementById("modal-container").innerHTML = `<div class="modal-overlay"><div class="modal-box" style="max-width:min(480px,95vw);max-height:95vh;">${body}</div></div>`;
+}
+
+function _updateSeatPickCounter(allowed) {
+  const checked = document.querySelectorAll(".sc-seat-pick:checked").length;
+  const counterEl = document.getElementById("sc-seat-pick-counter");
+  const saveBtn = document.getElementById("sc-seat-pick-save");
+  if (counterEl) counterEl.textContent = `${currentLang === "hi" ? "चुने गए" : "Selected"}: ${checked} / ${allowed}`;
+  if (saveBtn) {
+    const ready = checked === allowed;
+    saveBtn.disabled = !ready;
+    saveBtn.style.opacity = ready ? "1" : "0.5";
+  }
+  // Prevent selecting more than allowed — auto-uncheck extras
+  if (checked > allowed) {
+    const boxes = document.querySelectorAll(".sc-seat-pick:checked");
+    boxes[boxes.length - 1].checked = false;
+    _updateSeatPickCounter(allowed);
+  }
+}
+
+async function _confirmSeatSelection(allowed) {
+  const keepIds = Array.from(document.querySelectorAll(".sc-seat-pick:checked")).map(el => el.value);
+  if (keepIds.length !== allowed) return; // guard, button should already be disabled
+  try {
+    const members = await fetchTeamMembers();
+    const toLock = members.filter(m => !m.seat_locked && !keepIds.includes(m.id));
+    await Promise.all(toLock.map(m =>
+      fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?id=eq.${encodeURIComponent(m.id)}`, {
+        method: "PATCH",
+        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+        body: JSON.stringify({ seat_locked: true, active_session_token: null })
+      }).catch(() => {})
+    ));
+    closeModal();
+    notify(currentLang === "hi"
+      ? `✅ सहेजा गया — ${toLock.length} मेंबर लॉक किए गए (डेटा सुरक्षित है)।`
+      : `✅ Saved — ${toLock.length} member${toLock.length===1?"":"s"} locked out (their data is untouched).`,
+      "success");
+    if (currentTab === 13) safeRenderTab(13);
+  } catch (e) { notify(currentLang === "hi" ? "सहेजने में विफल" : "Failed to save", "error"); }
+}
+
+// Owner manually unlocks/re-locks a member from the Team tab (only allowed
+// to unlock if a free seat is actually available under the current plan).
+async function toggleMemberSeatLock(memberId, lock) {
+  if (!lock) {
+    // Unlocking — must not exceed the seat cap
+    const members = await fetchTeamMembers();
+    const unlockedCount = members.filter(m => !m.seat_locked).length;
+    if (unlockedCount >= allowedTeamSeats()) {
+      notify(currentLang === "hi"
+        ? `🔒 सीट उपलब्ध नहीं। पहले किसी और मेंबर को लॉक करें या अतिरिक्त सीट खरीदें।`
+        : `🔒 No free seat available. Lock another member first, or buy an extra seat.`,
+        "error");
+      return;
+    }
+  }
+  try {
+    await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?id=eq.${encodeURIComponent(memberId)}`, {
+      method: "PATCH",
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+      body: JSON.stringify(lock ? { seat_locked: true, active_session_token: null } : { seat_locked: false })
+    });
+    notify(lock
+      ? (currentLang === "hi" ? "🔒 मेंबर लॉक किया गया" : "🔒 Member locked")
+      : (currentLang === "hi" ? "🔓 मेंबर अनलॉक किया गया" : "🔓 Member unlocked"), "success");
+    renderTab(13);
+  } catch (e) { notify("Network error", "error"); }
+}
+
+// Automatic billing adjustment (Rayal opted for automatic-down, manual-up):
+// whenever the number of unlocked members drops below what the shop is
+// currently PAYING for (via extra_seats), silently reduce extra_seats to
+// match — no more manual seat-counting in Seller Panel for downgrades.
+// Increasing extra_seats always stays a manual/paid action (buy-seats flow).
+async function _autoAdjustExtraSeatsDown(newExtraSeats, reasonNote) {
+  if (!licenseKey || newExtraSeats >= licenseExtraSeats) return; // only ever decrease
+  const oldSeats = licenseExtraSeats;
+  try {
+    await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(licenseKey)}`, {
+      method: "PATCH",
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json", "Prefer": "return=minimal" },
+      body: JSON.stringify({ extra_seats: newExtraSeats })
+    });
+    saveLicense(licenseKey, licensePlan, licenseStatus, newExtraSeats);
+    updateLicenseUI();
+    // Mirror to Firestore so Seller Panel / other sessions see it without polling
+    try {
+      if (db && authPhone) {
+        await db.collection("users").doc(authPhone).collection("settings").doc("prefs")
+          .set({ license: { extraSeats: newExtraSeats } }, { merge: true });
+      }
+    } catch (_) {}
+    console.log("[SeatCheck] extra_seats auto-reduced:", oldSeats, "->", newExtraSeats, "(" + reasonNote + ")");
+    if (oldSeats > newExtraSeats) {
+      notify(currentLang === "hi"
+        ? `💰 अतिरिक्त सीट बिलिंग स्वतः घटाई गई: ${oldSeats} → ${newExtraSeats} (₹${(oldSeats-newExtraSeats)*50}/माह बची)।`
+        : `💰 Extra-seat billing auto-adjusted: ${oldSeats} → ${newExtraSeats} extra seat${newExtraSeats===1?"":"s"} (saves ₹${(oldSeats-newExtraSeats)*50}/month).`,
+        "success");
+    }
+  } catch (e) { console.warn("[SeatCheck] extra_seats auto-adjust failed:", e.message); }
 }
 
 // Shown when a shop tries to add a team member beyond their current seat cap
@@ -17630,6 +17854,14 @@ async function _doDeleteMember(memberId) {
       body: JSON.stringify({ p_shop_phone:authPhone, p_member_id:memberId })
     });
     notify("🗑 Member deleted"); renderTab(13);
+    // Automatic billing adjustment: if this drop in headcount now means the
+    // shop no longer needs all its paid extra seats, reduce billing to match.
+    try {
+      const remaining = await fetchTeamMembers();
+      const unlockedCount = remaining.filter(m => !m.seat_locked).length;
+      const neededExtra = Math.max(0, unlockedCount - 3);
+      if (neededExtra < licenseExtraSeats) await _autoAdjustExtraSeatsDown(neededExtra, "member deleted");
+    } catch (_) {}
   } catch(e) { notify("Network error","error"); }
 }
 
@@ -17747,6 +17979,24 @@ async function memberLogin() {
       }
     } catch(e) {
       console.warn("[MemberLogin] Plan check failed, allowing login (fail-open):", e.message);
+    }
+    // Step 3b: check if this specific member's seat was locked (owner reduced
+    // seat count and didn't pick this member to keep). Their account and past
+    // data are untouched — only login is disabled — so give a clear reason
+    // instead of a generic wrong-password error.
+    try {
+      const seatRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?id=eq.${encodeURIComponent(data.id)}&select=seat_locked`, {
+        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+      });
+      const seatRows = await seatRes.json();
+      if (seatRows && seatRows[0] && seatRows[0].seat_locked) {
+        errEl.textContent = "🔒 Your access was removed by the shop owner (seat limit). Contact them to be re-added.";
+        errEl.style.display = "block";
+        btn.disabled = false; btnTxt.textContent = "मेंबर के रूप में लॉगिन करें →";
+        return;
+      }
+    } catch(e) {
+      console.warn("[MemberLogin] Seat-lock check failed, allowing login (fail-open):", e.message);
     }
     // Successful login — reset attempt counter
     _memberLoginAttempts = 0;
@@ -17867,6 +18117,25 @@ function _startMemberHeartbeat() {
           return;
         }
       } catch(e) { /* fail-open on network blips, same as session check above */ }
+      // 1c) Also re-check this specific member's seat_locked flag every
+      // heartbeat — if the owner locks this seat mid-session (seat reduction
+      // or Pro Lite downgrade), kick them out within ~10s instead of waiting
+      // for their session token to expire naturally.
+      try {
+        const seatRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?id=eq.${encodeURIComponent(currentMember.id)}&select=seat_locked`, {
+          headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+        });
+        const seatRows = await seatRes.json();
+        if (seatRows && seatRows[0] && seatRows[0].seat_locked) {
+          notify("🔒 Your access was removed by the shop owner (seat limit).", "error");
+          if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
+          if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
+          if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
+          try{ stopAllLinkedLedgerListeners(); }catch(_){}
+          setTimeout(()=>doLogout(), 2000);
+          return;
+        }
+      } catch(e) { /* fail-open on network blips */ }
       // 2) Update last_seen_at directly — RLS policy allow_self_heartbeat permits this
       const patchRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?id=eq.${encodeURIComponent(currentMember.id)}`, {
         method:"PATCH",
@@ -21988,6 +22257,7 @@ window.addEventListener("load", () => {
           if (row.active && (row.plan === "pro" || row.plan === "pro_lite") && (!row.expires_at || new Date(row.expires_at) > new Date())) {
             saveLicense(row.key, row.plan, "pro", row.extra_seats);
             updateLicenseUI();
+            checkSeatOverLimit();
             console.log("[SC] BG poller: license confirmed from Supabase — activated:", row.plan);
             return;
           }
