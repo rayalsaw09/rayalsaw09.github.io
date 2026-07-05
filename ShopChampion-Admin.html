@@ -1532,8 +1532,8 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
     <div id="pm-step-1">
       <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:14px;">📋 अपना प्लान चुनें</div>
 
-      <!-- Plan selector: Monthly / Yearly -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
+      <!-- Plan selector: Monthly / Yearly / Lite -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
         <!-- Monthly -->
         <div id="pm-card-monthly" onclick="pmSelectPlan('monthly')" style="border:2px solid #FFD700;border-radius:14px;padding:14px;background:#0d1628;cursor:pointer;position:relative;">
           <div style="position:absolute;top:-9px;left:12px;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-size:9px;font-weight:900;padding:2px 8px;border-radius:20px;" id="pm-sel-monthly">✓ चुना गया</div>
@@ -1547,6 +1547,19 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
           <div style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:4px;">वार्षिक</div>
           <div style="font-size:22px;font-weight:900;color:#4f4;font-family:'Rajdhani',sans-serif;">₹3,499</div>
           <div style="font-size:10px;color:var(--text-dim,#4a5a7a);">/वर्ष · ₹292/माह</div>
+        </div>
+      </div>
+      <!-- Pro Lite -->
+      <div id="pm-card-lite" onclick="pmSelectPlan('lite')" style="border:2px solid #2a3560;border-radius:14px;padding:14px;background:#0d1628;cursor:pointer;position:relative;margin-bottom:18px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div>
+            <div style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:2px;">⚡ Pro Lite <span style="font-weight:600;color:var(--text-dim,#4a5a7a);">— बिना टीम मेंबर के</span></div>
+            <div style="font-size:10px;color:var(--text-dim,#4a5a7a);">बाकी सभी Pro फ़ीचर्स · टीम मेंबर एक्सेस शामिल नहीं</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:20px;font-weight:900;color:#7ab3ff;font-family:'Rajdhani',sans-serif;">₹199</div>
+            <div style="font-size:9px;color:var(--text-dim,#4a5a7a);">/माह</div>
+          </div>
         </div>
       </div>
 
@@ -1563,8 +1576,8 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
         </div>
       </div>
 
-      <!-- Extra seats stepper (optional, bundled with Pro purchase) -->
-      <div style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:12px 14px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <!-- Extra seats stepper (optional, bundled with Pro purchase; hidden for Pro Lite — no team access) -->
+      <div id="pm-seats-section" style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:12px 14px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div>
           <div style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);">👥 अतिरिक्त टीम सीटें</div>
           <div style="font-size:10px;color:var(--text-dim,#4a5a7a);">+₹50/सीट/माह · वैकल्पिक</div>
@@ -18122,7 +18135,7 @@ function renderSettings(){
     ["📦", "Inventory", "Unlimited"],
     ["📱", "WhatsApp Reminders", "Included"],
     ["📲", "WhatsApp Bill Send", "Included"],
-    ["👤", "Team Members", "Included"],
+    ["👤", "Team Members", "3 included (+₹50/extra seat)"],
     ["🔔", "Push Notifications", "Included"],
   ];
 
@@ -18290,6 +18303,10 @@ function renderSettings(){
       </div>
       <button onclick="navigator.clipboard.writeText('${myShopId()}').then(()=>notify(t('stIdCopied')))" style="background:#1e3a6e;border:none;color:#60a5fa;border-radius:10px;padding:10px 14px;font-size:12px;font-weight:800;cursor:pointer;flex-shrink:0;">${t('stCopyId')}</button>
     </div>
+
+    ${section("Plans",
+      row("⭐","View Pro Features","Compare Free vs Pro Lite vs Pro side-by-side","openFeatureCompareModal()")
+    )}
 
     ${section("Account",
       row("🏪","My Public Profile","Shop name, city, GSTIN visible to other shops","openShopProfileModal()") +
@@ -18821,6 +18838,56 @@ function removeAppIcon(){
 function closeModal(){ if(window._modalCloseHook){try{window._modalCloseHook();}catch(e){} window._modalCloseHook=null;} _scStopLedgerListener(); document.getElementById("modal-container").innerHTML=""; }
 function showModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:440px;">${html}</div></div>`;}
 function showWideModal(html){document.getElementById("modal-container").innerHTML=`<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal-box" style="max-width:min(960px,95vw);max-height:95vh;">${html}</div></div>`;}
+
+// ─── Pro plan feature comparison (Free vs Pro Lite vs Pro) ─────
+function openFeatureCompareModal(){
+  const rows = [
+    ["👥","Customers",`Up to ${FREE_MAX_CUSTOMERS}`,"Unlimited","Unlimited"],
+    ["🛒","Sales & Purchases","Included","Included","Included"],
+    ["💳","Creditors & Debtors",`Up to ${FREE_MAX_CREDITORS} each`,"Unlimited","Unlimited"],
+    ["📦","Inventory Items",`Up to ${FREE_MAX_INV_ITEMS}`,"Unlimited","Unlimited"],
+    ["💬","Shop Messaging","Included","Included","Included"],
+    ["🏆","Rankings / Leaderboard","Included","Included","Included"],
+    ["📊","Analytics & Compare","Included","Included","Included"],
+    ["🧾","GST Billing","Included","Included","Included"],
+    ["📱","WhatsApp Reminders","Pro only","Included","Included"],
+    ["📲","WhatsApp Bill Send","Pro only","Included","Included"],
+    ["👤","Team Members","Pro only","Not included","3 included (+₹50/extra seat)"],
+    ["🔔","Push Notifications","Pro only","Included","Included"],
+  ];
+  const colHead = (label, price, highlight) => `
+    <div style="text-align:center;padding:10px 6px;${highlight?'background:rgba(255,215,0,0.08);border-radius:10px 10px 0 0;':''}">
+      <div style="font-size:12px;font-weight:900;color:${highlight?'#FFD700':'var(--text-main,#e8eaf0)'};">${label}</div>
+      <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-top:2px;">${price}</div>
+    </div>`;
+  const cell = (val) => {
+    const locked = val === "Pro only" || val === "Not included";
+    return `<div style="text-align:center;padding:9px 6px;font-size:11.5px;font-weight:${locked?'600':'800'};color:${locked?'#f59e0b':'#4f4'};">${locked?'🔒 ':'✅ '}${val}</div>`;
+  };
+  const tableRows = rows.map(([icon,label,f,l,p]) => `
+    <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;align-items:center;border-bottom:1px solid var(--border-main,#1e2a45);">
+      <div style="padding:9px 8px;font-size:12px;color:var(--text-muted,#7a8aaa);"><span style="margin-right:6px;">${icon}</span>${label}</div>
+      ${cell(f)}${cell(l)}${cell(p)}
+    </div>`).join("");
+  showWideModal(`
+    ${modalHeader("⭐ Compare Plans")}
+    <div style="overflow-x:auto;">
+      <div style="min-width:520px;">
+        <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;">
+          <div></div>
+          ${colHead("Free","₹0",false)}
+          ${colHead("Pro Lite","₹199/mo",false)}
+          ${colHead("Pro","₹299/mo",true)}
+        </div>
+        ${tableRows}
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-top:12px;text-align:center;">
+      Pro Lite includes every Pro feature except team member access — best for solo shop owners who don't need staff logins.
+    </div>
+    <button onclick="closeModal();openPaymentModal();" style="margin-top:16px;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:13px;font-size:14px;font-weight:800;border:none;border-radius:10px;cursor:pointer;">Choose a Plan →</button>
+  `);
+}
 function modalHeader(t){return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;"><div class="modal-title">${t}</div><button onclick="closeModal()" style="background:none;border:none;color:var(--text-muted,#7a8aaa);cursor:pointer;font-size:20px;">✕</button></div>`;}
 function showConfirmModal(title, message, onConfirmJs, confirmLabel, danger){
   showModal(`
@@ -21580,10 +21647,20 @@ var pmExtraSeatsSelected = 0;
 // (no proration needed yet since there's no existing expiry to prorate against).
 // Yearly seat price is a flat 12x the monthly rate — no special discount, unlike
 // the base plan's small yearly saving.
+// Pro Lite (₹199) never allows team members, so it has no seat pricing at all.
 function pmSeatUnitPrice() { return pmSelectedPlan === "yearly" ? 600 : 50; }
-function pmTotalAmount() { return (pmSelectedPlan === "yearly" ? 3499 : 299) + pmExtraSeatsSelected * pmSeatUnitPrice(); }
+function pmBasePlanPrice() {
+  if (pmSelectedPlan === "lite") return 199;
+  if (pmSelectedPlan === "yearly") return 3499;
+  return 299;
+}
+function pmTotalAmount() {
+  if (pmSelectedPlan === "lite") return 199; // no seats possible on Lite
+  return pmBasePlanPrice() + pmExtraSeatsSelected * pmSeatUnitPrice();
+}
 
 function pmChangeSeats(delta) {
+  if (pmSelectedPlan === "lite") return; // Pro Lite has no team member access — no seats to buy
   pmExtraSeatsSelected = Math.max(0, Math.min(20, pmExtraSeatsSelected + delta));
   const countEl = document.getElementById("pm-seats-count");
   if (countEl) countEl.textContent = pmExtraSeatsSelected;
@@ -21607,16 +21684,21 @@ function pmRefreshAmountDisplay() {
 
 function pmSelectPlan(plan) {
   pmSelectedPlan = plan;
+  if (plan === "lite") { pmExtraSeatsSelected = 0; const c = document.getElementById("pm-seats-count"); if (c) c.textContent = "0"; }
   const mCard = document.getElementById("pm-card-monthly");
   const yCard = document.getElementById("pm-card-yearly");
+  const lCard = document.getElementById("pm-card-lite");
   const mSel  = document.getElementById("pm-sel-monthly");
+  const seatsSection = document.getElementById("pm-seats-section");
   if (mCard) mCard.style.borderColor = plan === "monthly" ? "#FFD700" : "#2a3560";
   if (yCard) yCard.style.borderColor = plan === "yearly"  ? "#4f4"    : "#2a3560";
+  if (lCard) lCard.style.borderColor = plan === "lite"    ? "#7ab3ff" : "#2a3560";
   if (mSel)  mSel.style.display      = plan === "monthly" ? "" : "none";
+  if (seatsSection) seatsSection.style.display = plan === "lite" ? "none" : "flex";
   // Update step-2 amount display
   const sumEl  = document.getElementById("pm-plan-summary");
   pmRefreshAmountDisplay();
-  if (sumEl) sumEl.textContent = plan === "yearly" ? "Yearly · ₹3,499" : "Monthly · ₹299";
+  if (sumEl) sumEl.textContent = plan === "yearly" ? "Yearly · ₹3,499" : plan === "lite" ? "Pro Lite · ₹199" : "Monthly · ₹299";
   pmBuildQR();
 }
 
@@ -21667,8 +21749,8 @@ async function pmSubmit() {
     utr_number: utr.toUpperCase(),
     status: "pending",
     submitted_at: new Date().toISOString(),
-    seats_requested: pmExtraSeatsSelected,
-    request_type: pmExtraSeatsSelected > 0 ? "pro_plus_seats" : "pro"
+    seats_requested: pmSelectedPlan === "lite" ? 0 : pmExtraSeatsSelected,
+    request_type: pmSelectedPlan === "lite" ? "pro_lite" : (pmExtraSeatsSelected > 0 ? "pro_plus_seats" : "pro")
   };
 
   try {
