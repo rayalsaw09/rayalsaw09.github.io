@@ -7543,7 +7543,8 @@ function safeRenderTab(i) {
   window._renderDebounceTimer = setTimeout(() => {
     _safeRenderTabImmediate(i);
     if (currentLang !== "en") {
-      setTimeout(applyUITranslations, 120);
+      // Synchronous first pass — no visible English flash before the Hindi swap.
+      applyUITranslations();
       setTimeout(applyUITranslations, 400); // second pass for slow-rendering tabs
     }
   }, 40);
@@ -7723,7 +7724,7 @@ function _safeRenderTabImmediate(i) {
 function renderTabs(){
   const TABS=getTabs();
   // Horizontal tab-bar (mobile fallback — hidden on desktop via CSS)
-  document.getElementById("tab-bar").innerHTML=TABS.map((tab)=>`<button class="tab-btn${currentTab===tab.index?" active":""}" onclick="switchTab(${tab.index})">${tab.label}</button>`).join("");
+  document.getElementById("tab-bar").innerHTML=TABS.map((tab)=>`<button class="tab-btn${currentTab===tab.index?" active":""}" data-tab-idx="${tab.index}" onclick="switchTab(${tab.index})">${tab.label}</button>`).join("");
 
   // Desktop sidebar
   const sidebar = document.getElementById("sidebar-nav");
@@ -7772,7 +7773,7 @@ function renderTabs(){
       const badgeMatch = tab.label.match(/<span[^>]*>(\d+)<\/span>/);
       const badge = badgeMatch ? `<span class="sb-badge">${badgeMatch[1]}</span>` : "";
 
-      html += `<div class="sb-item${isActive?" active":""}" onclick="switchTab(${i})" title="${label} (${shortcut})">
+      html += `<div class="sb-item${isActive?" active":""}" data-tab-idx="${i}" onclick="switchTab(${i})" title="${label} (${shortcut})">
         <span class="sb-icon">${icon}</span>
         <span class="sb-label">${label}</span>
         ${badge}
@@ -7785,6 +7786,25 @@ function renderTabs(){
   sidebar.innerHTML = html;
   updateBottomNavVisibility();
 }
+
+// Lightweight active-tab highlight update — toggles the "active" class on the
+// already-rendered sidebar/tab-bar items instead of rebuilding their innerHTML.
+// This is what switchTab() uses on every click; rebuilding the whole sidebar
+// (renderTabs()) on every single tab switch was destroying and recreating
+// every icon/label/badge node each time, which is what caused the visible
+// sidebar flicker. renderTabs() is still used for cases where the tab list
+// itself actually changes (language switch, permission change, badge counts).
+function _sbSetActive(i){
+  document.querySelectorAll('#tab-bar .tab-btn').forEach(el=>{
+    el.classList.toggle('active', Number(el.dataset.tabIdx) === i);
+  });
+  const sidebar = document.getElementById('sidebar-nav');
+  if(sidebar){
+    sidebar.querySelectorAll('.sb-item').forEach(el=>{
+      el.classList.toggle('active', Number(el.dataset.tabIdx) === i);
+    });
+  }
+}
 function switchTab(i){
   // Guard: members cannot switch to tabs they don't have access to
   if(currentMember && TABS_BASE[i] && !isTabVisible(TABS_BASE[i])) return;
@@ -7792,7 +7812,7 @@ function switchTab(i){
   if(i!==2&&i!==3)invPrefillName="";
   setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 150);
   window._pageStack=[];window._scDetailPage=null;
-  currentTab=i;renderTabs();renderTab(i);
+  currentTab=i;_sbSetActive(i);renderTab(i);
   var _tc=document.getElementById('tab-content');if(_tc)_tc.scrollTop=0;
   if(typeof window._scClearRowFocus==='function') window._scClearRowFocus();
   // If cloud data arrived while the user was on another tab, the dirty flag was set.
@@ -7897,8 +7917,13 @@ function renderTab(i){
   // never got translated, so the tab appeared to "revert to English" even
   // though currentLang was still 'hi'. Apply the same translation pass here.
   if (currentLang !== "en" && typeof applyUITranslations === "function") {
-    setTimeout(applyUITranslations, 50);
-    setTimeout(applyUITranslations, 300); // second pass for slower-rendering tabs (e.g. Messages)
+    // Run synchronously (not setTimeout) so the translation happens before the
+    // browser paints the next frame — this is what actually kills the
+    // English-then-Hindi flicker on tab switch. A single delayed pass is kept
+    // as a safety net for tabs that finish rendering more content asynchronously
+    // (e.g. Messages, Purchase banners) after this point.
+    applyUITranslations();
+    setTimeout(applyUITranslations, 300);
   }
 }
 
@@ -20414,17 +20439,18 @@ function applyUITranslations() {
         reverseMap[translated] = en;
       });
     });
-    // Walk DOM and reverse any translated text back to English
-    // (skip #tab-content — it's already rendered in the correct language by
-    // the tab's own render function, e.g. `currentLang==='hi'?...`. Running
-    // this text-replace pass over it too can mis-translate already-correct
-    // text and, since nothing re-renders it again until the next tab switch,
-    // leave it stuck showing the wrong language.)
+    // Walk DOM and reverse any translated text back to English.
+    // NOTE: #tab-content IS included here — most tab render functions write
+    // raw English HTML directly and rely entirely on this pass to translate
+    // it, so excluding tab-content leaves those tabs permanently in the
+    // wrong language. The flicker this used to cause is fixed instead by
+    // calling applyUITranslations() synchronously right after the tab HTML
+    // is set (see renderTab/safeRenderTab), so the browser never paints the
+    // untranslated intermediate state.
     const walker = document.createTreeWalker(mainApp, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
         const tag = node.parentElement?.tagName;
         if (tag === "SCRIPT" || tag === "STYLE" || tag === "INPUT" || tag === "TEXTAREA") return NodeFilter.FILTER_SKIP;
-        if (node.parentElement?.closest("#tab-content")) return NodeFilter.FILTER_SKIP;
         return NodeFilter.FILTER_ACCEPT;
       }
     });
@@ -20443,9 +20469,8 @@ function applyUITranslations() {
         if (changed) node.textContent = text;
       }
     });
-    // Reverse placeholders too (skip #tab-content, same reasoning as above)
+    // Reverse placeholders too (includes #tab-content — see note above)
     mainApp.querySelectorAll("[placeholder]").forEach(el => {
-      if (el.closest("#tab-content")) return;
       const p = el.getAttribute("placeholder");
       if (reverseMap[p]) el.setAttribute("placeholder", reverseMap[p]);
     });
@@ -20456,13 +20481,12 @@ function applyUITranslations() {
   if (!map) return;
 
   // Walk all text nodes inside main-app and replace exact matches
-  // (skip #tab-content — same reasoning as the reverse branch above)
+  // (includes #tab-content — same reasoning as the reverse branch above)
   const walker = document.createTreeWalker(mainApp, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       // Skip script/style content
       const tag = node.parentElement?.tagName;
       if (tag === "SCRIPT" || tag === "STYLE" || tag === "INPUT" || tag === "TEXTAREA") return NodeFilter.FILTER_SKIP;
-      if (node.parentElement?.closest("#tab-content")) return NodeFilter.FILTER_SKIP;
       return NodeFilter.FILTER_ACCEPT;
     }
   });
@@ -20486,9 +20510,8 @@ function applyUITranslations() {
     }
   });
 
-  // Also translate placeholder attributes (skip #tab-content, same reasoning as above)
+  // Also translate placeholder attributes (includes #tab-content, same reasoning as above)
   mainApp.querySelectorAll("[placeholder]").forEach(el => {
-    if (el.closest("#tab-content")) return;
     const p = el.getAttribute("placeholder");
     if (map[p]) el.setAttribute("placeholder", map[p]);
   });
