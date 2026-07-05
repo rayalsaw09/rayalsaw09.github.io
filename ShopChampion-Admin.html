@@ -2971,8 +2971,10 @@ function getTabs(){
   const isPro = currentAppStyle === "pro";
   const result = [];
   TABS_BASE.forEach((k,i)=>{
-    // Team tab: only show when logged in as owner AND plan includes team access (excludes Pro Lite)
-    if(k === "team" && (currentMember || !hasTeamAccess())) return;
+    // Team tab: always visible to the owner (locked/upgrade view renders inside
+    // the tab itself on Free/Pro Lite/expired plans — see renderTeamTab). Only
+    // hidden for member logins, who never get Team tab access at all.
+    if(k === "team" && currentMember) return;
     // Member tab visibility filter
     if(currentMember && !isTabVisible(k)) return;
     // Use t() for all languages; fall back to Pro English labels only for English
@@ -6186,7 +6188,7 @@ function hasPermission(actionKey) {
 }
 
 function isTabVisible(tabKey) {
-  if (!currentMember) return tabKey === "team" ? hasTeamAccess() : true; // owner sees all tabs except Team on non-Pro plans
+  if (!currentMember) return true; // owner sees all tabs; Team tab shows a locked/upgrade view internally on non-Pro plans
   // Team tab always hidden from members
   if (tabKey === "team") return false;
   const tabs = currentMember.permissions && currentMember.permissions.tabs;
@@ -7853,13 +7855,9 @@ function _sbSetActive(i){
 function switchTab(i){
   // Guard: members cannot switch to tabs they don't have access to
   if(currentMember && TABS_BASE[i] && !isTabVisible(TABS_BASE[i])) return;
-  // Guard: owner can't open Team tab directly (e.g. Alt+T shortcut) on a plan
-  // that doesn't include team access (Pro Lite) — bounce to Settings instead.
-  if(!currentMember && TABS_BASE[i] === "team" && !hasTeamAccess()){
-    notify("⚡ Team members aren't included in Pro Lite. Upgrade to Pro for team access.");
-    i = TABS_BASE.indexOf("settings");
-    if(i < 0) return;
-  }
+  // Owner opening Team tab on a plan without team access (Free/Pro Lite/expired)
+  // now lands on the tab itself — renderTeamTab() shows a locked/upgrade view
+  // instead of the tab being hidden or bouncing the owner elsewhere.
   if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}
   if(i!==2&&i!==3)invPrefillName="";
   setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 150);
