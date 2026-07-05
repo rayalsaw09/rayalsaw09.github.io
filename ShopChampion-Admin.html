@@ -2971,8 +2971,8 @@ function getTabs(){
   const isPro = currentAppStyle === "pro";
   const result = [];
   TABS_BASE.forEach((k,i)=>{
-    // Team tab: only show when logged in as owner
-    if(k === "team" && currentMember) return;
+    // Team tab: only show when logged in as owner AND plan includes team access (excludes Pro Lite)
+    if(k === "team" && (currentMember || !hasTeamAccess())) return;
     // Member tab visibility filter
     if(currentMember && !isTabVisible(k)) return;
     // Use t() for all languages; fall back to Pro English labels only for English
@@ -6148,13 +6148,19 @@ var currentMember = null; // null = shop owner logged in; object = team member
 var _memberSessionToken = null; // session token stored locally for heartbeat
 var _memberSessionTimer = null; // interval handle for heartbeat
 
+// Team member access requires full Pro — Pro Lite (₹199) includes every other
+// Pro feature but explicitly does NOT include team member seats.
+function hasTeamAccess() {
+  return licensePlan === "pro" && licenseStatus === "pro";
+}
+
 function hasPermission(actionKey) {
   if (!currentMember) return true; // owner always has full permission
   return !!(currentMember.permissions && currentMember.permissions.actions && currentMember.permissions.actions[actionKey]);
 }
 
 function isTabVisible(tabKey) {
-  if (!currentMember) return true; // owner sees all tabs
+  if (!currentMember) return tabKey === "team" ? hasTeamAccess() : true; // owner sees all tabs except Team on non-Pro plans
   // Team tab always hidden from members
   if (tabKey === "team") return false;
   const tabs = currentMember.permissions && currentMember.permissions.tabs;
@@ -7821,6 +7827,13 @@ function _sbSetActive(i){
 function switchTab(i){
   // Guard: members cannot switch to tabs they don't have access to
   if(currentMember && TABS_BASE[i] && !isTabVisible(TABS_BASE[i])) return;
+  // Guard: owner can't open Team tab directly (e.g. Alt+T shortcut) on a plan
+  // that doesn't include team access (Pro Lite) — bounce to Settings instead.
+  if(!currentMember && TABS_BASE[i] === "team" && !hasTeamAccess()){
+    notify("⚡ Team members aren't included in Pro Lite. Upgrade to Pro for team access.");
+    i = TABS_BASE.indexOf("settings");
+    if(i < 0) return;
+  }
   if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}
   if(i!==2&&i!==3)invPrefillName="";
   setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 150);
@@ -17131,16 +17144,26 @@ async function renderTeamTab(el) {
   // manage team members at all; show an upgrade prompt instead.
   if (!_hasFullAccess()) {
     if (window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
+    const isLitePlan = licensePlan === "pro_lite" && licenseStatus === "pro";
     const daysLeft = _trialDaysLeft();
     const trialMsg = _trialActive
       ? `<div style="background:#1a2a1a;border:1px solid #2a5a2a;border-radius:8px;padding:10px 14px;margin:0 auto 18px;max-width:360px;font-size:12px;color:#4f4;">⏳ Trial: <strong>${daysLeft} days left</strong></div>`
       : ``;
+    const heading = isLitePlan
+      ? (currentLang==='hi'?'टीम मेंबर्स — Pro Lite में शामिल नहीं':'Team Members isn\'t included in Pro Lite')
+      : (currentLang==='hi'?'टीम मेंबर्स — Pro फीचर':'Team Members is a Pro feature');
+    const body = isLitePlan
+      ? (currentLang==='hi'?'आपका मौजूदा प्लान (Pro Lite ₹199) बाकी सभी Pro फीचर्स देता है, लेकिन टीम मेंबर एक्सेस शामिल नहीं है। पूरे Pro प्लान में अपग्रेड करें ताकि टीम मेंबर जोड़ सकें।':'Your current plan (Pro Lite ₹199) includes every other Pro feature, but not team member access. Upgrade to full Pro to add and manage staff logins.')
+      : (currentLang==='hi'?'टीम मेंबर जोड़ने और मैनेज करने के लिए Pro प्लान खरीदें। Free प्लान पर यह फीचर उपलब्ध नहीं है.':'Adding and managing team members requires the Pro plan. Upgrade to invite staff, set permissions, and track their activity.');
+    const cta = isLitePlan
+      ? (currentLang==='hi'?'⭐ पूरे Pro में अपग्रेड करें — ₹299/महीना':'⭐ Upgrade to full Pro — ₹299/month')
+      : (currentLang==='hi'?'💳 Pro खरीदें — ₹299/महीना':'💳 Upgrade to Pro — ₹299/month');
     el.innerHTML = `<div style="padding:60px 20px;text-align:center;max-width:420px;margin:0 auto;">
       <div style="font-size:42px;margin-bottom:14px;">🔒</div>
-      <div style="font-size:18px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:8px;">${currentLang==='hi'?'टीम मेंबर्स — Pro फीचर':'Team Members is a Pro feature'}</div>
-      <div style="font-size:13px;color:var(--text-muted,#7a8aaa);margin-bottom:18px;line-height:1.6;">${currentLang==='hi'?'टीम मेंबर जोड़ने और मैनेज करने के लिए Pro प्लान खरीदें। Free प्लान पर यह फीचर उपलब्ध नहीं है.':'Adding and managing team members requires the Pro plan. Upgrade to invite staff, set permissions, and track their activity.'}</div>
+      <div style="font-size:18px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:8px;">${heading}</div>
+      <div style="font-size:13px;color:var(--text-muted,#7a8aaa);margin-bottom:18px;line-height:1.6;">${body}</div>
       ${trialMsg}
-      <button onclick="openPaymentModal()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-size:14px;font-weight:800;padding:12px 28px;">💳 ${currentLang==='hi'?'Pro खरीदें — ₹299/महीना':'Upgrade to Pro — ₹299/month'}</button>
+      <button onclick="openPaymentModal()" class="btn" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-size:14px;font-weight:800;padding:12px 28px;">${cta}</button>
     </div>`;
     return;
   }
@@ -17688,6 +17711,26 @@ async function memberLogin() {
       btn.disabled = false; btnTxt.textContent = "मेंबर के रूप में लॉगिन करें →";
       return;
     }
+
+    // Step 3: check the shop's CURRENT plan before granting a session — team
+    // access is a Pro-only feature (Pro Lite explicitly excludes it). This is
+    // checked here (not just hidden in the owner's UI) so a member whose shop
+    // downgraded can't keep logging in just because their credentials still work.
+    try {
+      const licRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(data.shop_phone)}&select=plan,active&order=created_at.desc&limit=1`, {
+        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+      });
+      const licRows = await licRes.json();
+      const currentShopPlan = (licRows && licRows[0]) ? licRows[0].plan : null;
+      if (currentShopPlan === "pro_lite") {
+        errEl.textContent = "🔒 Team member access is disabled — this shop is on the Pro Lite plan. Contact your shop owner.";
+        errEl.style.display = "block";
+        btn.disabled = false; btnTxt.textContent = "मेंबर के रूप में लॉगिन करें →";
+        return;
+      }
+    } catch(e) {
+      console.warn("[MemberLogin] Plan check failed, allowing login (fail-open):", e.message);
+    }
     // Successful login — reset attempt counter
     _memberLoginAttempts = 0;
     if(_memberLoginLockTimer) { clearInterval(_memberLoginLockTimer); _memberLoginLockTimer = null; }
@@ -17789,6 +17832,24 @@ function _startMemberHeartbeat() {
         setTimeout(()=>doLogout(), 2000);
         return;
       }
+      // 1b) Also re-check the shop's plan on every heartbeat — if the owner
+      // downgrades to Pro Lite mid-session, team members get kicked out within
+      // ~10s instead of staying logged in until their session token expires.
+      try {
+        const licRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(authPhone)}&select=plan&order=created_at.desc&limit=1`, {
+          headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+        });
+        const licRows = await licRes.json();
+        if (licRows && licRows[0] && licRows[0].plan === "pro_lite") {
+          notify("🔒 Team access removed — this shop is now on Pro Lite.", "error");
+          if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
+          if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
+          if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
+          try{ stopAllLinkedLedgerListeners(); }catch(_){}
+          setTimeout(()=>doLogout(), 2000);
+          return;
+        }
+      } catch(e) { /* fail-open on network blips, same as session check above */ }
       // 2) Update last_seen_at directly — RLS policy allow_self_heartbeat permits this
       const patchRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_shop_members?id=eq.${encodeURIComponent(currentMember.id)}`, {
         method:"PATCH",
@@ -21683,6 +21744,23 @@ function pmRefreshAmountDisplay() {
 }
 
 function pmSelectPlan(plan) {
+  // If the shop currently has full Pro (team access) and team members already
+  // added, warn before letting them select Lite — this is the moment they
+  // should find out team access will be locked, not after payment approval.
+  if (plan === "lite" && hasTeamAccess()) {
+    fetchTeamMembers().then(members => {
+      if (members && members.length > 0) {
+        const proceed = confirm(`⚠️ You currently have ${members.length} team member${members.length===1?'':'s'} added.\n\nPro Lite (₹199) does NOT include team member access. Once your request is approved, all your team members will be locked out of login immediately — their data and history stay intact, nothing is deleted, and you can restore access anytime by upgrading back to full Pro.\n\nContinue selecting Pro Lite?`);
+        if (!proceed) return;
+      }
+      _pmApplyPlanSelection(plan);
+    }).catch(() => _pmApplyPlanSelection(plan)); // fail-open on fetch error, don't block plan selection
+    return;
+  }
+  _pmApplyPlanSelection(plan);
+}
+
+function _pmApplyPlanSelection(plan) {
   pmSelectedPlan = plan;
   if (plan === "lite") { pmExtraSeatsSelected = 0; const c = document.getElementById("pm-seats-count"); if (c) c.textContent = "0"; }
   const mCard = document.getElementById("pm-card-monthly");
