@@ -1799,6 +1799,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <div id="member-login-toggle" onclick="toggleMemberLogin()" style="cursor:pointer;font-size:12px;color:var(--text-dim,#4a5a7a);text-align:center;text-decoration:underline;">👤 टीम मेंबर? यहां लॉगिन करें</div>
       <div id="member-login-form" style="display:none;margin-top:14px;">
         <div style="font-size:13px;color:#a78bfa;font-weight:700;margin-bottom:12px;">टीम मेंबर लॉगिन</div>
+        <input class="input" type="text" id="member-shopid" placeholder="Shop ID (जैसे SC-123456)" style="text-align:center;font-size:15px;margin-bottom:10px;font-family:monospace;letter-spacing:1px;" onkeydown="if(event.key==='Enter')document.getElementById('member-username').focus()"/>
         <input class="input" type="text" id="member-username" placeholder="यूज़रनेम" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')document.getElementById('member-password').focus()"/>
         <input class="input" type="password" id="member-password" placeholder="पासवर्ड" style="text-align:center;font-size:15px;margin-bottom:10px;" onkeydown="if(event.key==='Enter')memberLogin()"/>
         <div id="member-login-err" style="color:#f66;font-size:12px;margin-bottom:10px;display:none;"></div>
@@ -3306,10 +3307,10 @@ function saveSettingsToCloud(extraFields) {
 
 // Writes a minimal public-readable profile to shop_profiles/{phone}
 // CRIT-06: Includes Firebase uid so Firestore Rules can verify ownership via isOwner()
-function _savePublicShopProfile(){
+async function _savePublicShopProfile(){
   if(!db || !authPhone) return;
   if(currentMember) return; // members must not write shop_profiles — owner only
-  const shopId = "SC-" + String(authPhone).slice(-6);
+  const shopId = await ensureShopIdAssigned();
   const profile = {
     shopId,
     phone: authPhone,
@@ -7033,6 +7034,10 @@ function onLoginSuccess(phone) {
   if(_loginSuccessFired) return;
   _loginSuccessFired = true;
 
+  // Resolve/claim this shop's permanent Shop ID early (owner only — members
+  // share the shop's existing id and never assign their own).
+  if (!currentMember) { try { ensureShopIdAssigned(); } catch(e) {} }
+
   // When owner logs in via password — invalidate ALL active member sessions for this shop.
   // Members will be kicked out within 10s (next heartbeat detects null session_token).
   // Only fires on fresh password login (sc_fresh_owner_login flag), NOT on page refresh/auto-login.
@@ -7496,7 +7501,7 @@ function doLogout() {
   // Reset member login form
   const mf = document.getElementById("member-login-form");
   const mt = document.getElementById("member-login-toggle");
-  if(mf) { mf.style.display="none"; document.getElementById("member-username").value=""; document.getElementById("member-password").value=""; document.getElementById("member-login-err").style.display="none"; }
+  if(mf) { mf.style.display="none"; document.getElementById("member-shopid").value=""; document.getElementById("member-username").value=""; document.getElementById("member-password").value=""; document.getElementById("member-login-err").style.display="none"; }
   if(mt) mt.style.display="block";
 }
 
@@ -11806,16 +11811,81 @@ async function custGSTAutoFill(gstinInputId, companyInputId, addressInputId, sta
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ─── SHOP ID LOOKUP ──────────────────────────────────────────────────────────
-// Returns this shop's ShopChampion ID (SC-XXXXXX)
-function myShopId(){ return authPhone ? "SC-" + String(authPhone).slice(-6) : "SC-??????"; }
+// ══════════════════════════════════════════════
+// UNIQUE SHOP ID SYSTEM
+// Every shop gets a stable SC-XXXXXX id derived from the last 6 digits of
+// its phone number. If another shop already claimed that suffix, we
+// escalate to 7, then 8, then 9, then 10 digits — checked against a public
+// registry collection — so no two shops can ever end up with the same id.
+// Once assigned, the id is permanent (cached locally + in shop_profiles)
+// and never recomputed, so a shop's published SC-XXXXXX never changes later.
+// ══════════════════════════════════════════════
+var _scAssignedShopId = null; // cached once resolved this session
+
+function _cachedShopIdKey(){ return "sc_shopid_" + (authPhone||""); }
+
+// Synchronous getter for UI — returns the persisted id if we have it,
+// otherwise a best-guess (naive 6-digit) placeholder until resolution finishes.
+function myShopId(){
+  if (_scAssignedShopId) return _scAssignedShopId;
+  const cached = authPhone ? localStorage.getItem(_cachedShopIdKey()) : null;
+  if (cached) { _scAssignedShopId = cached; return cached; }
+  return authPhone ? "SC-" + String(authPhone).slice(-6) : "SC-??????";
+}
+
+// Call once after login, before the public profile is first written. Safe to
+// call repeatedly — it's a no-op once an id has already been assigned.
+async function ensureShopIdAssigned() {
+  if (!db || !authPhone || currentMember) return myShopId();
+  const cached = localStorage.getItem(_cachedShopIdKey());
+  if (cached) { _scAssignedShopId = cached; return cached; }
+
+  // Already assigned in a previous session (e.g. on another device)?
+  // Check the shop's own profile doc first — cheaper than the registry.
+  try {
+    const profileSnap = await db.collection("shop_profiles").doc(authPhone).get();
+    if (profileSnap.exists && profileSnap.data().shopId) {
+      const existing = profileSnap.data().shopId;
+      _scAssignedShopId = existing;
+      localStorage.setItem(_cachedShopIdKey(), existing);
+      return existing;
+    }
+  } catch(e) { console.warn("[ShopID] profile check failed:", e.message); }
+
+  // Not assigned yet — claim the shortest free suffix, escalating digits on collision.
+  const digitLengths = [6,7,8,9,10];
+  for (const len of digitLengths) {
+    const suffix = String(authPhone).slice(-len);
+    const regRef = db.collection("shop_id_registry").doc(suffix);
+    try {
+      const claimed = await db.runTransaction(async (tx) => {
+        const doc = await tx.get(regRef);
+        if (doc.exists && doc.data().phone !== authPhone) return false; // taken by a different shop
+        tx.set(regRef, { phone: authPhone, assignedAt: Date.now() });
+        return true;
+      });
+      if (claimed) {
+        const finalId = "SC-" + suffix;
+        _scAssignedShopId = finalId;
+        localStorage.setItem(_cachedShopIdKey(), finalId);
+        return finalId;
+      }
+    } catch(e) { console.warn("[ShopID] registry claim failed at length", len, e.message); }
+  }
+  // Practically impossible fallback — even the full 10-digit number collided.
+  const fallback = "SC-" + String(authPhone);
+  _scAssignedShopId = fallback;
+  localStorage.setItem(_cachedShopIdKey(), fallback);
+  return fallback;
+}
 
 // Search shop_profiles by SC-XXXXXX id or phone number
 async function lookupShopById(query){
   if(!db) return null;
   query = (query||"").trim();
-  // Accept SC-XXXXXX format or raw 6-digit suffix
+  // Accept SC-XXXXXX format (6-10 digit suffix, since ids escalate on collision) or raw phone
   let phone = null;
-  if(/^SC-\d{6}$/i.test(query)){
+  if(/^SC-\d{6,10}$/i.test(query)){
     // We can't reverse SC-XXXXXX → full phone without scanning, so query by shopId field
     const snap = await db.collection("shop_profiles").where("shopId","==",query.toUpperCase()).limit(1).get();
     if(!snap.empty) return snap.docs[0].data();
@@ -17508,12 +17578,15 @@ var _memberLoginAttempts = 0;
 var _memberLoginLockTimer = null;
 
 async function memberLogin() {
+  const shopIdRaw = (document.getElementById("member-shopid").value||"").trim().toUpperCase();
   const username = (document.getElementById("member-username").value||"").trim().toLowerCase();
   const pass = document.getElementById("member-password").value;
   const errEl = document.getElementById("member-login-err");
   const btn = document.getElementById("member-login-btn");
   const btnTxt = document.getElementById("member-login-txt");
   errEl.style.display = "none";
+  if(!shopIdRaw) { errEl.textContent="Enter your shop's Shop ID first."; errEl.style.display="block"; return; }
+  if(!/^SC-\d{6,10}$/i.test(shopIdRaw)) { errEl.textContent="Invalid Shop ID format — should look like SC-123456."; errEl.style.display="block"; return; }
   if(!username || !pass) { errEl.textContent="Enter username and password."; errEl.style.display="block"; return; }
 
   // Brute-force protection — same pattern as admin login
@@ -17524,6 +17597,21 @@ async function memberLogin() {
   }
 
   btn.disabled = true; btnTxt.textContent = "Logging in...";
+
+  // Step 1: resolve Shop ID → shop phone via the public registry
+  let resolvedPhone = null;
+  try {
+    const suffix = shopIdRaw.replace(/^SC-/i, "");
+    const regSnap = await db.collection("shop_id_registry").doc(suffix).get();
+    if (regSnap.exists) resolvedPhone = regSnap.data().phone || null;
+  } catch(e) { console.warn("[MemberLogin] Shop ID lookup failed:", e.message); }
+  if (!resolvedPhone) {
+    errEl.textContent = "❌ Shop ID not found — check with your shop owner.";
+    errEl.style.display = "block";
+    btn.disabled = false; btnTxt.textContent = "मेंबर के रूप में लॉगिन करें →";
+    return;
+  }
+
   try {
     const hash = await scHashPassword(username, pass);
     const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/rpc/check_member_password`, {
@@ -17532,6 +17620,14 @@ async function memberLogin() {
       body: JSON.stringify({ p_username:username, p_hash:hash })
     });
     const data = await res.json();
+    // Step 2: even if credentials matched, reject if the account isn't in
+    // the shop this Shop ID resolved to (prevents cross-shop username mix-ups)
+    if (data && data.shop_phone && data.shop_phone !== resolvedPhone) {
+      errEl.textContent = "❌ This username doesn't belong to that Shop ID.";
+      errEl.style.display = "block";
+      btn.disabled = false; btnTxt.textContent = "मेंबर के रूप में लॉगिन करें →";
+      return;
+    }
     if(!data || !data.shop_phone) {
       _memberLoginAttempts++;
       const remaining = 5 - _memberLoginAttempts;
@@ -20319,10 +20415,16 @@ function applyUITranslations() {
       });
     });
     // Walk DOM and reverse any translated text back to English
+    // (skip #tab-content — it's already rendered in the correct language by
+    // the tab's own render function, e.g. `currentLang==='hi'?...`. Running
+    // this text-replace pass over it too can mis-translate already-correct
+    // text and, since nothing re-renders it again until the next tab switch,
+    // leave it stuck showing the wrong language.)
     const walker = document.createTreeWalker(mainApp, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
         const tag = node.parentElement?.tagName;
         if (tag === "SCRIPT" || tag === "STYLE" || tag === "INPUT" || tag === "TEXTAREA") return NodeFilter.FILTER_SKIP;
+        if (node.parentElement?.closest("#tab-content")) return NodeFilter.FILTER_SKIP;
         return NodeFilter.FILTER_ACCEPT;
       }
     });
@@ -20341,8 +20443,9 @@ function applyUITranslations() {
         if (changed) node.textContent = text;
       }
     });
-    // Reverse placeholders too
+    // Reverse placeholders too (skip #tab-content, same reasoning as above)
     mainApp.querySelectorAll("[placeholder]").forEach(el => {
+      if (el.closest("#tab-content")) return;
       const p = el.getAttribute("placeholder");
       if (reverseMap[p]) el.setAttribute("placeholder", reverseMap[p]);
     });
@@ -20353,11 +20456,13 @@ function applyUITranslations() {
   if (!map) return;
 
   // Walk all text nodes inside main-app and replace exact matches
+  // (skip #tab-content — same reasoning as the reverse branch above)
   const walker = document.createTreeWalker(mainApp, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       // Skip script/style content
       const tag = node.parentElement?.tagName;
       if (tag === "SCRIPT" || tag === "STYLE" || tag === "INPUT" || tag === "TEXTAREA") return NodeFilter.FILTER_SKIP;
+      if (node.parentElement?.closest("#tab-content")) return NodeFilter.FILTER_SKIP;
       return NodeFilter.FILTER_ACCEPT;
     }
   });
@@ -20381,8 +20486,9 @@ function applyUITranslations() {
     }
   });
 
-  // Also translate placeholder attributes
+  // Also translate placeholder attributes (skip #tab-content, same reasoning as above)
   mainApp.querySelectorAll("[placeholder]").forEach(el => {
+    if (el.closest("#tab-content")) return;
     const p = el.getAttribute("placeholder");
     if (map[p]) el.setAttribute("placeholder", map[p]);
   });
@@ -23403,7 +23509,7 @@ function scSupa(path, opts={}) {
   });
 }
 
-function scMyShopId()  { return authPhone ? "SC-" + String(authPhone).slice(-6) : ""; }
+function scMyShopId()  { return myShopId(); } // shares the persisted, collision-checked id
 function scMyShopName(){ return (appSettings&&appSettings.shopName) ? appSettings.shopName : "My Shop"; }
 
 async function scLookupAndPreview(shopId) {
@@ -23412,7 +23518,7 @@ async function scLookupAndPreview(shopId) {
   const cardEl   = document.getElementById("sc-shop-preview-card");
   if (!statusEl || !cardEl) return;
 
-  if (!shopId || !/^SC-\d{6}$/i.test(shopId)) {
+  if (!shopId || !/^SC-\d{6,10}$/i.test(shopId)) {
     statusEl.style.color = "#ef4444";
     statusEl.textContent = "⚠️ Enter a valid Shop ID like SC-123456";
     cardEl.innerHTML = "";
@@ -23477,7 +23583,7 @@ async function scLookupAndPreview(shopId) {
 async function scSendConnRequest(toShopId) {
   toShopId = (toShopId||"").trim().toUpperCase();
   if (!authPhone) { notify("❌ Not logged in","error"); return; }
-  if (!toShopId || !/^SC-\d{6}$/i.test(toShopId)) { notify("❌ Invalid Shop ID. Format: SC-123456","error"); return; }
+  if (!toShopId || !/^SC-\d{6,10}$/i.test(toShopId)) { notify("❌ Invalid Shop ID. Format: SC-123456","error"); return; }
   if (toShopId === scMyShopId()) { notify("❌ That's your own Shop ID","error"); return; }
   const suffix = toShopId.replace(/^SC-/i,"");
   // sc_users direct SELECT is revoked from anon (CRIT-07/CRIT-06 lockdown),
