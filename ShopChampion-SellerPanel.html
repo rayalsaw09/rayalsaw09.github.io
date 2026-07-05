@@ -686,6 +686,7 @@
       <select id="filter-sub-status" class="input" style="max-width:160px;" onchange="filterMerged()">
         <option value="">All Statuses</option>
         <option value="active">✅ Active Pro</option>
+        <option value="lite">⚡ Pro Lite</option>
         <option value="trial">🎁 Trial</option>
         <option value="extrial">⏳ Ex-Trial</option>
         <option value="free">🆓 Free Tier</option>
@@ -1339,19 +1340,21 @@ function getSubStatus(key, now) {
     }
     return "free";
   }
+  if (key.plan === "pro_lite") return "lite";
   return "active";
 }
 
 function updateStats() {
   const now = new Date();
   const active   = mergedData.filter(r => r.subStatus === "active").length;
+  const lite     = mergedData.filter(r => r.subStatus === "lite").length;
   const trial    = mergedData.filter(r => r.subStatus === "trial").length;
   const extrial  = mergedData.filter(r => r.subStatus === "extrial").length;
   const free     = mergedData.filter(r => r.subStatus === "free").length;
   const expired  = mergedData.filter(r => r.subStatus === "expired").length;
   const pending  = allPayments.filter(p => p.status === "pending").length;
-  // Estimate MRR: active pro shops × ₹299
-  const mrrVal   = active * 299;
+  // Estimate MRR: active pro shops × ₹299 + pro lite shops × ₹199
+  const mrrVal   = (active * 299) + (lite * 199);
   const mrrStr   = mrrVal >= 1000 ? `₹${(mrrVal/1000).toFixed(1)}K` : `₹${mrrVal}`;
   document.getElementById("stat-total").textContent    = mergedData.length;
   document.getElementById("stat-active").textContent   = active;
@@ -1397,6 +1400,8 @@ function renderMergedTable(rows) {
     let subPill = "";
     if (r.subStatus === "active") {
       subPill = `<span class="sub-pill sub-active">⭐ Pro</span>`;
+    } else if (r.subStatus === "lite") {
+      subPill = `<span class="sub-pill" style="background:#0a1a2a;color:#5af;border:1px solid #5af;">⚡ Pro Lite</span>`;
     } else if (r.subStatus === "trial") {
       subPill = `<span class="sub-pill" style="background:#1a1a00;color:#FFD700;border:1px solid #FFD700;">🎁 Trial</span>`;
     } else if (r.subStatus === "extrial") {
@@ -1444,7 +1449,12 @@ function renderMergedTable(rows) {
       // Plan switch button
       if (key.plan === "free") {
         actions += `<button class="btn" onclick="switchPlan('${key.id}','pro','${safePhone}','${safeName}')" style="background:linear-gradient(135deg,#1a3a1a,#0a2a0a);color:#4f4;border:1px solid #2a5a2a;padding:5px 10px;font-size:11px;" title="Upgrade to Pro">⭐ → Pro</button>`;
+        actions += `<button class="btn" onclick="switchPlan('${key.id}','pro_lite','${safePhone}','${safeName}')" style="background:linear-gradient(135deg,#1a2a3a,#0a1a2a);color:#5af;border:1px solid #2a4a5a;padding:5px 10px;font-size:11px;" title="Upgrade to Pro Lite">⚡ → Pro Lite</button>`;
       } else if (key.plan === "pro" && key.active) {
+        actions += `<button class="btn" onclick="switchPlan('${key.id}','pro_lite','${safePhone}','${safeName}')" style="background:linear-gradient(135deg,#1a2a3a,#0a1a2a);color:#5af;border:1px solid #2a4a5a;padding:5px 10px;font-size:11px;" title="Downgrade to Pro Lite (locks team members)">⚡ → Lite</button>`;
+        actions += `<button class="btn" onclick="switchPlan('${key.id}','free','${safePhone}','${safeName}')" style="background:#0a1a3a;color:#88aaff;border:1px solid #1a2a5a;padding:5px 10px;font-size:11px;" title="Downgrade to Free">🆓 → Free</button>`;
+      } else if (key.plan === "pro_lite" && key.active) {
+        actions += `<button class="btn" onclick="switchPlan('${key.id}','pro','${safePhone}','${safeName}')" style="background:linear-gradient(135deg,#1a3a1a,#0a2a0a);color:#4f4;border:1px solid #2a5a2a;padding:5px 10px;font-size:11px;" title="Upgrade to full Pro">⭐ → Pro</button>`;
         actions += `<button class="btn" onclick="switchPlan('${key.id}','free','${safePhone}','${safeName}')" style="background:#0a1a3a;color:#88aaff;border:1px solid #1a2a5a;padding:5px 10px;font-size:11px;" title="Downgrade to Free">🆓 → Free</button>`;
       }
       actions += `<button class="btn" onclick="editExpiry('${key.id}','${key.expires_at||''}')" style="background:#1a2540;color:#aaa;border:1px solid #2a3560;padding:5px 10px;font-size:11px;">📅</button>`;
@@ -1553,15 +1563,19 @@ async function createKey() {
   }
 }
 
-// ── Switch Plan (Free ↔ Pro) ──
+// ── Switch Plan (Free ↔ Pro ↔ Pro Lite) ──
 async function switchPlan(keyId, newPlan, phone, name) {
-  const label = newPlan === "pro" ? "⭐ Pro" : "🆓 Free";
-  const confirmed = confirm(`Switch ${name || phone} to ${label}?\n\n${newPlan === "pro" ? "They will get full Pro access immediately." : "They will be downgraded to Free tier limits."}`);
+  const label = newPlan === "pro" ? "⭐ Pro" : newPlan === "pro_lite" ? "⚡ Pro Lite" : "🆓 Free";
+  let msg = `Switch ${name || phone} to ${label}?\n\n`;
+  if (newPlan === "pro") msg += "They will get full Pro access immediately, including team member seats.";
+  else if (newPlan === "pro_lite") msg += "They get all Pro features EXCEPT team member access.\n⚠️ If they currently have any team members, those members will be locked out of login immediately (their past data/history is kept, not deleted). The owner can restore them by upgrading back to full Pro.";
+  else msg += "They will be downgraded to Free tier limits.";
+  const confirmed = confirm(msg);
   if (!confirmed) return;
   try {
     const patch = { plan: newPlan };
-    // If upgrading to pro and no expiry, set 1 year from now
-    if (newPlan === "pro") {
+    // If upgrading to pro or pro_lite and no expiry, set 1 year from now
+    if (newPlan === "pro" || newPlan === "pro_lite") {
       const oneYear = new Date();
       oneYear.setFullYear(oneYear.getFullYear() + 1);
       patch.expires_at = oneYear.toISOString();
@@ -1575,16 +1589,16 @@ async function switchPlan(keyId, newPlan, phone, name) {
     if (phone && saDb) {
       try {
         const expiryIso = patch.expires_at || null;
-        const licObj = newPlan === "pro"
-          ? { plan: "pro", status: "pro", expires_at: expiryIso }
+        const licObj = (newPlan === "pro" || newPlan === "pro_lite")
+          ? { plan: newPlan, status: "pro", expires_at: expiryIso }
           : { plan: "free", status: "free" };
         await saDb.collection("users").doc(String(phone))
           .collection("settings").doc("prefs")
           .set({ license: licObj }, { merge: true });
       } catch(fbErr) { console.warn("[SP] switchPlan Firestore push failed:", fbErr.message); }
     }
-    spNotify(newPlan === "pro"
-      ? `✅ ${name || phone} upgraded to ⭐ Pro! Expires in 1 year.`
+    spNotify(newPlan === "pro" ? `✅ ${name || phone} upgraded to ⭐ Pro! Expires in 1 year.`
+      : newPlan === "pro_lite" ? `⚡ ${name || phone} moved to Pro Lite. Team members (if any) are now locked.`
       : `🆓 ${name || phone} moved to Free tier.`
     );
     loadKeys();
@@ -2084,6 +2098,8 @@ function renderPayments(payments) {
       planLine = `➕ ${seats} extra seat${seats===1?'':'s'} only (no plan change)`;
     } else if (reqType === "pro_plus_seats") {
       planLine = `${(p.plan||"monthly").charAt(0).toUpperCase()+(p.plan||"monthly").slice(1)} Plan + ${seats} extra seat${seats===1?'':'s'}`;
+    } else if (reqType === "pro_lite") {
+      planLine = `⚡ Pro Lite (₹199 — no team access)`;
     } else {
       planLine = `${(p.plan||"monthly").charAt(0).toUpperCase()+(p.plan||"monthly").slice(1)} Plan`;
     }
@@ -2096,7 +2112,7 @@ function renderPayments(payments) {
           <div style="font-size:11px;color:#4a5a7a;">🕐 ${date}</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
-          <span style="background:${reqType==='seats'?'#2a1a3a':'#3a2a00'};color:${reqType==='seats'?'#c084fc':'#f84'};border:1px solid ${reqType==='seats'?'#c084fc':'#f84'};font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;">${reqType==='seats'?'👥 Seats':'⏳ Pending'}</span>
+          <span style="background:${reqType==='seats'?'#2a1a3a':reqType==='pro_lite'?'#0a1a2a':'#3a2a00'};color:${reqType==='seats'?'#c084fc':reqType==='pro_lite'?'#5af':'#f84'};border:1px solid ${reqType==='seats'?'#c084fc':reqType==='pro_lite'?'#5af':'#f84'};font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;">${reqType==='seats'?'👥 Seats':reqType==='pro_lite'?'⚡ Lite':'⏳ Pending'}</span>
           <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;">
             <button onclick="approvePayment('${p.id}')" style="background:linear-gradient(135deg,#1a4a1a,#0a2a0a);color:#4f4;border:1px solid #4f4;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;">✅ Approve</button>
             <button onclick="rejectPayment('${p.id}')" style="background:#1a0a0a;color:#f66;border:1px solid #f44;border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;">✕ Reject</button>
@@ -2131,6 +2147,8 @@ async function _doApprove(payment) {
   const seatsToAdd = Number(payment.seats_requested) || 0;
   const reqType    = payment.request_type || "pro";
   const isSeatsOnly = reqType === "seats";
+  const isLite      = reqType === "pro_lite";
+  const finalPlan   = isLite ? "pro_lite" : "pro";
 
   // Ensure we have fresh user + key data before matching
   if (!allUsers.length) allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || [];
@@ -2188,11 +2206,11 @@ async function _doApprove(payment) {
         method: "PATCH",
         headers: { "apikey": SB_SERVICE_KEY||SB_ANON, "Authorization": "Bearer " + (SB_SERVICE_KEY||SB_ANON), "Content-Type": "application/json", "Prefer": "return=minimal" },
         body: JSON.stringify({
-          active: true, plan: "pro",
+          active: true, plan: finalPlan,
           expires_at: expiry.toISOString(),
           customer_phone: phone || existing.customer_phone,
           extra_seats: finalExtraSeats,
-          notes: (existing.notes || "") + " | Pro UTR " + payment.utr_number
+          notes: (existing.notes || "") + ` | ${isLite ? "Pro Lite" : "Pro"} UTR ` + payment.utr_number
         })
       });
       if (!patchRes.ok) {
@@ -2208,7 +2226,7 @@ async function _doApprove(payment) {
         method: "POST",
         headers: { "apikey": SB_SERVICE_KEY||SB_ANON, "Authorization": "Bearer " + (SB_SERVICE_KEY||SB_ANON), "Content-Type": "application/json", "Prefer": "return=representation" },
         body: JSON.stringify({
-          key: newKey, customer_name: name, plan: "pro",
+          key: newKey, customer_name: name, plan: finalPlan,
           active: true, expires_at: expiry.toISOString(),
           extra_seats: seatsToAdd,
           notes: "Auto — UTR " + payment.utr_number,
@@ -2240,7 +2258,7 @@ async function _doApprove(payment) {
         const expiryCheck = new Date();
         if ((payment.plan || "monthly") === "yearly") expiryCheck.setFullYear(expiryCheck.getFullYear() + 1);
         else expiryCheck.setMonth(expiryCheck.getMonth() + 1);
-        fsLicense = { key: usedKey, plan: "pro", status: "pro", expires_at: expiryCheck.toISOString(), extraSeats: finalExtraSeats };
+        fsLicense = { key: usedKey, plan: finalPlan, status: "pro", expires_at: expiryCheck.toISOString(), extraSeats: finalExtraSeats };
       }
       await saDb.collection("users").doc(String(fbPhone))
         .collection("settings").doc("prefs")
@@ -2259,11 +2277,13 @@ async function approvePayment(paymentId) {
   if (!payment) return;
   const seats = Number(payment.seats_requested) || 0;
   const seatsLine = seats > 0 ? `\nExtra seats: +${seats}` : "";
-  const planLine = payment.request_type === "seats" ? "Seats only (no plan change)" : (payment.plan||"monthly").charAt(0).toUpperCase()+(payment.plan||"monthly").slice(1);
-  if (!confirm(`Approve payment from "${payment.customer_name}"?\n\nPlan: ${planLine}${seatsLine}\nAmount: ₹${(payment.amount||0).toLocaleString("en-IN")}\nUTR: ${payment.utr_number}\n\nOK = activate/extend their Pro subscription`)) return;
+  const isLite = payment.request_type === "pro_lite";
+  const planLine = payment.request_type === "seats" ? "Seats only (no plan change)" : isLite ? "Pro Lite (₹199 — no team access)" : (payment.plan||"monthly").charAt(0).toUpperCase()+(payment.plan||"monthly").slice(1);
+  const liteWarning = isLite ? "\n\n⚠️ Pro Lite does NOT include team member access. If this shop currently has any team members added, they will be locked out of login immediately (their data/history stays intact). The owner can restore access by upgrading to full Pro later." : "";
+  if (!confirm(`Approve payment from "${payment.customer_name}"?\n\nPlan: ${planLine}${seatsLine}\nAmount: ₹${(payment.amount||0).toLocaleString("en-IN")}\nUTR: ${payment.utr_number}${liteWarning}\n\nOK = activate/extend their subscription`)) return;
   try {
     const usedKey = await _doApprove(payment);
-    alert(`✅ Approved!\n\nSubscription activated as Pro.\nCustomer's app updates within 15 seconds.`);
+    alert(`✅ Approved!\n\nSubscription activated as ${isLite ? "Pro Lite" : "Pro"}.\nCustomer's app updates within 15 seconds.`);
     loadPayments();
     // Refresh both keys AND users so the Pro status shows immediately in the user table
     allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || [];
@@ -2274,10 +2294,12 @@ async function approvePayment(paymentId) {
 async function approvePaymentFromHistory(paymentId) {
   const payment = allPayments.find(p => p.id === paymentId) || allPhPayments.find(p => p.id === paymentId);
   if (!payment) return;
-  if (!confirm(`Approve payment?\n\nPlan: ${(payment.plan||"monthly").charAt(0).toUpperCase()+(payment.plan||"monthly").slice(1)}\nAmount: ₹${(payment.amount||0).toLocaleString("en-IN")}\nUTR: ${payment.utr_number}\n\nOK = activate/extend their Pro subscription`)) return;
+  const isLite = payment.request_type === "pro_lite";
+  const liteWarning = isLite ? "\n\n⚠️ Pro Lite does NOT include team member access. Any existing team members will be locked out immediately (data preserved)." : "";
+  if (!confirm(`Approve payment?\n\nPlan: ${isLite ? "Pro Lite (₹199 — no team access)" : (payment.plan||"monthly").charAt(0).toUpperCase()+(payment.plan||"monthly").slice(1)}\nAmount: ₹${(payment.amount||0).toLocaleString("en-IN")}\nUTR: ${payment.utr_number}${liteWarning}\n\nOK = activate/extend their subscription`)) return;
   try {
     const usedKey = await _doApprove(payment);
-    alert(`✅ Approved!\n\nSubscription activated as Pro.\nCustomer's app updates within 15 seconds.`);
+    alert(`✅ Approved!\n\nSubscription activated as ${isLite ? "Pro Lite" : "Pro"}.\nCustomer's app updates within 15 seconds.`);
     loadPayments();
     // Refresh both keys AND users so the Pro status shows immediately in the user table
     allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || [];
