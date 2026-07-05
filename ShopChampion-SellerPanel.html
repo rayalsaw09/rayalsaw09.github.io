@@ -2077,16 +2077,26 @@ function renderPayments(payments) {
   }
   listEl.innerHTML = pending.map(p => {
     const date = p.submitted_at ? new Date(p.submitted_at).toLocaleString("en-IN",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) : "—";
+    const seats = Number(p.seats_requested) || 0;
+    const reqType = p.request_type || "pro";
+    let planLine;
+    if (reqType === "seats") {
+      planLine = `➕ ${seats} extra seat${seats===1?'':'s'} only (no plan change)`;
+    } else if (reqType === "pro_plus_seats") {
+      planLine = `${(p.plan||"monthly").charAt(0).toUpperCase()+(p.plan||"monthly").slice(1)} Plan + ${seats} extra seat${seats===1?'':'s'}`;
+    } else {
+      planLine = `${(p.plan||"monthly").charAt(0).toUpperCase()+(p.plan||"monthly").slice(1)} Plan`;
+    }
     return `<div style="background:#0a0e1a;border:1px solid #3a2a10;border-radius:12px;padding:14px 16px;margin-bottom:10px;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
         <div style="flex:1;min-width:160px;">
           <div style="font-size:14px;font-weight:800;color:#e8eaf0;margin-bottom:4px;">${escHtml(p.customer_name||"Unknown")}</div>
-          <div style="font-size:12px;color:#7a8aaa;margin-bottom:3px;">💰 ₹${(p.amount||0).toLocaleString("en-IN")} · ${(p.plan||"monthly").charAt(0).toUpperCase()+(p.plan||"monthly").slice(1)} Plan</div>
+          <div style="font-size:12px;color:#7a8aaa;margin-bottom:3px;">💰 ₹${(p.amount||0).toLocaleString("en-IN")} · ${planLine}</div>
           <div style="font-size:12px;color:#7a8aaa;margin-bottom:3px;">UTR: <span style="font-family:monospace;color:#FFD700;font-weight:700;">${escHtml(p.utr_number||"—")}</span></div>
           <div style="font-size:11px;color:#4a5a7a;">🕐 ${date}</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
-          <span style="background:#3a2a00;color:#f84;border:1px solid #f84;font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;">⏳ Pending</span>
+          <span style="background:${reqType==='seats'?'#2a1a3a':'#3a2a00'};color:${reqType==='seats'?'#c084fc':'#f84'};border:1px solid ${reqType==='seats'?'#c084fc':'#f84'};font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;">${reqType==='seats'?'👥 Seats':'⏳ Pending'}</span>
           <div style="display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;">
             <button onclick="approvePayment('${p.id}')" style="background:linear-gradient(135deg,#1a4a1a,#0a2a0a);color:#4f4;border:1px solid #4f4;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;">✅ Approve</button>
             <button onclick="rejectPayment('${p.id}')" style="background:#1a0a0a;color:#f66;border:1px solid #f44;border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;">✕ Reject</button>
@@ -2118,12 +2128,9 @@ async function _doApprove(payment) {
   const phone      = payment.customer_phone || null;
   const userNum    = payment.user_number    || null;
   const name       = payment.customer_name  || "";
-  const expiry     = new Date();
-  if ((payment.plan || "monthly") === "yearly") {
-    expiry.setFullYear(expiry.getFullYear() + 1);
-  } else {
-    expiry.setMonth(expiry.getMonth() + 1);
-  }
+  const seatsToAdd = Number(payment.seats_requested) || 0;
+  const reqType    = payment.request_type || "pro";
+  const isSeatsOnly = reqType === "seats";
 
   // Ensure we have fresh user + key data before matching
   if (!allUsers.length) allUsers = await sbFetch("/rest/v1/sc_users?select=*&order=created_at.desc", { forceService: true }) || [];
@@ -2148,41 +2155,69 @@ async function _doApprove(payment) {
   }
 
   let usedKey = null;
+  let finalExtraSeats = seatsToAdd;
 
-  if (existing) {
-    // PATCH existing row → activate + extend expiry
-    console.log("PATCHing license id:", existing.id, "with key prefix:", (SB_SERVICE_KEY||SB_ANON).substring(0,20));
+  if (isSeatsOnly) {
+    // Seat-only request: never touch plan or expiry — the shop must already
+    // be Pro. Just add the requested seats on top of whatever they already have.
+    if (!existing) throw new Error("No existing Pro license found for this shop — cannot add seats without an active plan.");
+    finalExtraSeats = (Number(existing.extra_seats) || 0) + seatsToAdd;
     const patchRes = await fetch(`${SB_URL}/rest/v1/licenses?id=eq.${existing.id}`, {
       method: "PATCH",
       headers: { "apikey": SB_SERVICE_KEY||SB_ANON, "Authorization": "Bearer " + (SB_SERVICE_KEY||SB_ANON), "Content-Type": "application/json", "Prefer": "return=minimal" },
       body: JSON.stringify({
-        active: true, plan: "pro",
-        expires_at: expiry.toISOString(),
-        customer_phone: phone || existing.customer_phone,
-        notes: (existing.notes || "") + " | Pro UTR " + payment.utr_number
+        extra_seats: finalExtraSeats,
+        notes: (existing.notes || "") + ` | +${seatsToAdd} seats UTR ${payment.utr_number}`
       })
     });
-    if (!patchRes.ok) {
-      const errBody = await patchRes.text();
-      throw new Error(`PATCH failed (${patchRes.status}): ${errBody.substring(0,200)}`);
-    }
+    if (!patchRes.ok) throw new Error(`PATCH failed (${patchRes.status}): ${(await patchRes.text()).substring(0,200)}`);
     usedKey = existing.key;
   } else {
-    // No existing license — create one linked to their phone + user_number
-    const seg = () => Math.random().toString(36).substring(2,6).toUpperCase();
-    const newKey = `SC-${seg()}-${seg()}-${seg()}`;
-    const licRes = await fetch(`${SB_URL}/rest/v1/licenses`, {
-      method: "POST",
-      headers: { "apikey": SB_SERVICE_KEY||SB_ANON, "Authorization": "Bearer " + (SB_SERVICE_KEY||SB_ANON), "Content-Type": "application/json", "Prefer": "return=representation" },
-      body: JSON.stringify({
-        key: newKey, customer_name: name, plan: "pro",
-        active: true, expires_at: expiry.toISOString(),
-        notes: "Auto — UTR " + payment.utr_number,
-        customer_phone: phone || null
-      })
-    });
-    if (!licRes.ok) throw new Error(await licRes.text());
-    usedKey = newKey;
+    const expiry = new Date();
+    if ((payment.plan || "monthly") === "yearly") {
+      expiry.setFullYear(expiry.getFullYear() + 1);
+    } else {
+      expiry.setMonth(expiry.getMonth() + 1);
+    }
+
+    if (existing) {
+      // PATCH existing row → activate + extend expiry (+ seats if bundled)
+      finalExtraSeats = (Number(existing.extra_seats) || 0) + seatsToAdd;
+      console.log("PATCHing license id:", existing.id, "with key prefix:", (SB_SERVICE_KEY||SB_ANON).substring(0,20));
+      const patchRes = await fetch(`${SB_URL}/rest/v1/licenses?id=eq.${existing.id}`, {
+        method: "PATCH",
+        headers: { "apikey": SB_SERVICE_KEY||SB_ANON, "Authorization": "Bearer " + (SB_SERVICE_KEY||SB_ANON), "Content-Type": "application/json", "Prefer": "return=minimal" },
+        body: JSON.stringify({
+          active: true, plan: "pro",
+          expires_at: expiry.toISOString(),
+          customer_phone: phone || existing.customer_phone,
+          extra_seats: finalExtraSeats,
+          notes: (existing.notes || "") + " | Pro UTR " + payment.utr_number
+        })
+      });
+      if (!patchRes.ok) {
+        const errBody = await patchRes.text();
+        throw new Error(`PATCH failed (${patchRes.status}): ${errBody.substring(0,200)}`);
+      }
+      usedKey = existing.key;
+    } else {
+      // No existing license — create one linked to their phone + user_number
+      const seg = () => Math.random().toString(36).substring(2,6).toUpperCase();
+      const newKey = `SC-${seg()}-${seg()}-${seg()}`;
+      const licRes = await fetch(`${SB_URL}/rest/v1/licenses`, {
+        method: "POST",
+        headers: { "apikey": SB_SERVICE_KEY||SB_ANON, "Authorization": "Bearer " + (SB_SERVICE_KEY||SB_ANON), "Content-Type": "application/json", "Prefer": "return=representation" },
+        body: JSON.stringify({
+          key: newKey, customer_name: name, plan: "pro",
+          active: true, expires_at: expiry.toISOString(),
+          extra_seats: seatsToAdd,
+          notes: "Auto — UTR " + payment.utr_number,
+          customer_phone: phone || null
+        })
+      });
+      if (!licRes.ok) throw new Error(await licRes.text());
+      usedKey = newKey;
+    }
   }
 
   // Mark payment as approved
@@ -2193,15 +2228,23 @@ async function _doApprove(payment) {
   });
   if (!payRes.ok) throw new Error(await payRes.text());
 
-  // ── REALTIME FIX: Push license to Firestore so Admin app reflects Pro immediately ──
+  // ── REALTIME FIX: Push license to Firestore so Admin app reflects Pro/seats immediately ──
   // Writes to users/{phone}/settings/prefs — same path Admin's loadSettingsFromCloud reads
   const fbPhone = matchPhone || phone || null;
   if (fbPhone && saDb) {
     try {
-      const licExpiry = expiry.toISOString();
+      let fsLicense;
+      if (isSeatsOnly) {
+        fsLicense = { extraSeats: finalExtraSeats };
+      } else {
+        const expiryCheck = new Date();
+        if ((payment.plan || "monthly") === "yearly") expiryCheck.setFullYear(expiryCheck.getFullYear() + 1);
+        else expiryCheck.setMonth(expiryCheck.getMonth() + 1);
+        fsLicense = { key: usedKey, plan: "pro", status: "pro", expires_at: expiryCheck.toISOString(), extraSeats: finalExtraSeats };
+      }
       await saDb.collection("users").doc(String(fbPhone))
         .collection("settings").doc("prefs")
-        .set({ license: { key: usedKey, plan: "pro", status: "pro", expires_at: licExpiry } }, { merge: true });
+        .set({ license: fsLicense }, { merge: true });
       console.log("[SP] License pushed to Firestore for", fbPhone);
     } catch(fbErr) {
       console.warn("[SP] Firestore license push failed (non-fatal):", fbErr.message);
@@ -2214,7 +2257,10 @@ async function _doApprove(payment) {
 async function approvePayment(paymentId) {
   const payment = allPayments.find(p => p.id === paymentId);
   if (!payment) return;
-  if (!confirm(`Approve payment from "${payment.customer_name}"?\n\nPlan: ${(payment.plan||"monthly").charAt(0).toUpperCase()+(payment.plan||"monthly").slice(1)}\nAmount: ₹${(payment.amount||0).toLocaleString("en-IN")}\nUTR: ${payment.utr_number}\n\nOK = activate/extend their Pro subscription`)) return;
+  const seats = Number(payment.seats_requested) || 0;
+  const seatsLine = seats > 0 ? `\nExtra seats: +${seats}` : "";
+  const planLine = payment.request_type === "seats" ? "Seats only (no plan change)" : (payment.plan||"monthly").charAt(0).toUpperCase()+(payment.plan||"monthly").slice(1);
+  if (!confirm(`Approve payment from "${payment.customer_name}"?\n\nPlan: ${planLine}${seatsLine}\nAmount: ₹${(payment.amount||0).toLocaleString("en-IN")}\nUTR: ${payment.utr_number}\n\nOK = activate/extend their Pro subscription`)) return;
   try {
     const usedKey = await _doApprove(payment);
     alert(`✅ Approved!\n\nSubscription activated as Pro.\nCustomer's app updates within 15 seconds.`);
