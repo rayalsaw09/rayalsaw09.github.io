@@ -1589,8 +1589,14 @@ async function switchPlan(keyId, newPlan, phone, name) {
     if (phone && saDb) {
       try {
         const expiryIso = patch.expires_at || null;
+        // Look up the actual license key string (e.g. "SC-XXXX-...") — keyId is
+        // just the Supabase row's primary key, not the key string itself. Without
+        // this, the Admin app's realtime listener receives a license object with
+        // no `key` field, queries Supabase for key=eq.'' , finds nothing, and
+        // silently never applies the plan change until the user fully re-logs in.
+        const keyRow = allKeys.find(k => k.id === keyId) || null;
         const licObj = (newPlan === "pro" || newPlan === "pro_lite")
-          ? { plan: newPlan, status: "pro", expires_at: expiryIso }
+          ? { key: keyRow?.key || "", plan: newPlan, status: "pro", expires_at: expiryIso }
           : { plan: "free", status: "free" };
         await saDb.collection("users").doc(String(phone))
           .collection("settings").doc("prefs")
