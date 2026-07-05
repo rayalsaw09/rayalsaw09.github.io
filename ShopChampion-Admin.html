@@ -3469,7 +3469,7 @@ function startFirestoreListener() {
         if (!snap || !snap.exists) return;
         const d = snap.data();
         if (d && d.license && d.license.plan === "pro" && d.license.status === "pro") {
-          const alreadyPro = (licensePlan === "pro" && licenseStatus === "pro");
+          const alreadyPro = hasProFeatures();
           if (alreadyPro) {
             // Already Pro — the only thing that could still change here live is
             // the extra-seats add-on (granted from Seller Panel). Verify against
@@ -5945,7 +5945,7 @@ function buildPayload() {
   return {
     shopName: appSettings.shopName,
     appIcon: appSettings.appIcon || "",
-    isPro: (licensePlan === "pro" && licenseStatus === "pro"),
+    isPro: hasProFeatures(),
     lastUpdated:new Date().toISOString(),
     filterMode: lbFilter.mode,
     filterLabel: filterDesc,
@@ -6148,10 +6148,19 @@ var currentMember = null; // null = shop owner logged in; object = team member
 var _memberSessionToken = null; // session token stored locally for heartbeat
 var _memberSessionTimer = null; // interval handle for heartbeat
 
-// Team member access requires full Pro — Pro Lite (₹199) includes every other
-// Pro feature but explicitly does NOT include team member seats.
+// Team member access requires full Pro (or an active trial, same as before) —
+// Pro Lite (₹199) includes every other Pro feature but explicitly does NOT
+// include team member seats.
 function hasTeamAccess() {
-  return licensePlan === "pro" && licenseStatus === "pro";
+  if (licensePlan === "pro" && licenseStatus === "pro") return true;
+  if (_trialActive && Date.now() < _trialEnd) return true;
+  return false;
+}
+// Everything else that's gated as "Pro" (unlimited counts, WhatsApp, GST,
+// push notifications, ad removal, etc.) should also unlock for Pro Lite —
+// only team member seats are Pro Lite's one exclusion.
+function hasProFeatures() {
+  return (licensePlan === "pro" || licensePlan === "pro_lite") && licenseStatus === "pro";
 }
 
 function hasPermission(actionKey) {
@@ -7197,7 +7206,7 @@ function onLoginSuccess(phone) {
               // Team Members is Pro-only. If the shop's plan has lapsed (trial ended,
               // subscription expired, or downgraded), existing members should be
               // signed out immediately rather than silently keep working.
-              if (!_hasFullAccess()) {
+              if (!hasTeamAccess()) {
                 _scHideLoginLoading();
                 notify(currentLang==='hi'
                   ? '🔒 इस दुकान का Pro प्लान समाप्त हो गया है। टीम मेंबर एक्सेस Pro प्लान पर ही उपलब्ध है। दुकान मालिक से संपर्क करें।'
@@ -17142,7 +17151,7 @@ async function renderTeamTab(el) {
   // Team Members is a Pro-only feature (see PRO_FEATURES in Settings). Free plan
   // users — and users whose trial has expired — should not be able to view or
   // manage team members at all; show an upgrade prompt instead.
-  if (!_hasFullAccess()) {
+  if (!hasTeamAccess()) {
     if (window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
     const isLitePlan = licensePlan === "pro_lite" && licenseStatus === "pro";
     const daysLeft = _trialDaysLeft();
@@ -18173,9 +18182,8 @@ function renderSettings(){
   const fbConnected = !!(typeof db !== "undefined" && db);
   const voiceOn = voiceSettings.enabled;
   const dispCount = displaySettings.showCount || 10;
-  const isPro = licensePlan === "pro" && licenseStatus === "pro";
-
-  // ── Feature comparison data ──
+  const isPro = hasProFeatures();
+  const isLite = licensePlan === "pro_lite" && licenseStatus === "pro";
   const FREE_FEATURES = [
     ["👥", "Customers", `Up to ${FREE_MAX_CUSTOMERS}`],
     ["🛒", "Sales & Purchases", "Included"],
@@ -18201,27 +18209,31 @@ function renderSettings(){
   ];
 
   const trialDaysLeft = _trialDaysLeft();
+  const proFeaturesForCard = isLite
+    ? PRO_FEATURES.map(([icon,label,val]) => label === "Team Members" ? [icon,label,"🔒 Not included"] : [icon,label,val])
+    : PRO_FEATURES;
   const planCard = isPro
-    ? `<div style="background:linear-gradient(135deg,#0a1f0a,#0f2a0f);border:2px solid #2a5a2a;border-radius:18px;padding:18px 20px;margin-bottom:16px;">
+    ? `<div style="background:${isLite?'linear-gradient(135deg,#0a1a30,#0d2038)':'linear-gradient(135deg,#0a1f0a,#0f2a0f)'};border:2px solid ${isLite?'#2a5a7a':'#2a5a2a'};border-radius:18px;padding:18px 20px;margin-bottom:16px;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-          <div style="font-size:32px;">⭐</div>
+          <div style="font-size:32px;">${isLite?'⚡':'⭐'}</div>
           <div style="flex:1;">
-            <div style="font-size:18px;font-weight:900;color:#4f4;font-family:'Rajdhani',sans-serif;letter-spacing:1px;">${t('stProPlan')}</div>
-            <div style="font-size:12px;color:#2a7a2a;">${t('stFullAccess')}</div>
+            <div style="font-size:18px;font-weight:900;color:${isLite?'#5af':'#4f4'};font-family:'Rajdhani',sans-serif;letter-spacing:1px;">${isLite ? (currentLang==='hi'?'प्रो लाइट प्लान':'Pro Lite Plan') : t('stProPlan')}</div>
+            <div style="font-size:12px;color:${isLite?'#3a7aaa':'#2a7a2a'};">${isLite ? (currentLang==='hi'?'टीम एक्सेस को छोड़कर सभी Pro सुविधाएं':'All Pro features except team access') : t('stFullAccess')}</div>
           </div>
-          <div style="background:#1a4a1a;border:1px solid #2a6a2a;border-radius:10px;padding:6px 14px;font-size:12px;font-weight:800;color:#4f4;">✅ Active</div>
+          <div style="background:${isLite?'#1a3a4a':'#1a4a1a'};border:1px solid ${isLite?'#2a5a6a':'#2a6a2a'};border-radius:10px;padding:6px 14px;font-size:12px;font-weight:800;color:${isLite?'#5af':'#4f4'};">✅ Active</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-          ${PRO_FEATURES.map(([icon,label,val])=>`
-            <div style="display:flex;align-items:center;gap:8px;background:#0a1a0a;border-radius:8px;padding:8px 10px;">
+          ${proFeaturesForCard.map(([icon,label,val])=>`
+            <div style="display:flex;align-items:center;gap:8px;background:${isLite?'#0a1622':'#0a1a0a'};border-radius:8px;padding:8px 10px;">
               <span style="font-size:14px;">${icon}</span>
               <div style="flex:1;min-width:0;">
-                <div style="font-size:11px;color:#2a7a2a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</div>
-                <div style="font-size:11px;font-weight:800;color:#4f4;">${val}</div>
+                <div style="font-size:11px;color:${isLite?'#3a7aaa':'#2a7a2a'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</div>
+                <div style="font-size:11px;font-weight:800;color:${val==='🔒 Not included'?'#f59e0b':(isLite?'#5af':'#4f4')};">${val}</div>
               </div>
             </div>`).join("")}
         </div>
-        ${licenseKey ? `<div style="margin-top:12px;font-size:11px;color:#2a5a2a;text-align:center;font-family:monospace;">Key: ${licenseKey}</div>` : ""}
+        ${isLite ? `<button onclick="openPaymentModal()" class="btn" style="width:100%;margin-top:12px;background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;font-weight:800;font-size:12px;padding:9px;">⭐ ${currentLang==='hi'?'पूरे Pro में अपग्रेड करें — ₹299/महीना':'Upgrade to full Pro — ₹299/month'}</button>` : ""}
+        ${licenseKey ? `<div style="margin-top:12px;font-size:11px;color:${isLite?'#3a6a8a':'#2a5a2a'};text-align:center;font-family:monospace;">Key: ${licenseKey}</div>` : ""}
       </div>`
     : _trialActive
     ? `<div style="background:linear-gradient(135deg,#0a1430,#0d1a3a);border:2px solid #FFD700;border-radius:18px;padding:18px 20px;margin-bottom:16px;">
@@ -21330,7 +21342,7 @@ function _trialDaysLeft() {
 
 // Full Pro access = paid Pro OR active trial
 function _hasFullAccess() {
-  if (licensePlan === "pro" && licenseStatus === "pro") return true;
+  if (hasProFeatures()) return true;
   if (_trialActive && Date.now() < _trialEnd) return true;
   return false;
 }
@@ -21345,7 +21357,7 @@ function maxTeamMembers() {
 var _trialExpiredShown = false;
 function _maybeShowTrialExpiredModal() {
   if (_trialExpiredShown) return;
-  if (licensePlan === "pro" && licenseStatus === "pro") return; // already paid
+  if (hasProFeatures()) return; // already paid
   _trialExpiredShown = true;
   const modal = document.getElementById("trial-expired-modal");
   if (modal) modal.style.display = "flex";
@@ -21484,23 +21496,26 @@ function updateLicenseUI() {
   // Update header plan pill
   const pill = document.getElementById("header-plan-pill");
   if (pill) {
-    const isPro = licensePlan === "pro" && licenseStatus === "pro";
+    const isPro = hasProFeatures();
+    const isLite = licensePlan === "pro_lite" && licenseStatus === "pro";
     const onTrial = !isPro && _trialActive;
-    pill.textContent = isPro
+    pill.textContent = isLite
+      ? ("⚡ " + (currentLang==="hi"?"प्रो लाइट":"Pro Lite"))
+      : isPro
       ? ("⭐ " + (currentLang==="hi"?"प्रो":"Pro"))
       : onTrial
       ? ("🎁 " + (currentLang==="hi"?"ट्रायल":"Trial"))
       : ("🆓 " + t("freePlan").replace("मुफ्त प्लान","फ्री").replace("Free Plan","Free"));
-    pill.style.background = isPro ? "linear-gradient(135deg,#1a3a1a,#0a2a0a)" : onTrial ? "linear-gradient(135deg,#2a2200,#1a1600)" : "#0a1a3a";
-    pill.style.color       = isPro ? "#4f4" : onTrial ? "#FFD700" : "#88aaff";
-    pill.style.border      = isPro ? "1px solid #2a5a2a" : onTrial ? "1px solid #7a6a1a" : "1px solid #1a2a5a";
+    pill.style.background = isLite ? "linear-gradient(135deg,#0a1a3a,#0a1428)" : isPro ? "linear-gradient(135deg,#1a3a1a,#0a2a0a)" : onTrial ? "linear-gradient(135deg,#2a2200,#1a1600)" : "#0a1a3a";
+    pill.style.color       = isLite ? "#5af" : isPro ? "#4f4" : onTrial ? "#FFD700" : "#88aaff";
+    pill.style.border      = isLite ? "1px solid #2a4a5a" : isPro ? "1px solid #2a5a2a" : onTrial ? "1px solid #7a6a1a" : "1px solid #1a2a5a";
     if (!_hasFullAccess()) pill.title = `Customers: ${customers.length}/${FREE_MAX_CUSTOMERS} · Inventory: ${inventoryItems.length}/${FREE_MAX_INV_ITEMS}`;
   }
   // Show trial banner if trial is active and not paid pro
   const trialBanner = document.getElementById("trial-banner");
   if (trialBanner) {
     _loadTrial();
-    const trialIsPaid = licensePlan === "pro" && licenseStatus === "pro";
+    const trialIsPaid = hasProFeatures();
     if (_trialActive && !trialIsPaid) {
       const days = _trialDaysLeft();
       trialBanner.style.display = "flex";
@@ -21538,7 +21553,7 @@ function updateLicenseUI() {
   }
   // Re-render current tab to apply lock overlays
   // If newly Pro, also switch to Pro app style automatically
-  const _newlyPro = (licensePlan === "pro" && licenseStatus === "pro");
+  const _newlyPro = hasProFeatures();
   if (_newlyPro && currentAppStyle !== "pro") {
     applyAppStyle("pro");
     return; // applyAppStyle already calls renderTabs + renderTab
@@ -21562,7 +21577,7 @@ function isTabAllowed(i) {
   if (i === 11) return true;
   // Full access: paid Pro OR active trial
   if (_hasFullAccess()) {
-    if (licensePlan === "pro" && licenseStatus === "pro") _maybeRevalidateLicense().catch(() => {});
+    if (hasProFeatures()) _maybeRevalidateLicense().catch(() => {});
     return true;
   }
   // Free/expired — only explicitly allowed free tabs
@@ -21939,7 +21954,7 @@ window.addEventListener("load", () => {
     if (now - _bgLastCheck < 55000) return; // debounce
     _bgLastCheck = now;
     // If already pro, use existing revalidator (respects 24h throttle)
-    if (licensePlan === "pro" && licenseStatus === "pro") {
+    if (hasProFeatures()) {
       // Reset throttle so it re-checks sooner if triggered from Seller Panel
       _lastLicenseCheck = 0;
       await _maybeRevalidateLicense().catch(() => {});
@@ -28356,7 +28371,7 @@ window.addEventListener('load', function() {
 
 function scApplyAdPayload(payload) {
   // Pro users get no ads
-  if (licensePlan === "pro" && licenseStatus === "pro") {
+  if (hasProFeatures()) {
     const s = window._scAdState;
     s.bannerAds = [];
     s.videoAds  = [];
