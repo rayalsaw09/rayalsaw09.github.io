@@ -3489,7 +3489,10 @@ function startFirestoreListener() {
             const newExtraSeats = Number(d.license.extraSeats) || 0;
             if (newExtraSeats === licenseExtraSeats && incomingPlan === licensePlan) return; // no real change
             const keyToCheck2 = d.license.key || licenseKey || "";
-            fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(keyToCheck2)}&select=key,plan,active,expires_at,extra_seats`,
+            const verifyUrl2 = keyToCheck2
+              ? `${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(keyToCheck2)}&select=key,plan,active,expires_at,extra_seats`
+              : `${SC_SUPABASE_URL}/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(authPhone||"")}&select=key,plan,active,expires_at,extra_seats&order=created_at.desc&limit=1`;
+            fetch(verifyUrl2,
               { headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON } }
             ).then(r => r.json()).then(rows => {
               if (!rows || !rows.length) return;
@@ -3498,7 +3501,7 @@ function startFirestoreListener() {
               if (row.expires_at && new Date(row.expires_at) < new Date()) return;
               const verifiedSeats = Number(row.extra_seats) || 0;
               const planChanged = row.plan !== licensePlan;
-              saveLicense(licenseKey, row.plan, "pro", verifiedSeats);
+              saveLicense(row.key || licenseKey, row.plan, "pro", verifiedSeats);
               try { renderTabs(); if (currentTab === 13) safeRenderTab(currentTab); } catch {}
               checkSeatOverLimit(); // downgrade or seat cut may need locking members
               if (planChanged) {
@@ -3514,9 +3517,16 @@ function startFirestoreListener() {
             }).catch(() => {}); // silent if offline
             return;
           }
-          // Verify with Supabase that this license is actually active before applying
+          // Verify with Supabase that this license is actually active before applying.
+          // Prefer querying by key; if the Firestore push didn't include a key
+          // (e.g. an older SellerPanel build, or a stale doc from before that was
+          // fixed), fall back to looking the license up by this shop's own phone
+          // number instead of silently doing nothing with an empty-key query.
           const keyToCheck = d.license.key || "";
-          fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(keyToCheck)}&select=key,plan,active,expires_at,extra_seats`,
+          const verifyUrl = keyToCheck
+            ? `${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(keyToCheck)}&select=key,plan,active,expires_at,extra_seats`
+            : `${SC_SUPABASE_URL}/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(authPhone||"")}&select=key,plan,active,expires_at,extra_seats&order=created_at.desc&limit=1`;
+          fetch(verifyUrl,
             { headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON } }
           ).then(r => r.json()).then(rows => {
             if (!rows || !rows.length) return; // no valid license in Supabase
