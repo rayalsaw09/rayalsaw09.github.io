@@ -1603,6 +1603,29 @@ async function switchPlan(keyId, newPlan, phone, name) {
     );
     loadKeys();
     loadUsers();
+
+    // Pro Lite has zero team seats — lock any existing members right away
+    // via our service-role key, so it doesn't depend on the shop owner's app
+    // being open to pick this up (the Admin app also self-corrects on its
+    // own next sync as a safety net, but this makes it immediate).
+    if (newPlan === "pro_lite" && phone) {
+      try {
+        const membersRes = await sbFetch(`/rest/v1/sc_shop_members?shop_phone=eq.${encodeURIComponent(phone)}&seat_locked=eq.false&select=id`);
+        const members = await membersRes.json();
+        if (Array.isArray(members) && members.length > 0) {
+          await Promise.all(members.map(m => sbFetch(`/rest/v1/sc_shop_members?id=eq.${encodeURIComponent(m.id)}`, {
+            method: "PATCH", prefer: "return=minimal",
+            body: JSON.stringify({ seat_locked: true, active_session_token: null })
+          })));
+          console.log("[SP] Locked", members.length, "member(s) for Pro Lite switch:", phone);
+        }
+        // Pro Lite has no seat add-on — zero out any extra-seat billing too
+        await sbFetch(`/rest/v1/licenses?id=eq.${keyId}`, {
+          method: "PATCH", prefer: "return=minimal",
+          body: JSON.stringify({ extra_seats: 0 })
+        });
+      } catch (e) { console.warn("[SP] Pro Lite member auto-lock failed (Admin app will self-correct):", e.message); }
+    }
   } catch(e) { alert("❌ Error: " + e.message); }
 }
 
@@ -1938,7 +1961,7 @@ async function switchPlanFromModal(id, newPlan) {
 // ── Grant/adjust extra team seats beyond Pro's included 3 (₹50/mo each) ──
 async function editExtraSeatsFromModal(keyId, currentSeats, phone) {
   const val = prompt(
-    `How many EXTRA team seats beyond the included 3?\n(0 = just the standard 3, no add-on charge)\n\nEach extra seat is ₹50/month.`,
+    `How many EXTRA team seats beyond the included 3?\n(0 = just the standard 3, no add-on charge)\n\nEach extra seat is ₹50/month.\n\nNote: if this is LOWER than their current count, the shop owner will see a prompt in their app to pick which members to keep — no one is removed automatically on this side.`,
     String(currentSeats || 0)
   );
   if (val === null) return; // cancelled
