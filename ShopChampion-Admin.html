@@ -3380,8 +3380,8 @@ function loadSettingsFromCloud(cb) {
         if (d.license) {
           // Apply license to memory variables AND localStorage (not just localStorage)
           const lic = d.license;
-          if (lic.plan === "pro" && lic.status === "pro") {
-            saveLicense(lic.key || "", "pro", "pro", lic.extraSeats);
+          if ((lic.plan === "pro" || lic.plan === "pro_lite") && lic.status === "pro") {
+            saveLicense(lic.key || "", lic.plan, "pro", lic.extraSeats);
           } else {
             try { localStorage.setItem(storageKey("license"), JSON.stringify(lic)); } catch {}
           }
@@ -3468,31 +3468,39 @@ function startFirestoreListener() {
         if (!_prefsListenerReady) { _prefsListenerReady = true; return; }
         if (!snap || !snap.exists) return;
         const d = snap.data();
-        if (d && d.license && d.license.plan === "pro" && d.license.status === "pro") {
+        if (d && d.license && (d.license.plan === "pro" || d.license.plan === "pro_lite") && d.license.status === "pro") {
+          const incomingPlan = d.license.plan;
           const alreadyPro = hasProFeatures();
           if (alreadyPro) {
-            // Already Pro — the only thing that could still change here live is
-            // the extra-seats add-on (granted from Seller Panel). Verify against
-            // Supabase before trusting it, same as a fresh Pro activation, since
-            // Firestore rules let the owner write to their own prefs doc and we
-            // don't want a self-granted seat count bypassing the ₹50/seat charge.
+            // Already Pro/Pro Lite — this listener re-fires when the seller panel
+            // changes extra seats OR switches between Pro and Pro Lite. Verify
+            // against Supabase before trusting it, same as a fresh activation,
+            // since Firestore rules let the owner write to their own prefs doc
+            // and we don't want a self-granted plan/seat count bypassing billing.
             const newExtraSeats = Number(d.license.extraSeats) || 0;
-            if (newExtraSeats === licenseExtraSeats) return; // no real change
+            if (newExtraSeats === licenseExtraSeats && incomingPlan === licensePlan) return; // no real change
             const keyToCheck2 = d.license.key || licenseKey || "";
             fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(keyToCheck2)}&select=key,plan,active,expires_at,extra_seats`,
               { headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON } }
             ).then(r => r.json()).then(rows => {
               if (!rows || !rows.length) return;
               const row = rows[0];
-              if (!row.active || row.plan !== "pro") return;
+              if (!row.active || (row.plan !== "pro" && row.plan !== "pro_lite")) return;
               if (row.expires_at && new Date(row.expires_at) < new Date()) return;
               const verifiedSeats = Number(row.extra_seats) || 0;
-              saveLicense(licenseKey, "pro", "pro", verifiedSeats);
+              const planChanged = row.plan !== licensePlan;
+              saveLicense(licenseKey, row.plan, "pro", verifiedSeats);
               try { renderTabs(); if (currentTab === 13) safeRenderTab(currentTab); } catch {}
-              notify(verifiedSeats > licenseExtraSeats
-                ? `✅ ${verifiedSeats} extra team seat${verifiedSeats===1?"":"s"} added!`
-                : "ℹ️ Team seat count updated.", "success");
-              console.log("[SC] Prefs listener: extra seats verified & applied:", verifiedSeats);
+              if (planChanged) {
+                notify(row.plan === "pro_lite"
+                  ? "⚡ Plan changed to Pro Lite — team member access is now disabled."
+                  : "⭐ Upgraded to full Pro — team member access is now available!", "success");
+              } else {
+                notify(verifiedSeats > licenseExtraSeats
+                  ? `✅ ${verifiedSeats} extra team seat${verifiedSeats===1?"":"s"} added!`
+                  : "ℹ️ Team seat count updated.", "success");
+              }
+              console.log("[SC] Prefs listener: license verified & applied:", row.plan, verifiedSeats);
             }).catch(() => {}); // silent if offline
             return;
           }
@@ -3503,10 +3511,10 @@ function startFirestoreListener() {
           ).then(r => r.json()).then(rows => {
             if (!rows || !rows.length) return; // no valid license in Supabase
             const row = rows[0];
-            if (!row.active || row.plan !== "pro") return; // not active pro
+            if (!row.active || (row.plan !== "pro" && row.plan !== "pro_lite")) return; // not active pro/pro_lite
             if (row.expires_at && new Date(row.expires_at) < new Date()) return; // expired
             // Confirmed valid — now activate
-            saveLicense(row.key, "pro", "pro", row.extra_seats);
+            saveLicense(row.key, row.plan, "pro", row.extra_seats);
             updateLicenseUI();
             try { renderTabs(); safeRenderTab(currentTab); } catch {}
             // Update payment modal if it was waiting
@@ -3520,7 +3528,7 @@ function startFirestoreListener() {
                 if (pmPollTimer) clearInterval(pmPollTimer);
               }
             } catch(_) {}
-            console.log("[SC] Prefs listener: Pro license verified & activated!");
+            console.log("[SC] Prefs listener: license verified & activated:", row.plan);
           }).catch(() => {}); // silent if offline
         }
       }, err => { console.warn("[SC] Prefs listener error:", err.message); });
@@ -21977,10 +21985,10 @@ window.addEventListener("load", () => {
         const rows = await sbRes.json();
         if (rows && rows.length > 0) {
           const row = rows[0];
-          if (row.active && row.plan === "pro" && (!row.expires_at || new Date(row.expires_at) > new Date())) {
-            saveLicense(row.key, "pro", "pro", row.extra_seats);
+          if (row.active && (row.plan === "pro" || row.plan === "pro_lite") && (!row.expires_at || new Date(row.expires_at) > new Date())) {
+            saveLicense(row.key, row.plan, "pro", row.extra_seats);
             updateLicenseUI();
-            console.log("[SC] BG poller: Pro license confirmed from Supabase — activated!");
+            console.log("[SC] BG poller: license confirmed from Supabase — activated:", row.plan);
             return;
           }
         }
