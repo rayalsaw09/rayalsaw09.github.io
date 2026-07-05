@@ -1563,6 +1563,19 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
         </div>
       </div>
 
+      <!-- Extra seats stepper (optional, bundled with Pro purchase) -->
+      <div style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:12px 14px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div>
+          <div style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);">👥 अतिरिक्त टीम सीटें</div>
+          <div style="font-size:10px;color:var(--text-dim,#4a5a7a);">+₹50/सीट/माह · वैकल्पिक</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button onclick="pmChangeSeats(-1)" style="width:30px;height:30px;border-radius:8px;background:#1a2540;border:1px solid var(--border-input,#2a3560);color:#fff;font-size:16px;cursor:pointer;">−</button>
+          <div id="pm-seats-count" style="font-size:16px;font-weight:800;color:#FFD700;min-width:18px;text-align:center;">0</div>
+          <button onclick="pmChangeSeats(1)" style="width:30px;height:30px;border-radius:8px;background:#1a2540;border:1px solid var(--border-input,#2a3560);color:#fff;font-size:16px;cursor:pointer;">+</button>
+        </div>
+      </div>
+
       <label style="display:block;font-size:11px;color:var(--text-muted,#7a8aaa);margin-bottom:5px;">आपकी दुकान / नाम <span style="color:#f66">*</span></label>
       <input id="pm-buyer-name" style="width:100%;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-input,#2a3560);border-radius:10px;padding:10px 13px;color:var(--text-main,#e8eaf0);font-family:'Nunito',sans-serif;font-size:13px;outline:none;margin-bottom:18px;" placeholder="जैसे राज किराना स्टोर, मुंबई"/>
 
@@ -1574,13 +1587,14 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:14px;">💳 UPI से पेमेंट करें</div>
 
       <!-- Amount strip -->
-      <div style="background:#0d1628;border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="background:#0d1628;border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:12px 16px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
         <div>
           <div style="font-size:12px;color:var(--text-muted,#7a8aaa);">मासिक प्लान</div>
           <div style="font-size:11px;color:var(--text-dim,#4a5a7a);" id="pm-buyer-label">—</div>
         </div>
         <div style="font-size:22px;font-weight:900;color:#FFD700;font-family:'Rajdhani',sans-serif;" id="pm-amount-display">₹299</div>
       </div>
+      <div id="pm-seats-line" style="display:none;font-size:11px;color:var(--text-dim,#4a5a7a);text-align:right;margin-bottom:16px;"></div>
 
       <!-- QR code -->
       <div style="text-align:center;margin-bottom:14px;">
@@ -17102,8 +17116,8 @@ function openSeatLimitModal() {
           ? `आपकी योजना में ${maxTeamMembers()} टीम मेंबर शामिल हैं${extra>0?` (3 शामिल + ${extra} अतिरिक्त)`:''}। और मेंबर जोड़ने के लिए ₹50/माह प्रति सीट में अतिरिक्त सीटें जोड़ें।`
           : `Your plan includes ${maxTeamMembers()} team member${maxTeamMembers()===1?'':'s'}${extra>0?` (3 included + ${extra} extra)`:''}. Add more seats for ₹50/month per seat to invite additional staff.`}
       </div>
-      <button onclick="closeModal();_requestExtraSeats();" class="btn" style="width:100%;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:14px;font-weight:800;padding:13px;margin-bottom:10px;">
-        ➕ ${currentLang==='hi' ? 'अतिरिक्त सीटें माँगें — ₹50/सीट' : 'Request Extra Seats — ₹50/seat'}
+      <button onclick="_requestExtraSeats()" class="btn" style="width:100%;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:14px;font-weight:800;padding:13px;margin-bottom:10px;">
+        ➕ ${currentLang==='hi' ? 'अतिरिक्त सीटें खरीदें — ₹50/सीट' : 'Buy Extra Seats — ₹50/seat'}
       </button>
       <button onclick="closeModal()" class="btn" style="width:100%;background:#1a2540;border:1px solid var(--border-input,#2a3560);color:var(--text-muted,#7a8aaa);font-size:13px;font-weight:700;padding:12px;">
         ${currentLang==='hi' ? 'बंद करें' : 'Close'}
@@ -17112,24 +17126,146 @@ function openSeatLimitModal() {
   showWideModal(body);
 }
 
-// Opens a WhatsApp message to the shop owner's registered support contact so
-// they can request N extra seats — matches the existing manual-approval
-// pattern (UPI payment + WhatsApp/UTR review) rather than a fully automated
-// checkout, since that's how Pro purchases already work in this app.
-function _requestExtraSeats() {
-  const n = parseInt(prompt(
-    (currentLang==='hi' ? "कितनी अतिरिक्त सीटें चाहिए? (₹50/माह प्रति सीट)" : "How many extra seats do you need? (₹50/month per seat)"),
-    "2"
-  ), 10);
-  if (!n || n <= 0) return;
-  if (!SC_SUPPORT_WHATSAPP) {
-    notify("⚠️ Support WhatsApp number not configured — set SC_SUPPORT_WHATSAPP in the code.", "error");
+// ══════════════════════════════════════════════
+// BUY EXTRA SEATS (in-app UTR submission — mirrors the Pro purchase flow)
+// Pro-rated to the number of days left until the shop's Pro plan renews,
+// so extra seats always expire/renew on the same date as Pro itself.
+// ══════════════════════════════════════════════
+var bsSeatsCount = 1, bsDaysRemaining = 30, bsExpiryDate = null;
+
+async function _requestExtraSeats() {
+  closeModal();
+  bsSeatsCount = 1;
+  bsDaysRemaining = 30;
+  bsExpiryDate = null;
+  try {
+    const licKeyRaw = localStorage.getItem(storageKey("license"));
+    const licKey = licKeyRaw ? (JSON.parse(licKeyRaw).key || licenseKey) : licenseKey;
+    if (licKey) {
+      const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(licKey)}&select=expires_at`, {
+        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+      });
+      const rows = await res.json();
+      if (rows && rows[0] && rows[0].expires_at) {
+        bsExpiryDate = new Date(rows[0].expires_at);
+        bsDaysRemaining = Math.max(1, Math.ceil((bsExpiryDate - new Date()) / 86400000));
+      }
+    }
+  } catch(e) { console.warn("[seats] could not fetch expiry for proration:", e.message); }
+  renderBuySeatsModal();
+}
+
+function bsCalcAmount() {
+  const perDay = 50 / 30; // ₹50/seat/month baseline
+  return Math.max(1, Math.round(perDay * bsDaysRemaining * bsSeatsCount));
+}
+
+function bsChangeSeats(delta) {
+  bsSeatsCount = Math.max(1, Math.min(20, bsSeatsCount + delta));
+  renderBuySeatsModal();
+}
+
+function renderBuySeatsModal() {
+  const amount = bsCalcAmount();
+  const expiryStr = bsExpiryDate ? bsExpiryDate.toLocaleDateString("en-IN", {day:"numeric",month:"short",year:"numeric"}) : "—";
+  const isHi = currentLang === 'hi';
+  const body = `
+    <div style="padding:6px 4px;max-width:420px;margin:0 auto;">
+      <button onclick="closeModal()" style="float:right;background:transparent;border:none;color:var(--text-dim,#4a5a7a);font-size:20px;cursor:pointer;">✕</button>
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:36px;margin-bottom:6px;">➕👥</div>
+        <div style="font-size:16px;font-weight:800;color:var(--text-main,#e8eaf0);">${isHi?'अतिरिक्त सीटें खरीदें':'Buy Extra Seats'}</div>
+        <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-top:4px;">${isHi?`₹50/सीट/माह · आपके प्लान के साथ ${expiryStr} को रिन्यू होगा`:`₹50/seat/month · renews with your plan on ${expiryStr}`}</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:16px;">
+        <button onclick="bsChangeSeats(-1)" style="width:40px;height:40px;border-radius:10px;background:#1a2540;border:1px solid var(--border-input,#2a3560);color:#fff;font-size:20px;cursor:pointer;">−</button>
+        <div style="font-size:30px;font-weight:900;color:#FFD700;min-width:44px;text-align:center;font-family:'Rajdhani',sans-serif;">${bsSeatsCount}</div>
+        <button onclick="bsChangeSeats(1)" style="width:40px;height:40px;border-radius:10px;background:#1a2540;border:1px solid var(--border-input,#2a3560);color:#fff;font-size:20px;cursor:pointer;">+</button>
+      </div>
+      <div style="background:#0d1628;border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:12px;color:var(--text-muted,#7a8aaa);">${isHi?`${bsDaysRemaining} दिन शेष के लिए (प्रो-रेटेड)`:`Pro-rated for ${bsDaysRemaining} remaining day${bsDaysRemaining===1?'':'s'}`}</div>
+        <div style="font-size:22px;font-weight:900;color:#FFD700;font-family:'Rajdhani',sans-serif;">₹${amount}</div>
+      </div>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="background:#fff;border-radius:12px;padding:10px;display:inline-block;" id="bs-qr-div"></div>
+        <div style="margin-top:8px;font-size:13px;font-weight:700;color:#FFD700;">rayalsaw@ybl</div>
+      </div>
+      <button onclick="bsCopyUPI()" style="background:var(--bg-main,#0a0e1a);color:#FFD700;border:1px solid #FFD700;width:100%;padding:9px;font-size:12px;font-weight:700;border-radius:10px;cursor:pointer;margin-bottom:14px;">📋 ${isHi?'UPI ID कॉपी करें':'Copy UPI ID'}: rayalsaw@ybl</button>
+      <div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:12px;padding:13px 14px;margin-bottom:16px;">
+        <div style="font-size:12px;color:#4f4;font-weight:700;margin-bottom:8px;">✅ ${isHi?'पेमेंट के बाद, अपना UTR डालें':'After payment, enter your UTR'}</div>
+        <input id="bs-utr" style="width:100%;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-input,#2a3560);border-radius:10px;padding:10px 13px;color:var(--text-main,#e8eaf0);font-family:monospace;font-size:13px;letter-spacing:1px;outline:none;" placeholder="जैसे 407293847162" maxlength="24"/>
+        <div id="bs-utr-err" style="color:#f66;font-size:11px;margin-top:5px;display:none;"></div>
+      </div>
+      <button id="bs-submit-btn" onclick="bsSubmit()" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;width:100%;padding:13px;font-size:14px;font-weight:800;border:none;border-radius:10px;cursor:pointer;">
+        <span id="bs-submit-txt">${isHi?'पेमेंट सबमिट करें':'Submit Payment'} →</span>
+      </button>
+    </div>`;
+  showWideModal(body);
+  setTimeout(() => {
+    const wrap = document.getElementById("bs-qr-div");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    try {
+      new QRCode(wrap, { text: `upi://pay?pa=rayalsaw@ybl&pn=ShopChampion&am=${amount}&cu=INR`, width: 140, height: 140,
+        colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
+    } catch(e) {
+      wrap.innerHTML = `<div style="width:140px;height:140px;display:flex;align-items:center;justify-content:center;background:#fff;color:#000;font-size:11px;text-align:center;padding:8px;">Pay ₹${amount} to<br><strong>rayalsaw@ybl</strong></div>`;
+    }
+  }, 80);
+}
+
+function bsCopyUPI() {
+  navigator.clipboard.writeText("rayalsaw@ybl").then(() => notify("✅ UPI ID copied", "success"));
+}
+
+async function bsSubmit() {
+  const utr = (document.getElementById("bs-utr").value || "").trim().replace(/\s/g,"");
+  const errEl = document.getElementById("bs-utr-err");
+  errEl.style.display = "none";
+  if (!utr || utr.length < 8) {
+    errEl.textContent = "❌ Please enter a valid UTR / Transaction ID";
+    errEl.style.display = "block";
     return;
   }
-  const msg = encodeURIComponent(
-    `Hi! I'd like to add ${n} extra team seat${n===1?'':'s'} to my ShopChampion Pro plan (+₹${n*50}/month).\n\nShop: ${appSettings.shopName||''}\nPhone: ${authPhone||''}`
-  );
-  window.open(`https://wa.me/${SC_SUPPORT_WHATSAPP||''}?text=${msg}`, "_blank");
+  const btn = document.getElementById("bs-submit-btn");
+  const btnTxt = document.getElementById("bs-submit-txt");
+  btn.disabled = true;
+  btnTxt.textContent = "Submitting...";
+
+  const userNumRaw = localStorage.getItem("sc_usernum_" + authPhone) || "";
+  const payload = {
+    customer_name: appSettings.shopName || "",
+    customer_phone: authPhone || null,
+    user_number: userNumRaw ? String(userNumRaw) : null,
+    plan: "pro",
+    amount: bsCalcAmount(),
+    utr_number: utr.toUpperCase(),
+    status: "pending",
+    submitted_at: new Date().toISOString(),
+    seats_requested: bsSeatsCount,
+    request_type: "seats"
+  };
+
+  try {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_payments`, {
+      method: "POST",
+      headers: {
+        "apikey": SC_SUPABASE_ANON,
+        "Authorization": "Bearer " + SC_SUPABASE_ANON,
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    closeModal();
+    notify(currentLang==='hi' ? "✅ रिक्वेस्ट भेज दी गई! अप्रूवल के बाद सीटें अपने आप जुड़ जाएंगी।" : "✅ Request submitted! Seats will appear automatically once approved.", "success");
+  } catch(e) {
+    errEl.textContent = "❌ Error: " + e.message;
+    errEl.style.display = "block";
+    btn.disabled = false;
+    btnTxt.textContent = "Submit Payment →";
+  }
 }
 
 function openAddMemberModal() {
@@ -21035,7 +21171,7 @@ function saveLicense(key, plan, status, extraSeats) {
 async function validateLicenseOnline() {
   if (!licenseKey || licenseStatus === "free") return;
   try {
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(licenseKey)}&select=key,plan,active,expires_at,customer_phone`, {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(licenseKey)}&select=key,plan,active,expires_at,customer_phone,extra_seats`, {
       headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
     });
     const rows = await res.json();
@@ -21062,8 +21198,10 @@ async function validateLicenseOnline() {
       }
     }
 
-    // Still valid — refresh plan
-    saveLicense(licenseKey, row.plan || "pro", "pro");
+    // Still valid — refresh plan (and seat count, so bundled seats from an
+    // initial "Pro + N seats" purchase show up even if this ran via the
+    // 15s polling fallback rather than the real-time Firestore listener)
+    saveLicense(licenseKey, row.plan || "pro", "pro", row.extra_seats);
   } catch (e) {
     // Network error — allow cached status for offline grace
     console.warn("License check offline, using cached:", e.message);
@@ -21191,7 +21329,7 @@ async function checkLicense() {
   btnTxt.textContent = "⏳ Checking...";
 
   try {
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(key)}&select=key,plan,active,expires_at,customer_phone`, {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?key=eq.${encodeURIComponent(key)}&select=key,plan,active,expires_at,customer_phone,extra_seats`, {
       headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
     });
     const rows = await res.json();
@@ -21219,7 +21357,7 @@ async function checkLicense() {
     }
 
     // SUCCESS
-    saveLicense(key, row.plan || "pro", "pro");
+    saveLicense(key, row.plan || "pro", "pro", row.extra_seats);
     document.getElementById("license-screen").style.display = "none";
     btnTxt.textContent = "✅ Activate →";
     // If already logged in — go straight to app
@@ -21265,6 +21403,9 @@ var pmPollTimer = null;
 
 function openPaymentModal() {
   document.getElementById("payment-modal").style.display = "flex";
+  pmExtraSeatsSelected = 0;
+  const countEl = document.getElementById("pm-seats-count");
+  if (countEl) countEl.textContent = "0";
   pmSetStep(1);
   // Auto-fill shop name
   const nameEl = document.getElementById("pm-buyer-name");
@@ -21304,6 +21445,36 @@ function pmGoStep2() {
 }
 
 var pmSelectedPlan = "monthly";
+var pmExtraSeatsSelected = 0;
+
+// Extra seats bought at initial Pro purchase, charged for a full period
+// (no proration needed yet since there's no existing expiry to prorate against).
+// Yearly seat price is a flat 12x the monthly rate — no special discount, unlike
+// the base plan's small yearly saving.
+function pmSeatUnitPrice() { return pmSelectedPlan === "yearly" ? 600 : 50; }
+function pmTotalAmount() { return (pmSelectedPlan === "yearly" ? 3499 : 299) + pmExtraSeatsSelected * pmSeatUnitPrice(); }
+
+function pmChangeSeats(delta) {
+  pmExtraSeatsSelected = Math.max(0, Math.min(20, pmExtraSeatsSelected + delta));
+  const countEl = document.getElementById("pm-seats-count");
+  if (countEl) countEl.textContent = pmExtraSeatsSelected;
+  pmRefreshAmountDisplay();
+  pmBuildQR();
+}
+
+function pmRefreshAmountDisplay() {
+  const amtEl = document.getElementById("pm-amount-display");
+  const seatsLineEl = document.getElementById("pm-seats-line");
+  if (amtEl) amtEl.textContent = "₹" + pmTotalAmount().toLocaleString("en-IN");
+  if (seatsLineEl) {
+    if (pmExtraSeatsSelected > 0) {
+      seatsLineEl.style.display = "block";
+      seatsLineEl.textContent = `Includes ${pmExtraSeatsSelected} extra seat${pmExtraSeatsSelected===1?'':'s'} · +₹${(pmExtraSeatsSelected*pmSeatUnitPrice()).toLocaleString("en-IN")}`;
+    } else {
+      seatsLineEl.style.display = "none";
+    }
+  }
+}
 
 function pmSelectPlan(plan) {
   pmSelectedPlan = plan;
@@ -21314,15 +21485,14 @@ function pmSelectPlan(plan) {
   if (yCard) yCard.style.borderColor = plan === "yearly"  ? "#4f4"    : "#2a3560";
   if (mSel)  mSel.style.display      = plan === "monthly" ? "" : "none";
   // Update step-2 amount display
-  const amtEl  = document.getElementById("pm-amount-display");
   const sumEl  = document.getElementById("pm-plan-summary");
-  if (amtEl) amtEl.textContent = plan === "yearly" ? "₹3,499" : "₹299";
+  pmRefreshAmountDisplay();
   if (sumEl) sumEl.textContent = plan === "yearly" ? "Yearly · ₹3,499" : "Monthly · ₹299";
   pmBuildQR();
 }
 
 function pmBuildQR() {
-  const upiStr = `upi://pay?pa=rayalsaw@ybl&pn=ShopChampion&am=${pmSelectedPlan==="yearly"?3499:299}&cu=INR`;
+  const upiStr = `upi://pay?pa=rayalsaw@ybl&pn=ShopChampion&am=${pmTotalAmount()}&cu=INR`;
   const wrap = document.getElementById("pm-qr-div");
   if (!wrap) return;
   wrap.innerHTML = "";
@@ -21330,7 +21500,7 @@ function pmBuildQR() {
     new QRCode(wrap, { text: upiStr, width: 160, height: 160,
       colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
   } catch(e) {
-    wrap.innerHTML = `<div style="width:160px;height:160px;display:flex;align-items:center;justify-content:center;background:#fff;color:#000;font-size:11px;text-align:center;padding:8px;">Pay ₹${pmSelectedPlan==="yearly"?3499:299} to<br><strong>rayalsaw@ybl</strong></div>`;
+    wrap.innerHTML = `<div style="width:160px;height:160px;display:flex;align-items:center;justify-content:center;background:#fff;color:#000;font-size:11px;text-align:center;padding:8px;">Pay ₹${pmTotalAmount()} to<br><strong>rayalsaw@ybl</strong></div>`;
   }
 }
 
@@ -21364,10 +21534,12 @@ async function pmSubmit() {
     customer_phone: authPhone || null,
     user_number: userNumRaw ? String(userNumRaw) : null,
     plan: pmSelectedPlan,
-    amount: pmSelectedPlan === "yearly" ? 3499 : 299,
+    amount: pmTotalAmount(),
     utr_number: utr.toUpperCase(),
     status: "pending",
-    submitted_at: new Date().toISOString()
+    submitted_at: new Date().toISOString(),
+    seats_requested: pmExtraSeatsSelected,
+    request_type: pmExtraSeatsSelected > 0 ? "pro_plus_seats" : "pro"
   };
 
   try {
@@ -21494,7 +21666,7 @@ window.addEventListener("load", () => {
 
       // Check Supabase directly by phone — the only source of truth for active licenses
       const sbRes = await fetch(
-        `${SC_SUPABASE_URL}/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(authPhone)}&select=key,plan,active,expires_at&order=created_at.desc&limit=1`,
+        `${SC_SUPABASE_URL}/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(authPhone)}&select=key,plan,active,expires_at,extra_seats&order=created_at.desc&limit=1`,
         { headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON } }
       );
       if (sbRes.ok) {
@@ -21502,7 +21674,7 @@ window.addEventListener("load", () => {
         if (rows && rows.length > 0) {
           const row = rows[0];
           if (row.active && row.plan === "pro" && (!row.expires_at || new Date(row.expires_at) > new Date())) {
-            saveLicense(row.key, "pro", "pro");
+            saveLicense(row.key, "pro", "pro", row.extra_seats);
             updateLicenseUI();
             console.log("[SC] BG poller: Pro license confirmed from Supabase — activated!");
             return;
