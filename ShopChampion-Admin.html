@@ -1553,8 +1553,8 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <div id="pm-card-lite" onclick="pmSelectPlan('lite')" style="border:2px solid #2a3560;border-radius:14px;padding:14px;background:#0d1628;cursor:pointer;position:relative;margin-bottom:18px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
           <div>
-            <div style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:2px;">⚡ Pro Lite <span style="font-weight:600;color:var(--text-dim,#4a5a7a);">— बिना टीम मेंबर के</span></div>
-            <div style="font-size:10px;color:var(--text-dim,#4a5a7a);">बाकी सभी Pro फ़ीचर्स · टीम मेंबर एक्सेस शामिल नहीं</div>
+            <div style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:2px;">⚡ Pro Lite <span style="font-weight:600;color:var(--text-dim,#4a5a7a);">— सभी टीम सीटें ₹50/माह</span></div>
+            <div style="font-size:10px;color:var(--text-dim,#4a5a7a);">बाकी सभी Pro फ़ीचर्स · टीम मेंबर उपलब्ध, कोई मुफ्त सीट नहीं</div>
           </div>
           <div style="text-align:right;flex-shrink:0;">
             <div style="font-size:20px;font-weight:900;color:#7ab3ff;font-family:'Rajdhani',sans-serif;">₹199</div>
@@ -1576,11 +1576,11 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
         </div>
       </div>
 
-      <!-- Extra seats stepper (optional, bundled with Pro purchase; hidden for Pro Lite — no team access) -->
+      <!-- Extra seats stepper (optional, bundled with Pro purchase; shown for Pro Lite too — 0 free seats there) -->
       <div id="pm-seats-section" style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:12px 14px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <div>
-          <div style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);">👥 अतिरिक्त टीम सीटें</div>
-          <div style="font-size:10px;color:var(--text-dim,#4a5a7a);">+₹50/सीट/माह · वैकल्पिक</div>
+          <div id="pm-seats-label" style="font-size:12px;font-weight:800;color:var(--text-main,#e8eaf0);">👥 अतिरिक्त टीम सीटें</div>
+          <div id="pm-seats-sublabel" style="font-size:10px;color:var(--text-dim,#4a5a7a);">+₹50/सीट/माह · वैकल्पिक</div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;">
           <button onclick="pmChangeSeats(-1)" style="width:30px;height:30px;border-radius:8px;background:#1a2540;border:1px solid var(--border-input,#2a3560);color:#fff;font-size:16px;cursor:pointer;">−</button>
@@ -3506,8 +3506,8 @@ function startFirestoreListener() {
               checkSeatOverLimit(); // downgrade or seat cut may need locking members
               if (planChanged) {
                 notify(row.plan === "pro_lite"
-                  ? "⚡ Plan changed to Pro Lite — team member access is now disabled."
-                  : "⭐ Upgraded to full Pro — team member access is now available!", "success");
+                  ? "⚡ Plan changed to Pro Lite — team members are still allowed, but all seats are now paid (₹50/each, no free seats)."
+                  : "⭐ Upgraded to full Pro — 3 free team seats are now included!", "success");
               } else {
                 notify(verifiedSeats > licenseExtraSeats
                   ? `✅ ${verifiedSeats} extra team seat${verifiedSeats===1?"":"s"} added!`
@@ -6177,11 +6177,11 @@ var currentMember = null; // null = shop owner logged in; object = team member
 var _memberSessionToken = null; // session token stored locally for heartbeat
 var _memberSessionTimer = null; // interval handle for heartbeat
 
-// Team member access requires full Pro (or an active trial, same as before) —
-// Pro Lite (₹199) includes every other Pro feature but explicitly does NOT
-// include team member seats.
+// Team member access: full Pro gets 3 free-included seats + paid extras.
+// Pro Lite (₹199) also allows team members now, but with ZERO free seats —
+// every seat on Lite is paid at ₹50/mo (see maxTeamMembers()).
 function hasTeamAccess() {
-  if (licensePlan === "pro" && licenseStatus === "pro") return true;
+  if ((licensePlan === "pro" || licensePlan === "pro_lite") && licenseStatus === "pro") return true;
   if (_trialActive && Date.now() < _trialEnd) return true;
   return false;
 }
@@ -7865,9 +7865,10 @@ function _sbSetActive(i){
 function switchTab(i){
   // Guard: members cannot switch to tabs they don't have access to
   if(currentMember && TABS_BASE[i] && !isTabVisible(TABS_BASE[i])) return;
-  // Owner opening Team tab on a plan without team access (Free/Pro Lite/expired)
-  // now lands on the tab itself — renderTeamTab() shows a locked/upgrade view
-  // instead of the tab being hidden or bouncing the owner elsewhere.
+  // Owner opening Team tab on a plan with zero allowed seats (Free/expired, or
+  // Pro Lite with 0 paid seats) now lands on the tab itself — renderTeamTab()
+  // shows a locked/upgrade view instead of the tab being hidden or bouncing
+  // the owner elsewhere.
   if(i!==1){custPage=0;custSelectMode=false;custSelected.clear();}
   if(i!==2&&i!==3)invPrefillName="";
   setTimeout(function(){ if(typeof updateShortcutBar==='function') updateShortcutBar(); }, 150);
@@ -17173,25 +17174,21 @@ function collectPermissions(prefix) {
 }
 
 async function renderTeamTab(el) {
-  // Team Members is a Pro-only feature (see PRO_FEATURES in Settings). Free plan
-  // users — and users whose trial has expired — should not be able to view or
-  // manage team members at all; show an upgrade prompt instead.
+  // Team Members requires Pro or Pro Lite (both now support team seats — Pro
+  // includes 3 free, Pro Lite has zero free seats but allows paid ones).
+  // Free plan users — and users whose trial has expired — see an upgrade
+  // prompt instead of the tab.
   if (!hasTeamAccess()) {
     if (window._teamRefreshTimer) { clearInterval(window._teamRefreshTimer); window._teamRefreshTimer = null; }
-    const isLitePlan = licensePlan === "pro_lite" && licenseStatus === "pro";
     const daysLeft = _trialDaysLeft();
     const trialMsg = _trialActive
       ? `<div style="background:#1a2a1a;border:1px solid #2a5a2a;border-radius:8px;padding:10px 14px;margin:0 auto 18px;max-width:360px;font-size:12px;color:#4f4;">⏳ Trial: <strong>${daysLeft} days left</strong></div>`
       : ``;
-    const heading = isLitePlan
-      ? (currentLang==='hi'?'टीम मेंबर्स — Pro Lite में शामिल नहीं':'Team Members isn\'t included in Pro Lite')
-      : (currentLang==='hi'?'टीम मेंबर्स — Pro फीचर':'Team Members is a Pro feature');
-    const body = isLitePlan
-      ? (currentLang==='hi'?'आपका मौजूदा प्लान (Pro Lite ₹199) बाकी सभी Pro फीचर्स देता है, लेकिन टीम मेंबर एक्सेस शामिल नहीं है। पूरे Pro प्लान में अपग्रेड करें ताकि टीम मेंबर जोड़ सकें।':'Your current plan (Pro Lite ₹199) includes every other Pro feature, but not team member access. Upgrade to full Pro to add and manage staff logins.')
-      : (currentLang==='hi'?'टीम मेंबर जोड़ने और मैनेज करने के लिए Pro प्लान खरीदें। Free प्लान पर यह फीचर उपलब्ध नहीं है.':'Adding and managing team members requires the Pro plan. Upgrade to invite staff, set permissions, and track their activity.');
-    const cta = isLitePlan
-      ? (currentLang==='hi'?'⭐ पूरे Pro में अपग्रेड करें — ₹299/महीना':'⭐ Upgrade to full Pro — ₹299/month')
-      : (currentLang==='hi'?'💳 Pro खरीदें — ₹299/महीना':'💳 Upgrade to Pro — ₹299/month');
+    const heading = currentLang==='hi' ? 'टीम मेंबर्स — Pro फीचर' : 'Team Members is a Pro feature';
+    const body = currentLang==='hi'
+      ? 'टीम मेंबर जोड़ने और मैनेज करने के लिए Pro या Pro Lite प्लान खरीदें। Free प्लान पर यह फीचर उपलब्ध नहीं है.'
+      : 'Adding and managing team members requires Pro or Pro Lite. Upgrade to invite staff, set permissions, and track their activity.';
+    const cta = currentLang==='hi' ? '💳 Pro खरीदें — ₹299/महीना' : '💳 Upgrade to Pro — ₹299/month';
     el.innerHTML = `<div style="padding:60px 20px;text-align:center;max-width:420px;margin:0 auto;">
       <div style="font-size:42px;margin-bottom:14px;">🔒</div>
       <div style="font-size:18px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:8px;">${heading}</div>
@@ -17253,7 +17250,11 @@ async function renderTeamTab(el) {
       </div>
     </div>
     <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:16px;">
-      👥 ${unlockedMembers.length} / ${maxTeamMembers()} seats used${licenseExtraSeats > 0 ? ` (3 included + ${licenseExtraSeats} extra)` : ""}
+      👥 ${unlockedMembers.length} / ${maxTeamMembers()} seats used${(() => {
+        const isLite = licensePlan === "pro_lite" && licenseStatus === "pro";
+        if (isLite) return licenseExtraSeats > 0 ? ` (all ${licenseExtraSeats} paid — no free seats on Pro Lite)` : ` (no free seats on Pro Lite — buy seats to add members)`;
+        return licenseExtraSeats > 0 ? ` (3 included + ${licenseExtraSeats} extra)` : "";
+      })()}
     </div>
     ${memberCards}
   </div>`;
@@ -17278,15 +17279,18 @@ async function renderTeamTab(el) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// SEAT-LOCK / DOWNGRADE HANDLING (fix114)
+// SEAT-LOCK / DOWNGRADE HANDLING (fix114, updated fix117)
 // Two scenarios that can put a shop's active (unlocked) member count above
 // what their current plan allows:
-//   A) Pro → Pro Lite switch — Pro Lite allows ZERO team seats, so every
-//      member gets locked, no picking needed.
-//   B) Pro seat count reduced (fewer extra seats) while still on full Pro —
-//      the owner must choose which members to keep; the rest get locked.
+//   A) Plan gives zero allowed seats right now — either Free/no-access plan,
+//      or Pro Lite with 0 paid extra seats (Lite has NO free seats included,
+//      so its allowance is purely licenseExtraSeats). Every member gets locked,
+//      no picking needed.
+//   B) Some seats are still allowed (Pro's 3 free + extra, or Lite's paid
+//      extra seats) but fewer than before — the owner must choose which
+//      members to keep; the rest get locked.
 // "Locked" NEVER deletes data — history/attribution stays intact, the member
-// just can't log in until the owner unlocks them (or re-adds a seat).
+// just can't log in until the owner unlocks them (or re-adds/pays for a seat).
 // ══════════════════════════════════════════════════════════════════════════
 
 function allowedTeamSeats() {
@@ -17296,7 +17300,8 @@ function allowedTeamSeats() {
 // Call this any time the license (plan or extra_seats) changes, and as a
 // safety-net whenever the Team tab is opened. Fetches fresh member data and,
 // if the shop now has more unlocked members than seats allowed, forces
-// resolution (auto-lock-all for Pro Lite, or a picker modal for seat cuts).
+// resolution (auto-lock-all when zero seats are allowed, or a picker modal
+// when some seats remain but fewer than before).
 var _seatCheckInFlight = false;
 async function checkSeatOverLimit() {
   if (currentMember) return; // only the owner resolves this
@@ -17320,9 +17325,9 @@ async function checkSeatOverLimit() {
   }
 }
 
-// Scenario A — Pro Lite has zero team seats. Lock everyone, force-logout
-// anyone currently online, and zero out any extra-seat billing since Pro
-// Lite doesn't have a seat add-on at all.
+// Scenario A — zero team seats currently allowed. Lock everyone, force-logout
+// anyone currently online. Only zero out extra-seat billing if the plan truly
+// can't use it (Free/no-access); on Pro Lite with 0 extra seats it's already 0.
 async function _autoLockAllForLite(unlockedMembers) {
   try {
     await Promise.all(unlockedMembers.map(m =>
@@ -17332,11 +17337,15 @@ async function _autoLockAllForLite(unlockedMembers) {
         body: JSON.stringify({ seat_locked: true, active_session_token: null })
       }).catch(() => {})
     ));
-    if (licenseExtraSeats > 0) await _autoAdjustExtraSeatsDown(0, "Pro Lite has no seat add-on");
-    notify(currentLang === "hi"
-      ? `🔒 Pro Lite में टीम मेंबर एक्सेस शामिल नहीं है — ${unlockedMembers.length} मेंबर लॉक कर दिए गए (डेटा सुरक्षित है)।`
-      : `🔒 Pro Lite doesn't include team seats — ${unlockedMembers.length} member${unlockedMembers.length===1?"":"s"} locked out (their data is untouched). Upgrade to full Pro to restore access.`,
-      "error");
+    const isLite = licensePlan === "pro_lite" && licenseStatus === "pro";
+    if (!isLite && licenseExtraSeats > 0) await _autoAdjustExtraSeatsDown(0, "Plan no longer allows team seats");
+    const msgHi = isLite
+      ? `🔒 Pro Lite में अभी कोई भुगतान की गई सीट नहीं है — ${unlockedMembers.length} मेंबर लॉक कर दिए गए (डेटा सुरक्षित है)। ₹50/माह में सीटें जोड़ें।`
+      : `🔒 आपके प्लान में टीम सीटें शामिल नहीं हैं — ${unlockedMembers.length} मेंबर लॉक कर दिए गए (डेटा सुरक्षित है)।`;
+    const msgEn = isLite
+      ? `🔒 Pro Lite currently has no paid seats — ${unlockedMembers.length} member${unlockedMembers.length===1?"":"s"} locked out (their data is untouched). Add seats at ₹50/month each to restore access.`
+      : `🔒 Your current plan doesn't include team seats — ${unlockedMembers.length} member${unlockedMembers.length===1?"":"s"} locked out (their data is untouched). Upgrade to Pro or Pro Lite to restore access.`;
+    notify(currentLang === "hi" ? msgHi : msgEn, "error");
     if (currentTab === 13) safeRenderTab(13);
   } catch (e) { console.warn("[SeatCheck] auto-lock-for-lite failed:", e.message); }
 }
@@ -17482,9 +17491,13 @@ async function _autoAdjustExtraSeatsDown(newExtraSeats, reasonNote) {
 }
 
 // Shown when a shop tries to add a team member beyond their current seat cap
-// (3 included with Pro, or more if extra seats were granted via Seller Panel).
+// (3 included with Pro, or fully paid seats — ₹50 each, zero included — on Pro Lite).
 function openSeatLimitModal() {
   const extra = licenseExtraSeats || 0;
+  const isLite = licensePlan === "pro_lite" && licenseStatus === "pro";
+  const includedText = isLite
+    ? (currentLang==='hi' ? 'Pro Lite में कोई मुफ्त सीट नहीं है' : 'Pro Lite has no free seats included')
+    : (extra>0 ? (currentLang==='hi'?` (3 शामिल + ${extra} अतिरिक्त)`:` (3 included + ${extra} extra)`) : '');
   const body = `
     <div style="text-align:center;padding:10px 6px;">
       <div style="font-size:42px;margin-bottom:12px;">👥🔒</div>
@@ -17492,9 +17505,13 @@ function openSeatLimitModal() {
         ${currentLang==='hi' ? `टीम सीमा पूरी हो गई (${maxTeamMembers()})` : `Team limit reached (${maxTeamMembers()})`}
       </div>
       <div style="font-size:13px;color:var(--text-muted,#7a8aaa);margin-bottom:20px;line-height:1.6;">
-        ${currentLang==='hi'
-          ? `आपकी योजना में ${maxTeamMembers()} टीम मेंबर शामिल हैं${extra>0?` (3 शामिल + ${extra} अतिरिक्त)`:''}। और मेंबर जोड़ने के लिए ₹50/माह प्रति सीट में अतिरिक्त सीटें जोड़ें।`
-          : `Your plan includes ${maxTeamMembers()} team member${maxTeamMembers()===1?'':'s'}${extra>0?` (3 included + ${extra} extra)`:''}. Add more seats for ₹50/month per seat to invite additional staff.`}
+        ${isLite
+          ? (currentLang==='hi'
+              ? `${includedText}। हर सीट ₹50/माह में जोड़ें — पहली सीट भी शामिल नहीं है।`
+              : `${includedText}. Add seats at ₹50/month each — even the first seat is paid on Pro Lite.`)
+          : (currentLang==='hi'
+              ? `आपकी योजना में ${maxTeamMembers()} टीम मेंबर शामिल हैं${includedText}। और मेंबर जोड़ने के लिए ₹50/माह प्रति सीट में अतिरिक्त सीटें जोड़ें।`
+              : `Your plan includes ${maxTeamMembers()} team member${maxTeamMembers()===1?'':'s'}${includedText}. Add more seats for ₹50/month per seat to invite additional staff.`)}
       </div>
       <button onclick="_requestExtraSeats()" class="btn" style="width:100%;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-size:14px;font-weight:800;padding:13px;margin-bottom:10px;">
         ➕ ${currentLang==='hi' ? 'अतिरिक्त सीटें खरीदें — ₹50/सीट' : 'Buy Extra Seats — ₹50/seat'}
@@ -17970,17 +17987,20 @@ async function memberLogin() {
     }
 
     // Step 3: check the shop's CURRENT plan before granting a session — team
-    // access is a Pro-only feature (Pro Lite explicitly excludes it). This is
-    // checked here (not just hidden in the owner's UI) so a member whose shop
-    // downgraded can't keep logging in just because their credentials still work.
+    // access requires an active Pro or Pro Lite plan (Free has none at all).
+    // This is checked here (not just hidden in the owner's UI) so a member
+    // whose shop downgraded to Free can't keep logging in just because their
+    // credentials still work. Pro Lite is allowed through to the seat-lock
+    // check below, since Lite members are gated by seat_locked (paid seats),
+    // not by plan alone.
     try {
       const licRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(data.shop_phone)}&select=plan,active&order=created_at.desc&limit=1`, {
         headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
       });
       const licRows = await licRes.json();
       const currentShopPlan = (licRows && licRows[0]) ? licRows[0].plan : null;
-      if (currentShopPlan === "pro_lite") {
-        errEl.textContent = "🔒 Team member access is disabled — this shop is on the Pro Lite plan. Contact your shop owner.";
+      if (currentShopPlan !== "pro" && currentShopPlan !== "pro_lite") {
+        errEl.textContent = "🔒 Team member access requires the shop to be on Pro or Pro Lite. Contact your shop owner.";
         errEl.style.display = "block";
         btn.disabled = false; btnTxt.textContent = "मेंबर के रूप में लॉगिन करें →";
         return;
@@ -18108,15 +18128,19 @@ function _startMemberHeartbeat() {
         return;
       }
       // 1b) Also re-check the shop's plan on every heartbeat — if the owner
-      // downgrades to Pro Lite mid-session, team members get kicked out within
-      // ~10s instead of staying logged in until their session token expires.
+      // downgrades to Free (no plan at all) mid-session, team members get
+      // kicked out within ~10s instead of staying logged in until their
+      // session token expires. Pro Lite is NOT kicked here — Lite allows
+      // paid team seats, so Lite members are gated by seat_locked (1c) below,
+      // same as any Pro member whose seat was cut.
       try {
         const licRes = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(authPhone)}&select=plan&order=created_at.desc&limit=1`, {
           headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
         });
         const licRows = await licRes.json();
-        if (licRows && licRows[0] && licRows[0].plan === "pro_lite") {
-          notify("🔒 Team access removed — this shop is now on Pro Lite.", "error");
+        const shopPlan = licRows && licRows[0] ? licRows[0].plan : null;
+        if (shopPlan !== "pro" && shopPlan !== "pro_lite") {
+          notify("🔒 Team access removed — this shop is no longer on Pro or Pro Lite.", "error");
           if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
           if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
           if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
@@ -18495,7 +18519,7 @@ function renderSettings(){
 
   const trialDaysLeft = _trialDaysLeft();
   const proFeaturesForCard = isLite
-    ? PRO_FEATURES.map(([icon,label,val]) => label === "Team Members" ? [icon,label,"🔒 Not included"] : [icon,label,val])
+    ? PRO_FEATURES.map(([icon,label,val]) => label === "Team Members" ? [icon,label,"₹50/seat (no free seats)"] : [icon,label,val])
     : PRO_FEATURES;
   const planCard = isPro
     ? `<div style="background:${isLite?'linear-gradient(135deg,#0a1a30,#0d2038)':'linear-gradient(135deg,#0a1f0a,#0f2a0f)'};border:2px solid ${isLite?'#2a5a7a':'#2a5a2a'};border-radius:18px;padding:18px 20px;margin-bottom:16px;">
@@ -19210,7 +19234,7 @@ function openFeatureCompareModal(){
     ["🧾","GST Billing","Included","Included","Included"],
     ["📱","WhatsApp Reminders","Pro only","Included","Included"],
     ["📲","WhatsApp Bill Send","Pro only","Included","Included"],
-    ["👤","Team Members","Pro only","Not included","3 included (+₹50/extra seat)"],
+    ["👤","Team Members","Pro only","₹50/seat (no free seats)","3 included (+₹50/extra seat)"],
     ["🔔","Push Notifications","Pro only","Included","Included"],
   ];
   const colHead = (label, price, highlight) => `
@@ -21632,10 +21656,13 @@ function _hasFullAccess() {
   return false;
 }
 
-// Pro includes 3 team seats; +1 extra seat = +₹50/mo, granted via Seller Panel.
-// Trial users get the same allowance as Pro so they can evaluate the feature.
+// Pro includes 3 free team seats; +1 extra seat = +₹50/mo, granted via Seller Panel.
+// Pro Lite includes ZERO free team seats — every seat (including the first) is
+// ₹50/mo, tracked the same way via licenseExtraSeats.
+// Trial users get Pro's allowance so they can evaluate the feature.
 function maxTeamMembers() {
-  return 3 + (Number(licenseExtraSeats) || 0);
+  const included = (licensePlan === "pro_lite" && licenseStatus === "pro") ? 0 : 3;
+  return included + (Number(licenseExtraSeats) || 0);
 }
 
 // Show trial-expired modal once per session (not every page load)
@@ -22008,7 +22035,9 @@ var pmExtraSeatsSelected = 0;
 // (no proration needed yet since there's no existing expiry to prorate against).
 // Yearly seat price is a flat 12x the monthly rate — no special discount, unlike
 // the base plan's small yearly saving.
-// Pro Lite (₹199) never allows team members, so it has no seat pricing at all.
+// Pro Lite (₹199) has ZERO free seats — every seat, including the first, costs
+// the same ₹50/mo (or ₹600/yr) as Pro's "extra" seats. Pro's first 3 are free;
+// Lite's are not, but the per-seat rate and UI are otherwise identical.
 function pmSeatUnitPrice() { return pmSelectedPlan === "yearly" ? 600 : 50; }
 function pmBasePlanPrice() {
   if (pmSelectedPlan === "lite") return 199;
@@ -22016,12 +22045,10 @@ function pmBasePlanPrice() {
   return 299;
 }
 function pmTotalAmount() {
-  if (pmSelectedPlan === "lite") return 199; // no seats possible on Lite
   return pmBasePlanPrice() + pmExtraSeatsSelected * pmSeatUnitPrice();
 }
 
 function pmChangeSeats(delta) {
-  if (pmSelectedPlan === "lite") return; // Pro Lite has no team member access — no seats to buy
   pmExtraSeatsSelected = Math.max(0, Math.min(20, pmExtraSeatsSelected + delta));
   const countEl = document.getElementById("pm-seats-count");
   if (countEl) countEl.textContent = pmExtraSeatsSelected;
@@ -22036,7 +22063,8 @@ function pmRefreshAmountDisplay() {
   if (seatsLineEl) {
     if (pmExtraSeatsSelected > 0) {
       seatsLineEl.style.display = "block";
-      seatsLineEl.textContent = `Includes ${pmExtraSeatsSelected} extra seat${pmExtraSeatsSelected===1?'':'s'} · +₹${(pmExtraSeatsSelected*pmSeatUnitPrice()).toLocaleString("en-IN")}`;
+      const seatWord = pmSelectedPlan === "lite" ? "paid seat" : "extra seat";
+      seatsLineEl.textContent = `Includes ${pmExtraSeatsSelected} ${seatWord}${pmExtraSeatsSelected===1?'':'s'} · +₹${(pmExtraSeatsSelected*pmSeatUnitPrice()).toLocaleString("en-IN")}`;
     } else {
       seatsLineEl.style.display = "none";
     }
@@ -22046,11 +22074,12 @@ function pmRefreshAmountDisplay() {
 function pmSelectPlan(plan) {
   // If the shop currently has full Pro (team access) and team members already
   // added, warn before letting them select Lite — this is the moment they
-  // should find out team access will be locked, not after payment approval.
+  // should find out Lite has zero free seats (every seat becomes paid), not
+  // after payment approval.
   if (plan === "lite" && hasTeamAccess()) {
     fetchTeamMembers().then(members => {
       if (members && members.length > 0) {
-        const proceed = confirm(`⚠️ You currently have ${members.length} team member${members.length===1?'':'s'} added.\n\nPro Lite (₹199) does NOT include team member access. Once your request is approved, all your team members will be locked out of login immediately — their data and history stay intact, nothing is deleted, and you can restore access anytime by upgrading back to full Pro.\n\nContinue selecting Pro Lite?`);
+        const proceed = confirm(`⚠️ You currently have ${members.length} team member${members.length===1?'':'s'} added.\n\nPro Lite (₹199) has NO free team seats — every seat, including ones that were free on Pro, becomes ₹50/month. If your paid seat count (selected below) is lower than your current member count, the excess members will be locked out of login immediately — their data and history stay intact, nothing is deleted, and you can restore access anytime by adding paid seats or upgrading back to full Pro.\n\nContinue selecting Pro Lite?`);
         if (!proceed) return;
       }
       _pmApplyPlanSelection(plan);
@@ -22062,17 +22091,20 @@ function pmSelectPlan(plan) {
 
 function _pmApplyPlanSelection(plan) {
   pmSelectedPlan = plan;
-  if (plan === "lite") { pmExtraSeatsSelected = 0; const c = document.getElementById("pm-seats-count"); if (c) c.textContent = "0"; }
   const mCard = document.getElementById("pm-card-monthly");
   const yCard = document.getElementById("pm-card-yearly");
   const lCard = document.getElementById("pm-card-lite");
   const mSel  = document.getElementById("pm-sel-monthly");
   const seatsSection = document.getElementById("pm-seats-section");
+  const seatsLabel = document.getElementById("pm-seats-label");
+  const seatsSublabel = document.getElementById("pm-seats-sublabel");
   if (mCard) mCard.style.borderColor = plan === "monthly" ? "#FFD700" : "#2a3560";
   if (yCard) yCard.style.borderColor = plan === "yearly"  ? "#4f4"    : "#2a3560";
   if (lCard) lCard.style.borderColor = plan === "lite"    ? "#7ab3ff" : "#2a3560";
   if (mSel)  mSel.style.display      = plan === "monthly" ? "" : "none";
-  if (seatsSection) seatsSection.style.display = plan === "lite" ? "none" : "flex";
+  if (seatsSection) seatsSection.style.display = "flex"; // shown for all plans now — Lite just has 0 included
+  if (seatsLabel) seatsLabel.textContent = plan === "lite" ? "👥 टीम सीटें (कोई मुफ्त नहीं)" : "👥 अतिरिक्त टीम सीटें";
+  if (seatsSublabel) seatsSublabel.textContent = plan === "lite" ? "₹50/सीट/माह · पहली सीट भी शुल्क सहित" : "+₹50/सीट/माह · वैकल्पिक";
   // Update step-2 amount display
   const sumEl  = document.getElementById("pm-plan-summary");
   pmRefreshAmountDisplay();
@@ -22127,7 +22159,7 @@ async function pmSubmit() {
     utr_number: utr.toUpperCase(),
     status: "pending",
     submitted_at: new Date().toISOString(),
-    seats_requested: pmSelectedPlan === "lite" ? 0 : pmExtraSeatsSelected,
+    seats_requested: pmExtraSeatsSelected,
     request_type: pmSelectedPlan === "lite" ? "pro_lite" : (pmExtraSeatsSelected > 0 ? "pro_plus_seats" : "pro")
   };
 
