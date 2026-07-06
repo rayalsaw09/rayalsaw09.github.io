@@ -1567,9 +1567,8 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <div style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:12px 14px;margin-bottom:18px;">
         <div style="font-size:10px;color:var(--text-dim,#4a5a7a);margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px;">आपको क्या मिलेगा</div>
         <div style="display:grid;gap:5px;">
-          <div style="font-size:12px;color:var(--text-main,#e8eaf0);">🏆 लीडरबोर्ड और रैंकिंग</div>
           <div style="font-size:12px;color:var(--text-main,#e8eaf0);">👥 अनलिमिटेड कस्टमर प्रोफ़ाइल</div>
-          <div style="font-size:12px;color:var(--text-main,#e8eaf0);">🧾 सेल्स ट्रैकिंग और पॉइंट्स</div>
+          <div style="font-size:12px;color:var(--text-main,#e8eaf0);">🧾 सेल्स ट्रैकिंग</div>
           <div style="font-size:12px;color:var(--text-main,#e8eaf0);">📊 एनालिटिक्स और रेवेन्यू चार्ट</div>
           <div style="font-size:12px;color:var(--text-main,#e8eaf0);">🎉 फेस्टिवल, स्पिन व्हील और इवेंट्स</div>
           <div style="font-size:12px;color:var(--text-main,#e8eaf0);">⚙️ पूरी सेटिंग्स और कॉन्फ़िगरेशन</div>
@@ -2971,6 +2970,11 @@ function getTabs(){
   const isPro = currentAppStyle === "pro";
   const result = [];
   TABS_BASE.forEach((k,i)=>{
+    // Points/Rankings system hidden per owner request — tab removed from UI.
+    // Left in TABS_BASE (not deleted) so every other tab's numeric index
+    // (messages=9, history=10, alerts=11, settings=12, team=13, etc.) stays
+    // unchanged everywhere else in the codebase.
+    if(k === "leaderboard") return;
     // Team tab: always visible to the owner (locked/upgrade view renders inside
     // the tab itself on Free/Pro Lite/expired plans — see renderTeamTab). Only
     // hidden for member logins, who never get Team tab access at all.
@@ -3239,8 +3243,7 @@ function ptRestoreState() {
       const _isPro1 = typeof isSubFeatureAllowed==="function";
       const _showVisits1 = !_isPro1||isSubFeatureAllowed(11);
       const _showLastVisit1 = !_isPro1||isSubFeatureAllowed(13);
-      const _showRank1 = !_isPro1||isSubFeatureAllowed(0);
-      pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:var(--text-main,#e8eaf0);">${escHtml(c.name)}</div><div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${formatINR(c.totalSpend)}${_showRank1?` &middot; Rank #${c.rank||"?"}`:""} ${_showVisits1?`&middot; 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit1?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc1};font-weight:700;">${_lv1}</span></div>`:""} ${c.gstin?`<div style="font-size:11px;color:#a78bfa;font-weight:700;margin-top:3px;">🔢 GST: ${c.gstin}${c.gstName?` · ${c.gstName}`:""}${c.gstAddress?`<br><span style="color:var(--text-muted,#7a8aaa);font-weight:400;">${c.gstAddress}</span>`:""}</div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
+      pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:var(--text-main,#e8eaf0);">${escHtml(c.name)}</div><div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${formatINR(c.totalSpend)} ${_showVisits1?`&middot; 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit1?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc1};font-weight:700;">${_lv1}</span></div>`:""} ${c.gstin?`<div style="font-size:11px;color:#a78bfa;font-weight:700;margin-top:3px;">🔢 GST: ${c.gstin}${c.gstName?` · ${c.gstName}`:""}${c.gstAddress?`<br><span style="color:var(--text-muted,#7a8aaa);font-weight:400;">${c.gstAddress}</span>`:""}</div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">&times;</button>`;
     }
   }
   // Restore date mode - only restore manual picker if it was open
@@ -5567,8 +5570,8 @@ function saveAppSettings() {
 var voiceSettings = {
   enabled: true,
   voiceLang: "en",   // "en" or "hi" or "auto"
-  template: "Congratulations {name}! You just purchased {amount} worth of amazing stuff! You are now ranked number {rank} on our leaderboard. Thank you for shopping with us!",
-  templateHi: "बधाई हो {name} जी! आपने {amount} की शानदार खरीदारी की! लीडरबोर्ड पर आपकी रैंक है नंबर {rank}! धन्यवाद, फिर पधारें!",
+  template: "Congratulations {name}! You just purchased {amount} worth of amazing stuff! Thank you for shopping with us!",
+  templateHi: "बधाई हो {name} जी! आपने {amount} की शानदार खरीदारी की! धन्यवाद, फिर पधारें!",
   voiceIndex: -1,    // -1 = auto-pick best for language
   voiceName: "",     // store by name for stability
   rate: 1.0,
@@ -5583,18 +5586,18 @@ function saveVoiceSettings() {
 
 // All preset templates per language
 var VOICE_PRESETS_EN = [
-  { label:"🎉 Celebratory", text:"Congratulations {name}! You just purchased {amount} worth of amazing stuff! You are now ranked number {rank} on our leaderboard. Thank you for shopping with us!" },
-  { label:"💎 Premium",     text:"Welcome back, {name}. Your purchase of {amount} has been recorded. You hold position {rank} on our leaderboard. We appreciate your loyalty." },
-  { label:"🏆 Champion",    text:"Attention everyone! {name} just made a power purchase of {amount} and is Champion number {rank} on our leaderboard! Keep shopping and climb higher!" },
-  { label:"✨ Friendly",    text:"Hey {name}! Great choice today — {amount} well spent! You are at rank {rank} right now. Come back soon and keep rising!" },
-  { label:"🌟 Royal",       text:"Dear {name}, it is our honour to announce your purchase of {amount}. You stand proud at rank {rank} on the leaderboard. Thank you for your patronage!" },
+  { label:"🎉 Celebratory", text:"Congratulations {name}! You just purchased {amount} worth of amazing stuff! Thank you for shopping with us!" },
+  { label:"💎 Premium",     text:"Welcome back, {name}. Your purchase of {amount} has been recorded. We appreciate your loyalty." },
+  { label:"🏆 Champion",    text:"Attention everyone! {name} just made a power purchase of {amount}! Keep shopping and enjoy more rewards!" },
+  { label:"✨ Friendly",    text:"Hey {name}! Great choice today — {amount} well spent! Come back soon!" },
+  { label:"🌟 Royal",       text:"Dear {name}, it is our honour to announce your purchase of {amount}. Thank you for your patronage!" },
 ];
 var VOICE_PRESETS_HI = [
-  { label:"🎉 उत्सव",       text:"बधाई हो {name} जी! आपने {amount} की शानदार खरीदारी की! लीडरबोर्ड पर आपकी रैंक है नंबर {rank}! धन्यवाद, फिर पधारें!" },
-  { label:"💎 प्रीमियम",    text:"स्वागत है {name} जी! आपकी {amount} की खरीदारी दर्ज हो गई है। आप हमारे लीडरबोर्ड पर {rank} नंबर पर हैं। आपकी वफादारी का शुक्रिया!" },
-  { label:"🏆 चैंपियन",     text:"ध्यान दीजिए! {name} ने {amount} की जबरदस्त खरीदारी की और वो हमारे लीडरबोर्ड पर नंबर {rank} चैंपियन बन गए! और ऊपर चढ़ते रहो!" },
-  { label:"✨ दोस्ताना",    text:"अरे {name} भाई! क्या बढ़िया चुनाव किया! {amount} बिल्कुल सही खर्च हुए। अभी आप रैंक {rank} पर हैं। जल्दी वापस आना!" },
-  { label:"🌟 शाही",        text:"{name} जी, आपकी {amount} की खरीदारी का हम सम्मान करते हैं। आप गर्व से लीडरबोर्ड पर {rank}वें स्थान पर विराजमान हैं। धन्यवाद!" },
+  { label:"🎉 उत्सव",       text:"बधाई हो {name} जी! आपने {amount} की शानदार खरीदारी की! धन्यवाद, फिर पधारें!" },
+  { label:"💎 प्रीमियम",    text:"स्वागत है {name} जी! आपकी {amount} की खरीदारी दर्ज हो गई है। आपकी वफादारी का शुक्रिया!" },
+  { label:"🏆 चैंपियन",     text:"ध्यान दीजिए! {name} ने {amount} की जबरदस्त खरीदारी की! शॉपिंग जारी रखें!" },
+  { label:"✨ दोस्ताना",    text:"अरे {name} भाई! क्या बढ़िया चुनाव किया! {amount} बिल्कुल सही खर्च हुए। जल्दी वापस आना!" },
+  { label:"🌟 शाही",        text:"{name} जी, आपकी {amount} की खरीदारी का हम सम्मान करते हैं। धन्यवाद!" },
 ];
 
 // ─── VOICE ENGINE (robust async + language-aware) ────────────
@@ -8175,12 +8178,11 @@ function renderCustomers(sorted,q=""){
     const daysSince=lastP?Math.floor((Date.now()-new Date(lastP.date))/86400000):9999;
     const visitColor=daysSince<=7?"#4f4":daysSince<=30?"#FFD700":daysSince<=60?"#f84":"#f66";
     const _isProPlan = _hasFullAccess();
-    const waMsg=(_isProPlan && c.phone)?`https://wa.me/91${c.phone}?text=${encodeURIComponent(`Hi ${c.name.split(" ")[0]}! 👋\nYou are ranked #${c.rank} at ${appSettings.shopName}.\nYour total spend: ${formatINR(c.totalSpend)} 🏆\nVisit us again to climb the leaderboard!`)}`:"";
+    const waMsg=(_isProPlan && c.phone)?`https://wa.me/91${c.phone}?text=${encodeURIComponent(`Hi ${c.name.split(" ")[0]}! 👋\nThank you for shopping with us at ${appSettings.shopName}.\nYour total spend: ${formatINR(c.totalSpend)} 🙌\nVisit us again soon!`)}`:"";
     const isSel = custSelected.has(c.id);
     const isPro = typeof isSubFeatureAllowed==="function";
     const showVisits = !isPro||isSubFeatureAllowed(11);
     const showLastVisit = !isPro||isSubFeatureAllowed(13);
-    const showRank = true;
 
     if(custSelectMode) return `
     <div class="card cust-card" style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;${isSel?'background:#1a0d30;outline:2px solid #a060ff;outline-offset:-2px;':''}" onclick="custToggleSelect('${c.id}')">
@@ -8203,7 +8205,6 @@ function renderCustomers(sorted,q=""){
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
         <div style="font-weight:800;color:#FFD700;font-size:14px;">${formatINR(c.totalSpend)}</div>
-        <div style="font-size:11px;color:var(--text-dim,#4a5a7a);">${t("rankHash")}${c.rank}</div>
       </div>
     </div>`;
   }
@@ -8585,8 +8586,7 @@ function ptSelectCustomer(id){
   const _isPro2 = typeof isSubFeatureAllowed==="function";
   const _showVisits2 = !_isPro2||isSubFeatureAllowed(11);
   const _showLastVisit2 = !_isPro2||isSubFeatureAllowed(13);
-  const _showRank2 = !_isPro2||isSubFeatureAllowed(0);
-  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:var(--text-main,#e8eaf0);">${escHtml(c.name)}</div><div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${formatINR(c.totalSpend)}${_showRank2?` · Rank #${c.rank}`:""}${_showVisits2?` · 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit2?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div>`:""} ${c.gstin?`<div style="font-size:11px;color:#a78bfa;font-weight:700;margin-top:3px;">🔢 GST: ${c.gstin}${c.gstName?` · ${c.gstName}`:""}${c.gstAddress?`<br><span style="color:var(--text-muted,#7a8aaa);font-weight:400;">${c.gstAddress}</span>`:""}</div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:20px;padding:4px 8px;">✕</button>`;
+  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:14px;color:var(--text-main,#e8eaf0);">${escHtml(c.name)}</div><div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${formatINR(c.totalSpend)}${_showVisits2?` · 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit2?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc2};font-weight:700;">${_lv2}</span></div>`:""} ${c.gstin?`<div style="font-size:11px;color:#a78bfa;font-weight:700;margin-top:3px;">🔢 GST: ${c.gstin}${c.gstName?` · ${c.gstName}`:""}${c.gstAddress?`<br><span style="color:var(--text-muted,#7a8aaa);font-weight:400;">${c.gstAddress}</span>`:""}</div>`:""}</div><button onclick="ptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:20px;padding:4px 8px;">✕</button>`;
   ptPts();
 }
 
@@ -8603,7 +8603,7 @@ function ptClearCustomer(){
   setTimeout(()=>{const el=document.getElementById("pt-search");if(el)el.focus();},50);
   ptPts();
 }
-function ptPts(){const aEl=document.getElementById("pt-amt"),sEl=document.getElementById("pt-sel"),b=document.getElementById("pt-pts");if(!aEl||!sEl||!b)return;const a=parseFloat(aEl.value)||0,s=sEl.value;if(a&&s){b.style.display="block";b.innerHTML=`Points: <strong style="color:#FFD700;">+${getPoints(a).toLocaleString()}</strong> pts`;}else b.style.display="none";}
+function ptPts(){const b=document.getElementById("pt-pts");if(b)b.style.display="none";} // Points system hidden per owner request
 function ptSetMode(mode){
   document.getElementById("pt-mode-val").value = mode;
   ["Cash","UPI","NEFT","Cheque","Other"].forEach(m=>{
@@ -8717,8 +8717,7 @@ function bptSelectCustomer(id){
   const _isPro3 = typeof isSubFeatureAllowed==="function";
   const _showVisits3 = !_isPro3||isSubFeatureAllowed(11);
   const _showLastVisit3 = !_isPro3||isSubFeatureAllowed(13);
-  const _showRank3 = !_isPro3||isSubFeatureAllowed(0);
-  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:var(--text-main,#e8eaf0);">${escHtml(c.name)}</div><div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${formatINR(c.totalSpend)}${_showRank3?` · Rank #${c.rank||"?"}`:""} ${_showVisits3?`· 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit3?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc3};font-weight:700;">${_lv3}</span></div>`:""}</div><button onclick="bptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
+  pr.innerHTML=`${avatarEl(c,40)}<div style="flex:1;min-width:0;"><div style="font-weight:700;color:var(--text-main,#e8eaf0);">${escHtml(c.name)}</div><div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${formatINR(c.totalSpend)} ${_showVisits3?`· 🧾 ${(c.purchases||[]).length} visits`:""}</div>${_showLastVisit3?`<div style="font-size:12px;margin-top:2px;">🕐 Last visit: <span style="color:${_vc3};font-weight:700;">${_lv3}</span></div>`:""}</div><button onclick="bptClearCustomer()" style="margin-left:auto;background:none;border:none;color:#f66;cursor:pointer;font-size:18px;">✕</button>`;
 }
 
 function bptClearCustomer(){
@@ -9870,8 +9869,8 @@ function cmpPrintReport(){
 
 function exportCSV(){
   const s=getSorted();
-  const hdr=["ID","Name","Phone","Total Spend","Points","Purchases","Rank"];
-  const rows=s.map(c=>[c.id,c.name,c.phone||"",c.totalSpend,c.points,(c.purchases||[]).length,c.rank]);
+  const hdr=["ID","Name","Phone","Total Spend","Purchases"];
+  const rows=s.map(c=>[c.id,c.name,c.phone||"",c.totalSpend,(c.purchases||[]).length]);
   const csv=[hdr,...rows].map(r=>r.map(v=>`"${v}"`).join(",")).join("\n");
   const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download="ShopChampion_Customers.csv";a.click();
   notify("✅ CSV exported!");
@@ -9879,11 +9878,11 @@ function exportCSV(){
 
 function exportYearCSV(year){
   const s=getSorted();
-  const hdr=["ID","Name","Phone",year+" Spend",year+" Visits","All-Time Spend","Rank"];
+  const hdr=["ID","Name","Phone",year+" Spend",year+" Visits","All-Time Spend"];
   const rows=s.map(c=>{
     const yp=(c.purchases||[]).filter(p=>(p.date||"").slice(0,4)===String(year));
     const ySpend=yp.reduce((a,p)=>a+p.amount,0);
-    return [c.id,c.name,c.phone||"",ySpend,yp.length,c.totalSpend,c.rank];
+    return [c.id,c.name,c.phone||"",ySpend,yp.length,c.totalSpend];
   }).filter(r=>r[3]>0);
   const csv=[hdr,...rows].map(r=>r.map(v=>`"${v}"`).join(",")).join("\n");
   const a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download=`ShopChampion_${year}_Report.csv`;a.click();
@@ -18499,7 +18498,6 @@ function renderSettings(){
     ["💳", "Creditors & Debtors", `Up to ${FREE_MAX_CREDITORS} each`],
     ["📦", "Inventory Items", `Up to ${FREE_MAX_INV_ITEMS}`],
     ["💬", "Shop Messaging", "Included"],
-    ["🏆", "Rankings / Leaderboard", "Included"],
     ["📊", "Analytics & Compare", "Included"],
     ["🧾", "GST Billing", "Included"],
     ["📱", "WhatsApp Reminders", "Pro only"],
@@ -19229,7 +19227,6 @@ function openFeatureCompareModal(){
     ["💳","Creditors & Debtors",`Up to ${FREE_MAX_CREDITORS} each`,"Unlimited","Unlimited"],
     ["📦","Inventory Items",`Up to ${FREE_MAX_INV_ITEMS}`,"Unlimited","Unlimited"],
     ["💬","Shop Messaging","Included","Included","Included"],
-    ["🏆","Rankings / Leaderboard","Included","Included","Included"],
     ["📊","Analytics & Compare","Included","Included","Included"],
     ["🧾","GST Billing","Included","Included","Included"],
     ["📱","WhatsApp Reminders","Pro only","Included","Included"],
@@ -20332,7 +20329,7 @@ function pmSelectMode(m){
     btn.style.color=active?"#22c55e":"#4a5a7a";
   });
 }
-function pmPts(){const a=parseFloat(document.getElementById("m-amt").value)||0,b=document.getElementById("m-pts");if(a){b.style.display="block";b.innerHTML=`Points: <strong style="color:#FFD700;">+${getPoints(a).toLocaleString()}</strong>`;}else b.style.display="none";}
+function pmPts(){const b=document.getElementById("m-pts");if(b)b.style.display="none";} // Points system hidden per owner request
 function savePurchaseModal(id){const a=parseFloat(document.getElementById("m-amt").value||"0");if(!a||a<=0){notify("❌ Amount must be greater than ₹0","error");return;}addPurchase(id,{amount:a,bill:document.getElementById("m-bill").value,notes:document.getElementById("m-notes").value,date:document.getElementById("m-date").value,payMode:window._mPayMode||"Cash"});}
 
 // ─── BULK PURCHASE MODAL ─────────────────────────────────────────────────────
@@ -20540,12 +20537,11 @@ function showProfile(id){
       <div>
         <div style="font-size:22px;font-weight:800;color:var(--text-main,#e8eaf0);">${escHtml(c.name)}</div>
         <div style="font-size:13px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${c.phone?"📞 "+c.phone:"<em>No phone</em>"} · <span style="font-family:monospace;">${c.id}</span></div>
-        <div style="margin-top:6px;font-size:13px;color:var(--text-muted,#7a8aaa);">Rank #${c.rank}</div>
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-      ${[{l:"Total Spend",v:formatINR(c.totalSpend),col:"#e8eaf0"},{l:"Points",v:c.points.toLocaleString(),col:"#e8eaf0"},...(isSubFeatureAllowed(11)?[{l:"Total Visits",v:visits,col:"#5af"}]:[])].map(m=>`<div style="background:var(--bg-main,#0a0e1a);border-radius:10px;padding:12px;text-align:center;"><div style="font-weight:800;font-size:16px;color:${m.col};">${m.v}</div><div style="font-size:11px;color:#556;margin-top:2px;">${m.l}</div></div>`).join("")}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      ${[{l:"Total Spend",v:formatINR(c.totalSpend),col:"#e8eaf0"},...(isSubFeatureAllowed(11)?[{l:"Total Visits",v:visits,col:"#5af"}]:[])].map(m=>`<div style="background:var(--bg-main,#0a0e1a);border-radius:10px;padding:12px;text-align:center;"><div style="font-weight:800;font-size:16px;color:${m.col};">${m.v}</div><div style="font-size:11px;color:#556;margin-top:2px;">${m.l}</div></div>`).join("")}
     </div>
 
     ${(isSubFeatureAllowed(11)||isSubFeatureAllowed(13))?`<div style="background:var(--bg-main,#0a0e1a);border-radius:10px;padding:14px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -21093,7 +21089,7 @@ function openCustomerPage(id){
       <button onclick="closeCustomerPage()" style="background:#1a2540;border:1px solid var(--border-input,#2a3560);color:#aaa;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;font-family:'Nunito',sans-serif;font-weight:700;display:flex;align-items:center;gap:6px;">${t('back')}</button>
       <div style="font-size:18px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">${t('customerProfile')}</div>
       <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
-        ${_hasFullAccess() && c.phone?`<a href="https://wa.me/91${c.phone}?text=${encodeURIComponent('Hi '+c.name.split(' ')[0]+'! 👋 You are ranked #'+c.rank+' at '+appSettings.shopName+'. Total spend: '+formatINR(c.totalSpend)+' 🏆 Visit us again!')}" target="_blank" class="btn" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px 12px;font-size:12px;font-weight:800;text-decoration:none;">💬 WA</a>`:''}
+        ${_hasFullAccess() && c.phone?`<a href="https://wa.me/91${c.phone}?text=${encodeURIComponent('Hi '+c.name.split(' ')[0]+'! 👋 Thank you for shopping with us at '+appSettings.shopName+'. Total spend: '+formatINR(c.totalSpend)+' 🙌 Visit us again soon!')}" target="_blank" class="btn" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px 12px;font-size:12px;font-weight:800;text-decoration:none;">💬 WA</a>`:''}
         <button class="btn" onclick="closeCustomerPage();openEditModal('${c.id}')" style="background:#1a2540;color:#aaa;border:1px solid var(--border-input,#2a3560);padding:8px 12px;font-size:12px;">✏️</button>
         <button class="btn" onclick="showEditHistoryModal('${c.id}','${c.name.replace(/'/g,"\\'")}','customer')" style="background:#1a2540;color:#FFD700;border:1px solid var(--border-input,#2a3560);padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;">📝 Edit History</button>
       </div>
@@ -21106,17 +21102,15 @@ function openCustomerPage(id){
         <div style="font-size:24px;font-weight:800;color:var(--text-main,#e8eaf0);">${escHtml(c.name)}</div>
         <div style="font-size:13px;color:var(--text-muted,#7a8aaa);margin-top:3px;">${c.phone?"📞 "+c.phone:"<em style='color:#2a3a5a;'>"+t('noPhone')+"</em>"} &nbsp;·&nbsp; <span style="font-family:monospace;font-size:11px;">${c.id}</span></div>
         <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;">
-          <span style="background:#1a2e50;border:1px solid #2a4a7a;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;color:#7ab3ff;">${t('rank')} #${c.rank}</span>
           ${pendingBorrows.length?`<span style="background:#2a1500;border:1px solid #5a3000;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;color:#f84;">📦 ${t('totalOwed')} ${formatINR(totalOwed)}</span>`:""}
         </div>
       </div>
     </div>
 
     <!-- Stats Grid -->
-    <div style="display:grid;grid-template-columns:${isSubFeatureAllowed(11)?'repeat(3,1fr)':'repeat(2,1fr)'};gap:10px;margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:${isSubFeatureAllowed(11)?'repeat(2,1fr)':'repeat(1,1fr)'};gap:10px;margin-bottom:14px;">
       ${[
         {l:t('totalSpend'),v:formatINR(c.totalSpend),col:"#FFD700"},
-        {l:t('points'),v:c.points.toLocaleString()+" pts",col:"#e8eaf0"},
         ...(isSubFeatureAllowed(11)?[{l:t('totalVisits'),v:visits,col:"#5af"}]:[])
       ].map(m=>`<div style="background:var(--bg-card,#0f1628);border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:14px;text-align:center;"><div style="font-weight:800;font-size:18px;color:${m.col};">${m.v}</div><div style="font-size:11px;color:#556;margin-top:3px;">${m.l}</div></div>`).join("")}
     </div>
@@ -21421,7 +21415,7 @@ function cpPurchaseCard(p,custId){
     <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:12px;" onclick="event.stopPropagation()">
       ${isBorrow
         ?(isPending?`<div style="display:flex;flex-direction:column;gap:5px;"><button onclick="openPartialPaymentModal('${custId}','${p.bill}');event.stopPropagation();" style="cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid #92400e;background:#1a0e00;color:#f59e0b;font-size:10px;font-weight:700;white-space:nowrap;">💰 Pay</button><button onclick="bwMarkReturned('${custId}','${p.bill}');openCustomerPage('${custId}');event.stopPropagation();" style="cursor:pointer;padding:5px 10px;border-radius:7px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:10px;font-weight:700;white-space:nowrap;">✓ Clear</button></div>`:'')
-        :`<div style="color:#5af;font-size:13px;font-weight:700;">+${getPoints(p.amount)} pts</div>`}
+        :`<div style="color:#5af;font-size:13px;font-weight:700;">${formatINR(p.amount)}</div>`}
       <button onclick="event.stopPropagation();deletePurchase('${custId}','${p.bill}','${encodeURIComponent(p.date)}');openCustomerPage('${custId}');" style="background:none;border:none;color:#f66;cursor:pointer;font-size:11px;">🗑 delete</button>
     </div>
   </div>`;
@@ -21465,7 +21459,7 @@ function phPurchaseCardHTML(p,custId){
     <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;" onclick="event.stopPropagation()">
       ${isBorrow
         ?(isPending?`<div style="display:flex;flex-direction:column;gap:5px;"><button onclick="openPartialPaymentModal('${custId}','${p.bill}');event.stopPropagation();" style="cursor:pointer;padding:4px 9px;border-radius:7px;border:1px solid #92400e;background:#1a0e00;color:#f59e0b;font-size:10px;font-weight:700;white-space:nowrap;">💰 Pay</button><button onclick="bwMarkReturned('${custId}','${p.bill}');closeModal();event.stopPropagation();" style="cursor:pointer;padding:4px 9px;border-radius:7px;border:1px solid #1a4a1a;background:#0a1a0a;color:#4f4;font-size:10px;font-weight:700;white-space:nowrap;">✓ Clear</button></div>`:'')
-        :`<div style="color:#5af;font-size:13px;font-weight:700;">+${getPoints(p.amount)} pts</div>`}
+        :`<div style="color:#5af;font-size:13px;font-weight:700;">${formatINR(p.amount)}</div>`}
       <button onclick="event.stopPropagation();deletePurchase('${custId}','${p.bill}','${encodeURIComponent(p.date)}');closeModal();" style="background:none;border:none;color:#f66;cursor:pointer;font-size:11px;">🗑 delete</button>
     </div>
   </div>`;
@@ -21697,6 +21691,7 @@ function _showUpgradePrompt(reason) {
 }
 
 async function loadFreeTabs() {
+  const _prevFreeTabsJSON = JSON.stringify(FREE_TABS); // FIX (fix118): snapshot before fetch to detect real changes
   try {
     const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_settings?key=eq.free_tabs&select=value`, {
       headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
@@ -21706,8 +21701,13 @@ async function loadFreeTabs() {
       FREE_TABS = JSON.parse(rows[0].value);
     }
   } catch(e) { /* keep default */ }
-  // Only re-render if user is already logged in
-  if (localStorage.getItem("sc_auth_phone") && document.getElementById("main-app").style.display !== "none") {
+  // FIX (fix118): only rebuild tabs/re-render the current tab if the setting
+  // actually changed. Previously this ran unconditionally every 60s, tearing
+  // down and rebuilding whatever tab was open (and resetting scroll position)
+  // even when nothing had changed — this was the periodic flicker / "stuck
+  // tab" bug reported on fix117.
+  const _freeTabsChanged = JSON.stringify(FREE_TABS) !== _prevFreeTabsJSON;
+  if (_freeTabsChanged && localStorage.getItem("sc_auth_phone") && document.getElementById("main-app").style.display !== "none") {
     try { renderTabs(); safeRenderTab(currentTab); } catch {}
   }
   // Show/hide push-to-display button based on feature toggle
@@ -21715,8 +21715,9 @@ async function loadFreeTabs() {
   if (pushBtn) pushBtn.style.display = ""; // Push to Display always available
 }
 
-// Poll every 30s so changes in Seller Panel reflect live
-setInterval(loadFreeTabs, 60000); // FIX: was 5000ms — reduced to 60s to avoid Supabase hammering
+// Poll every 60s so changes in Seller Panel reflect live — re-render is now
+// gated on an actual change (see fix118 note above), not run unconditionally.
+setInterval(loadFreeTabs, 60000);
 
 var licenseStatus = null; // null | "pro" | "free" | "expired"
 var licensePlan   = "free";
@@ -24575,8 +24576,9 @@ async function scRefreshUnreadBadges() {
   try {
     await Promise.all(_scConnections.map(c => scLoadMessages(scPeerPhone(c))));
   } catch(e){}
+  const _prevShopRequestsUnread = _shopRequestsUnread; // FIX (fix118): only rebuild tab bar on real change
   _shopRequestsUnread = _scPendingReqs.length + Object.values(_scUnreadCounts).reduce((s,v)=>s+v,0);
-  if (document.getElementById("tab-bar")) renderTabs();
+  if (_shopRequestsUnread !== _prevShopRequestsUnread && document.getElementById("tab-bar")) renderTabs();
   // If the Messages tab list (not an open chat) is on screen, refresh it so
   // unread badges/last-message previews update without needing to leave/reopen the tab.
   if (currentTab === 9 && !_scActiveChatPhone) {
@@ -29271,13 +29273,6 @@ history.pushState({sc:true}, '');
 // ── Step definitions (icon, tabIndex to highlight, elementId or selector) ──
 var STEPS_EN = [
   {
-    icon:"🏆", title:"Rankings (Leaderboard)",
-    text:"This is your Leaderboard — it ranks all your customers by their total purchases. The #1 buyer gets a crown 👑. Use this every day to instantly spot your most loyal customers.",
-    detail:"The Leaderboard is the heart of ShopChampion. Every time you record a purchase, that customer automatically moves up or down the ranking in real time. You can filter by this week, this month, or all time. You can also set up a display screen — like a TV at the counter — that shows the leaderboard live so customers are motivated to buy more and claim the top spot. Tap any customer's name to jump straight to their full profile and purchase history.",
-    speech:"This is your Leaderboard. It ranks all your customers by how much they have bought. The number one buyer gets a crown. Every time you enter a purchase, the rankings update automatically in real time.",
-    tabIndex:0, targetId:"tab-content"
-  },
-  {
     icon:"👥", title:"Customers",
     text:"All your customers live here. Search by name, view their full purchase history, edit their details, or delete a record. Every customer has their own profile card.",
     detail:"The Customers tab is your complete customer database. You can add new customers manually with their name, phone number, and photo. Use the search bar to find anyone instantly — it works even if you type just the first two letters. Tap a customer to open their profile: you will see every purchase they have made, their total spend, their current rank, and how many days since their last visit. You can also send them a WhatsApp message directly from here. If a customer asks to be removed, you can delete their record safely.",
@@ -29343,13 +29338,6 @@ var STEPS_EN = [
 ];
 
 var STEPS_HI = [
-  {
-    icon:"🏆", title:"लीडरबोर्ड (Leaderboard)",
-    text:"यह आपका लीडरबोर्ड है — यहाँ आपके सभी ग्राहक उनकी कुल खरीदारी के हिसाब से रैंक में दिखते हैं। सबसे ऊपर वाले ग्राहक को 👑 ताज मिलता है और वो आपका सबसे वफ़ादार ग्राहक है।",
-    detail:"लीडरबोर्ड ShopChampion का सबसे ख़ास फ़ीचर है। जैसे ही आप कोई खरीदारी दर्ज करते हैं, उस ग्राहक की रैंक तुरंत बदल जाती है — बिल्कुल लाइव। आप इसे इस हफ़्ते, इस महीने, या पूरे समय के हिसाब से फ़िल्टर कर सकते हैं। आप एक TV या डिस्प्ले स्क्रीन भी कनेक्ट कर सकते हैं जो काउंटर पर लाइव लीडरबोर्ड दिखाए — इससे ग्राहक और ज़्यादा खरीदारी करने के लिए प्रेरित होते हैं। किसी भी ग्राहक के नाम पर टैप करें और उनकी पूरी खरीदारी का इतिहास देखें।",
-    speech:"यह आपका लीडरबोर्ड है। यहाँ सभी ग्राहक उनकी कुल खरीदारी के अनुसार रैंक में दिखते हैं। जैसे ही आप कोई खरीदारी दर्ज करते हैं, रैंकिंग तुरंत अपडेट हो जाती है।",
-    tabIndex:0, targetId:"tab-content"
-  },
   {
     icon:"👥", title:"ग्राहक (Customers)",
     text:"यहाँ आपके सभी ग्राहकों की पूरी जानकारी है। नाम से खोजें, खरीदारी का इतिहास देखें, जानकारी बदलें, या ग्राहक हटाएं। हर ग्राहक का अपना प्रोफ़ाइल कार्ड है।",
