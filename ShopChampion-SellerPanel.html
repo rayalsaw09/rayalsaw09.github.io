@@ -144,6 +144,16 @@
     th, td { padding: 8px 8px; }
     .section-title { font-size: 16px; }
   }
+@media print {
+  body * { visibility: hidden; }
+  #sp-maintab-5-content, #sp-maintab-5-content * { visibility: visible; background:#fff !important; color:#111 !important; }
+  #sp-maintab-5-content { position: absolute; left:0; top:0; width:100%; }
+  #sp-maintab-5-content button, #sp-maintab-5-content input, #sp-maintab-5-content select { display:none !important; }
+  #sp-maintab-5-content table, #sp-maintab-5-content th, #sp-maintab-5-content td { border:1px solid #999 !important; color:#111 !important; }
+  #sp-maintab-5-content .stat { border:1px solid #999 !important; }
+  #sp-maintab-5-content svg rect { fill:#4a5a7a !important; }
+  #sp-maintab-5-content svg text { fill:#333 !important; }
+}
 </style>
 </head>
 <body>
@@ -781,6 +791,17 @@
       </div>
       <div style="font-size:12px;color:#4a5a7a;margin-bottom:16px;">Money actually received from approved payments only — pending and rejected UTRs are not counted. Filtered by the day each payment was approved.</div>
 
+      <!-- Always-on KPI strip: today/yesterday/week/month/year/lifetime, independent of the filter below -->
+      <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:8px;">At a glance</div>
+      <div id="rev-kpi-strip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:22px;">
+        <div class="stat" style="padding:12px 8px;"><div class="stat-num" id="kpi-today" style="color:#4f4;font-size:18px;">₹0</div><div class="stat-label" style="font-size:10px;">Today</div></div>
+        <div class="stat" style="padding:12px 8px;"><div class="stat-num" id="kpi-yesterday" style="color:#7ab3ff;font-size:18px;">₹0</div><div class="stat-label" style="font-size:10px;">Yesterday</div></div>
+        <div class="stat" style="padding:12px 8px;"><div class="stat-num" id="kpi-week" style="color:#7ab3ff;font-size:18px;">₹0</div><div class="stat-label" style="font-size:10px;">This Week</div></div>
+        <div class="stat" style="padding:12px 8px;"><div class="stat-num" id="kpi-month" style="color:#FFD700;font-size:18px;">₹0</div><div class="stat-label" style="font-size:10px;">This Month</div></div>
+        <div class="stat" style="padding:12px 8px;"><div class="stat-num" id="kpi-year" style="color:#FFD700;font-size:18px;">₹0</div><div class="stat-label" style="font-size:10px;">This Year</div></div>
+        <div class="stat" style="padding:12px 8px;border-color:#3a2a5a;"><div class="stat-num" id="kpi-lifetime" style="color:#c084fc;font-size:18px;">₹0</div><div class="stat-label" style="font-size:10px;">Lifetime</div></div>
+      </div>
+
       <!-- Date filter -->
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
         <input type="date" id="rev-date-from" class="input" style="max-width:150px;padding:8px 10px;font-size:13px;" onchange="renderRevenue()" />
@@ -789,7 +810,10 @@
         <button onclick="revSetToday()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">Today</button>
         <button onclick="revSetYesterday()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">Yesterday</button>
         <button onclick="revSetLast7()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">Last 7 days</button>
+        <button onclick="revSetLast30()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">Last 30 days</button>
         <button onclick="revSetThisMonth()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">This Month</button>
+        <button onclick="revSetLastMonth()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">Last Month</button>
+        <button onclick="revSetThisYear()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">This Year</button>
         <button onclick="revSetAllTime()" style="background:#1a2540;border:1px solid #2a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">All Time</button>
       </div>
 
@@ -803,7 +827,9 @@
           <option value="seats">👥 Extra Seats Only</option>
           <option value="pro_plus_seats">⭐ Pro + Seats</option>
         </select>
-        <button onclick="revExportCSV()" style="margin-left:auto;background:#0a2a1a;border:1px solid #1a4a2a;border-radius:8px;color:#4f4;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">⬇️ Export CSV</button>
+        <button onclick="revExportCSV()" style="background:#0a2a1a;border:1px solid #1a4a2a;border-radius:8px;color:#4f4;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">⬇️ CSV</button>
+        <button onclick="revExportExcel()" style="margin-left:auto;background:#0a1a2a;border:1px solid #1a3a5a;border-radius:8px;color:#7ab3ff;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;">📊 Excel</button>
+        <button onclick="window.print()" style="background:#1a1a2a;border:1px solid #3a3a5a;border-radius:8px;color:#c084fc;cursor:pointer;padding:7px 14px;font-size:12px;font-weight:700;" title="Opens your browser's print dialog — choose 'Save as PDF' as the destination">🖨️ PDF (Print)</button>
       </div>
 
       <!-- Summary stats -->
@@ -813,9 +839,36 @@
         <div class="stat"><div class="stat-num" id="rev-avg" style="color:#FFD700;">₹0</div><div class="stat-label">Avg / Transaction</div></div>
       </div>
 
+      <!-- Revenue trend chart (selected range, daily bars) -->
+      <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:8px;">Revenue trend (selected range)</div>
+      <div id="rev-chart" style="margin-bottom:20px;background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:14px;overflow-x:auto;"></div>
+
       <!-- Breakdown by plan -->
       <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:8px;">Breakdown by plan type</div>
       <div id="rev-breakdown" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;"></div>
+
+      <!-- Breakdown by transaction type (new / renewal / upgrade) -->
+      <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:4px;">Breakdown by transaction type</div>
+      <div style="font-size:11px;color:#4a5a7a;margin-bottom:8px;">Inferred from each shop's payment history — first-ever approved payment = New, same tier again = Renewal, moved to a higher tier = Upgrade.</div>
+      <div id="rev-type-breakdown" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;"></div>
+
+      <!-- Highest Paying Shops -->
+      <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:8px;">🏆 Highest paying shops (selected range)</div>
+      <div style="overflow-x:auto;margin-bottom:20px;">
+        <table id="rev-top-shops-table">
+          <thead><tr><th>Shop / Phone</th><th>Total Paid</th><th>Transactions</th></tr></thead>
+          <tbody id="rev-top-shops-tbody"><tr><td colspan="3" style="text-align:center;color:#4a5a7a;padding:20px;">Loading...</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- Expiring Soon (independent of the revenue date filter — always next 7 days) -->
+      <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:8px;">⏰ Expiring in next 7 days</div>
+      <div style="overflow-x:auto;margin-bottom:20px;">
+        <table id="rev-expiring-table">
+          <thead><tr><th>Shop / Phone</th><th>Plan</th><th>Expires</th></tr></thead>
+          <tbody id="rev-expiring-tbody"><tr><td colspan="3" style="text-align:center;color:#4a5a7a;padding:20px;">Loading...</td></tr></tbody>
+        </table>
+      </div>
 
       <!-- Detailed transaction list -->
       <div style="font-size:12px;color:#7a8aaa;font-weight:700;margin-bottom:8px;">Transaction details</div>
@@ -985,6 +1038,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="./config.js"></script>
 <script>
 // ── Config (credentials loaded from /config.js, with safe fallbacks) ──
@@ -2116,8 +2170,10 @@ function filterPaymentHistory() {
 // ══════════════════════════════════════════════
 async function revLoadAndRender() {
   // Always pull fresh data — a revenue number should never be stale.
-  await loadPayments();
+  await Promise.all([loadPayments(), loadKeys()]);
   renderRevenue();
+  revUpdateKpiStrip();
+  revRenderExpiringSoon();
 }
 
 function revSetToday() {
@@ -2143,6 +2199,28 @@ function revSetLast7() {
 function revSetThisMonth() {
   const now = new Date();
   const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  document.getElementById("rev-date-from").value = from.toISOString().slice(0,10);
+  document.getElementById("rev-date-to").value = now.toISOString().slice(0,10);
+  revLoadAndRender();
+}
+function revSetLast30() {
+  const to = new Date();
+  const from = new Date(); from.setDate(from.getDate() - 29);
+  document.getElementById("rev-date-from").value = from.toISOString().slice(0,10);
+  document.getElementById("rev-date-to").value = to.toISOString().slice(0,10);
+  revLoadAndRender();
+}
+function revSetLastMonth() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const to   = new Date(now.getFullYear(), now.getMonth(), 0); // last day of previous month
+  document.getElementById("rev-date-from").value = from.toISOString().slice(0,10);
+  document.getElementById("rev-date-to").value = to.toISOString().slice(0,10);
+  revLoadAndRender();
+}
+function revSetThisYear() {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), 0, 1);
   document.getElementById("rev-date-from").value = from.toISOString().slice(0,10);
   document.getElementById("rev-date-to").value = now.toISOString().slice(0,10);
   revLoadAndRender();
@@ -2211,27 +2289,221 @@ function renderRevenue() {
   const tbody = document.getElementById("rev-tbody");
   if (!filtered.length) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#4a5a7a;padding:32px;">No approved payments in this range.</td></tr>`;
-    return;
+  } else {
+    tbody.innerHTML = filtered.map(p => {
+      const ts = p.approved_at || p.submitted_at;
+      const dateStr = ts ? new Date(ts).toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
+      const seats = Number(p.seats_requested) || 0;
+      const reqType = p.request_type || "pro";
+      let planLine;
+      if (reqType === "seats") planLine = `👥 ${seats} extra seat${seats===1?"":"s"}`;
+      else if (reqType === "pro_plus_seats") planLine = `⭐ ${(p.plan||"monthly")} + ${seats} seat${seats===1?"":"s"}`;
+      else if (reqType === "pro_lite") planLine = `⚡ Pro Lite${seats>0?` + ${seats} seat${seats===1?"":"s"}`:""}`;
+      else planLine = `⭐ Pro (${p.plan||"monthly"})`;
+      return `<tr>
+        <td style="white-space:nowrap;">${dateStr}</td>
+        <td>${escHtml(p.customer_name||"Unknown")}</td>
+        <td style="font-family:monospace;">${escHtml(p.customer_phone||"—")}</td>
+        <td>${planLine}</td>
+        <td style="font-weight:800;color:#4f4;">₹${(Number(p.amount)||0).toLocaleString("en-IN")}</td>
+        <td style="font-family:monospace;color:#FFD700;font-size:11px;">${escHtml(p.utr_number||"—")}</td>
+      </tr>`;
+    }).join("");
   }
-  tbody.innerHTML = filtered.map(p => {
+
+  revRenderChart(filtered, fromMs, toMs);
+  revRenderTypeBreakdown(filtered);
+  revRenderTopShops(filtered);
+}
+
+// ── Revenue trend chart: simple dependency-free inline SVG bar chart ──
+function revRenderChart(filtered, fromMs, toMs) {
+  const el = document.getElementById("rev-chart");
+  if (!filtered.length) { el.innerHTML = `<div style="color:#4a5a7a;font-size:12px;text-align:center;padding:20px;">No data to chart in this range.</div>`; return; }
+
+  // Bucket by day (caps at 60 bars — beyond that, bucket by month instead so the chart stays readable)
+  const spanDays = (isFinite(fromMs) && isFinite(toMs)) ? Math.ceil((toMs - fromMs) / 86400000) + 1 : null;
+  const byMonth = spanDays === null || spanDays > 60;
+  const buckets = {};
+  filtered.forEach(p => {
     const ts = p.approved_at || p.submitted_at;
-    const dateStr = ts ? new Date(ts).toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
-    const seats = Number(p.seats_requested) || 0;
-    const reqType = p.request_type || "pro";
-    let planLine;
-    if (reqType === "seats") planLine = `👥 ${seats} extra seat${seats===1?"":"s"}`;
-    else if (reqType === "pro_plus_seats") planLine = `⭐ ${(p.plan||"monthly")} + ${seats} seat${seats===1?"":"s"}`;
-    else if (reqType === "pro_lite") planLine = `⚡ Pro Lite${seats>0?` + ${seats} seat${seats===1?"":"s"}`:""}`;
-    else planLine = `⭐ Pro (${p.plan||"monthly"})`;
+    const d = new Date(ts);
+    const key = byMonth ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}` : d.toISOString().slice(0,10);
+    buckets[key] = (buckets[key] || 0) + (Number(p.amount) || 0);
+  });
+  const keys = Object.keys(buckets).sort();
+  const max = Math.max(...keys.map(k => buckets[k]), 1);
+  const barW = Math.max(18, Math.min(48, Math.floor(760 / keys.length)));
+  const chartH = 140;
+  const svgW = Math.max(760, keys.length * (barW + 8));
+
+  const bars = keys.map((k, i) => {
+    const h = Math.round((buckets[k] / max) * (chartH - 24));
+    const x = i * (barW + 8);
+    const label = byMonth
+      ? new Date(k + "-01").toLocaleDateString("en-IN", {month:"short", year:"2-digit"})
+      : new Date(k).toLocaleDateString("en-IN", {day:"numeric", month:"short"});
+    return `
+      <g>
+        <title>${label}: ₹${buckets[k].toLocaleString("en-IN")}</title>
+        <rect x="${x}" y="${chartH - h - 20}" width="${barW}" height="${h}" fill="#4ade80" rx="3"/>
+        <text x="${x + barW/2}" y="${chartH - 4}" font-size="9" fill="#7a8aaa" text-anchor="middle">${label}</text>
+      </g>`;
+  }).join("");
+
+  el.innerHTML = `<svg width="${svgW}" height="${chartH}" viewBox="0 0 ${svgW} ${chartH}" style="display:block;">${bars}</svg>`;
+}
+
+// ── Transaction-type breakdown: New / Renewal / Upgrade, inferred from each
+// shop's payment history (no dedicated field for this exists in sc_payments,
+// so we derive it by walking each phone's approved payments in date order) ──
+function revRenderTypeBreakdown(filtered) {
+  const el = document.getElementById("rev-type-breakdown");
+  if (!filtered.length) { el.innerHTML = `<div style="color:#4a5a7a;font-size:12px;">No revenue in this period.</div>`; return; }
+
+  // Tier ranking used to detect an upgrade vs a same-tier renewal
+  const tierRank = { seats: 0, pro_lite: 1, pro_plus_seats: 2, pro: 2 };
+
+  // Build full chronological payment history per phone (across ALL approved
+  // payments, not just the filtered range) so "first ever" is judged correctly.
+  const allApproved = (allPayments || []).filter(p => p.status === "approved")
+    .slice().sort((a,b) => new Date(a.approved_at||a.submitted_at) - new Date(b.approved_at||b.submitted_at));
+  const historyByPhone = {};
+  allApproved.forEach(p => {
+    const phone = p.customer_phone || "unknown";
+    (historyByPhone[phone] = historyByPhone[phone] || []).push(p);
+  });
+
+  const buckets = { new: {count:0, amount:0}, renewal: {count:0, amount:0}, upgrade: {count:0, amount:0} };
+  const filteredIds = new Set(filtered.map(p => p.id));
+  Object.values(historyByPhone).forEach(hist => {
+    hist.forEach((p, idx) => {
+      if (!filteredIds.has(p.id)) return; // only classify payments in the current filtered range
+      let type;
+      if (idx === 0) type = "new";
+      else {
+        const prevTier = tierRank[hist[idx-1].request_type || "pro"] ?? 2;
+        const curTier  = tierRank[p.request_type || "pro"] ?? 2;
+        type = curTier > prevTier ? "upgrade" : "renewal";
+      }
+      buckets[type].count++;
+      buckets[type].amount += Number(p.amount) || 0;
+    });
+  });
+
+  const labels = { new: "🆕 New Subscription", renewal: "🔁 Renewal", upgrade: "⬆️ Upgrade" };
+  const colors = { new: "#4ade80", renewal: "#7ab3ff", upgrade: "#FFD700" };
+  el.innerHTML = Object.keys(buckets).map(k => `
+    <div style="background:#0a0e1a;border:1px solid #1e2a45;border-radius:10px;padding:12px 14px;min-width:150px;">
+      <div style="font-size:12px;color:#7a8aaa;margin-bottom:4px;">${labels[k]}</div>
+      <div style="font-size:18px;font-weight:800;color:${colors[k]};">₹${buckets[k].amount.toLocaleString("en-IN")}</div>
+      <div style="font-size:11px;color:#4a5a7a;">${buckets[k].count} txn${buckets[k].count===1?"":"s"}</div>
+    </div>`).join("");
+}
+
+// ── Highest paying shops within the selected range ──
+function revRenderTopShops(filtered) {
+  const tbody = document.getElementById("rev-top-shops-tbody");
+  if (!filtered.length) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#4a5a7a;padding:20px;">No data in this range.</td></tr>`; return; }
+
+  const byPhone = {};
+  filtered.forEach(p => {
+    const phone = p.customer_phone || "unknown";
+    if (!byPhone[phone]) byPhone[phone] = { amount: 0, count: 0, name: p.customer_name || "" };
+    byPhone[phone].amount += Number(p.amount) || 0;
+    byPhone[phone].count++;
+    if (p.customer_name) byPhone[phone].name = p.customer_name; // keep latest known name
+  });
+
+  const rows = Object.entries(byPhone)
+    .sort((a,b) => b[1].amount - a[1].amount)
+    .slice(0, 10);
+
+  tbody.innerHTML = rows.map(([phone, d]) => `
+    <tr>
+      <td>${escHtml(d.name || "Unknown")} <span style="color:#4a5a7a;font-family:monospace;font-size:11px;">${escHtml(phone)}</span></td>
+      <td style="font-weight:800;color:#4f4;">₹${d.amount.toLocaleString("en-IN")}</td>
+      <td>${d.count}</td>
+    </tr>`).join("");
+}
+
+// ── Always-on KPI strip: today/yesterday/week/month/year/lifetime,
+// computed against ALL approved payments regardless of the detail filter above ──
+function revUpdateKpiStrip() {
+  const approved = (allPayments || []).filter(p => p.status === "approved");
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = startOfToday - 86400000;
+  const dow = now.getDay(); // 0=Sun
+  const startOfWeek = startOfToday - dow * 86400000;
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const startOfYear = new Date(now.getFullYear(), 0, 1).getTime();
+
+  const sums = { today:0, yesterday:0, week:0, month:0, year:0, lifetime:0 };
+  approved.forEach(p => {
+    const ts = p.approved_at || p.submitted_at;
+    if (!ts) return;
+    const ms = new Date(ts).getTime();
+    const amt = Number(p.amount) || 0;
+    sums.lifetime += amt;
+    if (ms >= startOfToday) sums.today += amt;
+    if (ms >= startOfYesterday && ms < startOfToday) sums.yesterday += amt;
+    if (ms >= startOfWeek) sums.week += amt;
+    if (ms >= startOfMonth) sums.month += amt;
+    if (ms >= startOfYear) sums.year += amt;
+  });
+
+  const fmt = n => "₹" + n.toLocaleString("en-IN");
+  document.getElementById("kpi-today").textContent = fmt(sums.today);
+  document.getElementById("kpi-yesterday").textContent = fmt(sums.yesterday);
+  document.getElementById("kpi-week").textContent = fmt(sums.week);
+  document.getElementById("kpi-month").textContent = fmt(sums.month);
+  document.getElementById("kpi-year").textContent = fmt(sums.year);
+  document.getElementById("kpi-lifetime").textContent = fmt(sums.lifetime);
+}
+
+// ── Expiring in next 7 days — independent of the revenue date filter,
+// reads from allKeys (license records), same data source as Users & Subs ──
+function revRenderExpiringSoon() {
+  const tbody = document.getElementById("rev-expiring-tbody");
+  if (!tbody) return;
+  const now = Date.now();
+  const in7d = now + 7 * 86400000;
+  const soon = (allKeys || [])
+    .filter(k => k.active && k.expires_at && new Date(k.expires_at).getTime() > now && new Date(k.expires_at).getTime() <= in7d)
+    .sort((a,b) => new Date(a.expires_at) - new Date(b.expires_at));
+
+  if (!soon.length) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#4a5a7a;padding:20px;">Nothing expiring in the next 7 days.</td></tr>`; return; }
+
+  tbody.innerHTML = soon.map(k => {
+    const planLabel = k.plan === "pro_lite" ? "⚡ Pro Lite" : k.plan === "pro" ? "⭐ Pro" : (k.plan || "—");
+    const daysLeft = Math.ceil((new Date(k.expires_at).getTime() - now) / 86400000);
     return `<tr>
-      <td style="white-space:nowrap;">${dateStr}</td>
-      <td>${escHtml(p.customer_name||"Unknown")}</td>
-      <td style="font-family:monospace;">${escHtml(p.customer_phone||"—")}</td>
-      <td>${planLine}</td>
-      <td style="font-weight:800;color:#4f4;">₹${(Number(p.amount)||0).toLocaleString("en-IN")}</td>
-      <td style="font-family:monospace;color:#FFD700;font-size:11px;">${escHtml(p.utr_number||"—")}</td>
+      <td>${escHtml(k.customer_name||"Unknown")} <span style="color:#4a5a7a;font-family:monospace;font-size:11px;">${escHtml(k.customer_phone||"—")}</span></td>
+      <td>${planLabel}</td>
+      <td style="color:${daysLeft<=2?'#f66':'#FFD700'};font-weight:700;">${new Date(k.expires_at).toLocaleDateString("en-IN",{day:"numeric",month:"short"})} (${daysLeft}d)</td>
     </tr>`;
   }).join("");
+}
+
+function revExportExcel() {
+  if (typeof XLSX === "undefined") {
+    alert("Excel export library didn't load (needs internet access to cdnjs.cloudflare.com). Try again once you're back online, or use the CSV export instead.");
+    return;
+  }
+  const fromStr = document.getElementById("rev-date-from").value || "all";
+  const toStr   = document.getElementById("rev-date-to").value || "all";
+  const rows = [["Date","Customer","Phone","Plan","Amount","UTR"]];
+  document.querySelectorAll("#rev-tbody tr").forEach(tr => {
+    const cells = Array.from(tr.children).map(td => td.textContent.trim());
+    if (cells.length === 6) rows.push(cells);
+  });
+  if (rows.length <= 1) { alert("No data to export for this range."); return; }
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [{wch:18},{wch:20},{wch:14},{wch:22},{wch:12},{wch:16}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Revenue");
+  XLSX.writeFile(wb, `shopchampion-revenue-${fromStr}_to_${toStr}.xlsx`);
 }
 
 function revExportCSV() {
