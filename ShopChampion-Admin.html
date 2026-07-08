@@ -1011,6 +1011,14 @@ const SC_SUPPORT_WHATSAPP = "918744943038";
     padding: 20px !important;
     padding-bottom: 36px !important;
   }
+  /* BUG FIX (fix119): the trial banner is `position:fixed; bottom:60px` with
+     its own ~45px height, so its top edge sits ~105px above the viewport
+     bottom. Without this, its footprint can silently overlap the last
+     interactive element in a scrolled tab (confirmed: covered the Add Sale
+     submit button). Reserve enough bottom padding whenever it's visible. */
+  body.has-trial-banner #tab-content {
+    padding-bottom: 120px !important;
+  }
   #tab-content-wrap {
     max-width: 1100px;
     margin: 0 auto;
@@ -1489,7 +1497,7 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
     <div id="trial-banner-days" style="color:#88aaff;font-size:11px;"></div>
   </div>
   <button class="btn" onclick="openPaymentModal()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;padding:6px 14px;font-size:11px;font-weight:800;white-space:nowrap;">Pro खरीदें</button>
-  <button onclick="document.getElementById('trial-banner').style.display='none'" style="background:transparent;border:none;color:var(--text-dim,#4a5a7a);font-size:16px;cursor:pointer;padding:0 4px;">✕</button>
+  <button onclick="document.getElementById('trial-banner').style.display='none';document.body.classList.remove('has-trial-banner');" style="background:transparent;border:none;color:var(--text-dim,#4a5a7a);font-size:16px;cursor:pointer;padding:0 4px;">✕</button>
 </div>
 
 <!-- ── TRIAL EXPIRED MODAL ── -->
@@ -2388,6 +2396,46 @@ var TRANSLATIONS = {
     // Team tab
     tmLastLogin:"Last login:", tmOnline:"● Online", tmOffline:"○ Offline",
     tmLastSeen:"○ Last seen", tmAddMember:"+ Add Member",
+    // Add/Edit Customer modal
+    modalAddNewCustomer:"Add New Customer", modalEditCustomer:"Edit Customer",
+    modalAddPhoto:"📷 Add Photo", modalOptional:"Optional",
+    modalFullName:"Full Name", modalPhoneNumber:"Phone Number",
+    modalCustomerId:"Customer ID", modalLeaveBlank:"Leave blank if none",
+    modalAutoFilled:"Auto-filled or enter manually",
+    modalCompanyName:"Company / Legal Name", modalGstAddress:"GST Address",
+    modalAddCustomerBtn:"Add Customer →",
+    // Alerts tab
+    alAlertsTitle:"⚠️ Alerts", alAllClear:"All clear — nothing needs attention",
+    alAllClearSub:"Your stock, expiry, and dues all look fine.",
+    alCreditorOverdue:"Creditor Dues (payable by you)", alDaysAgo:"days ago",
+    alDebtorOverdue:"Debtor Dues (owed to you)", alExpired:"Expired",
+    alExpiring30:"Expiring in 30 days", alExpiring7:"Expiring in 7 days",
+    alExpiry:"Expiry:", alExpiryWarnings:"Expiry Warnings",
+    alInventoryBtn:"📦 Inventory →", alLowStock:"Low Stock",
+    alMin:"Min:", alOutOfStock:"Out of Stock", alOutOfStockLabel:"Out of stock · 0",
+    alStock:"Stock:",
+    // Feature comparison table
+    ftAnalytics:"Analytics tab", ftCompare:"Compare tab", ftCreditorsDebtors:"Creditors/Debtors",
+    ftCustomers:"Customers", ftDisplay:"Display screen", ftExport:"Sales history export & bills",
+    ftGst:"GST/GSTIN auto-fill", ftInventory:"Inventory", ftLeaderboard:"Rankings leaderboard",
+    ftMessages:"Shop-to-shop messages", ftPush:"Push notifications", ftSalesPurchases:"Add sales & purchases",
+    ftWhatsApp:"WhatsApp message",
+    fvAdFree:"✅ Ad-free", fvFullAccess:"✅ Full access", fvIncluded:"✅ Included",
+    fvProOnly:"🔒 Pro only", fvUnlimited:"Unlimited", fvUpTo10:"Up to 10",
+    fvUpTo100:"Up to 100", fvUpTo50:"Up to 50 items", fvWithAds:"✅ With ads",
+    // Inventory edit modal
+    invAvgCost:"Avg. Cost", invEditCancel:"Cancel", invEditCategory:"Category",
+    invEditGstRate:"GST Rate", invEditGstType:"GST Type", invEditHsnCode:"HSN/SAC Code",
+    invEditMinStock:"Min Stock Alert", invEditSaveChanges:"✅ Save Changes", invEditUnit:"Unit",
+    invGstExclusive:"Exclusive (added on sale + GST)", invGstInclusive:"Inclusive (GST included in price)",
+    invLowStockTitle:"Low Stock", invRestocked:"Restocked", invSellPrice:"Sell Price",
+    invSold:"Sold", invStockVal:"Stock Value", invTotalIn:"Total In", invTotalValue:"Total Value",
+    sales:"Sales", team:"Team",
+    // Ledger / transaction table headers
+    txAmount:"Amount", txBalance:"Balance", txClearFilters:"Clear Filters", txCredit:"Credit",
+    txDate:"Date", txDebit:"Debit", txDescription:"Description", txInvoice:"Invoice",
+    txNoMatch:"No transactions found matching your search/filter.", txNotFound:"Not Found",
+    txPayment:"Payment", txPurchase:"Purchase", txReceipt:"Receipt", txSale:"Sale", txType:"Type",
     // Settings — Shop ID card
     stShareId:"Share this ID with suppliers & buyers so they can connect with you",
     stCopyId:"📋 Copy ID",
@@ -3672,7 +3720,19 @@ async function saveOneCustomer(c) {
   _invalidateAnalyticsCache(); // MED-05: a single customer save can change purchase totals too
   if (useLocalOnly) { saveCustomers(); return; }
   const { _docId, ...data } = c;
-  await userCol().doc(c.id).set(data);
+  try {
+    await userCol().doc(c.id).set(data);
+  } catch (e) {
+    // BUG FIX (fix119): Firestore write failed (offline, blocked, quota,
+    // permission, etc). Previously this just threw and the caller showed
+    // a "Saved locally" toast that was FALSE — the change existed only in
+    // the in-memory `customers` array and was silently lost on next reload.
+    // Always persist locally here so the data genuinely survives, then
+    // re-throw so callers still show their existing error toast (which is
+    // now actually true).
+    try { safeLocalSet(storageKey("customers_v2"), JSON.stringify(customers)); } catch(_) {}
+    throw e;
+  }
 }
 
 async function deleteOneCustomer(id) {
@@ -3680,7 +3740,15 @@ async function deleteOneCustomer(id) {
   addDeletedId(id); // prevent this ID from being reused
   customers = customers.filter(c => c.id !== id);
   if (useLocalOnly) { saveCustomers(); return; }
-  await userCol().doc(id).delete();
+  try {
+    await userCol().doc(id).delete();
+  } catch (e) {
+    // BUG FIX (fix119): without this, a Firestore delete failure meant the
+    // customer vanished from the UI but reappeared after reload (localStorage
+    // still had the old copy). Persist the removal locally too.
+    try { safeLocalSet(storageKey("customers_v2"), JSON.stringify(customers)); } catch(_) {}
+    throw e;
+  }
 }
 
 
@@ -7183,7 +7251,7 @@ function onLoginSuccess(phone) {
       const dismissed = parseInt(localStorage.getItem(storageKey("sc_push_dismissed")) || "0", 10);
       const dayMs = 24 * 60 * 60 * 1000;
       if (Date.now() - dismissed < 3 * dayMs) return; // dismissed within 3 days — don't re-ask
-      scShowPushPrompt();
+      _showPushPromptWhenGuideClear();
     }, 3000); // wait 3s after login so app feels ready
   }, 1200);
 
@@ -19397,7 +19465,7 @@ async function saveNewCustomer(){
   notify(`✅ ${name} added! ID: ${id}`);
   addHistoryLog('customer','Customer added',`${name} · ID ${id} · _eid:${id}`);
   try { await saveOneCustomer(newC); } catch(e){notify("⚠️ Saved locally, Firebase error: "+e.message);}
-  if(useLocalOnly) safeRenderTab(currentTab);
+  safeRenderTab(currentTab); // always re-render — customer is already in the in-memory array whether or not the cloud save succeeded
 }
 
 // ─── BULK ADD CUSTOMERS ──────────────────────────────────────────────────────
@@ -20189,7 +20257,7 @@ async function saveEditCustomer(oldId){
   closeModal();tempPhoto="";notify("✅ Customer updated!");
   addHistoryLog('customer', _custDiffs.length?'Customer details updated':'Customer updated', _custLogDet);
   try { await saveOneCustomer(c); } catch(e){notify("⚠️ Saved locally, Firebase error: "+e.message);}
-  if(useLocalOnly) safeRenderTab(currentTab);
+  safeRenderTab(currentTab); // always re-render — same fix as addCustomer above
 }
 
 function openPhotoModal(id){
@@ -21856,12 +21924,19 @@ function updateLicenseUI() {
         if (daysEl) daysEl.textContent = `${days} दिन बाकी · ${days} days left in your free trial`;
         if (daysEl) daysEl.style.color = "#88aaff";
       }
+      // BUG FIX (fix119): reserve space in #tab-content so this fixed banner
+      // can never overlap a form's submit button (e.g. Add Sale) — confirmed
+      // the banner's footprint (bottom:60px + its own height) overlapped
+      // #pt-sub in testing.
+      document.body.classList.add("has-trial-banner");
     } else if (!trialIsPaid && !_trialActive && _trialEnd > 0) {
       // Trial just expired — show expiry modal (once per session)
       trialBanner.style.display = "none";
+      document.body.classList.remove("has-trial-banner");
       _maybeShowTrialExpiredModal();
     } else {
       trialBanner.style.display = "none";
+      document.body.classList.remove("has-trial-banner");
     }
   }
   // Re-render current tab to apply lock overlays
@@ -23709,6 +23784,7 @@ function invSubmitAdd(){
   const category = ((document.getElementById("inv-category").value||"").trim()||"General").replace(/\b\w/g,c=>c.toUpperCase());
   const unit = (document.getElementById("inv-unit").value||"").trim();
   const sellPrice = parseFloat(document.getElementById("inv-sell-price").value||"0")||0;
+  if(sellPrice < 0){ notify("❌ Sell price can't be negative","error"); document.getElementById("inv-sell-price").focus(); return; }
   const minStock = (document.getElementById("inv-min-stock").value||"").trim();
   const _gstRateEl = document.getElementById("inv-gst-rate");
   const gstRate = _gstRateEl?.value === "custom"
@@ -23889,7 +23965,22 @@ async function scRequestPushPermission() {
   }
 }
 
-// Show a friendly in-app prompt card asking user to enable notifications
+// Don't show the push-notification prompt on top of the welcome/intro-tour
+// overlays — new users on a slow connection could otherwise see both the
+// language-picker/guide modal AND this prompt stacked on screen at once.
+// Waits (polling, capped) until the guide UI has closed, then shows it.
+function _showPushPromptWhenGuideClear(retriesLeft) {
+  if (retriesLeft === undefined) retriesLeft = 12; // ~18s max wait (1.5s * 12)
+  const guideLangOpen = document.getElementById('sc-guide-lang')?.style.display === 'flex';
+  const guideActive = (typeof _guideActive !== 'undefined') && _guideActive;
+  if ((guideLangOpen || guideActive) && retriesLeft > 0) {
+    setTimeout(() => _showPushPromptWhenGuideClear(retriesLeft - 1), 1500);
+    return;
+  }
+  scShowPushPrompt();
+}
+
+// Show friendly in-app prompt card asking user to enable notifications
 function scDismissPushPrompt() {
   try { localStorage.setItem(storageKey("sc_push_dismissed"), Date.now().toString()); } catch(_){}
   document.getElementById("sc-push-prompt")?.remove();
