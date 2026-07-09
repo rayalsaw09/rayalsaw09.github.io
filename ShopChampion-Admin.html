@@ -23183,7 +23183,7 @@ function invEditModalSave(name){
   const gstIncluded = document.getElementById("iei-gst-included")?.value||"inclusive";
   const hsnCode = (document.getElementById("iei-hsn")?.value||"").trim();
   const minStockVal = document.getElementById("iei-min-stock")?.value;
-  const barcodeVal = (document.getElementById("iei-barcode")?.value||"").trim();
+  const barcodeVal = bcNormalizeCode(document.getElementById("iei-barcode")?.value||"");
 
   if(newNameRaw!==oldName) item.name = newNameRaw;
   if(!isNaN(sell) && sell >= 0) item.sellingPrice = sell;
@@ -23949,7 +23949,7 @@ function invSubmitAdd(){
     : (parseFloat(_gstRateEl?.value||"0")||0);
   const gstIncluded = document.getElementById("inv-gst-included")?.value||"inclusive";
   const hsnCode = (document.getElementById("inv-hsn-add")?.value||"").trim();
-  const barcodeVal = (document.getElementById("inv-barcode-add")?.value||"").trim();
+  const barcodeVal = bcNormalizeCode(document.getElementById("inv-barcode-add")?.value||"");
   if(!hasPermission('inventory_add')) return notify("🚫 No permission to add inventory items","error");
 
   // Find existing item or create new
@@ -23957,7 +23957,7 @@ function invSubmitAdd(){
 
   // ── Barcode conflict check: don't let two items share the same barcode ──
   if(barcodeVal){
-    const clash = inventoryItems.find(x => x.barcode && String(x.barcode).trim()===barcodeVal && x!==item);
+    const clash = inventoryItems.find(x => x.barcode && bcNormalizeCode(x.barcode)===barcodeVal && x!==item);
     if(clash){
       notify("❌ Barcode "+barcodeVal+" is already assigned to \""+clash.name+"\". Remove it there first or use a different code.","error");
       return;
@@ -25247,7 +25247,7 @@ function invMergeGroup(gi){
     // Combine sales log
     survivor.salesLog = (survivor.salesLog||[]).concat(other.salesLog||[]);
     // Keep barcode if survivor doesn't have one
-    if(!survivor.barcode && other.barcode) survivor.barcode = other.barcode;
+    if(!survivor.barcode && other.barcode) survivor.barcode = bcNormalizeCode(other.barcode);
     // Keep selling price / GST / HSN / category / min stock if survivor missing them
     if(!survivor.sellingPrice && other.sellingPrice) survivor.sellingPrice = other.sellingPrice;
     if(survivor.gstRate===undefined && other.gstRate!==undefined) survivor.gstRate = other.gstRate;
@@ -25299,10 +25299,29 @@ var _bcRafId  = null;   // requestAnimationFrame id
 var _bcActive = false;  // scan session active
 
 // ── Lookup item by barcode ────────────────────────────────────────────────────
+// ── Canonical barcode normalization ────────────────────────────────────────
+// Barcode scanners are inconsistent: the SAME physical UPC-A barcode can be
+// read as either a 12-digit UPC-A code or a 13-digit EAN-13 code (with a
+// leading 0) depending on which scan path fires (native BarcodeDetector vs
+// the ZXing fallback), or even between two scans in the same session.
+// Without normalizing, "already in your inventory" lookups and the shared
+// catalog doc-id both silently miss because the two scans produced two
+// different strings for the same real-world barcode. Normalize to a single
+// canonical form everywhere a barcode is compared, stored, or used as a key.
+function bcNormalizeCode(code) {
+  let c = String(code||"").trim();
+  if (/^\d+$/.test(c)) {
+    if (c.length === 12) c = "0" + c; // UPC-A → EAN-13 equivalent
+  }
+  return c;
+}
+
 function findItemByBarcode(code) {
   if (!code) return null;
+  const norm = bcNormalizeCode(code);
+  if (!norm) return null;
   return inventoryItems.find(it =>
-    it.barcode && String(it.barcode).trim() === String(code).trim()
+    it.barcode && bcNormalizeCode(it.barcode) === norm
   ) || null;
 }
 
@@ -25318,9 +25337,10 @@ function bcCatalogKey(name) {
 
 // Fetch up to top-3 name suggestions other shops have used for this barcode
 async function bcFetchCatalogSuggestions(code) {
-  if (!code || !db) return [];
+  const norm = bcNormalizeCode(code);
+  if (!norm || !db) return [];
   try {
-    const snap = await db.collection("barcode_catalog").doc(String(code).trim()).collection("names").get();
+    const snap = await db.collection("barcode_catalog").doc(norm).collection("names").get();
     if (snap.empty) return [];
     const list = [];
     snap.forEach(doc => {
@@ -25329,23 +25349,29 @@ async function bcFetchCatalogSuggestions(code) {
     });
     list.sort((a,b) => b.count - a.count);
     return list.slice(0,3);
-  } catch(e) { console.warn("barcode catalog fetch failed", e); return []; }
+  } catch(e) {
+    console.warn("[BarcodeCatalog] fetch failed", e && e.code, e && e.message);
+    if (e && e.code === "permission-denied") notify("⚠️ Barcode catalog: Firestore permission denied — check your Firestore rules","error");
+    return [];
+  }
 }
 
 // Write back the name this shop used for this barcode, incrementing the shared count
 function bcWriteBackCatalog(code, name, unit, category) {
-  if (!code || !name || !db) return;
+  const norm = bcNormalizeCode(code);
+  if (!norm || !name || !db) return;
   const key = bcCatalogKey(name);
   if (!key) return;
-  try {
-    db.collection("barcode_catalog").doc(String(code).trim()).collection("names").doc(key).set({
-      display: String(name).trim(),
-      unit: unit || "",
-      category: category || "",
-      count: firebase.firestore.FieldValue.increment(1),
-      updatedAt: Date.now()
-    }, { merge: true }).catch(()=>{});
-  } catch(e) {}
+  db.collection("barcode_catalog").doc(norm).collection("names").doc(key).set({
+    display: String(name).trim(),
+    unit: unit || "",
+    category: category || "",
+    count: firebase.firestore.FieldValue.increment(1),
+    updatedAt: Date.now()
+  }, { merge: true }).catch(e => {
+    console.warn("[BarcodeCatalog] write-back failed", e && e.code, e && e.message);
+    if (e && e.code === "permission-denied") notify("⚠️ Barcode catalog: Firestore permission denied — check your Firestore rules","error");
+  });
 }
 
 // ── Scan-first flow for the Add Item form ──────────────────────────────────────
@@ -25614,7 +25640,7 @@ function _bcAssignFilter(query, code, rowId) {
 function _bcAssignBarcodeToItem(itemName, code, rowId) {
   const item = inventoryItems.find(x=>x.name===itemName);
   if(!item){ notify("❌ Item not found","error"); return; }
-  item.barcode = code;
+  item.barcode = bcNormalizeCode(code);
   saveInventory();
   closeModal();
   notify("✅ Barcode " + code + " assigned to " + itemName);
