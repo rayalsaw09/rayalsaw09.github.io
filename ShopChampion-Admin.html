@@ -2208,6 +2208,11 @@ var TRANSLATIONS = {
     invUnit:"Unit", invField:"Field", invValue:"Value", invSr:"Sr.",
     invType:"TYPE", invQtyHeader:"QTY",
     invTaxInvoice:"Tax Invoice", invBill:"BILL", invOriginalRecipient:"ORIGINAL FOR RECIPIENT",
+    invBillNo:"Bill No", invTimeLabel:"Time", invCustomerLabel:"Customer", invItemCol:"Item",
+    invAmtCol:"Amt", invNoteLabel:"Note", invServedBy:"Served by", invPoweredBy:"Powered by", invBilledTo:"Billed To",
+    invTaxSummary:"Tax Summary", invTaxAmt:"Tax Amt",
+    sbSectionTransactions:"Transactions", sbSectionStockMoney:"Stock & Money",
+    sbSectionReports:"Reports", sbSectionOther:"Other",
     invTaxableAmount:"Taxable Amount", invTaxableValue:"Taxable Value",
     invTotalTax:"Total Tax", invTotalAfterTax:"Total Amount After Tax",
     invTotalInWords:"Total in Words", invTerms:"Terms and Conditions",
@@ -2245,6 +2250,8 @@ var TRANSLATIONS = {
     cmpNoData:"No Comparison Data Yet",
     cmpNoDataSub:"Start adding sales, expenses and customer records to unlock your business intelligence dashboard.",
     cmpAddFirstSale:"＋ Add First Sale",
+    cmpPageTitle:"⚖️ Business Comparison & Insights",
+    cmpPageSubtitle:"Compare revenue, profit, expenses, customers, debtors & creditors across different periods.",
     cmpRevenue:"Revenue", cmpProfit:"Profit", cmpExpenses:"Expenses",
     cmpCustomers:"Customers", cmpDebtors:"Debtors", cmpCreditors:"Creditors",
     cmpHealthScore:"🏥 Business Health Score",
@@ -2684,6 +2691,11 @@ var TRANSLATIONS = {
     invUnit:"इकाई", invField:"फ़ील्ड", invValue:"मूल्य", invSr:"क्र.",
     invType:"प्रकार", invQtyHeader:"मात्रा",
     invTaxInvoice:"कर चालान", invBill:"बिल", invOriginalRecipient:"मूल प्राप्तकर्ता के लिए",
+    invBillNo:"बिल नं.", invTimeLabel:"समय", invCustomerLabel:"ग्राहक", invItemCol:"आइटम",
+    invAmtCol:"राशि", invNoteLabel:"नोट", invServedBy:"सेवा द्वारा", invPoweredBy:"संचालित", invBilledTo:"बिल प्राप्तकर्ता",
+    invTaxSummary:"कर सारांश", invTaxAmt:"कर राशि",
+    sbSectionTransactions:"लेनदेन", sbSectionStockMoney:"स्टॉक और पैसा",
+    sbSectionReports:"रिपोर्ट", sbSectionOther:"अन्य",
     invTaxableAmount:"कर योग्य राशि", invTaxableValue:"कर योग्य मूल्य",
     invTotalTax:"कुल कर", invTotalAfterTax:"कर के बाद कुल राशि",
     invTotalInWords:"शब्दों में कुल", invTerms:"नियम और शर्तें",
@@ -2784,6 +2796,8 @@ var TRANSLATIONS = {
     cmpNoData:"अभी तुलना के लिए डेटा नहीं है",
     cmpNoDataSub:"बिज़नेस इंटेलिजेंस डैशबोर्ड अनलॉक करने के लिए बिक्री, खर्च और ग्राहक रिकॉर्ड जोड़ना शुरू करें।",
     cmpAddFirstSale:"＋ पहली बिक्री जोड़ें",
+    cmpPageTitle:"⚖️ बिज़नेस तुलना और जानकारी",
+    cmpPageSubtitle:"विभिन्न अवधियों में आय, मुनाफा, खर्च, ग्राहक, देनदार और लेनदार की तुलना करें।",
     cmpRevenue:"आमदनी", cmpProfit:"मुनाफा", cmpExpenses:"खर्च",
     cmpCustomers:"ग्राहक", cmpDebtors:"देनदार", cmpCreditors:"लेनदार",
     cmpHealthScore:"🏥 व्यापार स्वास्थ्य स्कोर",
@@ -7875,11 +7889,15 @@ function renderTabs(){
   });
 
   // Section groupings
+  // fix123: labels now go through t() so they respect currentLang — previously
+  // hardcoded English strings here bypassed translation entirely (the global
+  // DOM word-substitution pass only catches whole dictionary words, so "Stock & Money"
+  // partially matched "Stock" and left "& Money" in English).
   const SECTIONS = [
-    { label: "Transactions", indices: [0,2,3,1] },
-    { label: "Stock & Money", indices: [4,5] },
-    { label: "Reports", indices: [6,7,8] },
-    { label: "Other", indices: [9,10,11,12,13] }
+    { label: t('sbSectionTransactions'), indices: [0,2,3,1] },
+    { label: t('sbSectionStockMoney'), indices: [4,5] },
+    { label: t('sbSectionReports'), indices: [6,7,8] },
+    { label: t('sbSectionOther'), indices: [9,10,11,12,13] }
   ];
 
   const isPro = currentAppStyle === "pro";
@@ -7893,7 +7911,11 @@ function renderTabs(){
       const tab = TABS.find(t=>t.index===i);
       if(!tab) return;
       const icon = TABS_ICON[i] || "";
-      const label = isPro ? (TABS_LABEL_PRO[i] || TABS_BASE[i]) : (TABS_BASE[i].charAt(0).toUpperCase()+TABS_BASE[i].slice(1));
+      // fix123: mirror getTabs()'s language-aware logic exactly instead of
+      // always falling back to the English TABS_LABEL_PRO array / raw key name.
+      const label = isPro
+        ? (currentLang === "en" ? (TABS_LABEL_PRO[i] || TABS_BASE[i]) : t(TABS_BASE[i]))
+        : t(TABS_BASE[i]);
       const shortcut = SHORTCUT_LABELS[i] || "";
       const isActive = currentTab === i;
 
@@ -9294,10 +9316,25 @@ async function bwSubmit(){
     const nm=(row.querySelector('.bw-row-name')?.value||'').trim();
     const qty=parseFloat(row.querySelector('.bw-row-qty')?.value||'0')||0;
     const ppu=parseFloat(row.querySelector('.bw-row-price')?.value||'0')||0;
-    if(nm&&qty>0) borrowedItems.push({name:nm,qty,pricePerUnit:ppu});
+    if(nm&&qty>0){
+      // fix121: carry GST rate + HSN from matching inventory item so the
+      // saved borrow bill shows tax details just like Add Sale bills do.
+      const inv=inventoryItems.find(x=>x.name===nm);
+      const gstRate=(inv&&inv.gstRate&&inv.gstRate>0)?inv.gstRate:null;
+      const hsn=inv&&inv.hsnCode?inv.hsnCode:"";
+      const gstIncluded=inv&&inv.gstIncluded?inv.gstIncluded:undefined;
+      borrowedItems.push({name:nm,qty,pricePerUnit:ppu,gstRate,hsn,gstIncluded});
+    }
   });
   const a=borrowedItems.length
-    ? borrowedItems.reduce((sum,bi)=>sum+(bi.qty*(bi.pricePerUnit||0)),0)
+    ? borrowedItems.reduce((sum,bi)=>{
+        const inv = inventoryItems.find(x=>x.name===bi.name);
+        if(inv && inv.gstRate && inv.gstRate>0){
+          const g = invItemGstTotal(inv, bi.qty);
+          return sum + g.total;
+        }
+        return sum+(bi.qty*(bi.pricePerUnit||0));
+      },0)
     : parseFloat(document.getElementById('bw-amt').value)||0;
   if(!s||!a||a<=0){notify('⚠️ Select a customer and add items with quantity');return;}
   const c=customers.find(x=>x.id===s);if(!c)return;
@@ -9306,12 +9343,17 @@ async function bwSubmit(){
   const borrowId='BW'+Date.now();
   const isoDate=(date||new Date().toISOString().slice(0,10))+'T00:00:00.000Z';
   const itemLabel=borrowedItems.length ? borrowedItems.map(bi=>bi.qty+'× '+bi.name).join(', ') : '';
-  const borrow={id:borrowId,amount:a,item:itemLabel,items:borrowedItems,date:date||new Date().toISOString().slice(0,10),due:due||'',status:'pending',recordedAt:new Date().toISOString()};
+  // fix124: stamp actor (who recorded this) and log it to History — previously
+  // borrow entries were the only transaction type that skipped both, so they
+  // never showed an "Owner"/staff badge and never appeared in the History tab.
+  const bwActor = getActorName();
+  const borrow={id:borrowId,amount:a,item:itemLabel,items:borrowedItems,date:date||new Date().toISOString().slice(0,10),due:due||'',status:'pending',recordedAt:new Date().toISOString(),actor:bwActor};
   c.borrows.unshift(borrow);
-  c.purchases.unshift({bill:borrowId,amount:a,date:isoDate,notes:itemLabel,type:'borrow',borrowStatus:'pending',due:due||'',soldItems:borrowedItems});
+  c.purchases.unshift({bill:borrowId,amount:a,date:isoDate,notes:itemLabel,type:'borrow',borrowStatus:'pending',due:due||'',soldItems:borrowedItems,actor:bwActor});
   c.totalSpend+=a;
   notify(`📦 Borrow of ${formatINR(a)} added to ${c.name}'s total`);
   try{await saveOneCustomer(c);}catch(e){notify('⚠️ Firebase error: '+e.message);}
+  addHistoryLog('borrow','Borrow recorded',`${c.name} · ${formatINR(a)}${itemLabel?` · ${itemLabel}`:''} · Bill ${borrowId}`);
   document.getElementById('bw-amt').value='';
   document.getElementById('bw-items-list').innerHTML='';
   document.getElementById('bw-due').value='';
@@ -9363,12 +9405,14 @@ async function bwMarkReturned(custId,borrowId,payMode){
       }
       c.totalSpend=(c.purchases||[]).reduce((s,p)=>s+(p.amount||0),0);
       notify(`✅ Payment received — moved to purchase history for ${c.name}`);
+      addHistoryLog('borrow','Borrow payment received — moved to purchases',`${c.name} · ${formatINR(b.amount)} · Bill ${borrowId}`);
     } else {
       b.status="returned"; b.returnedAt=new Date().toISOString();
       // Sync status on the matching purchase entry (legacy)
       const p=(c.purchases||[]).find(x=>x.bill===borrowId);
       if(p){p.borrowStatus="returned";}
       notify(`✅ Marked as returned for ${c.name}`);
+      addHistoryLog('borrow','Borrow cleared',`${c.name} · ${formatINR(b.amount)}${b.item?` · ${b.item}`:''} · Bill ${borrowId}`);
     }
     const _bwClrRefId = "BW_CLR_"+borrowId+"_"+Date.now(); b._clrCashRefId = _bwClrRefId;
 
@@ -9549,11 +9593,13 @@ async function bwRecordPartialPayment(custId, borrowId, payAmount, payMode){
     const p = (c.purchases||[]).find(x=>x.bill===borrowId);
     if(p){ p.borrowStatus="returned"; p.amountPaid=b.amountPaid; }
     notify(`✅ Fully paid! ${c.name}'s borrow of ${formatINR(b.amount)} is cleared.`);
+    addHistoryLog('borrow','Borrow fully paid',`${c.name} · ${formatINR(payAmount)} (final payment) · Bill ${borrowId}`);
   } else {
     b.status = "partial";
     const p = (c.purchases||[]).find(x=>x.bill===borrowId);
     if(p){ p.borrowStatus="partial"; p.amountPaid=b.amountPaid; }
     notify(`💰 Payment of ${formatINR(payAmount)} recorded. ${formatINR(remaining)} still remaining for ${c.name}.`);
+    addHistoryLog('borrow','Borrow partial payment',`${c.name} · ${formatINR(payAmount)} · ${formatINR(remaining)} remaining · Bill ${borrowId}`);
   }
 
   try{ await saveOneCustomer(c); } catch(e){ notify("⚠️ Save error: "+e.message); }
@@ -9679,15 +9725,46 @@ function renderBorrowSlipHTML(c, b) {
 function showBorrowSlipModal(custId, borrowId) {
   const c = customers.find(x => x.id === custId); if (!c) return;
   const b = (c.borrows || []).find(x => x.id === borrowId); if (!b) return;
-  const slipHTML = renderBorrowSlipHTML(c, b);
+
+  // fix121: when the borrow has itemized items (from the Borrow tab's item rows),
+  // build the same bill object Add Sale uses and render it with the exact same
+  // template — so HSN/GST/tax breakdown looks identical to a sale bill.
+  // Falls back to the plain IOU slip only for old-style single-amount borrows.
+  const hasItems = Array.isArray(b.items) && b.items.length > 0;
+  const billObj = hasItems ? createBillObject({
+    custId,
+    soldItems: b.items,
+    amount: b.amount,
+    billNum: b.id,
+    notes: b.item || '',
+    date: (b.date || new Date().toISOString().slice(0,10)) + 'T00:00:00.000Z'
+  }) : null;
+
+  const paid = b.amountPaid || 0;
+  const remaining = Math.max(0, Math.round((Number(b.amount) - paid) * 100) / 100);
+  const statusBanner = `
+    <div style="max-width:420px;margin:0 auto 12px;padding:10px 14px;border-radius:10px;text-align:center;font-size:12px;font-weight:700;
+      background:${b.status==='returned'?'#0a2a12':'#2a1500'};color:${b.status==='returned'?'#4f4':'#f84'};">
+      ${b.status==='returned' ? '✅ Cleared' : b.status==='partial' ? `💛 Partial — ₹${formatINR(remaining)} left` : '🔴 Pending — Payment Due'}
+    </div>`;
+
+  const bodyHTML = billObj ? (statusBanner + renderBillHTML(billObj)) : renderBorrowSlipHTML(c, b);
+  window._currentBill = billObj; // so Download PDF / WhatsApp reuse Add Sale's bill functions
+
   showWideModal(`
     ${modalHeader('🧾 Borrow Slip — ' + escHtml(c.name))}
-    ${slipHTML}
+    <div style="background:#f5f5f5;border-radius:12px;padding:12px;margin-bottom:16px;max-height:55vh;overflow-y:auto;">
+      ${bodyHTML}
+    </div>
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
       <button onclick="printBill()" class="btn"
         style="flex:1;background:linear-gradient(135deg,#1d4ed8,#3b82f6);color:#fff;padding:11px;font-size:13px;font-weight:700;">
         🖨️ Print Slip
       </button>
+      ${billObj ? `<button onclick="downloadBillPDF(window._currentBill)" class="btn"
+        style="flex:1;background:linear-gradient(135deg,#3a1a6e,#7a3aaa);color:#fff;padding:11px;font-size:13px;font-weight:700;">
+        📄 Download PDF
+      </button>` : ''}
       ${c.phone ? `<button onclick="sendBorrowSlipWhatsApp('${custId}','${borrowId}')" class="btn"
         style="flex:1;background:linear-gradient(135deg,#15803d,#22c55e);color:#fff;padding:11px;font-size:13px;font-weight:700;">
         💬 Send WhatsApp
@@ -9714,7 +9791,23 @@ function sendBorrowSlipWhatsApp(custId, borrowId) {
   let msg = `🧾 *Borrow Slip — ${shopName}*\n`;
   msg += `────────────────────\n`;
   msg += `👤 Customer: *${c.name}*\n`;
-  msg += `📦 Item/Reason: ${b.item || '—'}\n`;
+  // fix121: show per-item GST breakdown (mirrors Add Sale's WhatsApp bill) when items exist
+  if (Array.isArray(b.items) && b.items.length > 0) {
+    msg += `📦 Items:\n`;
+    b.items.forEach(bi => {
+      const inv = inventoryItems.find(x => x.name === bi.name);
+      const gstRate = bi.gstRate || (inv && inv.gstRate) || 0;
+      let lineTotal = bi.qty * (bi.pricePerUnit || 0), gstAmt = 0;
+      if (inv && inv.gstRate && inv.gstRate > 0) {
+        const g = invItemGstTotal(inv, bi.qty);
+        lineTotal = g.total; gstAmt = g.gstAmt;
+      }
+      const gstLine = gstAmt > 0 ? ` (GST ${gstRate}%: ₹${gstAmt.toFixed(2)})` : "";
+      msg += `  ${bi.qty}× ${bi.name} = ₹${lineTotal.toFixed(2)}${gstLine}\n`;
+    });
+  } else {
+    msg += `📦 Item/Reason: ${b.item || '—'}\n`;
+  }
   msg += `💰 Amount Borrowed: *₹${formatINR(total)}*\n`;
   if (paid > 0) {
     msg += `✅ Paid So Far: ₹${formatINR(paid)}\n`;
@@ -9776,7 +9869,12 @@ async function deletePurchase(custId,bill,dateEnc){
     }
     notify("✅ Purchase deleted");
     try{await saveOneCustomer(c);}catch(e){notify("⚠️ Firebase error: "+e.message);}
-    addHistoryLog('sale','Sale deleted',`${c.name} · ${formatINR(_delAmt)}${bill?` · Bill ${bill}`:''} · _eid:${custId}`);
+    // fix124: label matches what was actually deleted — previously always said "Sale deleted" even for borrows
+    if(_delPurchase.type === "borrow"){
+      addHistoryLog('borrow','Borrow deleted',`${c.name} · ${formatINR(_delAmt)}${bill?` · Bill ${bill}`:''} · _eid:${custId}`);
+    } else {
+      addHistoryLog('sale','Sale deleted',`${c.name} · ${formatINR(_delAmt)}${bill?` · Bill ${bill}`:''} · _eid:${custId}`);
+    }
     // Reverse the cash/bank entry that was created when this sale was recorded.
     // Remove the original "in" entry by its refId — this correctly restores the
     // balance without double-counting. Falls back to a manual "in" reversal if
@@ -11795,8 +11893,8 @@ function renderCompare(){
     <div style="margin-bottom:18px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
         <div>
-          <h2 style="margin:0 0 4px;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">⚖️ Business Comparison & Insights</h2>
-          <div style="font-size:11px;color:var(--text-muted,#4a5a7a);">Compare revenue, profit, expenses, customers, debtors & creditors across different periods.</div>
+          <h2 style="margin:0 0 4px;font-size:20px;font-weight:800;color:#FFD700;font-family:'Rajdhani',sans-serif;">${t('cmpPageTitle')}</h2>
+          <div style="font-size:11px;color:var(--text-muted,#4a5a7a);">${t('cmpPageSubtitle')}</div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
           <div style="font-size:10px;color:var(--text-muted,#3a4a6a);">${t('cmpUpdatedLabel')} ${lastUpdated}</div>
@@ -17089,6 +17187,7 @@ var _histTextSearch = ""; // free-text search
 var HIST_TYPE_META = {
   sale:      {icon:"💰", color:"#4ade80", label:"Sale"},
   purchase:  {icon:"📦", color:"#f59e0b", label:"Purchase"},
+  borrow:    {icon:"🧡", color:"#f97316", label:"Borrow"},
   inventory: {icon:"📦", color:"#7ab3ff", label:"Inventory"},
   customer:  {icon:"👤", color:"#a78bfa", label:"Customer"},
   creditor:  {icon:"🏦", color:"#fbbf24", label:"Creditor"},
@@ -23377,16 +23476,34 @@ function ptAddItemRow(){
 function ptUpdateTotal(){
   const rows = document.querySelectorAll(".pt-item-row");
   let grand = 0;
+  let grandBase = 0;
+  let grandGst = 0;
   rows.forEach(row=>{
     const qty = parseFloat(row.querySelector(".pt-item-qty")?.value||"0")||0;
     const ppu = parseFloat(row.querySelector(".pt-item-price")?.value||"0")||0;
-    const lineTotal = qty*ppu;
+    const name = row.querySelector(".pt-item-name")?.value?.trim()||"";
+    const inv = inventoryItems.find(x=>x.name===name);
+    // fix121: mirror bwUpdateTotal's GST-aware calc exactly, so Add Sale's
+    // live preview matches what ptSubmit actually charges (and matches Borrow's preview)
+    let lineTotal = qty*ppu;
+    let gstAmt = 0;
+    if(inv && inv.gstRate && inv.gstRate>0 && qty>0 && ppu>0){
+      const g = invItemGstTotal(inv, qty);
+      lineTotal = g.total;
+      gstAmt = g.gstAmt;
+      grandBase += g.base;
+      grandGst  += g.gstAmt;
+    } else {
+      grandBase += lineTotal;
+    }
     grand += lineTotal;
     const lt = row.querySelector(".pt-line-total");
     if(lt){
       if(qty>0&&ppu>0){
         lt.style.display="block";
-        lt.textContent="= ₹"+lineTotal.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
+        lt.innerHTML = gstAmt>0
+          ? `= ₹${lineTotal.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})} <span style="font-size:10px;color:#a78bfa;">(+GST ₹${gstAmt.toFixed(2)})</span>`
+          : "= ₹"+lineTotal.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
       } else {
         lt.style.display="none";
       }
@@ -23397,7 +23514,10 @@ function ptUpdateTotal(){
   if(totalEl){
     if(grand>0){
       totalEl.style.display="block";
-      totalEl.innerHTML=`<span style="color:var(--text-muted,#7a8aaa);font-size:13px;">Total Amount:</span> <span style="color:#FFD700;font-size:20px;font-weight:800;">₹${grand.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>`;
+      const gstLine = grandGst>0
+        ? `<div style="font-size:11px;color:#a78bfa;margin-top:4px;">Base: ₹${grandBase.toFixed(2)} + GST: ₹${grandGst.toFixed(2)}</div>`
+        : '';
+      totalEl.innerHTML=`<span style="color:var(--text-muted,#7a8aaa);font-size:13px;">Total Amount:</span> <span style="color:#FFD700;font-size:20px;font-weight:800;">₹${grand.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}</span>${gstLine}`;
     } else {
       totalEl.style.display="none";
     }
@@ -27885,9 +28005,10 @@ function createBillObject({ custId, soldItems, amount, billNum, notes, date }) {
   const subtotal = items.reduce((s, i) => s + i.amount, 0) || amount;
   const taxTotal = items.reduce((s, i) => s + (i.taxAmt || 0), 0);
   const taxableTotal = items.reduce((s, i) => s + (i.taxableAmt || 0), 0);
-  // For exclusive GST items, customer pays base + tax; for inclusive, total = subtotal (tax already inside)
-  const hasExclusive = items.some(i => (i.gstIncluded || "inclusive") === "exclusive" && (i.taxAmt || 0) > 0);
-  const total = parseFloat((subtotal + (hasExclusive ? taxTotal : 0)).toFixed(2));
+  // fix122: item.amount already equals base+tax for exclusive lines (and equals the
+  // tax-inclusive price for inclusive lines) — so subtotal alone IS the customer-facing
+  // total. Previously this added taxTotal again on top for exclusive items, double-counting GST.
+  const total = parseFloat(subtotal.toFixed(2));
 
   // Build GST summary by rate
   const gstSummary = {};
@@ -28158,16 +28279,16 @@ function renderBillHTML(bill) {
         ${showGST ? `<div style="font-size:11px;color:#555;margin-top:4px;"><strong>GSTIN:</strong> ${gstNum}</div>` : ""}
       </div>
       <div style="text-align:right;">
-        <div style="font-size:18px;font-weight:900;color:#1a5aaa;letter-spacing:1px;margin-bottom:8px;">TAX INVOICE</div>
-        <div style="font-size:12px;color:#555;"><strong style="color:#111;">Invoice No:</strong> ${bill.billId}</div>
-        <div style="font-size:12px;color:#555;margin-top:3px;"><strong style="color:#111;">Date:</strong> ${dateStr}</div>
-        <div style="font-size:12px;color:#555;margin-top:3px;"><strong style="color:#111;">Time:</strong> ${timeStr}</div>
+        <div style="font-size:18px;font-weight:900;color:#1a5aaa;letter-spacing:1px;margin-bottom:8px;">${t('invTaxInvoice').toUpperCase()}</div>
+        <div style="font-size:12px;color:#555;"><strong style="color:#111;">${t('invInvoiceNo')}:</strong> ${bill.billId}</div>
+        <div style="font-size:12px;color:#555;margin-top:3px;"><strong style="color:#111;">${t('invDate')}:</strong> ${dateStr}</div>
+        <div style="font-size:12px;color:#555;margin-top:3px;"><strong style="color:#111;">${t('invTimeLabel')}:</strong> ${timeStr}</div>
       </div>
     </div>
 
     <!-- Billed To -->
     <div style="margin-bottom:14px;padding:10px 14px;background:#f7f9ff;border-radius:8px;border:1px solid #e0e8f8;">
-      <div style="font-size:11px;font-weight:700;color:#1a5aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Billed To</div>
+      <div style="font-size:11px;font-weight:700;color:#1a5aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">${t('invBilledTo')}</div>
       <div style="font-size:14px;font-weight:700;color:#111;">${bill.customerName}</div>
       ${bill.customerPhone ? `<div style="font-size:12px;color:#555;margin-top:2px;">📞 ${bill.customerPhone}</div>` : ""}
     </div>
@@ -28177,15 +28298,15 @@ function renderBillHTML(bill) {
       <thead>
         <tr style="background:#1a2a50;color:#fff;">
           ${hsnEnabled ? `<th style="padding:8px 6px;font-size:11px;text-align:left;font-weight:700;">HSN/SAC</th>` : ""}
-          <th style="padding:8px 6px;font-size:11px;text-align:left;font-weight:700;">Description</th>
-          <th style="padding:8px 6px;font-size:11px;text-align:center;font-weight:700;">Qty</th>
-          <th style="padding:8px 6px;font-size:11px;text-align:right;font-weight:700;">Rate</th>
-          <th style="padding:8px 6px;font-size:11px;text-align:right;font-weight:700;">Taxable</th>
+          <th style="padding:8px 6px;font-size:11px;text-align:left;font-weight:700;">${t('invDescription')}</th>
+          <th style="padding:8px 6px;font-size:11px;text-align:center;font-weight:700;">${t('invQty')}</th>
+          <th style="padding:8px 6px;font-size:11px;text-align:right;font-weight:700;">${t('invRate')}</th>
+          <th style="padding:8px 6px;font-size:11px;text-align:right;font-weight:700;">${t('invTaxableValue')}</th>
           ${isIGST
             ? `<th style="padding:8px 6px;font-size:11px;text-align:center;font-weight:700;">IGST</th>`
             : `<th style="padding:8px 6px;font-size:11px;text-align:center;font-weight:700;">CGST</th>
                <th style="padding:8px 6px;font-size:11px;text-align:center;font-weight:700;">SGST</th>`}
-          <th style="padding:8px 6px;font-size:11px;text-align:right;font-weight:700;">Amount</th>
+          <th style="padding:8px 6px;font-size:11px;text-align:right;font-weight:700;">${t('invAmount')}</th>
         </tr>
       </thead>
       <tbody style="border-bottom:1px solid #ccc;">
@@ -28197,17 +28318,17 @@ function renderBillHTML(bill) {
     <div style="display:flex;gap:20px;align-items:flex-start;margin-bottom:14px;">
       <!-- GST Summary table -->
       ${gstSummaryRows ? `<div style="flex:1;">
-        <div style="font-size:11px;font-weight:700;color:#1a2a50;text-transform:uppercase;margin-bottom:6px;">Tax Summary</div>
+        <div style="font-size:11px;font-weight:700;color:#1a2a50;text-transform:uppercase;margin-bottom:6px;">${t('invTaxSummary')}</div>
         <table style="width:100%;border-collapse:collapse;border:1px solid #ddd;">
           <thead>
             <tr style="background:#f0f4fa;">
-              <th style="padding:5px 8px;font-size:10px;text-align:left;font-weight:700;border:1px solid #ddd;">Rate</th>
-              <th style="padding:5px 8px;font-size:10px;text-align:right;font-weight:700;border:1px solid #ddd;">Taxable</th>
+              <th style="padding:5px 8px;font-size:10px;text-align:left;font-weight:700;border:1px solid #ddd;">${t('invRate')}</th>
+              <th style="padding:5px 8px;font-size:10px;text-align:right;font-weight:700;border:1px solid #ddd;">${t('invTaxableValue')}</th>
               ${isIGST
                 ? `<th style="padding:5px 8px;font-size:10px;text-align:right;font-weight:700;border:1px solid #ddd;">IGST</th>`
                 : `<th style="padding:5px 8px;font-size:10px;text-align:right;font-weight:700;border:1px solid #ddd;">CGST</th>
                    <th style="padding:5px 8px;font-size:10px;text-align:right;font-weight:700;border:1px solid #ddd;">SGST</th>`}
-              <th style="padding:5px 8px;font-size:10px;text-align:right;font-weight:700;border:1px solid #ddd;">Tax Amt</th>
+              <th style="padding:5px 8px;font-size:10px;text-align:right;font-weight:700;border:1px solid #ddd;">${t('invTaxAmt')}</th>
             </tr>
           </thead>
           <tbody>${gstSummaryRows}</tbody>
@@ -28236,8 +28357,8 @@ function renderBillHTML(bill) {
     <!-- Footer -->
     <div style="margin-top:16px;text-align:center;border-top:1px solid #ccc;padding-top:12px;">
       <div style="font-size:12px;color:#555;">${footer}</div>
-      ${showStaffOnBill && bill.actor ? `<div style="font-size:11px;color:#666;margin-top:6px;">Served by: <strong>${bill.actor}</strong></div>` : ""}
-      <div style="font-size:10px;color:#aaa;margin-top:4px;">Powered by ShopChampion</div>
+      ${showStaffOnBill && bill.actor ? `<div style="font-size:11px;color:#666;margin-top:6px;">${t('invServedBy')}: <strong>${bill.actor}</strong></div>` : ""}
+      <div style="font-size:10px;color:#aaa;margin-top:4px;">${t('invPoweredBy')} ShopChampion</div>
     </div>
   </div>`;
   }
@@ -28256,14 +28377,14 @@ function renderBillHTML(bill) {
     <!-- Bill Info -->
     <div style="margin-bottom:10px;border-bottom:1px dashed #999;padding-bottom:8px;">
       <div style="display:flex;justify-content:space-between;font-size:11px;color:#555;">
-        <span><strong style="color:#111;">Bill No:</strong> ${bill.billId}</span>
+        <span><strong style="color:#111;">${t('invBillNo')}:</strong> ${bill.billId}</span>
         <span>${dateStr}</span>
       </div>
       <div style="font-size:11px;color:#555;margin-top:3px;">
-        <strong style="color:#111;">Time:</strong> ${timeStr}
+        <strong style="color:#111;">${t('invTimeLabel')}:</strong> ${timeStr}
       </div>
       <div style="font-size:12px;font-weight:700;color:#111;margin-top:5px;">
-        Customer: ${bill.customerName}${bill.customerPhone ? ` · 📞 ${bill.customerPhone}` : ""}
+        ${t('invCustomerLabel')}: ${bill.customerName}${bill.customerPhone ? ` · 📞 ${bill.customerPhone}` : ""}
       </div>
     </div>
 
@@ -28271,8 +28392,8 @@ function renderBillHTML(bill) {
     <table style="width:100%;border-collapse:collapse;margin-bottom:10px;">
       <thead>
         <tr style="border-bottom:1px solid #ccc;">
-          <th style="text-align:left;font-size:10px;color:#666;padding-bottom:4px;font-weight:700;text-transform:uppercase;">Item</th>
-          <th style="text-align:right;font-size:10px;color:#666;padding-bottom:4px;font-weight:700;text-transform:uppercase;">Amt</th>
+          <th style="text-align:left;font-size:10px;color:#666;padding-bottom:4px;font-weight:700;text-transform:uppercase;">${t('invItemCol')}</th>
+          <th style="text-align:right;font-size:10px;color:#666;padding-bottom:4px;font-weight:700;text-transform:uppercase;">${t('invAmtCol')}</th>
         </tr>
       </thead>
       <tbody>${itemRows}</tbody>
@@ -28287,13 +28408,13 @@ function renderBillHTML(bill) {
       </div>
     </div>
 
-    ${bill.notes ? `<div style="margin-top:8px;font-size:10px;color:#666;border-top:1px dashed #ccc;padding-top:6px;">Note: ${bill.notes}</div>` : ""}
+    ${bill.notes ? `<div style="margin-top:8px;font-size:10px;color:#666;border-top:1px dashed #ccc;padding-top:6px;">${t('invNoteLabel')}: ${bill.notes}</div>` : ""}
 
     <!-- Footer -->
     <div style="margin-top:12px;text-align:center;border-top:1px dashed #999;padding-top:8px;">
       <div style="font-size:11px;color:#555;">${footer}</div>
-      ${showStaffOnBill && bill.actor ? `<div style="font-size:10px;color:#666;margin-top:4px;">Served by: <strong>${bill.actor}</strong></div>` : ""}
-      <div style="font-size:9px;color:#999;margin-top:4px;">Powered by ShopChampion</div>
+      ${showStaffOnBill && bill.actor ? `<div style="font-size:10px;color:#666;margin-top:4px;">${t('invServedBy')}: <strong>${bill.actor}</strong></div>` : ""}
+      <div style="font-size:9px;color:#999;margin-top:4px;">${t('invPoweredBy')} ShopChampion</div>
     </div>
   </div>`;
 }
