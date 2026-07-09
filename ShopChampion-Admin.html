@@ -2340,6 +2340,14 @@ var TRANSLATIONS = {
     invBarcodePlaceholder:"e.g. 8901234567890 or custom code like 1001",
     invScanBtn:"📷 Scan",
     invBarcodeTip:"💡 Custom code tip: assign short codes like 1001=Rice, 1002=Dal for easy scanning",
+    invScanFirstTitle:"📷 Scan Barcode First",
+    invScanFirstDesc:"Scan the item's barcode before typing anything — if another shop has already added it, we'll suggest the name, unit and category so you don't have to type it all out.",
+    invCatalogLoading:"🔍 Checking what other shops call this...",
+    invOthersCalledThis:"📦 Others have called this:",
+    invUsedByOneShop:"used by 1 shop",
+    invUsedByShops:"used by {n} shops",
+    invUseBtn:"Use →",
+    invNoneOfThese:"✏️ None of these, type my own",
     invOpeningStockHeader:"📦 Opening Stock",
     invOpeningStockSkipHint:"(optional — skip if adding stock via Creditor tab)",
     invOpeningStockDesc:"Enter qty if you already have this item in stock. Gets added directly to inventory.",
@@ -2886,6 +2894,14 @@ var TRANSLATIONS = {
     invBarcodePlaceholder:"जैसे 8901234567890 या कस्टम कोड जैसे 1001",
     invScanBtn:"📷 स्कैन करें",
     invBarcodeTip:"💡 कस्टम कोड टिप: आसान स्कैनिंग के लिए छोटे कोड दें जैसे 1001=चावल, 1002=दाल",
+    invScanFirstTitle:"📷 पहले बारकोड स्कैन करें",
+    invScanFirstDesc:"कुछ भी टाइप करने से पहले आइटम का बारकोड स्कैन करें — अगर किसी और दुकान ने इसे पहले ही जोड़ा है, तो हम नाम, इकाई और श्रेणी सुझाएंगे ताकि आपको सब कुछ टाइप न करना पड़े।",
+    invCatalogLoading:"🔍 देख रहे हैं कि इसे और दुकानें क्या कहती हैं...",
+    invOthersCalledThis:"📦 दूसरों ने इसे यह नाम दिया है:",
+    invUsedByOneShop:"1 दुकान द्वारा उपयोग",
+    invUsedByShops:"{n} दुकानों द्वारा उपयोग",
+    invUseBtn:"उपयोग करें →",
+    invNoneOfThese:"✏️ इनमें से कोई नहीं, खुद टाइप करूंगा",
     invOpeningStockHeader:"📦 शुरुआती स्टॉक",
     invOpeningStockSkipHint:"(वैकल्पिक — यदि लेनदार टैब से स्टॉक जोड़ रहे हैं तो छोड़ दें)",
     invOpeningStockDesc:"यदि यह आइटम पहले से स्टॉक में है तो मात्रा दर्ज करें। यह सीधे इन्वेंटरी में जुड़ जाएगा।",
@@ -3009,6 +3025,10 @@ var invView = "stock"; // "stock" | "add" | "restock" | "log" | "detail" | "cate
 var invRestockSearch = ""; // search query for restock tab
 var invRestockSelected = null; // selected item name for restock
 var invPrefillName = ""; // pre-fill name when Restock button is clicked
+var invCatalogPick = null; // {display, unit, category} chosen from shared barcode catalog suggestions
+var invCatalogSuggestions = []; // top-3 suggestions loaded from shared barcode catalog for scanned code
+var invCatalogLoading = false; // true while fetching suggestions after a scan
+var invScannedBarcode = ""; // barcode captured by the Add Item scan-first flow
 var invSelectedCat = ""; // currently selected category pill
 var invSearchQuery = ""; // search box text
 
@@ -23592,7 +23612,7 @@ function renderInventoryTab(){
 
   const tabBtn=(v,label,color)=>{
     const a=invView===v;
-    return `<button onclick="if('${v}'!=='add')invPrefillName='';invView='${v}';invSelectedCat='';safeRenderTab(currentTab)" style="cursor:pointer;flex:1;padding:8px 2px;border-radius:10px;border:2px solid ${a?color:'#1e2a45'};background:${a?'#0a0e1a':'transparent'};color:${a?color:'#4a5a7a'};font-size:11px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;">${label}</button>`;
+    return `<button onclick="if('${v}'!=='add'){invPrefillName='';invCatalogPick=null;invCatalogSuggestions=[];invCatalogLoading=false;invScannedBarcode='';}invView='${v}';invSelectedCat='';safeRenderTab(currentTab)" style="cursor:pointer;flex:1;padding:8px 2px;border-radius:10px;border:2px solid ${a?color:'#1e2a45'};background:${a?'#0a0e1a':'transparent'};color:${a?color:'#4a5a7a'};font-size:11px;font-weight:${a?800:600};font-family:'Nunito',sans-serif;transition:all 0.2s;">${label}</button>`;
   };
 
   const nav = `<div style="display:flex;gap:6px;margin-bottom:16px;">
@@ -23654,23 +23674,52 @@ function renderInventoryTab(){
       <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:6px;">${t('invAddEditHeader')}</div>
       <div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-bottom:14px;padding:10px 12px;background:var(--bg-row-even,#0d1220);border-radius:8px;border:1px solid var(--border-main,#1e2a45);">${t('invAddEditDesc')}</div>
 
+      <div style="background:linear-gradient(135deg,#0d2010,#0a1a0a);border:1px solid #22c55e;border-radius:10px;padding:12px;margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:800;color:#4ade80;margin-bottom:8px;">${t('invScanFirstTitle')}</div>
+        <div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-bottom:8px;line-height:1.5;">${t('invScanFirstDesc')}</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="input" id="inv-barcode-add" type="text" placeholder="${t('invBarcodePlaceholder')}"
+            value="${prefillItem ? escHtml(prefillItem.barcode||"") : escHtml(invScannedBarcode||"")}"
+            oninput="invScannedBarcode=this.value.trim();"
+            style="margin-bottom:0;font-family:monospace;flex:1;" />
+          <button type="button" onclick="startBarcodeScanForAddItem()" style="cursor:pointer;background:#1a3a1a;border:1px solid #22c55e;border-radius:8px;color:#22c55e;font-size:12px;font-weight:700;padding:9px 12px;white-space:nowrap;">${t('invScanBtn')}</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-top:6px;">${t('invBarcodeTip')}</div>
+        ${invCatalogLoading ? `<div style="margin-top:10px;font-size:12px;color:#93c5fd;">${t('invCatalogLoading')}</div>` : ""}
+        ${(!invCatalogLoading && invCatalogSuggestions.length) ? `
+        <div style="margin-top:10px;border-top:1px solid #1a4a1a;padding-top:10px;">
+          <div style="font-size:11px;font-weight:700;color:#4ade80;margin-bottom:6px;">${t('invOthersCalledThis')}</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            ${invCatalogSuggestions.map((s,i)=>`
+              <div onclick="invApplyCatalogSuggestion(${i})" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--bg-main,#0a0e1a);border:1px solid #1e3a1e;border-radius:8px;">
+                <div style="min-width:0;text-align:left;">
+                  <div style="font-weight:700;color:var(--text-main,#e8eaf0);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.display)}</div>
+                  <div style="font-size:10px;color:var(--text-muted,#7a8aaa);">${s.count===1?t('invUsedByOneShop'):t('invUsedByShops').replace('{n}',s.count)}</div>
+                </div>
+                <span style="font-size:11px;font-weight:800;color:#4ade80;white-space:nowrap;flex-shrink:0;">${t('invUseBtn')}</span>
+              </div>`).join("")}
+            <div onclick="invDismissCatalogSuggestions()" style="cursor:pointer;text-align:center;font-size:11px;color:var(--text-muted,#7a8aaa);padding:6px;">${t('invNoneOfThese')}</div>
+          </div>
+        </div>` : ""}
+      </div>
+
       <label style="display:block;font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:5px;">${t('invItemNameLabel')}</label>
       <input class="input" id="inv-name" placeholder="${t('invItemNamePlaceholder')}"
         oninput="(function(el){var n=el.value.trim();var ex=inventoryItems.find(x=>x.name===n);if(ex){var catEl=document.getElementById('inv-category');var unitEl=document.getElementById('inv-unit');var sellEl=document.getElementById('inv-sell-price');var minEl=document.getElementById('inv-min-stock');var gstEl=document.getElementById('inv-gst-rate');var hsnEl=document.getElementById('inv-hsn-add');var bcEl=document.getElementById('inv-barcode-add');if(catEl)catEl.value=ex.category||'General';if(unitEl)unitEl.value=ex.unit||'';if(sellEl&&ex.sellingPrice>0)sellEl.value=Number(ex.sellingPrice).toFixed(2);if(minEl&&ex.minStock>0)minEl.value=ex.minStock;if(gstEl)gstEl.value=String(ex.gstRate||0);if(hsnEl&&ex.hsnCode)hsnEl.value=ex.hsnCode;if(bcEl&&ex.barcode)bcEl.value=ex.barcode;}invCheckDuplicateName(n);})(this)"
-        value="${invPrefillName ? invPrefillName : ''}"
+        value="${invPrefillName ? invPrefillName : (invCatalogPick ? invCatalogPick.display : '')}"
         style="margin-bottom:6px;" />
       <div id="inv-dup-warning-add" style="font-size:11px;min-height:0;margin-bottom:8px;"></div>
 
       <label style="display:block;font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:5px;">${t('invCategory')}</label>
       <input class="input" id="inv-category" list="inv-category-list" placeholder="${t('invCategoryPlaceholder')}"
-        value="${prefillItem ? prefillItem.category||'General' : ''}" style="margin-bottom:12px;" />
+        value="${prefillItem ? prefillItem.category||'General' : (invCatalogPick&&invCatalogPick.category ? invCatalogPick.category : '')}" style="margin-bottom:12px;" />
       <datalist id="inv-category-list">${existingCats.map(c=>`<option value="${c.replace(/"/g,'&quot;')}">`).join("")}</datalist>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
         <div>
           <label style="display:block;font-size:12px;color:var(--text-muted,#7a8aaa);margin-bottom:5px;">${t('invUnit')}</label>
           <input class="input" id="inv-unit" list="inv-units" placeholder="${t('invUnitPlaceholder')}"
-            value="${prefillItem ? prefillItem.unit||'' : ''}" />
+            value="${prefillItem ? prefillItem.unit||'' : (invCatalogPick&&invCatalogPick.unit ? invCatalogPick.unit : '')}" />
           <datalist id="inv-units"><option value="kg"><option value="pcs"><option value="litre"><option value="box"><option value="dozen"><option value="packet"><option value="bottle"><option value="bag"></datalist>
         </div>
         <div>
@@ -23726,18 +23775,6 @@ function renderInventoryTab(){
           <div id="inv-hsn-msg-add" style="font-size:11px;min-height:14px;"></div>
           <div id="inv-cheat-add" style="display:none;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:10px;padding:12px;margin-top:6px;"></div>
         </div>
-      </div>
-
-      <div style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:10px;padding:12px;margin-bottom:18px;">
-        <div style="font-size:12px;font-weight:800;color:#FFD700;margin-bottom:8px;">${t('invBarcodeHeader')} <span style="font-size:10px;color:var(--text-dim,#4a5a7a);font-weight:400;">${t('invOptional')}</span></div>
-        <div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-bottom:8px;line-height:1.5;">${t('invBarcodeDesc')}</div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <input class="input" id="inv-barcode-add" type="text" placeholder="${t('invBarcodePlaceholder')}"
-            value="${prefillItem ? escHtml(prefillItem.barcode||"") : ''}"
-            style="margin-bottom:0;font-family:monospace;flex:1;" />
-          <button type="button" onclick="startBarcodeScanIntoField('inv-barcode-add')" style="cursor:pointer;background:#1a3a1a;border:1px solid #22c55e;border-radius:8px;color:#22c55e;font-size:12px;font-weight:700;padding:9px 12px;white-space:nowrap;">${t('invScanBtn')}</button>
-        </div>
-        <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-top:6px;">${t('invBarcodeTip')}</div>
       </div>
 
       <div style="background:var(--bg-card,#0a1628);border:1px solid #1a3a5a;border-radius:10px;padding:14px;margin-bottom:18px;" ${prefillItem ? 'style="display:none;"' : ''}>
@@ -23964,7 +24001,14 @@ function invSubmitAdd(){
   } else {
     saveInventory();
   }
+  // ── Write back to the shared barcode catalog so other shops benefit next scan ──
+  if (barcodeVal) bcWriteBackCatalog(barcodeVal, name, unit, category);
+
   invPrefillName = "";
+  invCatalogPick = null;
+  invCatalogSuggestions = [];
+  invCatalogLoading = false;
+  invScannedBarcode = "";
   invView = "stock";
   safeRenderTab(currentTab);
 }
@@ -25260,6 +25304,101 @@ function findItemByBarcode(code) {
   return inventoryItems.find(it =>
     it.barcode && String(it.barcode).trim() === String(code).trim()
   ) || null;
+}
+
+// ── Shared Barcode Catalog: normalize names so near-duplicates merge ──────────
+function bcNormalizeName(name) {
+  return String(name||"").toLowerCase().trim().replace(/[-_]+/g," ").replace(/\s+/g," ").trim();
+}
+function bcCatalogKey(name) {
+  // Safe Firestore doc-id: strip characters that are awkward in doc ids
+  const k = bcNormalizeName(name).replace(/[.\/\[\]`~*]/g,"").slice(0,120);
+  return k || null;
+}
+
+// Fetch up to top-3 name suggestions other shops have used for this barcode
+async function bcFetchCatalogSuggestions(code) {
+  if (!code || !db) return [];
+  try {
+    const snap = await db.collection("barcode_catalog").doc(String(code).trim()).collection("names").get();
+    if (snap.empty) return [];
+    const list = [];
+    snap.forEach(doc => {
+      const d = doc.data() || {};
+      if (d.display) list.push({ key: doc.id, display: d.display, count: Number(d.count)||0, unit: d.unit||"", category: d.category||"" });
+    });
+    list.sort((a,b) => b.count - a.count);
+    return list.slice(0,3);
+  } catch(e) { console.warn("barcode catalog fetch failed", e); return []; }
+}
+
+// Write back the name this shop used for this barcode, incrementing the shared count
+function bcWriteBackCatalog(code, name, unit, category) {
+  if (!code || !name || !db) return;
+  const key = bcCatalogKey(name);
+  if (!key) return;
+  try {
+    db.collection("barcode_catalog").doc(String(code).trim()).collection("names").doc(key).set({
+      display: String(name).trim(),
+      unit: unit || "",
+      category: category || "",
+      count: firebase.firestore.FieldValue.increment(1),
+      updatedAt: Date.now()
+    }, { merge: true }).catch(()=>{});
+  } catch(e) {}
+}
+
+// ── Scan-first flow for the Add Item form ──────────────────────────────────────
+function startBarcodeScanForAddItem() {
+  _openBarcodeScanModal(async code => {
+    invScannedBarcode = code;
+    const bcEl = document.getElementById('inv-barcode-add');
+    if (bcEl) bcEl.value = code;
+
+    const existing = findItemByBarcode(code);
+    if (existing) {
+      // Already in this shop's inventory — switch straight to editing it
+      notify("✅ Already in inventory: " + existing.name);
+      invPrefillName = existing.name;
+      invCatalogPick = null;
+      invCatalogSuggestions = [];
+      invCatalogLoading = false;
+      if (invView === 'add') safeRenderTab(currentTab);
+      return;
+    }
+
+    notify("✅ Barcode scanned: " + code);
+    invCatalogPick = null;
+    invCatalogSuggestions = [];
+    invCatalogLoading = true;
+    // Only redraw the loading state if the user hasn't already started typing a name
+    if (invView === 'add' && !(document.getElementById('inv-name')?.value||'').trim()) safeRenderTab(currentTab);
+
+    const suggestions = await bcFetchCatalogSuggestions(code);
+    invCatalogLoading = false;
+    invCatalogSuggestions = suggestions;
+    if (invView === 'add' && !(document.getElementById('inv-name')?.value||'').trim()) safeRenderTab(currentTab);
+  });
+}
+
+// User tapped one of the "Others have called this" suggestions
+function invApplyCatalogSuggestion(idx) {
+  const s = invCatalogSuggestions[idx];
+  if (!s) return;
+  invPrefillName = s.display;
+  invCatalogPick = s;
+  invCatalogSuggestions = [];
+  invCatalogLoading = false;
+  safeRenderTab(currentTab);
+  setTimeout(() => { document.getElementById('inv-sell-price')?.focus(); }, 60);
+}
+
+// "None of these, type my own" — dismiss suggestions, leave name field free
+function invDismissCatalogSuggestions() {
+  invCatalogSuggestions = [];
+  invCatalogLoading = false;
+  safeRenderTab(currentTab);
+  setTimeout(() => { document.getElementById('inv-name')?.focus(); }, 60);
 }
 
 // ── Stop camera cleanly ───────────────────────────────────────────────────────
