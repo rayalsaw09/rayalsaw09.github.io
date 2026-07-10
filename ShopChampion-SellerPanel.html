@@ -2724,7 +2724,15 @@ async function _doApprove(payment) {
     if (!patchRes.ok) throw new Error(`PATCH failed (${patchRes.status}): ${(await patchRes.text()).substring(0,200)}`);
     usedKey = existing.key;
   } else {
-    const expiry = new Date();
+    // Extend from the LATER of "now" and the existing license's current
+    // expiry — otherwise a shop that renews a few days before their plan
+    // lapses gets those remaining paid days silently discarded, because the
+    // old code always computed new expiry as today+1 period regardless of
+    // how much time was still left on the current license.
+    const baseDate = (existing && existing.expires_at && new Date(existing.expires_at) > new Date())
+      ? new Date(existing.expires_at)
+      : new Date();
+    const expiry = new Date(baseDate);
     if ((payment.plan || "monthly") === "yearly") {
       expiry.setFullYear(expiry.getFullYear() + 1);
     } else {
@@ -2788,7 +2796,12 @@ async function _doApprove(payment) {
       if (isSeatsOnly) {
         fsLicense = { extraSeats: finalExtraSeats };
       } else {
-        const expiryCheck = new Date();
+        // Same fix as the Supabase license update above: extend from the
+        // existing expiry if it's still in the future, not always from today.
+        const baseDateCheck = (existing && existing.expires_at && new Date(existing.expires_at) > new Date())
+          ? new Date(existing.expires_at)
+          : new Date();
+        const expiryCheck = new Date(baseDateCheck);
         if ((payment.plan || "monthly") === "yearly") expiryCheck.setFullYear(expiryCheck.getFullYear() + 1);
         else expiryCheck.setMonth(expiryCheck.getMonth() + 1);
         fsLicense = { key: usedKey, plan: finalPlan, status: "pro", expires_at: expiryCheck.toISOString(), extraSeats: finalExtraSeats };
