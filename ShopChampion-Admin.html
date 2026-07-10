@@ -3158,6 +3158,21 @@ function escHtml(s) {
   if (s == null) return "";
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
+// Safe for embedding a value as a single-quoted JS string literal *inside* an
+// onclick="..." (double-quoted HTML attribute). Handles all three ways a raw
+// value could otherwise break out: a backslash confusing the JS escaping, a
+// straight quote ending the JS string early, or a double-quote ending the
+// HTML attribute early (which plain .replace(/'/g,"\\'") never covered).
+function jsAttrStr(s) {
+  if (s == null) return "";
+  return String(s)
+    .replace(/\\/g,"\\\\")
+    .replace(/&/g,"&amp;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"\\'")
+    .replace(/\n/g,"\\n")
+    .replace(/\r/g,"\\r");
+}
 function getInitials(name) { return name.split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2); }
 function avatarColor(name) {
   return ["#1a3a5c","#2d1b4e","#1a3a2a","#3a1a1a","#2a2a1a"][name.charCodeAt(0)%5];
@@ -7785,7 +7800,7 @@ function _safeRenderTabImmediate(i) {
               const catOOS = catItems.filter(x => invGetStock(x.name) <= 0).length;
               const catLow = catItems.filter(x => invGetStock(x.name) > 0 && invGetStock(x.name) <= 3).length;
               return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #FFD70030;"
-                onclick="invCatPageName='${cat.replace(/'/g, "\\'")}';invCatPageSearch=${tallyMatch(cat,q)?"''":`'${q.replace(/'/g,"\\'")}'`};invView='category';invSearchQuery='';safeRenderTab(currentTab)">
+                onclick="invCatPageName='${jsAttrStr(cat)}';invCatPageSearch=${tallyMatch(cat,q)?"''":`'${jsAttrStr(q)}'`};invView='category';invSearchQuery='';safeRenderTab(currentTab)">
                 <div><div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
                 <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:4px;">${catItems.length} item${catItems.length !== 1 ? 's' : ''}${catLow > 0 ? ` &nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} low</span>` : ''}${catOOS > 0 ? ` &nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} out</span>` : ''}</div></div>
                 <div style="display:flex;align-items:center;gap:12px;">${catVal > 0 ? `<div style="text-align:right;"><div style="font-size:15px;font-weight:800;color:#4f4;">₹${catVal >= 100000 ? (catVal / 100000).toFixed(1) + 'L' : catVal >= 1000 ? (catVal / 1000).toFixed(1) + 'k' : catVal.toFixed(0)}</div><div style="font-size:10px;color:var(--text-dim,#4a5a7a);">Value</div></div>` : ''}<span style="color:#7ab3ff;font-size:22px;font-weight:300;">›</span></div>
@@ -7799,7 +7814,7 @@ function _safeRenderTabImmediate(i) {
             const catOOS = catItems.filter(x => invGetStock(x.name) <= 0).length;
             const catLow = catItems.filter(x => invGetStock(x.name) > 0 && invGetStock(x.name) <= 3).length;
             return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
-              onclick="invCatPageName='${cat.replace(/'/g, "\\'")}';invCatPageSearch='';invView='category';safeRenderTab(currentTab)">
+              onclick="invCatPageName='${jsAttrStr(cat)}';invCatPageSearch='';invView='category';safeRenderTab(currentTab)">
               <div><div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
               <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:4px;">${catItems.length} item${catItems.length !== 1 ? 's' : ''}${catLow > 0 ? `&nbsp;·&nbsp;<span style="color:#FFD700;">⚠ ${catLow} low</span>` : ''}${catOOS > 0 ? `&nbsp;·&nbsp;<span style="color:#f66;">❌ ${catOOS} out</span>` : ''}</div></div>
               <div style="display:flex;align-items:center;gap:12px;">${catVal > 0 ? `<div style="text-align:right;"><div style="font-size:15px;font-weight:800;color:#4f4;">₹${catVal >= 100000 ? (catVal / 100000).toFixed(1) + 'L' : catVal >= 1000 ? (catVal / 1000).toFixed(1) + 'k' : catVal.toFixed(0)}</div><div style="font-size:10px;color:var(--text-dim,#4a5a7a);">Value</div></div>` : ''}<span style="color:#7ab3ff;font-size:22px;font-weight:300;">›</span></div>
@@ -7825,7 +7840,7 @@ function _safeRenderTabImmediate(i) {
               const lastAdded = (item.stock || []).length ? new Date(item.stock[item.stock.length - 1].date).toLocaleDateString('en-IN', {day:'numeric',month:'short'}) : '—';
               const costEntries = (item.stock || []).filter(e => Number(e.costPerUnit || 0) > 0);
               const avgCost = costEntries.length ? (costEntries.reduce((s, e) => s + Number(e.costPerUnit), 0) / costEntries.length).toFixed(2) : 0;
-              return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${item.name.replace(/'/g, "\\'")}')">
+              return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${jsAttrStr(item.name)}')">
                 <div style="display:flex;align-items:flex-start;gap:12px;">
                   <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
                   <div style="flex:1;min-width:0;">
@@ -8770,7 +8785,7 @@ async function ptSubmit(){
     a = soldItems.reduce((sum,si)=>{
       const inv = inventoryItems.find(x=>x.name===si.name);
       if(inv && inv.gstRate && inv.gstRate>0){
-        const g = invItemGstTotal(inv, si.qty);
+        const g = invItemGstTotal(inv, si.qty, si.pricePerUnit);
         return sum + g.total;
       }
       return sum+(si.qty*(si.pricePerUnit||0));
@@ -9003,7 +9018,7 @@ function bwItemTallySearch(inp, rowId){
     const stockColor = stock<=0?"#e03030":stock<=3?"#cc8800":"#1a8a3a";
     return `<div data-idx="${i}" data-name="${n.replace(/"/g,'&quot;')}"
       style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #e0e4f0;display:flex;justify-content:space-between;align-items:center;font-size:14px;background:#fff;"
-      onmousedown="bwItemDdSelect('${rowId}','${n.replace(/'/g,"\\'")}',this)"
+      onmousedown="bwItemDdSelect('${rowId}','${jsAttrStr(n)}',this)"
       onmouseover="this.parentElement._activeIdx=parseInt(this.getAttribute('data-idx'));this.parentElement.querySelectorAll('div').forEach(d=>d.style.background='#fff');this.style.background='#eef2ff'"
       onmouseout="this.style.background='#fff'">
       <span style="color:#111827;font-weight:600;">${tallyHighlight(n,q)}</span>
@@ -9214,11 +9229,17 @@ function buildCheatSheet(formType) {
 }
 // ── End HSN Lookup ──────────────────────────────────────────────────────────
 
-function invItemGstTotal(item, qty){
+function invItemGstTotal(item, qty, priceOverride){
   // Returns { base, gstAmt, total, rate, included }
+  // priceOverride: the actual per-unit price for THIS transaction (what was
+  // typed on the row, or stored on a historical item). When omitted, falls
+  // back to the inventory item's current sellingPrice for backward
+  // compatibility with any older call site.
   const rate     = Number(item.gstRate)||0;
   const included = item.gstIncluded || "inclusive";
-  const sellPrice = Number(item.sellingPrice)||0;
+  const sellPrice = (priceOverride!==undefined && priceOverride!==null && priceOverride>0)
+    ? Number(priceOverride)
+    : (Number(item.sellingPrice)||0);
   const basePerUnit = included === "inclusive"
     ? +(sellPrice * 100 / (100 + rate)).toFixed(4)
     : sellPrice;
@@ -9290,7 +9311,7 @@ function bwUpdateTotal(){
     let lineTotal = qty*ppu;
     let gstAmt = 0;
     if(inv && inv.gstRate && inv.gstRate>0 && qty>0 && ppu>0){
-      const g = invItemGstTotal(inv, qty);
+      const g = invItemGstTotal(inv, qty, ppu);
       lineTotal = g.total;
       gstAmt = g.gstAmt;
       grandBase += g.base;
@@ -9350,7 +9371,7 @@ async function bwSubmit(){
     ? borrowedItems.reduce((sum,bi)=>{
         const inv = inventoryItems.find(x=>x.name===bi.name);
         if(inv && inv.gstRate && inv.gstRate>0){
-          const g = invItemGstTotal(inv, bi.qty);
+          const g = invItemGstTotal(inv, bi.qty, bi.pricePerUnit);
           return sum + g.total;
         }
         return sum+(bi.qty*(bi.pricePerUnit||0));
@@ -9391,6 +9412,7 @@ async function bwMarkReturned(custId,borrowId,payMode){
   const b=(c.borrows||[]).find(x=>x.id===borrowId);
   if(b){
     const remaining = Math.round((Number(b.amount)-(b.amountPaid||0))*100)/100;
+    const _bwClrRefId = "BW_CLR_"+borrowId+"_"+Date.now(); b._clrCashRefId = _bwClrRefId;
     if(b._syncType==="purchase" && b.status==="pending_payment"){
       // This was a synced purchase borrow — payment received, move to purchase history
       b.status="returned"; b.returnedAt=new Date().toISOString();
@@ -9428,13 +9450,21 @@ async function bwMarkReturned(custId,borrowId,payMode){
       addHistoryLog('borrow','Borrow payment received — moved to purchases',`${c.name} · ${formatINR(b.amount)} · Bill ${borrowId}`);
     } else {
       b.status="returned"; b.returnedAt=new Date().toISOString();
-      // Sync status on the matching purchase entry (legacy)
+      // fix: the "Clear" button (as opposed to "Pay" partial payments) was never
+      // updating amountPaid to the full amount, leaving stale paid/remaining figures
+      // on the Borrow Slip, WhatsApp message, and Borrow Details even though the
+      // status correctly showed "Cleared" — a visible contradiction on the same doc.
+      if(remaining > 0){
+        if(!b.payments) b.payments=[];
+        b.payments.push({ amount: remaining, date: new Date().toISOString().slice(0,10), paidAt: new Date().toISOString(), mode: payMode, _cashRefId: _bwClrRefId });
+      }
+      b.amountPaid = Number(b.amount); // fully paid
+      // Sync status + paid amount on the matching purchase entry (legacy)
       const p=(c.purchases||[]).find(x=>x.bill===borrowId);
-      if(p){p.borrowStatus="returned";}
+      if(p){p.borrowStatus="returned";p.amountPaid=b.amountPaid;}
       notify(`✅ Marked as returned for ${c.name}`);
       addHistoryLog('borrow','Borrow cleared',`${c.name} · ${formatINR(b.amount)}${b.item?` · ${b.item}`:''} · Bill ${borrowId}`);
     }
-    const _bwClrRefId = "BW_CLR_"+borrowId+"_"+Date.now(); b._clrCashRefId = _bwClrRefId;
 
     // Record any remaining unpaid amount as cash-in when marking fully cleared
     // (Skipped for _syncType==="purchase" path — that path records its own cashRecordTx above)
@@ -9819,7 +9849,7 @@ function sendBorrowSlipWhatsApp(custId, borrowId) {
       const gstRate = bi.gstRate || (inv && inv.gstRate) || 0;
       let lineTotal = bi.qty * (bi.pricePerUnit || 0), gstAmt = 0;
       if (inv && inv.gstRate && inv.gstRate > 0) {
-        const g = invItemGstTotal(inv, bi.qty);
+        const g = invItemGstTotal(inv, bi.qty, bi.pricePerUnit);
         lineTotal = g.total; gstAmt = g.gstAmt;
       }
       const gstLine = gstAmt > 0 ? ` (GST ${gstRate}%: ₹${gstAmt.toFixed(2)})` : "";
@@ -9867,7 +9897,17 @@ async function deletePurchase(custId,bill,dateEnc){
     c.purchases.splice(idx,1);
     // If this was a borrow-type purchase, also remove the matching borrows[] entry
     // (prevents orphaned borrow records after purchase card is deleted)
+    // fix: reverse cash-ledger entries for any payments already made on this borrow
+    // BEFORE removing the borrow record — otherwise a partially/fully paid borrow's
+    // cash-in entries stay in the ledger forever after deletion, permanently
+    // overstating cash-in-hand on the Balance Sheet (mirrors deleteCustomer's logic,
+    // which already did this correctly — deletePurchase had been missed).
     if(_delPurchase.type === "borrow" && c.borrows){
+      const _delBorrow = c.borrows.find(b => b.id === bill);
+      if(_delBorrow){
+        (_delBorrow.payments||[]).forEach(pm => { if(pm._cashRefId) cashRemoveByRef(pm._cashRefId); });
+        if(_delBorrow._clrCashRefId) cashRemoveByRef(_delBorrow._clrCashRefId);
+      }
       c.borrows = c.borrows.filter(b => b.id !== bill);
     }
     // Restore inventory: remove each item's salesLog entry so stock goes back up
@@ -11350,14 +11390,32 @@ function cmpBestPeriods(){
 
 function cmpAllPurchases(){
   const all=[];
-  // Customer purchases — exclude unpaid borrows; partial borrows count only paid portion
+  // Customer purchases — exclude unpaid borrows; partial/returned borrows are
+  // attributed to the date(s) each payment was actually received (via
+  // b.payments, logged by bwRecordPartialPayment/bwMarkReturned), not the
+  // original borrow date — otherwise a borrow paid off weeks or months later
+  // would show as revenue on the day it was borrowed instead of the day the
+  // cash actually came in. Falls back to the old lump-sum behavior only for
+  // legacy borrows recorded before payments[] was tracked.
   customers.forEach(c=>(c.purchases||[]).forEach(p=>{
-    if(p.type==='borrow' && p.borrowStatus!=='returned'){
-      // Partial: count only what's been paid so far
-      if(p.borrowStatus==='partial' && (p.amountPaid||0)>0){
-        all.push({amount:Number(p.amountPaid),date:(p.date||'').slice(0,10),custId:c.id,_src:'customer'});
+    if(p.type==='borrow'){
+      const b = (c.borrows||[]).find(x=>x.id===p.bill);
+      if(b && Array.isArray(b.payments) && b.payments.length){
+        b.payments.forEach(pay=>{
+          all.push({amount:Number(pay.amount)||0, date:(pay.date||'').slice(0,10), custId:c.id, _src:'customer'});
+        });
+        return;
       }
-      return; // skip unpaid borrows entirely
+      if(p.borrowStatus!=='returned'){
+        // Partial: count only what's been paid so far
+        if(p.borrowStatus==='partial' && (p.amountPaid||0)>0){
+          all.push({amount:Number(p.amountPaid),date:(p.date||'').slice(0,10),custId:c.id,_src:'customer'});
+        }
+        return; // skip unpaid borrows entirely
+      }
+      // Returned but no payments[] logged (legacy data) — count full amount on borrow date
+      all.push({amount:Number(p.amount),date:(p.date||'').slice(0,10),custId:c.id,_src:'customer'});
+      return;
     }
     all.push({amount:Number(p.amount),date:(p.date||'').slice(0,10),custId:c.id,_src:'customer'});
   }));
@@ -13182,7 +13240,7 @@ function openCreditorDetail(id){
           <div style="display:flex;gap:8px;">
             <button onclick="printCreditorStatement('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">🖨 Print</button>
             ${!isUnrec ? `<button onclick="openAddCreditorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>` : ""}
-            ${!isUnrec ? `<button onclick="showEditHistoryModal('${id}','${cr.name.replace(/'/g,"\\'")}','creditor')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#FFD700;font-size:11px;font-weight:700;padding:6px 12px;white-space:nowrap;">📝 Edit History</button>` : ""}
+            ${!isUnrec ? `<button onclick="showEditHistoryModal('${id}','${jsAttrStr(cr.name)}','creditor')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#FFD700;font-size:11px;font-weight:700;padding:6px 12px;white-space:nowrap;">📝 Edit History</button>` : ""}
           </div>
         </div>
 
@@ -13422,7 +13480,7 @@ function openRequestAgainModal(creditorId, txId, amount, note, date, invoiceNo, 
       <div style="background:#1a0808;border:1px solid #ef444440;border-radius:12px;padding:12px;font-size:13px;color:#fca5a5;">
         ❌ Previous sync request was declined. You can send up to 3 requests total.
       </div>
-      <button onclick="sendPaymentSyncRequest('${creditorId}','${txId}',${amount},'${(note||'').replace(/'/g,"\'")}','${date}','${(invoiceNo||'').replace(/'/g,"\'")}','${cr.phone||''}','${reqId}')" class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-size:13px;font-weight:800;padding:12px;">
+      <button onclick="sendPaymentSyncRequest('${creditorId}','${txId}',${amount},'${jsAttrStr((note||''))}','${date}','${jsAttrStr((invoiceNo||''))}','${cr.phone||''}','${reqId}')" class="btn" style="background:linear-gradient(135deg,#1e3a6e,#2a5aaa);color:#fff;font-size:13px;font-weight:800;padding:12px;">
         📤 Send Request Again
       </button>
       <button onclick="closeModal();setTimeout(()=>openCreditorDetail('${creditorId}'),200)" style="cursor:pointer;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:10px;color:var(--text-muted,#7a8aaa);font-size:13px;font-weight:700;padding:10px;">
@@ -15335,7 +15393,7 @@ ${monthTotal>0 ? `
       <div>${e.recurring?`<span class="exp-badge" style="background:#eef0fe;color:#5457e5;">${t('expFilterRecurring')}</span>`:"<span style='color:#9aa3b6;font-size:11px;'>—</span>"}</div>
       <div style="display:flex;gap:5px;">
         <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#eef1f7;border:none;border-radius:6px;color:#5457e5;font-size:11px;padding:5px 8px;cursor:pointer;" title="Edit">✏️</button>
-        <button onclick="showEditHistoryModal('${e.id}','','expense','${e.category.replace(/'/g,"\'")}')" style="background:#eef1f7;border:none;border-radius:6px;color:#b8860b;font-size:11px;padding:5px 8px;cursor:pointer;" title="Edit History">📝</button>
+        <button onclick="showEditHistoryModal('${e.id}','','expense','${jsAttrStr(e.category)}')" style="background:#eef1f7;border:none;border-radius:6px;color:#b8860b;font-size:11px;padding:5px 8px;cursor:pointer;" title="Edit History">📝</button>
         <button onclick="duplicateExpense('${e.id}')" style="background:#eef1f7;border:none;border-radius:6px;color:#15803d;font-size:11px;padding:5px 8px;cursor:pointer;" title="Duplicate">📋</button>
         <button onclick="expDeleteEntry('${e.id}')" style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#dc2626;font-size:11px;padding:5px 8px;cursor:pointer;" title="Delete">🗑</button>
       </div>
@@ -15357,7 +15415,7 @@ ${monthTotal>0 ? `
         </div>
         <div style="display:flex;gap:5px;margin-top:6px;">
           <button onclick="_expEditId='${e.id}';safeRenderTab(currentTab);document.getElementById('exp-form-card').scrollIntoView({behavior:'smooth'});" style="background:#eef1f7;border:none;border-radius:6px;color:#5457e5;font-size:11px;padding:5px 8px;cursor:pointer;">${t('expEditBtn')}</button>
-          <button onclick="showEditHistoryModal('${e.id}','','expense','${e.category.replace(/'/g,"\'")}')" style="background:#eef1f7;border:none;border-radius:6px;color:#b8860b;font-size:11px;padding:5px 8px;cursor:pointer;">📝</button>
+          <button onclick="showEditHistoryModal('${e.id}','','expense','${jsAttrStr(e.category)}')" style="background:#eef1f7;border:none;border-radius:6px;color:#b8860b;font-size:11px;padding:5px 8px;cursor:pointer;">📝</button>
           <button onclick="duplicateExpense('${e.id}')" style="background:#eef1f7;border:none;border-radius:6px;color:#15803d;font-size:11px;padding:5px 8px;cursor:pointer;">${t('expCopyBtn')}</button>
           <button onclick="expDeleteEntry('${e.id}')" style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;color:#dc2626;font-size:11px;padding:5px 8px;cursor:pointer;">🗑</button>
         </div>
@@ -15883,7 +15941,7 @@ function openDebtorDetail(id){
             ):''}
             <button onclick="printDebtorStatement('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">🖨 Print</button>
             <button onclick="openAddDebtorModal('${id}')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#a0b0d0;font-size:11px;font-weight:700;padding:6px 12px;">✏️ Edit</button>
-            <button onclick="showEditHistoryModal('${id}','${dr.name.replace(/'/g,"\\'")}','debtor')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#FFD700;font-size:11px;font-weight:700;padding:6px 12px;white-space:nowrap;">📝 Edit History</button>
+            <button onclick="showEditHistoryModal('${id}','${jsAttrStr(dr.name)}','debtor')" style="cursor:pointer;background:#1e2a45;border:none;border-radius:8px;color:#FFD700;font-size:11px;font-weight:700;padding:6px 12px;white-space:nowrap;">📝 Edit History</button>
           </div>
         </div>
 
@@ -16277,13 +16335,13 @@ function openTxBillDetail(parentId, txId, entityType) {
           🚛 E-Way Bill
         </button>
       </div>
-      <button onclick="showEditHistoryModal('${parentId}','${(entity.name||'').replace(/\\/g,'\\\\').replace(/'/g,'\\\'')}','${entityType}',null,'${tx.id}')"
+      <button onclick="showEditHistoryModal('${parentId}','${jsAttrStr(entity.name||'')}','${entityType}',null,'${tx.id}')"
         style="cursor:pointer;background:var(--bg-card,#0a1628);border:1px solid #FFD70055;border-radius:12px;color:#FFD700;font-size:13px;font-weight:700;padding:12px;width:100%;">
         📝 Edit History
       </button>
       ${(tx.syncStatus==='declined'||tx.syncStatus==='local')&&entity._fromShopConnect&&isCr?`
       <div style="font-size:11px;color:#f87171;background:#1a0808;border:1px solid #ef444444;border-radius:10px;padding:8px 12px;margin-bottom:6px;">⚠️ <strong>ShopConnect:</strong> Sync was declined/failed — tap below to re-send.</div>
-      <button onclick="openRequestAgainModal('${parentId}','${txId||''}',${tx.amount},'${(tx.note||'').replace(/'/g,"\\'")}','${tx.date||''}','${(tx.invoiceNo||'').replace(/'/g,"\\'")}','${tx.syncReqId||''}')"
+      <button onclick="openRequestAgainModal('${parentId}','${txId||''}',${tx.amount},'${jsAttrStr((tx.note||''))}','${tx.date||''}','${jsAttrStr((tx.invoiceNo||''))}','${tx.syncReqId||''}')"
         style="cursor:pointer;background:#1a0808;border:1px solid #ef4444;border-radius:12px;color:#f87171;font-size:13px;font-weight:700;padding:12px;width:100%;">
         🔄 Re-send to Linked Shop
       </button>`:''}
@@ -17084,12 +17142,12 @@ function renderAlertsTab(){
     lowStockItems.forEach(item=>{
       const stk = invGetStock(item.name);
       const min = item.minStock || 5;
-      html += `<div class="card" data-sc-row="1" tabindex="-1" onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;">
+      html += `<div class="card" data-sc-row="1" tabindex="-1" onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${jsAttrStr(item.name)}'),50)" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(item.name)}</div>
           <div style="font-size:11px;color:var(--text-muted,#7a8aaa);margin-top:2px;">${t('alCurrent')} <span style="color:#FFD700;font-weight:700;">${stk} ${escHtml(item.unit||"unit")}</span> · ${t('alMin')} ${min} ${escHtml(item.unit||"unit")}</div>
         </div>
-        <button onclick="event.stopPropagation();switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+        <button onclick="event.stopPropagation();switchTab(4);setTimeout(()=>invShowItemDetail('${jsAttrStr(item.name)}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
       </div>`;
     });
     html += `</div>`;
@@ -17105,12 +17163,12 @@ function renderAlertsTab(){
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     negativeStockItems.forEach(item=>{
       const stk = invGetStock(item.name);
-      html += `<div class="card" data-sc-row="1" tabindex="-1" onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-left:3px solid #ef4444;cursor:pointer;">
+      html += `<div class="card" data-sc-row="1" tabindex="-1" onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${jsAttrStr(item.name)}'),50)" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-left:3px solid #ef4444;cursor:pointer;">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(item.name)}</div>
           <div style="font-size:11px;color:#ff2222;margin-top:2px;font-weight:800;">⚠ Stock: ${stk} ${escHtml(item.unit||"unit")}</div>
         </div>
-        <button onclick="event.stopPropagation();switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+        <button onclick="event.stopPropagation();switchTab(4);setTimeout(()=>invShowItemDetail('${jsAttrStr(item.name)}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
       </div>`;
     });
     html += `</div>`;
@@ -17120,12 +17178,12 @@ function renderAlertsTab(){
     html += sectionHeader("❌",t('alOutOfStock'),"#f66");
     html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
     zeroStockItems.forEach(item=>{
-      html += `<div class="card" data-sc-row="1" tabindex="-1" onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;">
+      html += `<div class="card" data-sc-row="1" tabindex="-1" onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${jsAttrStr(item.name)}'),50)" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;">
         <div style="flex:1;min-width:0;">
           <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(item.name)}</div>
           <div style="font-size:11px;color:#f66;margin-top:2px;font-weight:700;">${t('alOutOfStockLabel')} ${escHtml(item.unit||"unit")}</div>
         </div>
-        <button onclick="event.stopPropagation();switchTab(4);setTimeout(()=>invShowItemDetail('${item.name.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+        <button onclick="event.stopPropagation();switchTab(4);setTimeout(()=>invShowItemDetail('${jsAttrStr(item.name)}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
       </div>`;
     });
     html += `</div>`;
@@ -17140,12 +17198,12 @@ function renderAlertsTab(){
       out += `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px;">`;
       items.forEach(e=>{
         const dt = new Date(e.expiryDate+"T00:00:00").toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"});
-        out += `<div class="card" data-sc-row="1" tabindex="-1" onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${e.itemName.replace(/'/g,"\\'")}'),50)" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;">
+        out += `<div class="card" data-sc-row="1" tabindex="-1" onclick="switchTab(4);setTimeout(()=>invShowItemDetail('${jsAttrStr(e.itemName)}'),50)" style="padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;">
           <div style="flex:1;min-width:0;">
             <div style="font-weight:800;font-size:13px;color:var(--text-main,#e8eaf0);">${escHtml(e.itemName)}</div>
             <div style="font-size:11px;color:${color};margin-top:2px;">${t('alExpiry')} ${dt} · ${t('alStock')} ${e.qty} ${escHtml(e.unit||"unit")}</div>
           </div>
-          <button onclick="event.stopPropagation();switchTab(4);setTimeout(()=>invShowItemDetail('${e.itemName.replace(/'/g,"\\'")}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
+          <button onclick="event.stopPropagation();switchTab(4);setTimeout(()=>invShowItemDetail('${jsAttrStr(e.itemName)}'),50)" class="btn" style="background:#1a2540;border:1px solid #3a4a6a;color:#7ab3ff;font-size:11px;font-weight:700;padding:7px 12px;flex-shrink:0;">${t('alInventoryBtn')}</button>
         </div>`;
       });
       out += `</div>`;
@@ -21278,7 +21336,7 @@ function openCustomerPage(id){
       <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
         ${_hasFullAccess() && c.phone?`<a href="https://wa.me/91${c.phone}?text=${encodeURIComponent('Hi '+c.name.split(' ')[0]+'! 👋 Thank you for shopping with us at '+appSettings.shopName+'. Total spend: '+formatINR(c.totalSpend)+' 🙌 Visit us again soon!')}" target="_blank" class="btn" style="background:#1a3a1a;color:#4f4;border:1px solid #2a5a2a;padding:8px 12px;font-size:12px;font-weight:800;text-decoration:none;">💬 WA</a>`:''}
         <button class="btn" onclick="closeCustomerPage();openEditModal('${c.id}')" style="background:#1a2540;color:#aaa;border:1px solid var(--border-input,#2a3560);padding:8px 12px;font-size:12px;">✏️</button>
-        <button class="btn" onclick="showEditHistoryModal('${c.id}','${c.name.replace(/'/g,"\\'")}','customer')" style="background:#1a2540;color:#FFD700;border:1px solid var(--border-input,#2a3560);padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;">📝 Edit History</button>
+        <button class="btn" onclick="showEditHistoryModal('${c.id}','${jsAttrStr(c.name)}','customer')" style="background:#1a2540;color:#FFD700;border:1px solid var(--border-input,#2a3560);padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;">📝 Edit History</button>
       </div>
     </div>
 
@@ -22927,7 +22985,7 @@ function invDeleteItem(name){
     </div>
     <div style="display:flex;gap:10px;margin-top:20px;">
       <button onclick="closeModal()" style="flex:1;padding:13px;background:#1a2540;border:none;border-radius:12px;color:var(--text-muted,#7a8aaa);font-size:14px;font-weight:700;cursor:pointer;">Cancel</button>
-      <button onclick="_confirmInvDelete('${name.replace(/'/g,"\\'")}');closeModal();" style="flex:1;padding:13px;background:linear-gradient(135deg,#8b0000,#cc2200);border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;">🗑 Yes, Delete</button>
+      <button onclick="_confirmInvDelete('${jsAttrStr(name)}');closeModal();" style="flex:1;padding:13px;background:linear-gradient(135deg,#8b0000,#cc2200);border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;">🗑 Yes, Delete</button>
     </div>
   `);
 }
@@ -23249,7 +23307,19 @@ function invGetStockValue(itemName){
   if(stk<=0) return 0;
   const entries = (item.stock||[]).filter(e=>Number(e.costPerUnit||0)>0);
   if(!entries.length) return 0;
-  const avgCost = entries.reduce((s,e)=>s+Number(e.costPerUnit),0) / entries.length;
+  // Weighted-average cost: weight each stock-in entry's cost by its own
+  // quantity, not treat every batch as equally sized. A plain average of
+  // costPerUnit figures silently misvalues inventory whenever batches were
+  // bought in different quantities — e.g. 100 units @ ₹10 + 1 unit @ ₹50
+  // should value close to ₹10/unit, not ₹30/unit (the old, wrong average).
+  let totalQty = 0, totalCost = 0;
+  entries.forEach(e=>{
+    const q = Number(e.qty)||0;
+    if(q<=0) return;
+    totalQty += q;
+    totalCost += q * Number(e.costPerUnit);
+  });
+  const avgCost = totalQty>0 ? (totalCost/totalQty) : (entries.reduce((s,e)=>s+Number(e.costPerUnit),0)/entries.length);
   return stk * avgCost;
 }
 
@@ -23291,8 +23361,8 @@ function ptItemTallySearch(inp, rowId){
     const stockColor = stock<=0?"#e03030":stock<=3?"#cc8800":"#1a8a3a";
     return `<div data-idx="${i}" data-name="${n.replace(/"/g,'&quot;')}"
       style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #e0e4f0;display:flex;justify-content:space-between;align-items:center;font-size:14px;background:#fff;"
-      onmousedown="ptItemDdSelect('${rowId}','${n.replace(/'/g,"\\'")}',this)"
-      ontouchend="event.preventDefault();ptItemDdSelect('${rowId}','${n.replace(/'/g,"\\'")}',this)"
+      onmousedown="ptItemDdSelect('${rowId}','${jsAttrStr(n)}',this)"
+      ontouchend="event.preventDefault();ptItemDdSelect('${rowId}','${jsAttrStr(n)}',this)"
       onmouseover="this.style.background='#eef2ff'"
       onmouseout="this.style.background='#fff'">
       <span style="color:#111827;font-weight:600;">${tallyHighlight(n,q)}</span>
@@ -23508,7 +23578,7 @@ function ptUpdateTotal(){
     let lineTotal = qty*ppu;
     let gstAmt = 0;
     if(inv && inv.gstRate && inv.gstRate>0 && qty>0 && ppu>0){
-      const g = invItemGstTotal(inv, qty);
+      const g = invItemGstTotal(inv, qty, ppu);
       lineTotal = g.total;
       gstAmt = g.gstAmt;
       grandBase += g.base;
@@ -23670,6 +23740,13 @@ function renderInventoryTab(){
   if(invView==="add"){
     const existingCats = [...new Set(inventoryItems.map(x=>x.category||"General"))].sort();
     const prefillItem = invPrefillName ? inventoryItems.find(x=>x.name===invPrefillName) : null;
+    // Only apply catalog GST/HSN suggestion when NOT editing an existing item
+    // (an existing item's own saved values always take priority).
+    const catalogGst = (!prefillItem && invCatalogPick && (invCatalogPick.gstRate===0||invCatalogPick.gstRate>0)) ? invCatalogPick.gstRate : null;
+    const catalogGstIncluded = (!prefillItem && invCatalogPick && invCatalogPick.gstIncluded) ? invCatalogPick.gstIncluded : null;
+    const catalogHsn = (!prefillItem && invCatalogPick && invCatalogPick.hsnCode) ? invCatalogPick.hsnCode : "";
+    const catalogGstIsStandard = catalogGst!==null && [5,12,18,28].includes(Number(catalogGst));
+    const catalogGstIsCustom = catalogGst!==null && !catalogGstIsStandard && catalogGst>0;
     body = `<div class="card" style="padding:22px;">
       <div style="font-size:14px;font-weight:800;color:#FFD700;margin-bottom:6px;">${t('invAddEditHeader')}</div>
       <div style="font-size:12px;color:var(--text-dim,#4a5a7a);margin-bottom:14px;padding:10px 12px;background:var(--bg-row-even,#0d1220);border-radius:8px;border:1px solid var(--border-main,#1e2a45);">${t('invAddEditDesc')}</div>
@@ -23694,7 +23771,7 @@ function renderInventoryTab(){
               <div onclick="invApplyCatalogSuggestion(${i})" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--bg-main,#0a0e1a);border:1px solid #1e3a1e;border-radius:8px;">
                 <div style="min-width:0;text-align:left;">
                   <div style="font-weight:700;color:var(--text-main,#e8eaf0);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.display)}</div>
-                  <div style="font-size:10px;color:var(--text-muted,#7a8aaa);">${s.count===1?t('invUsedByOneShop'):t('invUsedByShops').replace('{n}',s.count)}</div>
+                  <div style="font-size:10px;color:var(--text-muted,#7a8aaa);">${s.count===1?t('invUsedByOneShop'):t('invUsedByShops').replace('{n}',s.count)}${(s.gstRate===0||s.gstRate>0)?` · GST ${s.gstRate}%`:""}</div>
                 </div>
                 <span style="font-size:11px;font-weight:800;color:#4ade80;white-space:nowrap;flex-shrink:0;">${t('invUseBtn')}</span>
               </div>`).join("")}
@@ -23742,23 +23819,24 @@ function renderInventoryTab(){
             <label style="font-size:11px;color:var(--text-muted,#7a8aaa);font-weight:700;display:block;margin-bottom:4px;">${t('invGstRatePercent')}</label>
             <div style="display:flex;gap:6px;align-items:center;">
               <select class="input" id="inv-gst-rate" style="margin-bottom:0;flex:1;" onchange="(function(){var v=this.value;if(v==='custom'){document.getElementById('inv-gst-custom').style.display='block';document.getElementById('inv-gst-custom').focus();}else{document.getElementById('inv-gst-custom').style.display='none';}invUpdateGstPreview('add');}).call(this)">
-                <option value="0" ${!prefillItem||![5,12,18,28].includes(Number(prefillItem.gstRate))?'selected':''}>${t('invNoGst')}</option>
-                <option value="5" ${prefillItem&&prefillItem.gstRate===5?'selected':''}>5%</option>
-                <option value="12" ${prefillItem&&prefillItem.gstRate===12?'selected':''}>12%</option>
-                <option value="18" ${prefillItem&&prefillItem.gstRate===18?'selected':''}>18%</option>
-                <option value="28" ${prefillItem&&prefillItem.gstRate===28?'selected':''}>28%</option>
-                <option value="custom">${t('invCustomPercent')}</option>
+                <option value="0" ${prefillItem ? (![5,12,18,28].includes(Number(prefillItem.gstRate))?'selected':'') : (catalogGst===null||catalogGst===0?'selected':'')}>${t('invNoGst')}</option>
+                <option value="5" ${prefillItem ? (prefillItem.gstRate===5?'selected':'') : (catalogGst===5?'selected':'')}>5%</option>
+                <option value="12" ${prefillItem ? (prefillItem.gstRate===12?'selected':'') : (catalogGst===12?'selected':'')}>12%</option>
+                <option value="18" ${prefillItem ? (prefillItem.gstRate===18?'selected':'') : (catalogGst===18?'selected':'')}>18%</option>
+                <option value="28" ${prefillItem ? (prefillItem.gstRate===28?'selected':'') : (catalogGst===28?'selected':'')}>28%</option>
+                <option value="custom" ${!prefillItem&&catalogGstIsCustom?'selected':''}>${t('invCustomPercent')}</option>
               </select>
               <input type="number" id="inv-gst-custom" min="0" max="100" step="0.5" placeholder="e.g. 3"
-                style="display:none;width:70px;padding:9px 8px;border-radius:8px;border:1px solid #2a3a5a;background:var(--bg-row-even,#0d1220);color:#fff;font-size:13px;"
+                style="display:${!prefillItem&&catalogGstIsCustom?'block':'none'};width:70px;padding:9px 8px;border-radius:8px;border:1px solid #2a3a5a;background:var(--bg-row-even,#0d1220);color:#fff;font-size:13px;"
+                value="${!prefillItem&&catalogGstIsCustom?catalogGst:''}"
                 oninput="invUpdateGstPreview('add')" />
             </div>
           </div>
           <div>
             <label style="font-size:11px;color:var(--text-muted,#7a8aaa);font-weight:700;display:block;margin-bottom:4px;">${t('invPriceIs')}</label>
             <select class="input" id="inv-gst-included" style="margin-bottom:0;" onchange="invUpdateGstPreview('add')">
-              <option value="exclusive" ${prefillItem&&prefillItem.gstIncluded==='exclusive'?'selected':''}>${t('invPriceIsExclusive')}</option>
-              <option value="inclusive" ${!prefillItem||prefillItem.gstIncluded!=='exclusive'?'selected':''}>${t('invPriceIsInclusive')}</option>
+              <option value="exclusive" ${prefillItem ? (prefillItem.gstIncluded==='exclusive'?'selected':'') : (catalogGstIncluded==='exclusive'?'selected':'')}>${t('invPriceIsExclusive')}</option>
+              <option value="inclusive" ${prefillItem ? (prefillItem.gstIncluded!=='exclusive'?'selected':'') : (catalogGstIncluded!=='exclusive'?'selected':'')}>${t('invPriceIsInclusive')}</option>
             </select>
           </div>
         </div>
@@ -23770,7 +23848,7 @@ function renderInventoryTab(){
           </div>
           <input class="input" type="text" id="inv-hsn-add" placeholder="${t('invHsnPlaceholder')}" maxlength="8"
             oninput="hsnOnInput('add')"
-            value="${prefillItem&&prefillItem.hsnCode ? prefillItem.hsnCode : ''}"
+            value="${prefillItem&&prefillItem.hsnCode ? prefillItem.hsnCode : catalogHsn}"
             style="margin-bottom:4px;" />
           <div id="inv-hsn-msg-add" style="font-size:11px;min-height:14px;"></div>
           <div id="inv-cheat-add" style="display:none;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:10px;padding:12px;margin-top:6px;"></div>
@@ -23866,7 +23944,7 @@ function renderInventoryTab(){
             const catOOS   = catItems.filter(x=>invGetStock(x.name)<=0).length;
             const catLow   = catItems.filter(x=>invGetStock(x.name)>0&&invGetStock(x.name)<=3).length;
             return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #FFD70030;"
-              onclick="invCatPageName='${cat.replace(/'/g,"\\'")}';invCatPageSearch=${tallyMatch(cat,q)?"''":`'${q.replace(/'/g,"\\'")}'`};invView='category';invSearchQuery='';safeRenderTab(currentTab)">
+              onclick="invCatPageName='${jsAttrStr(cat)}';invCatPageSearch=${tallyMatch(cat,q)?"''":`'${jsAttrStr(q)}'`};invView='category';invSearchQuery='';safeRenderTab(currentTab)">
               <div>
                 <div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
                 <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:4px;">
@@ -23895,7 +23973,7 @@ function renderInventoryTab(){
           const catOOS   = catItems.filter(x=>invGetStock(x.name)<=0).length;
           const catLow   = catItems.filter(x=>invGetStock(x.name)>0&&invGetStock(x.name)<=3).length;
           return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 18px;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;"
-            onclick="invCatPageName='${cat.replace(/'/g,"\\'")}';invCatPageSearch='';invView='category';safeRenderTab(currentTab)">
+            onclick="invCatPageName='${jsAttrStr(cat)}';invCatPageSearch='';invView='category';safeRenderTab(currentTab)">
             <div>
               <div style="font-size:16px;font-weight:800;color:#FFD700;">🏷 ${cat}</div>
               <div style="font-size:12px;color:var(--text-muted,#7a8aaa);margin-top:4px;">
@@ -23955,6 +24033,12 @@ function invSubmitAdd(){
   // Find existing item or create new
   let item = inventoryItems.find(x=>x.name.trim().toLowerCase()===name.toLowerCase());
 
+  // Catalog write-back should only fire when this barcode is genuinely new
+  // info for this item (new item, or barcode wasn't already saved on it) —
+  // not on every routine edit (price/category/etc.), or the shared "used by
+  // N shops" count would inflate every time one shop re-saves its own item.
+  const _bcIsNewAssignment = barcodeVal && (!item || bcNormalizeCode(item.barcode||"") !== barcodeVal);
+
   // ── Barcode conflict check: don't let two items share the same barcode ──
   if(barcodeVal){
     const clash = inventoryItems.find(x => x.barcode && bcNormalizeCode(x.barcode)===barcodeVal && x!==item);
@@ -24002,7 +24086,8 @@ function invSubmitAdd(){
     saveInventory();
   }
   // ── Write back to the shared barcode catalog so other shops benefit next scan ──
-  if (barcodeVal) bcWriteBackCatalog(barcodeVal, name, unit, category);
+  // (only when this barcode is newly assigned to this item — see _bcIsNewAssignment above)
+  if (_bcIsNewAssignment) bcWriteBackCatalog(barcodeVal, name, unit, category, gstRate, gstIncluded, hsnCode);
 
   invPrefillName = "";
   invCatalogPick = null;
@@ -25140,7 +25225,7 @@ function invCheckDuplicateName(name){
         <div style="font-weight:700;color:var(--text-main,#e8eaf0);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(it.name)}</div>
         <div style="font-size:10px;color:var(--text-muted,#7a8aaa);">${stock} ${escHtml(it.unit||"unit")} in stock${sales?` · ${sales} past sale${sales!==1?"s":""}`:""}</div>
       </div>
-      <button type="button" onclick="document.getElementById('inv-name').value='${it.name.replace(/'/g,"\\'")}';invCheckDuplicateName('${it.name.replace(/'/g,"\\'")}');document.getElementById('inv-name').dispatchEvent(new Event('input'));"
+      <button type="button" onclick="document.getElementById('inv-name').value='${jsAttrStr(it.name)}';invCheckDuplicateName('${jsAttrStr(it.name)}');document.getElementById('inv-name').dispatchEvent(new Event('input'));"
         style="cursor:pointer;background:#1a3a6e;border:1px solid #2563eb;border-radius:6px;color:#fff;font-size:11px;font-weight:700;padding:6px 10px;white-space:nowrap;flex-shrink:0;">Edit this instead</button>
     </div>`;
   }).join("");
@@ -25345,7 +25430,12 @@ async function bcFetchCatalogSuggestions(code) {
     const list = [];
     snap.forEach(doc => {
       const d = doc.data() || {};
-      if (d.display) list.push({ key: doc.id, display: d.display, count: Number(d.count)||0, unit: d.unit||"", category: d.category||"" });
+      if (d.display) list.push({
+        key: doc.id, display: d.display, count: Number(d.count)||0,
+        unit: d.unit||"", category: d.category||"",
+        gstRate: (d.gstRate===0||d.gstRate>0) ? Number(d.gstRate) : null,
+        gstIncluded: d.gstIncluded||"", hsnCode: d.hsnCode||""
+      });
     });
     list.sort((a,b) => b.count - a.count);
     return list.slice(0,3);
@@ -25356,19 +25446,25 @@ async function bcFetchCatalogSuggestions(code) {
   }
 }
 
-// Write back the name this shop used for this barcode, incrementing the shared count
-function bcWriteBackCatalog(code, name, unit, category) {
+// Write back the name (+ GST/HSN, if this shop set them) this shop used for this barcode
+function bcWriteBackCatalog(code, name, unit, category, gstRate, gstIncluded, hsnCode) {
   const norm = bcNormalizeCode(code);
   if (!norm || !name || !db) return;
   const key = bcCatalogKey(name);
   if (!key) return;
-  db.collection("barcode_catalog").doc(norm).collection("names").doc(key).set({
+  const payload = {
     display: String(name).trim(),
     unit: unit || "",
     category: category || "",
     count: firebase.firestore.FieldValue.increment(1),
     updatedAt: Date.now()
-  }, { merge: true }).catch(e => {
+  };
+  // Only write GST/HSN if this shop actually set them — don't overwrite a
+  // useful shared value with a blank just because this shop left it empty.
+  if (gstRate > 0) payload.gstRate = gstRate;
+  if (gstIncluded) payload.gstIncluded = gstIncluded;
+  if (hsnCode) payload.hsnCode = hsnCode;
+  db.collection("barcode_catalog").doc(norm).collection("names").doc(key).set(payload, { merge: true }).catch(e => {
     console.warn("[BarcodeCatalog] write-back failed", e && e.code, e && e.message);
     if (e && e.code === "permission-denied") notify("⚠️ Barcode catalog: Firestore permission denied — check your Firestore rules","error");
   });
@@ -25620,7 +25716,7 @@ function _bcAssignResultsHtml(items, code, rowId) {
         <div style="font-weight:700;color:var(--text-main,#e8eaf0);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(it.name)}</div>
         <div style="font-size:10px;color:var(--text-muted,#7a8aaa);">${stock} ${escHtml(it.unit||"unit")} in stock${it.sellingPrice>0?` · ₹${Number(it.sellingPrice).toFixed(2)}`:""}</div>
       </div>
-      <button onclick="_bcAssignBarcodeToItem('${it.name.replace(/'/g,"\\'")}','${escHtml(code)}','${rowId}')"
+      <button onclick="_bcAssignBarcodeToItem('${jsAttrStr(it.name)}','${escHtml(code)}','${rowId}')"
         style="cursor:pointer;background:#1a3a1a;border:1px solid #22c55e;border-radius:8px;color:#22c55e;font-size:11px;font-weight:800;padding:8px 12px;white-space:nowrap;flex-shrink:0;">
         ✅ Assign
       </button>
@@ -25644,6 +25740,9 @@ function _bcAssignBarcodeToItem(itemName, code, rowId) {
   saveInventory();
   closeModal();
   notify("✅ Barcode " + code + " assigned to " + itemName);
+  // ── Write back to the shared barcode catalog, same as the Add Item flow,
+  // so other shops benefit from this assignment on their next scan too ──
+  bcWriteBackCatalog(item.barcode, item.name, item.unit, item.category, item.gstRate, item.gstIncluded, item.hsnCode);
   // Auto-fill the row with this item, as if it had scanned correctly the first time
   const row = document.querySelector(`[data-row-id="${rowId}"]`);
   if(row){
@@ -27214,7 +27313,7 @@ function renderInventoryCategoryPage(catName){
         const avgCost = costEntries.length?(costEntries.reduce((s,e)=>s+Number(e.costPerUnit),0)/costEntries.length).toFixed(2):0;
         const stkColor = stk<0?"#ff2222":stk===0?"#f66":stk<=3?"#FFD700":"#4f4";
         const stkBg = stk<0?"#3a0000":stk===0?"#2a0808":stk<=3?"#1a1400":"#081a08";
-        return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${item.name.replace(/'/g,"\\'")}')">
+        return `<div data-sc-row="1" tabindex="-1" class="card" style="padding:14px 16px;cursor:pointer;margin-bottom:8px;" onclick="invShowItemDetail('${jsAttrStr(item.name)}')">
           <div style="display:flex;align-items:flex-start;gap:12px;">
             <div style="background:#1a2540;border-radius:10px;padding:9px;font-size:20px;flex-shrink:0;">🛒</div>
             <div style="flex:1;min-width:0;">
@@ -27235,7 +27334,7 @@ function renderInventoryCategoryPage(catName){
                   <div style="font-size:12px;font-weight:800;color:#7ab3ff;">${avgCost>0?"₹"+avgCost:"—"}</div>
                   <div style="font-size:9px;color:var(--text-dim,#4a5a7a);">Avg Cost</div>
                 </div>
-                <div style="background:#081a08;border:1px solid #1a4a1a20;border-radius:8px;padding:7px;text-align:center;" onclick="invEditSellPrice('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()">
+                <div style="background:#081a08;border:1px solid #1a4a1a20;border-radius:8px;padding:7px;text-align:center;" onclick="invEditSellPrice('${jsAttrStr(item.name)}');event.stopPropagation()">
                   <div style="font-size:12px;font-weight:800;color:#FFD700;">${item.sellingPrice>0?"₹"+Number(item.sellingPrice).toFixed(2):"Set ✏️"}</div>
                   <div style="font-size:9px;color:var(--text-dim,#4a5a7a);">Sell Price</div>
                 </div>
@@ -27248,9 +27347,9 @@ function renderInventoryCategoryPage(catName){
                 <div style="font-size:11px;color:var(--text-dim,#4a5a7a);">Restocked: ${lastAdded} · <span style="color:#4a8aff;">Tap for buyers →</span></div>
                 <div style="display:flex;gap:5px;" onclick="event.stopPropagation()">
                   
-                  <button onclick="openInvEditModal('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#0a1a3a;border:none;border-radius:7px;color:#4a8aff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">✏️ Edit</button>
-                  <button onclick="invShowItemEditHistory('${(item.id||'').replace(/'/g,"\\'")}','${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#1a1500;border:none;border-radius:7px;color:#FFD700;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">📝 Edit History</button>
-                  <button onclick="invDeleteItem('${item.name.replace(/'/g,"\\'")}');event.stopPropagation()" style="background:#2a0808;border:none;border-radius:7px;color:#f66;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🗑</button>
+                  <button onclick="openInvEditModal('${jsAttrStr(item.name)}');event.stopPropagation()" style="background:#0a1a3a;border:none;border-radius:7px;color:#4a8aff;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">✏️ Edit</button>
+                  <button onclick="invShowItemEditHistory('${jsAttrStr((item.id||''))}','${jsAttrStr(item.name)}');event.stopPropagation()" style="background:#1a1500;border:none;border-radius:7px;color:#FFD700;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">📝 Edit History</button>
+                  <button onclick="invDeleteItem('${jsAttrStr(item.name)}');event.stopPropagation()" style="background:#2a0808;border:none;border-radius:7px;color:#f66;cursor:pointer;padding:5px 9px;font-size:11px;font-weight:700;">🗑</button>
                 </div>
               </div>
             </div>
@@ -27410,7 +27509,7 @@ function renderInventoryItemDetail(itemName){
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
       <button onclick="invView='stock';invDetailItem=null;window._invDetailTab='history';window._invHistMode='all';window._invCustMode='all';safeRenderTab(currentTab)" style="background:#1a2540;border:none;border-radius:9px;color:#7ab3ff;cursor:pointer;padding:8px 14px;font-size:13px;font-weight:700;">← पीछे</button>
       <div style="font-size:17px;font-weight:800;color:#FFD700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${itemName}</div>
-      <button onclick="invShowItemEditHistory('${(item.id||'').replace(/'/g,"\\'")}','${itemName.replace(/'/g,"\\'")}')" style="background:#1a1500;border:none;border-radius:9px;color:#FFD700;cursor:pointer;padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0;">📝 Edit History</button>
+      <button onclick="invShowItemEditHistory('${jsAttrStr((item.id||''))}','${jsAttrStr(itemName)}')" style="background:#1a1500;border:none;border-radius:9px;color:#FFD700;cursor:pointer;padding:8px 12px;font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0;">📝 Edit History</button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:16px;">
       <div style="background:var(--bg-main,#0a0e1a);border:1px solid var(--border-main,#1e2a45);border-radius:10px;padding:9px 4px;text-align:center;">
@@ -27425,7 +27524,7 @@ function renderInventoryItemDetail(itemName){
         <div style="font-size:15px;font-weight:800;color:#f66;">${totalSold}</div>
         <div style="font-size:9px;color:var(--text-dim,#4a5a7a);margin-top:1px;">${t("invSold")}</div>
       </div>
-      <div style="background:#081a08;border:1px solid #FFD70030;border-radius:10px;padding:9px 4px;text-align:center;cursor:pointer;" onclick="invEditSellPrice('${itemName.replace(/'/g,"\\'")}');safeRenderTab(currentTab)">
+      <div style="background:#081a08;border:1px solid #FFD70030;border-radius:10px;padding:9px 4px;text-align:center;cursor:pointer;" onclick="invEditSellPrice('${jsAttrStr(itemName)}');safeRenderTab(currentTab)">
         <div style="font-size:12px;font-weight:800;color:#FFD700;">${item.sellingPrice>0?"₹"+Number(item.sellingPrice).toFixed(2):"Set ✏️"}</div>
         <div style="font-size:9px;color:var(--text-dim,#4a5a7a);margin-top:1px;">${t("invSellPrice")}</div>
       </div>
@@ -27858,7 +27957,7 @@ function showEditHistoryModal(entityId, entityName, histType, displayLabel, txId
   const fullTitle = '📝 Edit History' + (label ? (' — ' + escHtml(label)) : '');
   const title = txId ? scopedTitle : fullTitle;
   const toggleLink = txId
-    ? `<div style="margin-bottom:12px;"><a href="javascript:void(0)" onclick="showEditHistoryModal('${entityId}','${(entityName||'').replace(/'/g,"\\'")}','${histType}','${(displayLabel||'').replace(/'/g,"\\'")}')" style="font-size:12px;color:#7ab3ff;text-decoration:underline;">View full account history for ${escHtml(label||'this record')} →</a></div>`
+    ? `<div style="margin-bottom:12px;"><a href="javascript:void(0)" onclick="showEditHistoryModal('${entityId}','${jsAttrStr((entityName||''))}','${histType}','${jsAttrStr((displayLabel||''))}')" style="font-size:12px;color:#7ab3ff;text-decoration:underline;">View full account history for ${escHtml(label||'this record')} →</a></div>`
     : '';
   const html = modalHeader(title) +
     toggleLink +
