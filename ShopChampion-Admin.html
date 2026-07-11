@@ -3389,6 +3389,41 @@ function ptRestoreState() {
 function userCol() {
   return db.collection("users").doc(authPhone || "unknown").collection("customers");
 }
+
+// ─── Shop ownership claim (shop_profiles.uid) ────────────────────────────
+// Firestore rules (v13) block changing an already-claimed uid from any
+// normal client write — only a first-time claim or a no-op (same uid)
+// write succeeds directly. When this IS a genuine device switch, the direct
+// write is rejected, and we fall back to the claim-shop-uid Edge Function,
+// which independently re-verifies the password server-side (same
+// check_password RPC used for normal login) before writing uid with
+// Firebase Admin credentials — a path no browser client has access to.
+async function claimShopProfileUid(phone, uid, hashForReclaim) {
+  if (!phone || !uid || !db) return false;
+  try {
+    await db.collection("shop_profiles").doc(phone)
+      .set({ uid: uid, phone: phone, updatedAt: Date.now() }, { merge: true });
+    return true; // first-time claim, or same device refreshing — no server round-trip needed
+  } catch (e) {
+    if (!hashForReclaim) {
+      console.warn("[SC] shop_profiles uid write blocked and no password hash available to re-claim — staying logged out on this device");
+      return false;
+    }
+    try {
+      const res = await fetch(`${SC_SUPABASE_URL}/functions/v1/claim-shop-uid`, {
+        method: "POST",
+        headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phone, hash: hashForReclaim, firebaseUid: uid })
+      });
+      if (!res.ok) { console.warn("[SC] claim-shop-uid failed:", res.status, await res.text().catch(()=> "")); return false; }
+      const data = await res.json();
+      return !!data.success;
+    } catch (e2) {
+      console.warn("[SC] claim-shop-uid network error:", e2.message);
+      return false;
+    }
+  }
+}
 function userDisplayDoc() {
   return db.collection("users").doc(authPhone || "unknown").collection("display").doc("leaderboard");
 }
@@ -3436,24 +3471,26 @@ async function _savePublicShopProfile(){
     address:  appSettings.shopAddress || "",
     updatedAt: Date.now()
   };
-  // Include Firebase uid for Firestore Rules ownership check (isOwner helper)
-  // Sign in anonymously if not already authenticated so request.auth is set
-  const doWrite = (uid) => {
-    if (uid) profile.uid = uid;
+  // NOTE (v13): 'uid' is intentionally NOT written here anymore. Ownership
+  // claims are handled exclusively by claimShopProfileUid() in the login
+  // flow — keeping it out of this payload means routine profile-field
+  // edits (name/city/address/etc.) can never be blocked by the uid-lock
+  // rule, since a merge-write that omits 'uid' leaves it untouched.
+  const doWrite = () => {
     db.collection("shop_profiles").doc(authPhone).set(profile, {merge:true})
       .catch(e=>console.warn("Public profile save error:",e));
   };
   try {
     const currentUser = firebase.auth().currentUser;
     if (currentUser) {
-      doWrite(currentUser.uid);
+      doWrite();
     } else {
       firebase.auth().signInAnonymously()
-        .then(cred => doWrite(cred.user.uid))
-        .catch(() => doWrite(null)); // write without uid if auth fails
+        .then(() => doWrite())
+        .catch(() => doWrite()); // write profile fields regardless — uid is no longer part of this payload
     }
   } catch(e) {
-    doWrite(null);
+    doWrite();
   }
 }
 
@@ -6913,6 +6950,7 @@ async function submitResetPassword() {
     localStorage.setItem("sc_user_" + authPhone, hashed);
     localStorage.setItem("sc_auth_phone", authPhone);
     localStorage.setItem("sc_session_type", "admin");
+    authHash = hashed; // needed by claimShopProfileUid() if a re-claim is ever required later
     notify("✅ Password reset successfully!");
     onLoginSuccess(authPhone);
   } catch(e) {
@@ -6981,6 +7019,7 @@ async function setNewPassword() {
   if(saveTxt) saveTxt.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #1a0a00;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;"></span>Saving...`;
 
   const hashed = await scHashPassword(authPhone, p1);
+  authHash = hashed; // needed by claimShopProfileUid() if a re-claim is ever required later
   const userNum = Date.now();
 
   try {
@@ -7431,12 +7470,19 @@ function onLoginSuccess(phone) {
             // CRITICAL: wait for shop_profiles uid write to complete BEFORE starting
             // Firestore listener. If we start listener first, isOwner() checks the OLD uid
             // in shop_profiles → permission-denied on first snapshot.
-            console.log("[SC] Refreshing shop_profiles uid before starting listener:", uid);
-            db.collection("shop_profiles").doc(phone)
-              .set({ uid: uid, phone: phone, updatedAt: Date.now() }, { merge: true })
-              .then(() => { console.log("[SC] shop_profiles uid saved:", uid); _afterAuth(); })
+            console.log("[SC] Claiming shop_profiles uid before starting listener:", uid);
+            claimShopProfileUid(phone, uid, authHash)
+              .then((ok) => {
+                if (ok) {
+                  console.log("[SC] shop_profiles uid claimed:", uid);
+                  db.collection("uid_owner").doc(uid).set({ phone: phone, updatedAt: Date.now() }).catch(()=>{});
+                } else {
+                  console.warn("[SC] shop_profiles uid claim failed — this device may not get owner access");
+                }
+                _afterAuth();
+              })
               .catch(e => {
-                console.warn("[SC] shop_profiles uid save failed:", e.message, "— proceeding anyway");
+                console.warn("[SC] shop_profiles uid claim error:", e.message, "— proceeding anyway");
                 _afterAuth(); // don't block the app if this fails
               });
           } else {
@@ -7447,11 +7493,18 @@ function onLoginSuccess(phone) {
             .then(cred => {
               const newUid = cred && cred.user && cred.user.uid;
               if (!currentMember && newUid) {
-                console.log("[SC] New anon UID, saving to shop_profiles:", newUid);
-                db.collection("shop_profiles").doc(phone)
-                  .set({ uid: newUid, phone: phone, updatedAt: Date.now() }, { merge: true })
-                  .then(() => { console.log("[SC] shop_profiles uid saved:", newUid); _afterAuth(); })
-                  .catch(e => { console.warn("[SC] shop_profiles uid save failed:", e.message); _afterAuth(); });
+                console.log("[SC] New anon UID, claiming shop_profiles:", newUid);
+                claimShopProfileUid(phone, newUid, authHash)
+                  .then((ok) => {
+                    if (ok) {
+                      console.log("[SC] shop_profiles uid claimed:", newUid);
+                      db.collection("uid_owner").doc(newUid).set({ phone: phone, updatedAt: Date.now() }).catch(()=>{});
+                    } else {
+                      console.warn("[SC] shop_profiles uid claim failed — this device may not get owner access");
+                    }
+                    _afterAuth();
+                  })
+                  .catch(e => { console.warn("[SC] shop_profiles uid claim error:", e.message); _afterAuth(); });
               } else {
                 _afterAuth();
               }
@@ -7489,17 +7542,19 @@ function onLoginSuccess(phone) {
           const _cu2 = firebase.auth().currentUser;
           if (_cu2) {
             if (!currentMember) {
-              db.collection("shop_profiles").doc(phone).set({ uid: _cu2.uid, phone: phone, updatedAt: Date.now() }, { merge: true }).catch(()=>{});
+              claimShopProfileUid(phone, _cu2.uid, authHash).finally(_afterAuth2);
+            } else {
+              _afterAuth2();
             }
-            _afterAuth2();
           } else {
             firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{}).finally(() => {
               firebase.auth().signInAnonymously()
                 .then(cred => {
                   if (!currentMember && cred && cred.user) {
-                    db.collection("shop_profiles").doc(phone).set({ uid: cred.user.uid, phone: phone, updatedAt: Date.now() }, { merge: true }).catch(()=>{});
+                    claimShopProfileUid(phone, cred.user.uid, authHash).finally(_afterAuth2);
+                  } else {
+                    _afterAuth2();
                   }
-                  _afterAuth2();
                 })
                 .catch(() => _afterAuth2());
             });
@@ -24476,7 +24531,44 @@ async function scLoadConnections() {
     scLoadBlockList();
     // Fetch peer ledger balances in background (no await — non-blocking)
     scFetchAllPeerBalances().then(()=>{ /* balances cached, UI will show on next render */ });
+    // One-time backfill: connections accepted before fix134 have no Firestore
+    // mirror doc yet, so the app_data isConnectedTo() rule can't see them.
+    // Runs once per shop (localStorage-gated), non-blocking.
+    scBackfillConnectionMirrors();
   } catch(e) { _scConnections = []; }
+}
+
+// Ensures every Supabase sc_connections row this shop is party to has a
+// matching Firestore connections/{sortedPair} mirror doc. Needed because
+// connections made before the fix133 app_data security fix predate the
+// mirror-write code in scAcceptRequest(), and would otherwise silently lose
+// peer-balance visibility (the isConnectedTo() rule checks the mirror, not
+// Supabase). Safe to call repeatedly — no-ops after the first successful run.
+async function scBackfillConnectionMirrors() {
+  if (!authPhone || !db) return;
+  const flagKey = storageKey('conn_mirror_backfilled_v1');
+  if (localStorage.getItem(flagKey) === '1') return;
+  if (!_scConnections || !_scConnections.length) {
+    // Nothing to backfill, but still mark done so we don't re-check every load.
+    localStorage.setItem(flagKey, '1');
+    return;
+  }
+  let allOk = true;
+  for (const conn of _scConnections) {
+    if (!conn.phone_a || !conn.phone_b) continue;
+    const _pair = [conn.phone_a, conn.phone_b].sort();
+    try {
+      await db.collection("connections").doc(_pair[0] + "_" + _pair[1])
+        .set({ phone_a: _pair[0], phone_b: _pair[1], createdAt: conn.created_at || Date.now() }, { merge: true });
+    } catch(e) {
+      allOk = false;
+      console.warn("[SC] Connection mirror backfill failed for", conn.id, ":", e.message);
+    }
+  }
+  // Only set the flag once every row succeeded — if any write failed (e.g.
+  // permission-denied on old rules not yet published), retry on next load
+  // rather than silently giving up.
+  if (allOk) localStorage.setItem(flagKey, '1');
 }
 
 async function scLoadPendingRequests() {
@@ -24503,6 +24595,15 @@ async function scAcceptRequest(reqId) {
       ledger_share_a_to_b:false, ledger_share_b_to_a:false, created_at:Date.now()
     })
   });
+  // Mirror into Firestore too — Firestore security rules have no visibility into
+  // Supabase, so the app_data cross-shop-read check needs its own record of this
+  // connection living in Firestore. Doc id is the two phones sorted so either side
+  // can compute the same id.
+  try {
+    const _pair = [req.from_phone, authPhone].sort();
+    if (db) await db.collection("connections").doc(_pair[0] + "_" + _pair[1])
+      .set({ phone_a: _pair[0], phone_b: _pair[1], createdAt: Date.now() });
+  } catch(e) { console.warn("[SC] Firestore connection mirror failed:", e.message); }
   await scSupa(`sc_conn_requests?id=eq.${encodeURIComponent(reqId)}`, {
     method:"PATCH", body:JSON.stringify({status:"accepted"})
   });
@@ -24589,6 +24690,13 @@ async function scConfirmUnlink(connId) {
     if (peerPh) scSendPush(peerPh, `🔗✕ Unlinked by ${scMyShopName()}`, "They have removed the connection with your shop");
     // Delete connection record
     await scSupa(`sc_connections?id=eq.${encodeURIComponent(connId)}`, {method:"DELETE"});
+    // Remove the Firestore mirror too, or the app_data read rule would keep granting access
+    if (peerPh) {
+      try {
+        const _pair = [peerPh, authPhone].sort();
+        if (db) await db.collection("connections").doc(_pair[0] + "_" + _pair[1]).delete();
+      } catch(e) { console.warn("[SC] Firestore connection mirror delete failed:", e.message); }
+    }
     // Delete all messages between these two phones
     if (conn) {
       const pa = encodeURIComponent(conn.phone_a);
@@ -26611,8 +26719,35 @@ async function sendShopConnectRequest(targetProfile, myRoleForThem, theirRoleFor
 }
 
 function _showFirestoreRulesError(errMsg){
-  const rules = `// ShopChampion — Firestore Security Rules v8
-// v8: Fixed isOwner chicken-and-egg on fresh UID; added owner_session rule.
+  const rules = `// ShopChampion — Firestore Security Rules v14
+// v9: Closed shop_profiles uid-takeover hole (uid now locked after first
+// claim), owner_session no longer writable by any signed-in user, and
+// app_data cross-shop reads now require a real mirrored ShopConnect
+// connection (uid_owner + connections collections) instead of any auth.
+// v10: connections/{pairId} now also allows 'update' (same-phones-only) so
+// the one-time mirror-backfill migration (for connections made before v9)
+// can safely merge-set an existing doc, not just create new ones.
+// v11: shop_id_registry/{suffix} now locks the phone mapping after first
+// claim (matches the app's own "id is permanent" design) — closes a
+// Shop-ID hijack hole where anyone signed in could overwrite a claimed
+// suffix to redirect Member Logins to a different phone.
+// v12: EMERGENCY REVERT of the v9 shop_profiles uid-lock (temporary — it
+// broke legitimate multi-device login).
+// v13: PROPER fix for shop_profiles. uid can no longer be changed by any
+// normal client write once a shop is claimed (first claim and no-op writes
+// still work directly). Changing uid on a device switch now requires the
+// claim-shop-uid Supabase Edge Function, which independently re-verifies
+// the password server-side (via check_password RPC) before writing uid
+// with Firebase Admin credentials — closing hole #1 for real, without
+// breaking multi-device login. Requires deploying that Edge Function —
+// see claim-shop-uid.ts deployment notes.
+// v14: owner_session/current read is now open to any signed-in device
+// (write stays locked to isOwner). A device that's just been superseded by
+// a login elsewhere is, by definition, no longer isOwner() — if read also
+// required isOwner, that device could never detect the takeover (its
+// permission-denied read error was being silently swallowed), so the
+// single-session force-logout notification would never show. The token
+// itself isn't a sensitive credential, so opening read is safe.
 // Apply in Firebase Console -> Firestore -> Rules -> Publish
 rules_version = '2';
 service cloud.firestore {
@@ -26636,19 +26771,55 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/seller_admins/$(request.auth.uid));
     }
 
+    // Reverse lookup: what phone does THIS caller's uid own? Written at login
+    // to uid_owner/{uid}. Needed because ShopConnect connections are keyed by
+    // phone pairs, but rules only know the caller's uid, not their phone.
+    function callerPhone() {
+      return exists(/databases/$(database)/documents/uid_owner/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/uid_owner/$(request.auth.uid)).data.phone
+        : null;
+    }
+
+    // Deterministic doc id for a connection between two phones, independent
+    // of which side is "a" or "b".
+    function connPairId(a, b) {
+      return a < b ? a + "_" + b : b + "_" + a;
+    }
+
+    // Is the caller a confirmed, mutually-accepted ShopConnect peer of 'phone'?
+    // Backed by connections/{sortedPair} written when a connect request is
+    // accepted (and deleted on unlink) — see scAcceptRequest()/scConfirmUnlink().
+    function isConnectedTo(phone) {
+      return request.auth != null
+        && callerPhone() != null
+        && exists(/databases/$(database)/documents/connections/$(connPairId(phone, callerPhone())));
+    }
+
     match /users/{phone}/member_auth_uids/{uid} {
       allow write: if request.auth != null && request.auth.uid == uid;
       allow read: if isOwner(phone);
     }
 
+    // Read stays open to any signed-in device — the token itself isn't a
+    // sensitive credential (it grants nothing by itself; all real data
+    // access is separately gated by isOwner() elsewhere). This is what lets
+    // a device that's JUST BEEN SUPERSEDED still read the new token and
+    // detect the takeover — locking read to isOwner(phone) would mean a
+    // kicked device loses read access the instant it's kicked, so it could
+    // never learn it needs to log out (silent break, not a visible one).
+    // Write stays locked to the real owner — this is what actually closes
+    // the force-logout/session-hijack hole.
     match /users/{phone}/owner_session/current {
-      allow read, write: if isOwner(phone) || request.auth != null;
+      allow read: if request.auth != null;
+      allow write: if isOwner(phone);
     }
 
-    // ShopConnect shared ledger: any authenticated shop can read app_data
-    // (creditors/debtors) so linked shops can view the shared ledger.
+    // ShopConnect shared ledger: only a confirmed connected peer (mirrored
+    // into Firestore on accept/unlink) can read app_data (creditors/debtors).
+    // Owner/member/seller-admin already get read+write via the wildcard rule
+    // below, so this only needs to add the cross-shop peer case.
     match /users/{phone}/app_data/{doc} {
-      allow read: if request.auth != null;
+      allow read: if isConnectedTo(phone);
       allow write: if isOwner(phone) || isShopMember(phone);
     }
 
@@ -26663,9 +26834,63 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // Reverse phone lookup — a caller may only claim/read their own uid entry.
+    match /uid_owner/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Mirrored ShopConnect connections (source of truth is Supabase; this
+    // mirror exists purely so Firestore rules can verify a real connection).
+    // Only the two phones in the connection may read/create/delete it.
+    match /connections/{pairId} {
+      allow read, delete: if request.auth != null
+        && callerPhone() != null
+        && (resource.data.phone_a == callerPhone() || resource.data.phone_b == callerPhone());
+      allow create: if request.auth != null
+        && callerPhone() != null
+        && (request.resource.data.phone_a == callerPhone() || request.resource.data.phone_b == callerPhone());
+      // Idempotent merge-set (used by the mirror-backfill migration) is an
+      // "update" once the doc exists — allow it for either side of the pair,
+      // same phones only, so re-running the backfill is a safe no-op.
+      allow update: if request.auth != null
+        && callerPhone() != null
+        && (resource.data.phone_a == callerPhone() || resource.data.phone_b == callerPhone())
+        && request.resource.data.phone_a == resource.data.phone_a
+        && request.resource.data.phone_b == resource.data.phone_b;
+    }
+
+    // FIXED (v13): uid can no longer be changed by any normal client write
+    // once a shop has been claimed. First-time claim (doc has no uid yet)
+    // stays open — nothing to hijack there. After that, only the current
+    // owner may write (so shop-name/city/etc. edits keep working), and even
+    // the owner cannot change uid through this path — a device switch must
+    // go through the claim-shop-uid Edge Function, which independently
+    // re-verifies the password server-side before writing uid with Admin
+    // credentials (not subject to these rules at all).
     match /shop_profiles/{phone} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null
+        && (
+          !("uid" in resource.data)
+          || (resource.data.uid == request.auth.uid
+              && request.resource.data.uid == resource.data.uid)
+        );
+    }
+
+    // Public registry mapping a Shop ID suffix (e.g. "123456") -> owning phone.
+    // Must be publicly readable because the Member Login screen resolves a
+    // Shop ID to a phone BEFORE anyone is authenticated as that shop.
+    // FIXED: once a suffix is claimed, the phone mapping is locked — nobody
+    // can overwrite it to redirect Member Logins to a different phone. This
+    // matches the app's own design (a claimed Shop ID is meant to be
+    // permanent — see ensureShopIdAssigned()'s comment) and closes a hijack
+    // path identical in shape to the shop_profiles uid-takeover hole.
+    match /shop_id_registry/{suffix} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null
+        && resource.data.phone == request.resource.data.phone;
     }
 
     // Leaderboard display data (sc_shops)
@@ -26709,6 +26934,13 @@ service cloud.firestore {
     match /ad_impressions/{adOwner}/shops/{shopId}/ads/{adId} {
       allow read: if isOwner(adOwner);
       allow write: if true;
+    }
+
+    // Shared barcode -> product-name catalog. Any shop can look up what
+    // other shops called a barcode, and contribute its own naming choice.
+    match /barcode_catalog/{code}/names/{nameKey} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
     }
 
     // Global settings — read-only for all clients, write only via Admin SDK / Console
