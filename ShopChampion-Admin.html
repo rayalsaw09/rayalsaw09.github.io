@@ -3574,6 +3574,10 @@ function startFirestoreListener() {
     _firstSnapshotDone = true; // allow render even on error
     updateDbStatus("⚠️ Firebase error: " + err.message, "#f84");
     _scCheckIfBlocked(err.message); // show blocker banner if network-blocked
+    if (err.code === "permission-denied" && !currentMember && typeof window._ownerSessionCheckNow === "function") {
+      // Likely means another device just took over — don't wait for the next poll.
+      window._ownerSessionCheckNow();
+    }
     // Auto-restart listener after WebChannel drop — Firebase does NOT do this automatically
     if (authPhone && !currentMember) { // only owner restarts (members handled by heartbeat)
       fbUnsubscribe = null;
@@ -3689,7 +3693,12 @@ function startFirestoreListener() {
             console.log("[SC] Prefs listener: license verified & activated:", row.plan);
           }).catch(() => {}); // silent if offline
         }
-      }, err => { console.warn("[SC] Prefs listener error:", err.message); });
+      }, err => {
+        console.warn("[SC] Prefs listener error:", err.message);
+        if (err.code === "permission-denied" && !currentMember && typeof window._ownerSessionCheckNow === "function") {
+          window._ownerSessionCheckNow();
+        }
+      });
   }
 }
 
@@ -7150,51 +7159,70 @@ async function _registerOwnerSession(phone) {
   } catch(e) { console.warn('[Owner] Could not register session token:', (e && e.code) || '', e && e.message); _scCheckIfBlocked((e && e.message) || String(e)); return true; }
 }
 
+var _ownerSessionCheckInFlight = false; // de-dupe overlapping on-demand + interval checks
+
+// The actual "is this device still the owner?" check, extracted so it can be
+// called either on the regular 10s poll OR immediately, on-demand, the moment
+// a listener (Inventory/Prefs/Customers) reports permission-denied. Waiting
+// for the next scheduled poll after a listener already told us access was
+// revoked meant up to a 10s delay (plus repeated, doomed listener retries)
+// before the user ever saw "session superseded" — this closes that gap.
+async function _ownerSessionCheckOnce(phone, graceDoneRef) {
+  if (!authPhone || currentMember) { _stopOwnerSessionWatcher(); return; }
+  if (!graceDoneRef.done) return; // still in grace period — skip
+  if (_ownerSessionCheckInFlight) return; // a check is already running, avoid overlap
+  _ownerSessionCheckInFlight = true;
+  try {
+    const doc = await db.collection('users').doc(phone).collection('owner_session').doc('current').get();
+    if (!doc.exists) return;
+    const remoteToken = doc.data().token;
+    if (remoteToken && _ownerSessionToken && remoteToken !== _ownerSessionToken) {
+      console.warn('[Owner] Session superseded by another device — logging out');
+      _stopOwnerSessionWatcher();
+      if (_fbListenerRetryTimer) { clearTimeout(_fbListenerRetryTimer); _fbListenerRetryTimer = null; }
+      // Stop ALL listeners immediately
+      if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
+      if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
+      if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
+      if(_payReqListener){ try{ _payReqListener(); }catch(_){} _payReqListener=null; }
+      if(_autoAcceptedListener){ try{ _autoAcceptedListener(); }catch(_){} _autoAcceptedListener=null; }
+      try{ stopAllLinkedLedgerListeners(); }catch(_){}
+      // Show non-blocking overlay instead of alert() (alert blocks on mobile)
+      _showSessionKickedOverlay();
+      setTimeout(() => doLogout(), 2500);
+    }
+  } catch(e) {
+    // Was silently swallowed before — meant a genuinely blocked/failing
+    // connection would prevent the kick from EVER firing, with no way to
+    // tell why from outside. Now logged, and fed into the same blocker
+    // detection used elsewhere so a real network/permission block shows
+    // the same banner instead of just quietly breaking multi-device kick.
+    console.warn('[Owner] Session watcher read failed:', (e && e.code) || '', e && e.message);
+    _scCheckIfBlocked((e && e.message) || String(e));
+  } finally {
+    _ownerSessionCheckInFlight = false;
+  }
+}
+
 function _startOwnerSessionWatcher(phone) {
   if (!phone || !db) return;
   _stopOwnerSessionWatcher(); // ensure no duplicate watcher
   // Grace period: wait 20s before first check so our own token write can settle in Firestore.
   // Without this, the watcher can read a stale token from a previous device and self-kick.
-  let _graceDone = false;
-  const _graceTimer = setTimeout(() => { _graceDone = true; }, 20000);
-  _ownerSessionWatcher = setInterval(async () => {
-    if (!authPhone || currentMember) { clearTimeout(_graceTimer); _stopOwnerSessionWatcher(); return; }
-    if (!_graceDone) return; // still in grace period — skip this tick
-    try {
-      const doc = await db.collection('users').doc(phone).collection('owner_session').doc('current').get();
-      if (!doc.exists) return;
-      const remoteToken = doc.data().token;
-      if (remoteToken && _ownerSessionToken && remoteToken !== _ownerSessionToken) {
-        console.warn('[Owner] Session superseded by another device — logging out');
-        clearTimeout(_graceTimer);
-        _stopOwnerSessionWatcher();
-        if (_fbListenerRetryTimer) { clearTimeout(_fbListenerRetryTimer); _fbListenerRetryTimer = null; }
-        // Stop ALL listeners immediately
-        if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
-        if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
-        if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
-        if(_payReqListener){ try{ _payReqListener(); }catch(_){} _payReqListener=null; }
-        if(_autoAcceptedListener){ try{ _autoAcceptedListener(); }catch(_){} _autoAcceptedListener=null; }
-        try{ stopAllLinkedLedgerListeners(); }catch(_){}
-        // Show non-blocking overlay instead of alert() (alert blocks on mobile)
-        _showSessionKickedOverlay();
-        setTimeout(() => doLogout(), 2500);
-      }
-    } catch(e) {
-      // Was silently swallowed before — meant a genuinely blocked/failing
-      // connection would prevent the kick from EVER firing, with no way to
-      // tell why from outside. Now logged, and fed into the same blocker
-      // detection used elsewhere so a real network/permission block shows
-      // the same banner instead of just quietly breaking multi-device kick.
-      console.warn('[Owner] Session watcher read failed:', (e && e.code) || '', e && e.message);
-      _scCheckIfBlocked((e && e.message) || String(e));
-    }
-  }, 10000);
+  const _graceRef = { done: false };
+  const _graceTimer = setTimeout(() => { _graceRef.done = true; }, 20000);
+  _ownerSessionWatcher = setInterval(() => _ownerSessionCheckOnce(phone, _graceRef), 10000);
+  // Exposed so listener permission-denied handlers (Inventory/Prefs/Customers) can
+  // trigger an immediate check instead of waiting for the next 10s poll tick.
+  window._ownerSessionCheckNow = () => _ownerSessionCheckOnce(phone, _graceRef);
+  window._ownerSessionGraceTimer = _graceTimer;
   console.log('[Owner] Session watcher started');
 }
 
 function _stopOwnerSessionWatcher() {
   if (_ownerSessionWatcher) { clearInterval(_ownerSessionWatcher); _ownerSessionWatcher = null; }
+  if (window._ownerSessionGraceTimer) { clearTimeout(window._ownerSessionGraceTimer); window._ownerSessionGraceTimer = null; }
+  window._ownerSessionCheckNow = null;
 }
 
 function _scHideLoginLoading() {
@@ -7318,25 +7346,6 @@ function onLoginSuccess(phone) {
           _scHideLoginLoading();
           safeRenderTab(currentTab);
           notify(currentLang === 'hi' ? '\u26a0\ufe0f Firebase धीमा है — cached data दिख रहा है' : '\u26a0\ufe0f Firebase slow — showing cached data', 'warning');
-        }
-      }, 3000);
-    }
-  }, 12000);
-
-  // Safety watchdog: force-show app if loading hangs beyond 12s
-  setTimeout(function() {
-    var _ll = document.getElementById('sc-login-loading');
-    if (_ll && _ll.style.display !== 'none') {
-      console.warn('[SC] Loading watchdog: 12s timeout hit');
-      var _msgEl = document.getElementById('sc-login-loading-msg');
-      if (_msgEl) _msgEl.textContent = currentLang === 'hi' ? 'थोड़ी देरी हो रही है...' : 'Taking longer than usual...';
-      setTimeout(function() {
-        var _ll2 = document.getElementById('sc-login-loading');
-        if (_ll2 && _ll2.style.display !== 'none') {
-          console.warn('[SC] Loading watchdog forcing app visible');
-          _scHideLoginLoading();
-          safeRenderTab(currentTab);
-          notify(currentLang === 'hi' ? '⚠️ Firebase धीमा है — cached data दिख रहा है' : '⚠️ Firebase slow — showing cached data', 'warning');
         }
       }, 3000);
     }
@@ -22863,6 +22872,10 @@ function loadInventoryFromFirestore(cb){
     if(err.code === "permission-denied"){
       updateDbStatus("⚠️ Inventory: Firestore permission denied — check rules", "#f84");
       _scCheckIfBlocked("permission-denied");
+      // Permission-denied here almost always means isOwner() just stopped
+      // passing — i.e. another device took over. Check owner_session right
+      // now instead of waiting up to 10s for the next scheduled poll.
+      if (typeof window._ownerSessionCheckNow === "function") window._ownerSessionCheckNow();
     }
     // Auto-restart inventory listener after WebChannel drop (same pattern as customer listener)
     invUnsubscribe = null;
