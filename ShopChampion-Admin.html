@@ -7147,7 +7147,7 @@ async function _registerOwnerSession(phone) {
     localStorage.setItem(storageKey('owner_session_token'), token);
     console.log('[Owner] Session token registered:', token.slice(0, 8) + '...');
     return true;
-  } catch(e) { console.warn('[Owner] Could not register session token:', e.message); return true; }
+  } catch(e) { console.warn('[Owner] Could not register session token:', (e && e.code) || '', e && e.message); _scCheckIfBlocked((e && e.message) || String(e)); return true; }
 }
 
 function _startOwnerSessionWatcher(phone) {
@@ -7180,7 +7180,15 @@ function _startOwnerSessionWatcher(phone) {
         _showSessionKickedOverlay();
         setTimeout(() => doLogout(), 2500);
       }
-    } catch(e) {}
+    } catch(e) {
+      // Was silently swallowed before — meant a genuinely blocked/failing
+      // connection would prevent the kick from EVER firing, with no way to
+      // tell why from outside. Now logged, and fed into the same blocker
+      // detection used elsewhere so a real network/permission block shows
+      // the same banner instead of just quietly breaking multi-device kick.
+      console.warn('[Owner] Session watcher read failed:', (e && e.code) || '', e && e.message);
+      _scCheckIfBlocked((e && e.message) || String(e));
+    }
   }, 10000);
   console.log('[Owner] Session watcher started');
 }
