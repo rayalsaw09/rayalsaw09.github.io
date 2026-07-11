@@ -7600,6 +7600,15 @@ function onLoginSuccess(phone) {
               const newUid = cred && cred.user && cred.user.uid;
               if (!currentMember && newUid) {
                 console.log("[SC] New anon UID, claiming shop_profiles:", newUid);
+                // FIXED: without forcing a fresh ID token here, Firestore's
+                // active listener connections can keep using the
+                // pre-sign-in auth token indefinitely (not just for a brief
+                // propagation window) — so isOwner() never resolves true on
+                // this login no matter how long you wait, and only a full
+                // page reload (which re-inits Firebase from scratch) fixes
+                // it. Forcing a refresh here makes the new token available
+                // to Firestore's connections before any listener attaches.
+                cred.user.getIdToken(true).catch(()=>{}).then(() => {
                 claimShopProfileUid(phone, newUid, authHash)
                   .then((ok) => {
                     if (ok) {
@@ -7611,6 +7620,7 @@ function onLoginSuccess(phone) {
                     _afterAuth();
                   })
                   .catch(e => { console.warn("[SC] shop_profiles uid claim error:", e.message); _afterAuth(); });
+                });
               } else {
                 _afterAuth();
               }
@@ -7654,10 +7664,15 @@ function onLoginSuccess(phone) {
             }
           } else {
             firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{}).finally(() => {
-              firebase.auth().signInAnonymously()
+            firebase.auth().signInAnonymously()
                 .then(cred => {
                   if (!currentMember && cred && cred.user) {
-                    claimShopProfileUid(phone, cred.user.uid, authHash).finally(_afterAuth2);
+                    // Same fix as the main login path: force a fresh ID token
+                    // before claiming, so Firestore's connections don't keep
+                    // using the pre-sign-in token.
+                    cred.user.getIdToken(true).catch(()=>{}).then(() => {
+                      claimShopProfileUid(phone, cred.user.uid, authHash).finally(_afterAuth2);
+                    });
                   } else {
                     _afterAuth2();
                   }
