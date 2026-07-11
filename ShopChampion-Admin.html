@@ -3400,6 +3400,13 @@ function userCol() {
 // Firebase Admin credentials — a path no browser client has access to.
 async function claimShopProfileUid(phone, uid, hashForReclaim) {
   if (!phone || !uid || !db) return false;
+  // Mark a brief window during which permission-denied on OTHER listeners
+  // (Inventory/Prefs/Customers) is expected — isOwner() takes a moment to
+  // propagate after this write, and until it does, those listeners will
+  // legitimately fail. Without this, that propagation delay was being
+  // misread as "browser/extension blocking Firebase" and shown to the user
+  // as a scary banner, when it usually just needed a few more seconds.
+  window._scFreshClaimUntil = Date.now() + 15000;
   try {
     await db.collection("shop_profiles").doc(phone)
       .set({ uid: uid, phone: phone, updatedAt: Date.now() }, { merge: true });
@@ -3551,7 +3558,7 @@ function loadSettingsFromCloud(cb) {
 
 // ── Real-time Firestore listener ──
 var _fbListenerRetryTimer = null;
-var _fbListenerRetryDelay = 3000;
+var _fbListenerRetryDelay = 1500; // was 3000 — faster first retries help converge before the post-claim propagation window (~15s) and loading watchdog fire
 
 function startFirestoreListener() {
   if (!authPhone) {
@@ -3561,9 +3568,9 @@ function startFirestoreListener() {
   if (fbUnsubscribe) fbUnsubscribe();
   if (_fbListenerRetryTimer) { clearTimeout(_fbListenerRetryTimer); _fbListenerRetryTimer = null; }
   _firstSnapshotDone = false;
-  _fbListenerRetryDelay = 3000; // reset backoff on fresh start
+  _fbListenerRetryDelay = 1500; // reset backoff on fresh start
   fbUnsubscribe = userCol().onSnapshot(snap => {
-    _fbListenerRetryDelay = 3000; // reset backoff on successful snapshot
+    _fbListenerRetryDelay = 1500; // reset backoff on successful snapshot
     customers = snap.docs.map(d => ({ ...d.data(), _docId: d.id }));
     customers.forEach(c=>{ if(!c.photo)c.photo=""; if(!c.purchases)c.purchases=[]; if(!c.borrows)c.borrows=[]; });
     _invalidateAnalyticsCache(); // MED-05: rebuild cache on live data change
@@ -3709,6 +3716,7 @@ function updateDbStatus(msg, color) {
 
 // ── Brave / ad-blocker detection ──────────────────────────────
 var _scBlockerShown = false;
+window._scFreshClaimUntil = 0;
 function _scCheckIfBlocked(errorMsg) {
   if (_scBlockerShown) return;
   const msg = (errorMsg || "").toLowerCase();
@@ -3717,15 +3725,26 @@ function _scCheckIfBlocked(errorMsg) {
   // Detect Brave/extension blocking: shows as network errors OR as permission-denied
   // (Brave blocks firestore.googleapis.com so auth token never arrives → Firebase reports permission-denied)
   const isBraveBlocking = !!(navigator.brave && typeof navigator.brave.isBrave === "function");
-  const isBlocked = msg.includes("failed to fetch")
-    || msg.includes("network error")
+  // Hard signals: a genuinely blocked request fails at the network layer —
+  // these are never caused by isOwner() propagation delay, so always show.
+  const isHardBlockSignal = msg.includes("failed to fetch")
     || msg.includes("err_blocked")
     || msg.includes("could not reach cloud firestore")
     || msg.includes("websocket")
-    || msg.includes("transport")
+    || msg.includes("transport");
+  // Soft signals: plain permission-denied, or the generic "no snapshot in
+  // 8s" probe timeout. These are ALSO what a normal, brief isOwner()
+  // propagation delay right after a fresh login looks like — so during that
+  // window, don't jump straight to "your browser is blocking Firebase".
+  const isSoftSignal = msg.includes("network error")
     || (msg.includes("permission-denied") && isBraveBlocking)
     || (msg.includes("missing or insufficient permissions") && isBraveBlocking);
-  if (!isBlocked) return;
+  const inFreshClaimWindow = Date.now() < (window._scFreshClaimUntil || 0);
+  if (!isHardBlockSignal && !isSoftSignal) return;
+  if (!isHardBlockSignal && isSoftSignal && inFreshClaimWindow) {
+    console.log('[SC] Suppressing blocker banner — within post-claim propagation window, likely not a real block');
+    return;
+  }
   _scBlockerShown = true;
   const banner = document.getElementById("sc-blocker-banner");
   const msgEl = document.getElementById("sc-blocker-msg");
@@ -3784,12 +3803,27 @@ function _scProbeFirebaseReachability() {
   if (_scBlockerShown) return;
   // Instead of an external HEAD request (creates console noise),
   // watch silently: if Firestore snapshot hasn't arrived within 8s
-  // AND customers array is still empty → almost certainly blocked.
+  // AND customers array is still empty → possibly blocked.
   setTimeout(() => {
     if (_scBlockerShown) return;
     if (!db || !authPhone || useLocalOnly) return;
     if (!_firstSnapshotDone && customers.length === 0) {
-      _scCheckIfBlocked("network error"); // timed out — likely blocked
+      // FIXED: this 8s check almost always lands inside the ~15s post-claim
+      // propagation window on a fresh login, so "network error" was
+      // frequently a false alarm for isOwner() still settling, not a real
+      // block. _scCheckIfBlocked already suppresses it while in that
+      // window — but instead of just dropping it, re-check once more right
+      // after the window closes, so a GENUINE block still gets caught
+      // (just not prematurely).
+      if (Date.now() < (window._scFreshClaimUntil || 0)) {
+        const _remaining = (window._scFreshClaimUntil || 0) - Date.now() + 500;
+        setTimeout(() => {
+          if (_scBlockerShown) return;
+          if (!_firstSnapshotDone && customers.length === 0) _scCheckIfBlocked("network error");
+        }, Math.max(_remaining, 500));
+      } else {
+        _scCheckIfBlocked("network error"); // timed out — likely blocked
+      }
     }
   }, 8000);
 }
@@ -7138,19 +7172,37 @@ async function _registerOwnerSession(phone) {
     const _writeToken = () => db.collection('users').doc(phone).collection('owner_session').doc('current').set({
       token: token, loginAt: Date.now(), ua: navigator.userAgent.slice(0, 100)
     });
+    // FIXED: this used to give up after a single 1.5s retry. In practice the
+    // isOwner() propagation delay after a fresh claim can run well past that
+    // (we've seen Inventory/Prefs listeners take 8-12s+ to start passing on
+    // the SAME login) — Inventory has its own independent retry loop so its
+    // data eventually loads fine, but this write would already have
+    // permanently given up by then, silently disabling the entire
+    // session-kick mechanism for that login (the old device never finds out
+    // it was superseded, even after this device's data loads correctly).
+    // Now retries with real patience — several attempts over ~15s — so it
+    // has at least as much runway as the data listeners do to catch up.
+    const _writeDelays = [1000, 2000, 3000, 4000, 5000];
+    let _writeOk = false;
     try {
       await _writeToken();
+      _writeOk = true;
     } catch (e1) {
-      // One short retry — covers the brief window right after claimShopProfileUid()
-      // where isOwner() may not have propagated yet. Not a real hijack scenario.
-      console.warn('[Owner] Session claim write failed, retrying once:', e1.message);
-      await new Promise(r => setTimeout(r, 1500));
-      try {
-        await _writeToken();
-      } catch (e2) {
-        console.warn('[Owner] Session claim write failed again — NOT starting watcher (avoids self-kick):', e2.message);
-        return false; // caller must not start the watcher with an unconfirmed token
+      console.warn('[Owner] Session claim write failed, retrying:', e1.message);
+      for (let i = 0; i < _writeDelays.length && !_writeOk; i++) {
+        await new Promise(r => setTimeout(r, _writeDelays[i]));
+        try {
+          await _writeToken();
+          _writeOk = true;
+          console.log('[Owner] Session claim write succeeded on retry', i + 2);
+        } catch (eN) {
+          console.warn('[Owner] Session claim write retry', i + 2, 'failed:', eN.message);
+        }
       }
+    }
+    if (!_writeOk) {
+      console.warn('[Owner] Session claim write failed after all retries — NOT starting watcher (avoids self-kick)');
+      return false; // caller must not start the watcher with an unconfirmed token
     }
     _ownerSessionToken = token;
     localStorage.setItem(storageKey('owner_session_token'), token);
@@ -7344,11 +7396,15 @@ function onLoginSuccess(phone) {
   // main-app stays hidden until _scHideLoginLoading() is called after first data render
   document.getElementById("main-app").style.display = "none";
 
-  // Safety watchdog: force-show app if loading hangs beyond 12s
+  // Safety watchdog: force-show app if loading hangs beyond 17s.
+  // FIXED: was 12s, which fires BEFORE the ~15s post-claim propagation window
+  // (see claimShopProfileUid) even closes — meaning on a normal fresh login
+  // it would routinely show "Firebase slow — showing cached data" before
+  // legitimately-still-propagating data had a real chance to arrive.
   setTimeout(function() {
     var _ll = document.getElementById('sc-login-loading');
     if (_ll && _ll.style.display !== 'none') {
-      console.warn('[SC] Loading watchdog: 12s timeout hit');
+      console.warn('[SC] Loading watchdog: 17s timeout hit');
       var _msgEl = document.getElementById('sc-login-loading-msg');
       if (_msgEl) _msgEl.textContent = currentLang === 'hi' ? 'थोड़ी देरी हो रही है...' : 'Taking longer than usual...';
       setTimeout(function() {
@@ -7359,9 +7415,9 @@ function onLoginSuccess(phone) {
           safeRenderTab(currentTab);
           notify(currentLang === 'hi' ? '\u26a0\ufe0f Firebase धीमा है — cached data दिख रहा है' : '\u26a0\ufe0f Firebase slow — showing cached data', 'warning');
         }
-      }, 3000);
+      }, 6000);
     }
-  }, 12000);
+  }, 17000);
   // Init ShopChat
   setTimeout(()=>{
     scLoadConnections().then(()=>scLoadPendingRequests()).then(async()=>{
@@ -7733,10 +7789,10 @@ function doLogout() {
   _firstSnapshotDone = false; // reset so customers tab shows loader on next login
   authHash = "";             // clear credential hash
   // Unsubscribe all Firestore real-time listeners
-  if (_fbListenerRetryTimer) { clearTimeout(_fbListenerRetryTimer); _fbListenerRetryTimer = null; } _fbListenerRetryDelay=3000;
+  if (_fbListenerRetryTimer) { clearTimeout(_fbListenerRetryTimer); _fbListenerRetryTimer = null; } _fbListenerRetryDelay=1500;
   if(fbUnsubscribe){ try{ fbUnsubscribe(); } catch(e){} fbUnsubscribe=null; }
   if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); } catch(e){} _prefsUnsubscribe=null; }
-  if(_invListenerRetryTimer){ clearTimeout(_invListenerRetryTimer); _invListenerRetryTimer=null; } _invListenerRetryDelay=3000;
+  if(_invListenerRetryTimer){ clearTimeout(_invListenerRetryTimer); _invListenerRetryTimer=null; } _invListenerRetryDelay=1500;
   if(invUnsubscribe){ try{ invUnsubscribe(); } catch(e){} invUnsubscribe=null; }
   stopAllLinkedLedgerListeners();
   // Unsubscribe shop-connect listeners
@@ -22835,7 +22891,7 @@ function loadInventory(){
 // Called after login to pull latest from Firestore and keep in sync
 var invUnsubscribe = null; // Firestore real-time listener for inventory
 var _invListenerRetryTimer = null;
-var _invListenerRetryDelay = 3000;
+var _invListenerRetryDelay = 1500; // was 3000 — faster first retries help converge before the post-claim propagation window (~15s) and loading watchdog fire
 
 function loadInventoryFromFirestore(cb){
   if(!db || !authPhone){ console.warn("[Inv] loadInventoryFromFirestore: db=",!!db,"authPhone=",authPhone); if(cb) cb(); return; }
@@ -22844,7 +22900,7 @@ function loadInventoryFromFirestore(cb){
 
   const docRef = db.collection("users").doc(authPhone).collection("inventory_data").doc("items");
   console.log("[Inv] Starting listener on users/"+authPhone+"/inventory_data/items");
-  if(_invListenerRetryTimer){ clearTimeout(_invListenerRetryTimer); _invListenerRetryTimer=null; } _invListenerRetryDelay=3000;
+  if(_invListenerRetryTimer){ clearTimeout(_invListenerRetryTimer); _invListenerRetryTimer=null; } _invListenerRetryDelay=1500;
 
   // First do a one-time GET for instant load, then start real-time listener
   docRef.get().then(snap=>{
@@ -22891,7 +22947,7 @@ function loadInventoryFromFirestore(cb){
     }
     // Auto-restart inventory listener after WebChannel drop (same pattern as customer listener)
     invUnsubscribe = null;
-    if(!_invListenerRetryDelay) _invListenerRetryDelay = 3000;
+    if(!_invListenerRetryDelay) _invListenerRetryDelay = 1500;
     else _invListenerRetryDelay = Math.min(_invListenerRetryDelay * 2, 30000);
     if(_invListenerRetryTimer) clearTimeout(_invListenerRetryTimer);
     _invListenerRetryTimer = setTimeout(()=>{
