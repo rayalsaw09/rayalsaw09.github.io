@@ -26674,7 +26674,7 @@ async function sendShopConnectRequest(targetProfile, myRoleForThem, theirRoleFor
 }
 
 function _showFirestoreRulesError(errMsg){
-  const rules = `// ShopChampion — Firestore Security Rules v11
+  const rules = `// ShopChampion — Firestore Security Rules v12
 // v9: Closed shop_profiles uid-takeover hole (uid now locked after first
 // claim), owner_session no longer writable by any signed-in user, and
 // app_data cross-shop reads now require a real mirrored ShopConnect
@@ -26686,6 +26686,12 @@ function _showFirestoreRulesError(errMsg){
 // claim (matches the app's own "id is permanent" design) — closes a
 // Shop-ID hijack hole where anyone signed in could overwrite a claimed
 // suffix to redirect Member Logins to a different phone.
+// v12: EMERGENCY REVERT of the v9 shop_profiles uid-lock. It broke
+// legitimate multi-device login — every login unconditionally re-claims
+// uid, and Firestore rules cannot verify the separate Supabase password
+// check that's supposed to gate it. Back to open write on shop_profiles
+// until a server-signed claim mechanism is built. owner_session, app_data,
+// and shop_id_registry fixes (v9-v11) all remain active.
 // Apply in Firebase Console -> Firestore -> Rules -> Publish
 rules_version = '2';
 service cloud.firestore {
@@ -26787,16 +26793,15 @@ service cloud.firestore {
         && request.resource.data.phone_b == resource.data.phone_b;
     }
 
+    // ⚠️ REVERTED in v12 (see note above rules_version): the v9 uid-lock broke
+    // legitimate multi-device login — every login unconditionally re-claims
+    // uid via merge-set, and Firestore rules can't verify the separate
+    // Supabase password check that gates it. Back to open write until a
+    // proper server-signed claim mechanism exists. Re-opens hole #1
+    // (shop_profiles account takeover) — known trade-off, not an oversight.
     match /shop_profiles/{phone} {
       allow read: if true;
-      // First-time claim: anyone signed in can CREATE their own profile.
-      // After that, the uid field is locked — only the current owner can
-      // update it, and only if the uid isn't being changed to someone else's.
-      allow create: if request.auth != null;
-      allow update: if request.auth != null
-        && (!("uid" in resource.data)
-            || resource.data.uid == request.auth.uid
-            || resource.data.uid == request.resource.data.uid);
+      allow write: if request.auth != null;
     }
 
     // Public registry mapping a Shop ID suffix (e.g. "123456") -> owning phone.
