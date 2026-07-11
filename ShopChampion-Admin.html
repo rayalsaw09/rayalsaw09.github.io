@@ -26740,7 +26740,7 @@ async function sendShopConnectRequest(targetProfile, myRoleForThem, theirRoleFor
 }
 
 function _showFirestoreRulesError(errMsg){
-  const rules = `// ShopChampion — Firestore Security Rules v14
+  const rules = `// ShopChampion — Firestore Security Rules v15
 // v9: Closed shop_profiles uid-takeover hole (uid now locked after first
 // claim), owner_session no longer writable by any signed-in user, and
 // app_data cross-shop reads now require a real mirrored ShopConnect
@@ -26769,6 +26769,15 @@ function _showFirestoreRulesError(errMsg){
 // permission-denied read error was being silently swallowed), so the
 // single-session force-logout notification would never show. The token
 // itself isn't a sensitive credential, so opening read is safe.
+// v15: TEMPORARY EMERGENCY REVERT of the v13 shop_profiles uid lock (same
+// kind of revert as v12, for the same reason). The claim-shop-uid Edge
+// Function that v13/v14 require for a device switch is not deployed yet —
+// without it, device-switching had NO working path (new device permission-
+// denied on everything, old device never legitimately superseded). Reverted
+// to "any signed-in user can write uid" so multi-device login works again.
+// RE-LOCK THIS (restore the v13/v14 shop_profiles rule) once claim-shop-uid
+// is deployed and tested — until then, any signed-in user could in theory
+// claim any shop's uid if they knew/guessed the phone number.
 // Apply in Firebase Console -> Firestore -> Rules -> Publish
 rules_version = '2';
 service cloud.firestore {
@@ -26880,23 +26889,21 @@ service cloud.firestore {
         && request.resource.data.phone_b == resource.data.phone_b;
     }
 
-    // FIXED (v13): uid can no longer be changed by any normal client write
-    // once a shop has been claimed. First-time claim (doc has no uid yet)
-    // stays open — nothing to hijack there. After that, only the current
-    // owner may write (so shop-name/city/etc. edits keep working), and even
-    // the owner cannot change uid through this path — a device switch must
-    // go through the claim-shop-uid Edge Function, which independently
-    // re-verifies the password server-side before writing uid with Admin
-    // credentials (not subject to these rules at all).
+    // v15: TEMPORARY EMERGENCY REVERT of the v13 uid lock. v13 required every
+    // device-switch to go through the claim-shop-uid Edge Function — but that
+    // function isn't deployed yet, so v13/v14 left device-switching with NO
+    // working path at all (new device gets permission-denied on everything,
+    // old device is never legitimately superseded). Reverting to "any
+    // signed-in user can write uid" restores working multi-device login
+    // immediately. TRADE-OFF: this reopens the original account-takeover
+    // hole from before v9 — any signed-in user could claim ANY shop's uid if
+    // they knew/guessed the phone number. Re-lock this (restore the v13/v14
+    // block above) as soon as the claim-shop-uid Edge Function is deployed
+    // and tested — see claim-shop-uid.ts.
     match /shop_profiles/{phone} {
       allow read: if true;
       allow create: if request.auth != null;
-      allow update: if request.auth != null
-        && (
-          !("uid" in resource.data)
-          || (resource.data.uid == request.auth.uid
-              && request.resource.data.uid == resource.data.uid)
-        );
+      allow update: if request.auth != null;
     }
 
     // Public registry mapping a Shop ID suffix (e.g. "123456") -> owning phone.
