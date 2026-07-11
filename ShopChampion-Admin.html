@@ -7118,12 +7118,33 @@ async function _registerOwnerSession(phone) {
     }
     // No existing token, or no local record of ever holding one (this is a fresh,
     // explicit login) — claim the session for this device.
+    // IMPORTANT: token is only committed to memory/localStorage AFTER the write
+    // below actually succeeds. Committing it BEFORE the write (the old bug) meant
+    // that if the write failed — e.g. isOwner() briefly not resolving true yet,
+    // right after a device-switch ownership claim — this device would believe it
+    // held the new token while Firestore still had the PREVIOUS device's token.
+    // Its own watcher would then see that as "superseded" on the very next poll
+    // and kick ITSELF, even though nothing else actually took over.
     const token = _generateOwnerToken();
-    _ownerSessionToken = token;
-    localStorage.setItem(storageKey('owner_session_token'), token);
-    await db.collection('users').doc(phone).collection('owner_session').doc('current').set({
+    const _writeToken = () => db.collection('users').doc(phone).collection('owner_session').doc('current').set({
       token: token, loginAt: Date.now(), ua: navigator.userAgent.slice(0, 100)
     });
+    try {
+      await _writeToken();
+    } catch (e1) {
+      // One short retry — covers the brief window right after claimShopProfileUid()
+      // where isOwner() may not have propagated yet. Not a real hijack scenario.
+      console.warn('[Owner] Session claim write failed, retrying once:', e1.message);
+      await new Promise(r => setTimeout(r, 1500));
+      try {
+        await _writeToken();
+      } catch (e2) {
+        console.warn('[Owner] Session claim write failed again — NOT starting watcher (avoids self-kick):', e2.message);
+        return false; // caller must not start the watcher with an unconfirmed token
+      }
+    }
+    _ownerSessionToken = token;
+    localStorage.setItem(storageKey('owner_session_token'), token);
     console.log('[Owner] Session token registered:', token.slice(0, 8) + '...');
     return true;
   } catch(e) { console.warn('[Owner] Could not register session token:', e.message); return true; }
