@@ -7167,9 +7167,16 @@ var _ownerSessionCheckInFlight = false; // de-dupe overlapping on-demand + inter
 // for the next scheduled poll after a listener already told us access was
 // revoked meant up to a 10s delay (plus repeated, doomed listener retries)
 // before the user ever saw "session superseded" — this closes that gap.
-async function _ownerSessionCheckOnce(phone, graceDoneRef) {
+async function _ownerSessionCheckOnce(phone, graceDoneRef, force) {
   if (!authPhone || currentMember) { _stopOwnerSessionWatcher(); return; }
-  if (!graceDoneRef.done) return; // still in grace period — skip
+  // The grace gate only protects against reading back a stale pre-write copy
+  // of OUR OWN token right after registering it — and _registerOwnerSession
+  // already awaits that write succeeding before the watcher starts, so the
+  // real race window is milliseconds, not seconds. When `force` is true, the
+  // caller is a data listener (Inventory/Prefs/Customers) that just got a
+  // real permission-denied — independent evidence a takeover already
+  // happened — so it's safe to skip the gate and check right now.
+  if (!force && !graceDoneRef.done) return; // still in grace period — skip
   if (_ownerSessionCheckInFlight) return; // a check is already running, avoid overlap
   _ownerSessionCheckInFlight = true;
   try {
@@ -7207,14 +7214,19 @@ async function _ownerSessionCheckOnce(phone, graceDoneRef) {
 function _startOwnerSessionWatcher(phone) {
   if (!phone || !db) return;
   _stopOwnerSessionWatcher(); // ensure no duplicate watcher
-  // Grace period: wait 20s before first check so our own token write can settle in Firestore.
-  // Without this, the watcher can read a stale token from a previous device and self-kick.
+  // Grace period: brief buffer so our own token write can settle in Firestore
+  // before the PERIODIC poll starts checking (avoids a same-tick race reading
+  // back a stale pre-write copy). Was 20s — cut to 4s: _registerOwnerSession
+  // already awaits its write succeeding before this watcher even starts, so
+  // that's already far more margin than the real race needs. The old 20s
+  // meant a genuine takeover mid-grace-period went undetected for up to 20s
+  // (plus the next 10s poll wait) while the app kept showing stale data.
   const _graceRef = { done: false };
-  const _graceTimer = setTimeout(() => { _graceRef.done = true; }, 20000);
-  _ownerSessionWatcher = setInterval(() => _ownerSessionCheckOnce(phone, _graceRef), 10000);
+  const _graceTimer = setTimeout(() => { _graceRef.done = true; }, 4000);
+  _ownerSessionWatcher = setInterval(() => _ownerSessionCheckOnce(phone, _graceRef), 6000);
   // Exposed so listener permission-denied handlers (Inventory/Prefs/Customers) can
-  // trigger an immediate check instead of waiting for the next 10s poll tick.
-  window._ownerSessionCheckNow = () => _ownerSessionCheckOnce(phone, _graceRef);
+  // trigger an immediate, grace-bypassing check instead of waiting for the next poll tick.
+  window._ownerSessionCheckNow = () => _ownerSessionCheckOnce(phone, _graceRef, true);
   window._ownerSessionGraceTimer = _graceTimer;
   console.log('[Owner] Session watcher started');
 }
