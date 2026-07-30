@@ -18070,7 +18070,7 @@ async function bsSubmit() {
         "apikey": SC_SUPABASE_ANON,
         "Authorization": "Bearer " + SC_SUPABASE_ANON,
         "Content-Type": "application/json",
-        "Prefer": "return=representation"
+        "Prefer": "return=minimal"
       },
       body: JSON.stringify(payload)
     });
@@ -22593,7 +22593,7 @@ async function pmSubmit() {
   };
 
   try {
-    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_payments`, {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/sc_payments?select=id`, {
       method: "POST",
       headers: {
         "apikey": SC_SUPABASE_ANON,
