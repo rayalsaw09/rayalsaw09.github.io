@@ -1932,14 +1932,14 @@ async function openPaymentHistory(phone, name) {
     // Try by phone number first (customer_phone column)
     let data = [];
     try {
-      data = await sbFetch(`/rest/v1/sc_payments?customer_phone=eq.${encodeURIComponent(phone)}&select=*&order=submitted_at.desc`) || [];
+      data = await sbFetch(`/rest/v1/sc_payments?customer_phone=eq.${encodeURIComponent(phone)}&select=*&order=submitted_at.desc`, { forceService: true }) || [];
     } catch(e) {
       // fallback: try customer_name
     }
     // Also try matching by license key if we have one
     if (key && data.length === 0) {
       try {
-        const byKey = await sbFetch(`/rest/v1/sc_payments?license_key=eq.${encodeURIComponent(key.key)}&select=*&order=submitted_at.desc`) || [];
+        const byKey = await sbFetch(`/rest/v1/sc_payments?license_key=eq.${encodeURIComponent(key.key)}&select=*&order=submitted_at.desc`, { forceService: true }) || [];
         data = [...data, ...byKey];
       } catch(e2) {}
     }
@@ -2603,7 +2603,7 @@ async function loadPayments() {
   const badge  = document.getElementById("pending-badge");
   listEl.innerHTML = `<div style="text-align:center;color:#4a5a7a;padding:28px;font-size:13px;">Loading...</div>`;
   try {
-    const data = await sbFetch("/rest/v1/sc_payments?select=*&order=submitted_at.desc");
+    const data = await sbFetch("/rest/v1/sc_payments?select=*&order=submitted_at.desc", { forceService: true });
     allPayments = data || [];
     renderPayments(allPayments);
     const pendingCount = allPayments.filter(p => p.status === "pending").length;
@@ -2868,7 +2868,7 @@ async function rejectPayment(paymentId) {
     // Refresh modal if open
     if (currentPhUser) {
       const phone = currentPhUser.phone;
-      const updated = await sbFetch(`/rest/v1/sc_payments?customer_phone=eq.${encodeURIComponent(phone)}&select=*&order=submitted_at.desc`) || [];
+      const updated = await sbFetch(`/rest/v1/sc_payments?customer_phone=eq.${encodeURIComponent(phone)}&select=*&order=submitted_at.desc`, { forceService: true }) || [];
       allPhPayments = updated;
       renderPhHistory(allPhPayments);
     }
