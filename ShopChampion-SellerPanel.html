@@ -3418,7 +3418,7 @@ let adFilter = 'all';
 // ── Load all ads from Supabase ──
 async function loadAds() {
   try {
-    const data = await sbFetch("/rest/v1/sc_ads?select=*&order=created_at.desc");
+    const data = await sbFetch("/rest/v1/sc_ads?select=*&order=created_at.desc", { forceService: true });
     allAds = data || [];
     renderAdStats();
     renderAdsList();
@@ -4705,7 +4705,7 @@ async function scLoadCentralAds() {
 
   // 2. Try Supabase in background (optional sync)
   try {
-    const data = await sbFetch("/rest/v1/sc_central_ads?select=*&order=created_at.desc");
+    const data = await sbFetch("/rest/v1/sc_central_ads?select=*&order=created_at.desc", { forceService: true });
     if (data && data.length) {
       // Merge: Supabase is authoritative if it has records
       scCentralAds = data;
