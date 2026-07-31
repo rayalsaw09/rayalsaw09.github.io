@@ -7219,7 +7219,13 @@ var _ownerSessionCheckInFlight = false; // de-dupe overlapping on-demand + inter
 // for the next scheduled poll after a listener already told us access was
 // revoked meant up to a 10s delay (plus repeated, doomed listener retries)
 // before the user ever saw "session superseded" — this closes that gap.
-async function _ownerSessionCheckOnce(phone, graceDoneRef, force) {
+// Shared kick-logic: given a fresh owner_session/current doc snapshot,
+// decide whether this device has been superseded and, if so, tear
+// everything down. Used by both the live listener AND the on-demand
+// check (triggered when a data listener hits permission-denied).
+// (fix146: was a fetch-once function called every 6s by setInterval —
+// now driven by a live onSnapshot push, see _startOwnerSessionWatcher.)
+function _handleOwnerSessionDoc(doc, graceDoneRef, force) {
   if (!authPhone || currentMember) { _stopOwnerSessionWatcher(); return; }
   // The grace gate only protects against reading back a stale pre-write copy
   // of OUR OWN token right after registering it — and _registerOwnerSession
@@ -7229,37 +7235,22 @@ async function _ownerSessionCheckOnce(phone, graceDoneRef, force) {
   // real permission-denied — independent evidence a takeover already
   // happened — so it's safe to skip the gate and check right now.
   if (!force && !graceDoneRef.done) return; // still in grace period — skip
-  if (_ownerSessionCheckInFlight) return; // a check is already running, avoid overlap
-  _ownerSessionCheckInFlight = true;
-  try {
-    const doc = await db.collection('users').doc(phone).collection('owner_session').doc('current').get();
-    if (!doc.exists) return;
-    const remoteToken = doc.data().token;
-    if (remoteToken && _ownerSessionToken && remoteToken !== _ownerSessionToken) {
-      console.warn('[Owner] Session superseded by another device — logging out');
-      _stopOwnerSessionWatcher();
-      if (_fbListenerRetryTimer) { clearTimeout(_fbListenerRetryTimer); _fbListenerRetryTimer = null; }
-      // Stop ALL listeners immediately
-      if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
-      if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
-      if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
-      if(_payReqListener){ try{ _payReqListener(); }catch(_){} _payReqListener=null; }
-      if(_autoAcceptedListener){ try{ _autoAcceptedListener(); }catch(_){} _autoAcceptedListener=null; }
-      try{ stopAllLinkedLedgerListeners(); }catch(_){}
-      // Show non-blocking overlay instead of alert() (alert blocks on mobile)
-      _showSessionKickedOverlay();
-      setTimeout(() => doLogout(), 2500);
-    }
-  } catch(e) {
-    // Was silently swallowed before — meant a genuinely blocked/failing
-    // connection would prevent the kick from EVER firing, with no way to
-    // tell why from outside. Now logged, and fed into the same blocker
-    // detection used elsewhere so a real network/permission block shows
-    // the same banner instead of just quietly breaking multi-device kick.
-    console.warn('[Owner] Session watcher read failed:', (e && e.code) || '', e && e.message);
-    _scCheckIfBlocked((e && e.message) || String(e));
-  } finally {
-    _ownerSessionCheckInFlight = false;
+  if (!doc || !doc.exists) return;
+  const remoteToken = doc.data().token;
+  if (remoteToken && _ownerSessionToken && remoteToken !== _ownerSessionToken) {
+    console.warn('[Owner] Session superseded by another device — logging out');
+    _stopOwnerSessionWatcher();
+    if (_fbListenerRetryTimer) { clearTimeout(_fbListenerRetryTimer); _fbListenerRetryTimer = null; }
+    // Stop ALL listeners immediately
+    if(fbUnsubscribe){ try{ fbUnsubscribe(); }catch(_){} fbUnsubscribe=null; }
+    if(invUnsubscribe){ try{ invUnsubscribe(); }catch(_){} invUnsubscribe=null; }
+    if(_prefsUnsubscribe){ try{ _prefsUnsubscribe(); }catch(_){} _prefsUnsubscribe=null; }
+    if(_payReqListener){ try{ _payReqListener(); }catch(_){} _payReqListener=null; }
+    if(_autoAcceptedListener){ try{ _autoAcceptedListener(); }catch(_){} _autoAcceptedListener=null; }
+    try{ stopAllLinkedLedgerListeners(); }catch(_){}
+    // Show non-blocking overlay instead of alert() (alert blocks on mobile)
+    _showSessionKickedOverlay();
+    setTimeout(() => doLogout(), 2500);
   }
 }
 
@@ -7267,24 +7258,41 @@ function _startOwnerSessionWatcher(phone) {
   if (!phone || !db) return;
   _stopOwnerSessionWatcher(); // ensure no duplicate watcher
   // Grace period: brief buffer so our own token write can settle in Firestore
-  // before the PERIODIC poll starts checking (avoids a same-tick race reading
-  // back a stale pre-write copy). Was 20s — cut to 4s: _registerOwnerSession
-  // already awaits its write succeeding before this watcher even starts, so
-  // that's already far more margin than the real race needs. The old 20s
-  // meant a genuine takeover mid-grace-period went undetected for up to 20s
-  // (plus the next 10s poll wait) while the app kept showing stale data.
+  // before the live listener starts reacting (avoids a same-tick race reading
+  // back a stale pre-write copy of our own token).
   const _graceRef = { done: false };
   const _graceTimer = setTimeout(() => { _graceRef.done = true; }, 4000);
-  _ownerSessionWatcher = setInterval(() => _ownerSessionCheckOnce(phone, _graceRef), 6000);
-  // Exposed so listener permission-denied handlers (Inventory/Prefs/Customers) can
-  // trigger an immediate, grace-bypassing check instead of waiting for the next poll tick.
-  window._ownerSessionCheckNow = () => _ownerSessionCheckOnce(phone, _graceRef, true);
+  // fix146: LIVE LISTENER, replacing setInterval polling every 6s. Firestore
+  // pushes the new doc the instant another device's login writes a new
+  // token — typically under a second — instead of waiting up to 6s for the
+  // next poll tick, closing the "shows stale data / doesn't kick immediately
+  // on device switch" gap.
+  _ownerSessionWatcher = db.collection('users').doc(phone).collection('owner_session').doc('current')
+    .onSnapshot(
+      (doc) => _handleOwnerSessionDoc(doc, _graceRef, false),
+      (err) => {
+        console.warn('[Owner] Session watcher listener error:', (err && err.code) || '', err && err.message);
+        _scCheckIfBlocked((err && err.message) || String(err));
+      }
+    );
+  // Still exposed so listener permission-denied handlers (Inventory/Prefs/Customers)
+  // can force an immediate, grace-bypassing check independent of the live listener.
+  window._ownerSessionCheckNow = () => {
+    db.collection('users').doc(phone).collection('owner_session').doc('current').get()
+      .then(doc => _handleOwnerSessionDoc(doc, _graceRef, true))
+      .catch(e => {
+        console.warn('[Owner] on-demand session check failed:', (e && e.code) || '', e && e.message);
+        _scCheckIfBlocked((e && e.message) || String(e));
+      });
+  };
   window._ownerSessionGraceTimer = _graceTimer;
-  console.log('[Owner] Session watcher started');
+  console.log('[Owner] Session watcher started (live listener)');
 }
 
 function _stopOwnerSessionWatcher() {
-  if (_ownerSessionWatcher) { clearInterval(_ownerSessionWatcher); _ownerSessionWatcher = null; }
+  // fix146: _ownerSessionWatcher now holds an unsubscribe FUNCTION (from
+  // onSnapshot), not a setInterval ID — call it instead of clearInterval.
+  if (_ownerSessionWatcher) { try { _ownerSessionWatcher(); } catch(_) {} _ownerSessionWatcher = null; }
   if (window._ownerSessionGraceTimer) { clearTimeout(window._ownerSessionGraceTimer); window._ownerSessionGraceTimer = null; }
   window._ownerSessionCheckNow = null;
 }
