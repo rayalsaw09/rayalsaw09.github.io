@@ -1616,6 +1616,18 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       </div>
       <div id="pm-seats-line" style="display:none;font-size:11px;color:var(--text-dim,#4a5a7a);text-align:right;margin-bottom:16px;"></div>
 
+      <!-- Automatic payment (Razorpay) — main path -->
+      <button id="pm-auto-pay-btn" onclick="pmPayAutomatically()" style="background:linear-gradient(135deg,#4CAF50,#2E7D32);color:#fff;width:100%;padding:13px;font-size:14px;font-weight:800;border:none;border-radius:10px;cursor:pointer;margin-bottom:8px;">
+        <span id="pm-auto-pay-txt">⚡ अभी पेमेंट करें (UPI/Card) — तुरंत सक्रिय</span>
+      </button>
+      <div id="pm-auto-pay-err" style="color:#f66;font-size:11px;margin-bottom:14px;display:none;text-align:center;"></div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:4px 0 16px;">
+        <div style="flex:1;height:1px;background:var(--border-main,#1e2a45);"></div>
+        <div style="font-size:10px;color:var(--text-dim,#4a5a7a);">या मैन्युअल रूप से (यदि ऑटोमैटिक काम न करे)</div>
+        <div style="flex:1;height:1px;background:var(--border-main,#1e2a45);"></div>
+      </div>
+
       <!-- QR code -->
       <div style="text-align:center;margin-bottom:14px;">
         <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:10px;">PhonePe · GPay · Paytm · BHIM से स्कैन करें</div>
@@ -22568,6 +22580,131 @@ function pmCopyUPI() {
     btn.textContent = "✅ Copied!";
     setTimeout(() => btn.textContent = "📋 UPI ID कॉपी करें: rayalsaw@ybl", 2000);
   });
+}
+
+// ── Automatic payment via Razorpay ──────────────────────────────────────
+// Main path (manual UPI/UTR flow above stays as a fallback). Actual license
+// activation happens server-side via razorpay-webhook the instant payment
+// succeeds — this code just opens the Checkout popup and then polls briefly
+// to reflect the result in the UI. Even if this tab closes right after
+// paying, the webhook still activates the license; the poll here is purely
+// cosmetic, not the source of truth.
+let _razorpayScriptPromise = null;
+function loadRazorpayScript() {
+  if (_razorpayScriptPromise) return _razorpayScriptPromise;
+  _razorpayScriptPromise = new Promise((resolve, reject) => {
+    if (window.Razorpay) { resolve(); return; }
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("पेमेंट सिस्टम लोड नहीं हो सका — इंटरनेट जांचें"));
+    document.head.appendChild(s);
+  });
+  return _razorpayScriptPromise;
+}
+
+async function pmPayAutomatically() {
+  const btn = document.getElementById("pm-auto-pay-btn");
+  const txt = document.getElementById("pm-auto-pay-txt");
+  const errEl = document.getElementById("pm-auto-pay-err");
+  const defaultTxt = "⚡ अभी पेमेंट करें (UPI/Card) — तुरंत सक्रिय";
+  if (errEl) errEl.style.display = "none";
+
+  const phone = authPhone || localStorage.getItem("sc_auth_phone") || "";
+  const hash = phone ? localStorage.getItem("sc_user_" + phone) : "";
+
+  if (!phone || !hash) {
+    if (errEl) { errEl.textContent = "❌ कृपया पहले लॉगिन करें"; errEl.style.display = "block"; }
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  if (txt) txt.textContent = "⏳ तैयार हो रहा है...";
+
+  try {
+    await loadRazorpayScript();
+
+    const res = await fetch(`${SC_SUPABASE_URL}/functions/v1/create-razorpay-order`, {
+      method: "POST",
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, hash, plan: pmSelectedPlan, seats: pmExtraSeatsSelected })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || "ऑर्डर नहीं बन सका");
+
+    const rzp = new Razorpay({
+      key: data.key_id,
+      amount: data.amount,
+      currency: data.currency,
+      order_id: data.order_id,
+      name: "ShopChampion",
+      description: pmSelectedPlan === "lite" ? "Pro Lite Subscription"
+                  : pmSelectedPlan === "yearly" ? "Pro Yearly Subscription"
+                  : "Pro Monthly Subscription",
+      prefill: { contact: phone },
+      theme: { color: "#FFD700" },
+      handler: function() {
+        pmShowActivatingState();
+        pmPollForActivation(phone, 10);
+      },
+      modal: {
+        ondismiss: function() {
+          if (btn) btn.disabled = false;
+          if (txt) txt.textContent = defaultTxt;
+        }
+      }
+    });
+
+    rzp.on("payment.failed", function() {
+      if (btn) btn.disabled = false;
+      if (txt) txt.textContent = defaultTxt;
+      if (errEl) { errEl.textContent = "❌ पेमेंट असफल — कृपया दोबारा कोशिश करें या नीचे मैन्युअल विकल्प उपयोग करें"; errEl.style.display = "block"; }
+    });
+
+    rzp.open();
+    if (btn) btn.disabled = false;
+    if (txt) txt.textContent = defaultTxt;
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    if (txt) txt.textContent = defaultTxt;
+    if (errEl) { errEl.textContent = "❌ " + (e.message || "कुछ गलत हो गया — मैन्युअल विकल्प आज़माएं"); errEl.style.display = "block"; }
+  }
+}
+
+function pmShowActivatingState() {
+  document.getElementById("pm-step-2").style.display = "none";
+  document.getElementById("pm-step-3").style.display = "block";
+  const utrEl = document.getElementById("pm-conf-utr");
+  if (utrEl && utrEl.parentElement) utrEl.parentElement.style.display = "none"; // no UTR for automatic payments
+  const statusEl = document.getElementById("pm-conf-status");
+  if (statusEl) statusEl.textContent = "⏳ सक्रिय किया जा रहा है...";
+}
+
+async function pmPollForActivation(phone, attemptsLeft) {
+  const statusEl = document.getElementById("pm-conf-status");
+  try {
+    const res = await fetch(`${SC_SUPABASE_URL}/rest/v1/licenses?customer_phone=eq.${encodeURIComponent(phone)}&select=key,plan,active,expires_at,extra_seats&order=created_at.desc&limit=1`, {
+      headers: { "apikey": SC_SUPABASE_ANON, "Authorization": "Bearer " + SC_SUPABASE_ANON }
+    });
+    const rows = await res.json();
+    const row = rows && rows[0];
+    if (row && row.active && row.expires_at && new Date(row.expires_at) > new Date()) {
+      saveLicense(row.key, row.plan || "pro", "pro", row.extra_seats);
+      if (typeof updateLicenseUI === "function") updateLicenseUI();
+      if (statusEl) statusEl.textContent = "✅ सक्रिय हो गया!";
+      setTimeout(() => {
+        const modal = document.getElementById("payment-modal");
+        if (modal) modal.style.display = "none";
+      }, 1800);
+      return;
+    }
+  } catch (e) { /* transient network error — keep polling */ }
+
+  if (attemptsLeft > 1) {
+    setTimeout(() => pmPollForActivation(phone, attemptsLeft - 1), 2000);
+  } else if (statusEl) {
+    statusEl.textContent = "⏳ अभी भी प्रतीक्षा में — कृपया पेज रीफ्रेश करें";
+  }
 }
 
 async function pmSubmit() {
