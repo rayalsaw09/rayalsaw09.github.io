@@ -1482,9 +1482,38 @@ function updateStats() {
   const free     = mergedData.filter(r => r.subStatus === "free").length;
   const expired  = mergedData.filter(r => r.subStatus === "expired").length;
   const pending  = allPayments.filter(p => p.status === "pending").length;
-  // Estimate MRR: active pro shops × ₹299 + pro lite shops × ₹199
-  const mrrVal   = (active * 299) + (lite * 199);
-  const mrrStr   = mrrVal >= 1000 ? `₹${(mrrVal/1000).toFixed(1)}K` : `₹${mrrVal}`;
+
+  // fix (2026-08-16): MRR now derived from real payment amounts instead of a
+  // flat ₹299/₹199-per-active-head guess. The old formula never looked at
+  // actual payments at all — a ₹3,499 yearly payment or a paid seat add-on
+  // changed nothing about the number shown. This looks up each active/lite
+  // customer's most recent APPROVED payment (sc_payments — the only place
+  // that still knows monthly vs yearly, since the licenses table collapses
+  // both into plan="pro"), and normalizes yearly amounts to a monthly
+  // figure. Falls back to the old flat estimate only when there's no real
+  // payment on record at all (e.g. an admin-assigned key with no purchase).
+  let mrrVal = 0;
+  mergedData.forEach(r => {
+    if (r.subStatus !== "active" && r.subStatus !== "lite") return;
+    const phone = r.user?.phone || r.key?.customer_phone;
+    const seats = (r.key && r.key.extra_seats) || 0;
+    const customerPayments = phone
+      ? allPayments.filter(p => p.customer_phone === phone && p.status === "approved")
+          .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))
+      : [];
+    const latest = customerPayments[0];
+    if (latest && latest.amount) {
+      // Real payment on record — this already includes any seat add-ons
+      // paid at that time, so don't add seats again below.
+      mrrVal += latest.plan === "yearly" ? (latest.amount / 12) : latest.amount;
+    } else {
+      // No real payment (e.g. manually assigned by admin) — flat estimate.
+      const base = r.subStatus === "lite" ? 199 : 299;
+      mrrVal += base + seats * 50;
+    }
+  });
+
+  const mrrStr   = mrrVal >= 1000 ? `₹${(mrrVal/1000).toFixed(1)}K` : `₹${Math.round(mrrVal)}`;
   document.getElementById("stat-total").textContent    = mergedData.length;
   document.getElementById("stat-active").textContent   = active;
   const trialEl = document.getElementById("stat-trial");
