@@ -1602,9 +1602,9 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <button id="pm-step1-continue-btn" onclick="pmGoStep2()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;border:none;border-radius:10px;cursor:pointer;">पेमेंट पर जाएं →</button>
     </div>
 
-    <!-- ── PM STEP 2: Manual fallback (only reached if automatic payment fails) ── -->
+    <!-- ── PM STEP 2: Payment problem (only reached if automatic payment fails for a real, non-network reason) ── -->
     <div id="pm-step-2" style="display:none;">
-      <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:14px;">💳 मैन्युअल पेमेंट (UPI QR)</div>
+      <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:14px;">⚠️ पेमेंट में समस्या</div>
 
       <!-- Amount strip -->
       <div style="background:#0d1628;border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:12px 16px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
@@ -1616,38 +1616,12 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       </div>
       <div id="pm-seats-line" style="display:none;font-size:11px;color:var(--text-dim,#4a5a7a);text-align:right;margin-bottom:16px;"></div>
 
-      <div id="pm-auto-pay-err" style="color:#f66;font-size:11px;margin-bottom:10px;display:none;text-align:center;"></div>
-
-      <!-- Retry automatic payment -->
-      <button id="pm-auto-pay-btn" onclick="pmPayAutomatically()" style="background:linear-gradient(135deg,#4CAF50,#2E7D32);color:#fff;width:100%;padding:13px;font-size:14px;font-weight:800;border:none;border-radius:10px;cursor:pointer;margin-bottom:16px;">
-        <span id="pm-auto-pay-txt">⚡ दोबारा ऑटोमैटिक पेमेंट आज़माएं</span>
-      </button>
-
-      <!-- QR code -->
-      <div style="text-align:center;margin-bottom:14px;">
-        <div style="font-size:11px;color:var(--text-dim,#4a5a7a);margin-bottom:10px;">PhonePe · GPay · Paytm · BHIM से स्कैन करें</div>
-        <div style="background:#fff;border-radius:12px;padding:10px;display:inline-block;" id="pm-qr-wrap">
-          <div id="pm-qr-div"></div>
-        </div>
-        <div style="margin-top:8px;font-size:13px;font-weight:700;color:#FFD700;">rayalsaw@ybl</div>
-        <div style="font-size:10px;color:var(--text-dim,#4a5a7a);margin-top:2px;">या इस UPI ID पर सीधे पेमेंट करें</div>
-      </div>
-
-      <!-- Copy UPI -->
-      <button id="pm-copy-btn" onclick="pmCopyUPI()" style="background:var(--bg-main,#0a0e1a);color:#FFD700;border:1px solid #FFD700;width:100%;padding:9px;font-size:12px;font-weight:700;border-radius:10px;cursor:pointer;margin-bottom:16px;">📋 UPI ID कॉपी करें: rayalsaw@ybl</button>
-
-      <!-- UTR input -->
-      <div style="background:#0a1a0a;border:1px solid #2a4a2a;border-radius:12px;padding:13px 14px;margin-bottom:16px;">
-        <div style="font-size:12px;color:#4f4;font-weight:700;margin-bottom:4px;">✅ पेमेंट के बाद, अपना ट्रांज़ैक्शन ID (UTR) डालें</div>
-        <div style="font-size:10px;color:var(--text-dim,#4a5a7a);margin-bottom:10px;">UPI ऐप खोलें → Payment history → 12 अंकों का UTR नंबर कॉपी करें</div>
-        <input id="pm-utr" style="width:100%;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-input,#2a3560);border-radius:10px;padding:10px 13px;color:var(--text-main,#e8eaf0);font-family:monospace;font-size:13px;letter-spacing:1px;outline:none;" placeholder="जैसे 407293847162" maxlength="24"/>
-        <div id="pm-utr-err" style="color:#f66;font-size:11px;margin-top:5px;display:none;"></div>
-      </div>
+      <div id="pm-auto-pay-err" style="display:none;color:#f66;font-size:12px;margin-bottom:16px;text-align:center;background:#2a0d0d;border:1px solid #4a1a1a;border-radius:10px;padding:10px 12px;"></div>
 
       <div style="display:flex;gap:10px;">
         <button onclick="pmGoStep1()" style="background:var(--bg-main,#0a0e1a);color:var(--text-muted,#7a8aaa);border:1px solid var(--border-main,#1e2a45);border-radius:10px;padding:10px 16px;font-size:12px;cursor:pointer;">← पीछे</button>
-        <button id="pm-submit-btn" onclick="pmSubmit()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;flex:1;padding:11px;font-size:13px;font-weight:800;border:none;border-radius:10px;cursor:pointer;">
-          <span id="pm-submit-txt">पेमेंट सबमिट करें →</span>
+        <button id="pm-auto-pay-btn" onclick="pmPayAutomatically()" style="background:linear-gradient(135deg,#4CAF50,#2E7D32);color:#fff;flex:1;padding:11px;font-size:13px;font-weight:800;border:none;border-radius:10px;cursor:pointer;">
+          <span id="pm-auto-pay-txt">⚡ दोबारा पेमेंट करें</span>
         </button>
       </div>
     </div>
@@ -1874,11 +1848,11 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
   <div id="sc-blocker-banner" style="display:none;background:linear-gradient(135deg,#2a1500,#1a0e00);border-bottom:2px solid #f97316;padding:10px 16px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
     <span style="font-size:18px;">🦁</span>
     <div style="flex:1;min-width:200px;">
-      <div style="font-size:13px;font-weight:800;color:#fb923c;">Browser is blocking Firebase sync</div>
+      <div style="font-size:13px;font-weight:800;color:#fb923c;" id="sc-blocker-title">Browser is blocking Firebase sync</div>
       <div style="font-size:11px;color:#9a6a4a;margin-top:2px;" id="sc-blocker-msg">Your browser or an extension is blocking cloud sync. Data may not save or load.</div>
     </div>
     <button onclick="document.getElementById('sc-blocker-banner').style.display='none';" style="background:#3a1a00;border:1px solid #f97316;border-radius:8px;color:#fb923c;font-size:11px;font-weight:700;cursor:pointer;padding:5px 10px;white-space:nowrap;">✕ Dismiss</button>
-    <button onclick="showBlockerHelp()" style="background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:8px;color:#fff;font-size:11px;font-weight:800;cursor:pointer;padding:6px 12px;white-space:nowrap;">Fix This →</button>
+    <button id="sc-blocker-fixbtn" onclick="showBlockerHelp()" style="background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:8px;color:#fff;font-size:11px;font-weight:800;cursor:pointer;padding:6px 12px;white-space:nowrap;">Fix This →</button>
   </div>
 
   <!-- Tabs (desktop horizontal scroll — hidden on desktop, kept for mobile fallback) -->
@@ -3721,11 +3695,50 @@ function updateDbStatus(msg, color) {
   if (el) { el.textContent = msg; el.style.color = color || "#4f4"; }
 }
 
+// ── fix (2026-08-16): react to real connectivity changes immediately,
+// rather than only discovering network loss indirectly when a Firestore
+// listener eventually times out after 8 seconds.
+window.addEventListener("offline", () => {
+  _scBlockerShown = false; // allow the banner to (re)trigger
+  _scCheckIfBlocked("offline event");
+});
+window.addEventListener("online", () => {
+  const banner = document.getElementById("sc-blocker-banner");
+  const titleEl = document.getElementById("sc-blocker-title");
+  if (banner && titleEl && titleEl.textContent === "No internet connection") {
+    banner.style.display = "none";
+    _scBlockerShown = false;
+  }
+});
+
 // ── Brave / ad-blocker detection ──────────────────────────────
 var _scBlockerShown = false;
 window._scFreshClaimUntil = 0;
 function _scCheckIfBlocked(errorMsg) {
   if (_scBlockerShown) return;
+
+  // fix (2026-08-16): check this FIRST, before any signal-string matching —
+  // navigator.onLine is an unambiguous, browser-reported signal. If false,
+  // the device genuinely has no network connection, which is a completely
+  // different situation from "an extension is blocking Firebase" (that
+  // assumes the device IS online but a specific request is being
+  // interfered with). Checking this first also lets the online/offline
+  // event listeners above call this function directly with a message that
+  // wouldn't otherwise match any known block-signal pattern.
+  if (!navigator.onLine) {
+    _scBlockerShown = true;
+    const banner = document.getElementById("sc-blocker-banner");
+    const titleEl = document.getElementById("sc-blocker-title");
+    const msgEl = document.getElementById("sc-blocker-msg");
+    const fixBtn = document.getElementById("sc-blocker-fixbtn");
+    if (!banner) return;
+    if (titleEl) titleEl.textContent = "No internet connection";
+    if (msgEl) msgEl.textContent = "आपका डिवाइस ऑफ़लाइन है — इंटरनेट कनेक्शन जांचें। कनेक्ट होते ही डेटा अपने आप सिंक हो जाएगा।";
+    if (fixBtn) fixBtn.style.display = "none";
+    banner.style.display = "flex";
+    return;
+  }
+
   const msg = (errorMsg || "").toLowerCase();
   // Detect network-level block (ERR_BLOCKED_BY_CLIENT shows as failed fetch)
   // or Firestore permission errors caused by blocked auth token exchange
@@ -3754,10 +3767,15 @@ function _scCheckIfBlocked(errorMsg) {
   }
   _scBlockerShown = true;
   const banner = document.getElementById("sc-blocker-banner");
+  const titleEl = document.getElementById("sc-blocker-title");
   const msgEl = document.getElementById("sc-blocker-msg");
+  const fixBtn = document.getElementById("sc-blocker-fixbtn");
   if (!banner) return;
+
+  if (fixBtn) fixBtn.style.display = "";
   // Try to detect Brave specifically
   const isBrave = navigator.brave && typeof navigator.brave.isBrave === "function";
+  if (titleEl) titleEl.textContent = "Browser is blocking Firebase sync";
   if (isBrave) {
     if (msgEl) msgEl.textContent = "Brave Shields is blocking Firebase. Click Fix This for step-by-step instructions.";
   } else {
@@ -22617,8 +22635,28 @@ async function pmPayAutomatically() {
     if (s1btn) { s1btn.disabled = false; s1btn.textContent = s1defaultTxt; }
   }
 
+  // fix (2026-08-16): a genuine network problem gets its own message and
+  // stays on step 1 — it never falls through to the manual QR screen,
+  // because paying manually still requires an internet connection to send
+  // the UPI payment and submit the UTR. Showing "pay manually instead" for
+  // a connectivity problem would be actively misleading. Only real
+  // server-side failures (order rejected, payment declined) fall back to
+  // the manual screen, where it's an actually useful alternative.
+  function isNetworkFailure(e) {
+    return !navigator.onLine || (e instanceof TypeError && /fetch|network/i.test(e.message || ""));
+  }
+  function showNetworkProblem() {
+    if (s1btn) { s1btn.disabled = false; s1btn.textContent = s1defaultTxt; }
+    notify("📶 इंटरनेट कनेक्शन की समस्या — कृपया कनेक्शन जांचकर दोबारा कोशिश करें", "error");
+  }
+
   if (!phone || !hash) {
     fallbackToManual("कृपया पहले लॉगिन करें");
+    return;
+  }
+
+  if (!navigator.onLine) {
+    showNetworkProblem();
     return;
   }
 
@@ -22664,7 +22702,11 @@ async function pmPayAutomatically() {
     rzp.open();
     if (s1btn) { s1btn.disabled = false; s1btn.textContent = s1defaultTxt; }
   } catch (e) {
-    fallbackToManual((e.message || "कुछ गलत हो गया") + " — कृपया मैन्युअल विकल्प उपयोग करें");
+    if (isNetworkFailure(e)) {
+      showNetworkProblem();
+    } else {
+      fallbackToManual((e.message || "कुछ गलत हो गया") + " — कृपया मैन्युअल विकल्प उपयोग करें");
+    }
   }
 }
 
