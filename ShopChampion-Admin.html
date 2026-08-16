@@ -1599,12 +1599,12 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       <label style="display:block;font-size:11px;color:var(--text-muted,#7a8aaa);margin-bottom:5px;">आपकी दुकान / नाम <span style="color:#f66">*</span></label>
       <input id="pm-buyer-name" style="width:100%;background:var(--bg-main,#0a0e1a);border:1px solid var(--border-input,#2a3560);border-radius:10px;padding:10px 13px;color:var(--text-main,#e8eaf0);font-family:'Nunito',sans-serif;font-size:13px;outline:none;margin-bottom:18px;" placeholder="जैसे राज किराना स्टोर, मुंबई"/>
 
-      <button onclick="pmGoStep2()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;border:none;border-radius:10px;cursor:pointer;">पेमेंट पर जाएं →</button>
+      <button id="pm-step1-continue-btn" onclick="pmGoStep2()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#1a0a00;width:100%;padding:12px;font-size:14px;font-weight:800;border:none;border-radius:10px;cursor:pointer;">पेमेंट पर जाएं →</button>
     </div>
 
-    <!-- ── PM STEP 2: Pay ── -->
+    <!-- ── PM STEP 2: Manual fallback (only reached if automatic payment fails) ── -->
     <div id="pm-step-2" style="display:none;">
-      <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:14px;">💳 UPI से पेमेंट करें</div>
+      <div style="font-size:13px;font-weight:800;color:var(--text-main,#e8eaf0);margin-bottom:14px;">💳 मैन्युअल पेमेंट (UPI QR)</div>
 
       <!-- Amount strip -->
       <div style="background:#0d1628;border:1px solid var(--border-main,#1e2a45);border-radius:12px;padding:12px 16px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;">
@@ -1616,17 +1616,12 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
       </div>
       <div id="pm-seats-line" style="display:none;font-size:11px;color:var(--text-dim,#4a5a7a);text-align:right;margin-bottom:16px;"></div>
 
-      <!-- Automatic payment (Razorpay) — main path -->
-      <button id="pm-auto-pay-btn" onclick="pmPayAutomatically()" style="background:linear-gradient(135deg,#4CAF50,#2E7D32);color:#fff;width:100%;padding:13px;font-size:14px;font-weight:800;border:none;border-radius:10px;cursor:pointer;margin-bottom:8px;">
-        <span id="pm-auto-pay-txt">⚡ अभी पेमेंट करें (UPI/Card) — तुरंत सक्रिय</span>
-      </button>
-      <div id="pm-auto-pay-err" style="color:#f66;font-size:11px;margin-bottom:14px;display:none;text-align:center;"></div>
+      <div id="pm-auto-pay-err" style="color:#f66;font-size:11px;margin-bottom:10px;display:none;text-align:center;"></div>
 
-      <div style="display:flex;align-items:center;gap:10px;margin:4px 0 16px;">
-        <div style="flex:1;height:1px;background:var(--border-main,#1e2a45);"></div>
-        <div style="font-size:10px;color:var(--text-dim,#4a5a7a);">या मैन्युअल रूप से (यदि ऑटोमैटिक काम न करे)</div>
-        <div style="flex:1;height:1px;background:var(--border-main,#1e2a45);"></div>
-      </div>
+      <!-- Retry automatic payment -->
+      <button id="pm-auto-pay-btn" onclick="pmPayAutomatically()" style="background:linear-gradient(135deg,#4CAF50,#2E7D32);color:#fff;width:100%;padding:13px;font-size:14px;font-weight:800;border:none;border-radius:10px;cursor:pointer;margin-bottom:16px;">
+        <span id="pm-auto-pay-txt">⚡ दोबारा ऑटोमैटिक पेमेंट आज़माएं</span>
+      </button>
 
       <!-- QR code -->
       <div style="text-align:center;margin-bottom:14px;">
@@ -22474,7 +22469,11 @@ function pmGoStep2() {
     return;
   }
   document.getElementById("pm-buyer-label").textContent = name;
-  pmSetStep(2);
+  // fix (2026-08-16): go straight to Razorpay instead of showing the manual
+  // QR screen. The manual screen is still fully wired up and only appears
+  // as an automatic fallback if pmPayAutomatically() fails for any reason
+  // (see its catch blocks below) — never as the default path anymore.
+  pmPayAutomatically();
 }
 
 var pmSelectedPlan = "monthly";
@@ -22604,22 +22603,26 @@ function loadRazorpayScript() {
 }
 
 async function pmPayAutomatically() {
-  const btn = document.getElementById("pm-auto-pay-btn");
-  const txt = document.getElementById("pm-auto-pay-txt");
-  const errEl = document.getElementById("pm-auto-pay-err");
-  const defaultTxt = "⚡ अभी पेमेंट करें (UPI/Card) — तुरंत सक्रिय";
+  const s1btn = document.getElementById("pm-step1-continue-btn");
+  const s1defaultTxt = "पेमेंट पर जाएं →";
+  const errEl = document.getElementById("pm-auto-pay-err"); // lives inside step-2, used only on fallback
   if (errEl) errEl.style.display = "none";
 
   const phone = authPhone || localStorage.getItem("sc_auth_phone") || "";
   const hash = phone ? localStorage.getItem("sc_user_" + phone) : "";
 
+  function fallbackToManual(message) {
+    pmSetStep(2);
+    if (errEl) { errEl.textContent = "❌ " + message; errEl.style.display = "block"; }
+    if (s1btn) { s1btn.disabled = false; s1btn.textContent = s1defaultTxt; }
+  }
+
   if (!phone || !hash) {
-    if (errEl) { errEl.textContent = "❌ कृपया पहले लॉगिन करें"; errEl.style.display = "block"; }
+    fallbackToManual("कृपया पहले लॉगिन करें");
     return;
   }
 
-  if (btn) btn.disabled = true;
-  if (txt) txt.textContent = "⏳ तैयार हो रहा है...";
+  if (s1btn) { s1btn.disabled = true; s1btn.textContent = "⏳ तैयार हो रहा है..."; }
 
   try {
     await loadRazorpayScript();
@@ -22649,25 +22652,19 @@ async function pmPayAutomatically() {
       },
       modal: {
         ondismiss: function() {
-          if (btn) btn.disabled = false;
-          if (txt) txt.textContent = defaultTxt;
+          if (s1btn) { s1btn.disabled = false; s1btn.textContent = s1defaultTxt; }
         }
       }
     });
 
     rzp.on("payment.failed", function() {
-      if (btn) btn.disabled = false;
-      if (txt) txt.textContent = defaultTxt;
-      if (errEl) { errEl.textContent = "❌ पेमेंट असफल — कृपया दोबारा कोशिश करें या नीचे मैन्युअल विकल्प उपयोग करें"; errEl.style.display = "block"; }
+      fallbackToManual("पेमेंट असफल — कृपया मैन्युअल विकल्प से पेमेंट करें");
     });
 
     rzp.open();
-    if (btn) btn.disabled = false;
-    if (txt) txt.textContent = defaultTxt;
+    if (s1btn) { s1btn.disabled = false; s1btn.textContent = s1defaultTxt; }
   } catch (e) {
-    if (btn) btn.disabled = false;
-    if (txt) txt.textContent = defaultTxt;
-    if (errEl) { errEl.textContent = "❌ " + (e.message || "कुछ गलत हो गया — मैन्युअल विकल्प आज़माएं"); errEl.style.display = "block"; }
+    fallbackToManual((e.message || "कुछ गलत हो गया") + " — कृपया मैन्युअल विकल्प उपयोग करें");
   }
 }
 
