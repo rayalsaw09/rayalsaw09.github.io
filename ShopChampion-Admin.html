@@ -1844,15 +1844,15 @@ body.day-theme .more-menu-btn.active { background: #fffbe6; border-color: #FFD70
 
   </div>
 
-  <!-- Brave/Blocker Warning Banner -->
-  <div id="sc-blocker-banner" style="display:none;background:linear-gradient(135deg,#2a1500,#1a0e00);border-bottom:2px solid #f97316;padding:10px 16px;display:none;align-items:center;gap:10px;flex-wrap:wrap;">
-    <span style="font-size:18px;">🦁</span>
+  <!-- Network Connection Error Banner -->
+  <div id="sc-blocker-banner" style="display:none;background:linear-gradient(135deg,#2a1500,#1a0e00);border-bottom:2px solid #f97316;padding:10px 16px;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span style="font-size:18px;">⚠️</span>
     <div style="flex:1;min-width:200px;">
-      <div style="font-size:13px;font-weight:800;color:#fb923c;" id="sc-blocker-title">Browser is blocking Firebase sync</div>
-      <div style="font-size:11px;color:#9a6a4a;margin-top:2px;" id="sc-blocker-msg">Your browser or an extension is blocking cloud sync. Data may not save or load.</div>
+      <div style="font-size:13px;font-weight:800;color:#fb923c;" id="sc-blocker-title">Network connection error</div>
+      <div style="font-size:11px;color:#9a6a4a;margin-top:2px;" id="sc-blocker-msg">There's a problem with your network connection. Please refresh to reload the app.</div>
     </div>
     <button onclick="document.getElementById('sc-blocker-banner').style.display='none';" style="background:#3a1a00;border:1px solid #f97316;border-radius:8px;color:#fb923c;font-size:11px;font-weight:700;cursor:pointer;padding:5px 10px;white-space:nowrap;">✕ Dismiss</button>
-    <button id="sc-blocker-fixbtn" onclick="showBlockerHelp()" style="background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:8px;color:#fff;font-size:11px;font-weight:800;cursor:pointer;padding:6px 12px;white-space:nowrap;">Fix This →</button>
+    <button id="sc-blocker-fixbtn" onclick="location.reload();" style="background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:8px;color:#fff;font-size:11px;font-weight:800;cursor:pointer;padding:6px 12px;white-space:nowrap;">⟳ Refresh</button>
   </div>
 
   <!-- Tabs (desktop horizontal scroll — hidden on desktop, kept for mobile fallback) -->
@@ -3704,123 +3704,61 @@ window.addEventListener("offline", () => {
 });
 window.addEventListener("online", () => {
   const banner = document.getElementById("sc-blocker-banner");
-  const titleEl = document.getElementById("sc-blocker-title");
-  if (banner && titleEl && titleEl.textContent === "No internet connection") {
+  if (banner) {
     banner.style.display = "none";
     _scBlockerShown = false;
   }
 });
 
-// ── Brave / ad-blocker detection ──────────────────────────────
+// ── Network connection error banner ────────────────────────────
+// (2026-08-19): replaced the old Brave/extension-blocking detection —
+// it was guessing WHY sync was failing (browser blocking vs permission
+// issue vs propagation delay) and got the guess wrong often enough to be
+// misleading. Now this just reports "there's a network/sync problem" and
+// gives the user a one-click way to reload the app, without asserting a
+// specific (possibly wrong) cause.
 var _scBlockerShown = false;
 window._scFreshClaimUntil = 0;
 function _scCheckIfBlocked(errorMsg) {
   if (_scBlockerShown) return;
 
-  // fix (2026-08-16): check this FIRST, before any signal-string matching —
-  // navigator.onLine is an unambiguous, browser-reported signal. If false,
-  // the device genuinely has no network connection, which is a completely
-  // different situation from "an extension is blocking Firebase" (that
-  // assumes the device IS online but a specific request is being
-  // interfered with). Checking this first also lets the online/offline
-  // event listeners above call this function directly with a message that
-  // wouldn't otherwise match any known block-signal pattern.
+  // navigator.onLine is an unambiguous, browser-reported signal — check it
+  // first since offline/online events call this directly with a message
+  // that wouldn't otherwise match any pattern below.
   if (!navigator.onLine) {
-    _scBlockerShown = true;
-    const banner = document.getElementById("sc-blocker-banner");
-    const titleEl = document.getElementById("sc-blocker-title");
-    const msgEl = document.getElementById("sc-blocker-msg");
-    const fixBtn = document.getElementById("sc-blocker-fixbtn");
-    if (!banner) return;
-    if (titleEl) titleEl.textContent = "No internet connection";
-    if (msgEl) msgEl.textContent = "आपका डिवाइस ऑफ़लाइन है — इंटरनेट कनेक्शन जांचें। कनेक्ट होते ही डेटा अपने आप सिंक हो जाएगा।";
-    if (fixBtn) fixBtn.style.display = "none";
-    banner.style.display = "flex";
+    _showNetworkErrorBanner();
     return;
   }
 
   const msg = (errorMsg || "").toLowerCase();
-  // Detect network-level block (ERR_BLOCKED_BY_CLIENT shows as failed fetch)
-  // or Firestore permission errors caused by blocked auth token exchange
-  // Detect Brave/extension blocking: shows as network errors OR as permission-denied
-  // (Brave blocks firestore.googleapis.com so auth token never arrives → Firebase reports permission-denied)
-  const isBraveBlocking = !!(navigator.brave && typeof navigator.brave.isBrave === "function");
-  // Hard signals: a genuinely blocked request fails at the network layer —
-  // these are never caused by isOwner() propagation delay, so always show.
+  // Hard signals: a genuinely blocked/failed request at the network layer —
+  // never caused by isOwner() propagation delay, so always show.
   const isHardBlockSignal = msg.includes("failed to fetch")
     || msg.includes("err_blocked")
     || msg.includes("could not reach cloud firestore")
     || msg.includes("websocket")
     || msg.includes("transport");
-  // Soft signals: plain permission-denied, or the generic "no snapshot in
-  // 8s" probe timeout. These are ALSO what a normal, brief isOwner()
-  // propagation delay right after a fresh login looks like — so during that
-  // window, don't jump straight to "your browser is blocking Firebase".
+  // Soft signals: permission-denied, or the generic "no snapshot in 8s"
+  // probe timeout. These are ALSO what a normal, brief isOwner()
+  // propagation delay right after a fresh login looks like — so during
+  // that window, don't show the banner yet.
   const isSoftSignal = msg.includes("network error")
-    || (msg.includes("permission-denied") && isBraveBlocking)
-    || (msg.includes("missing or insufficient permissions") && isBraveBlocking);
+    || msg.includes("permission-denied")
+    || msg.includes("missing or insufficient permissions");
   const inFreshClaimWindow = Date.now() < (window._scFreshClaimUntil || 0);
   if (!isHardBlockSignal && !isSoftSignal) return;
   if (!isHardBlockSignal && isSoftSignal && inFreshClaimWindow) {
-    console.log('[SC] Suppressing blocker banner — within post-claim propagation window, likely not a real block');
+    console.log('[SC] Suppressing network banner — within post-claim propagation window, likely not a real issue');
     return;
   }
-  _scBlockerShown = true;
-  const banner = document.getElementById("sc-blocker-banner");
-  const titleEl = document.getElementById("sc-blocker-title");
-  const msgEl = document.getElementById("sc-blocker-msg");
-  const fixBtn = document.getElementById("sc-blocker-fixbtn");
-  if (!banner) return;
-
-  if (fixBtn) fixBtn.style.display = "";
-  // Try to detect Brave specifically
-  const isBrave = navigator.brave && typeof navigator.brave.isBrave === "function";
-  if (titleEl) titleEl.textContent = "Browser is blocking Firebase sync";
-  if (isBrave) {
-    if (msgEl) msgEl.textContent = "Brave Shields is blocking Firebase. Click Fix This for step-by-step instructions.";
-  } else {
-    if (msgEl) msgEl.textContent = "An extension or browser setting is blocking Firebase cloud sync. Click Fix This to learn how to fix it.";
-  }
-  banner.style.display = "flex";
+  _showNetworkErrorBanner();
 }
 
-function showBlockerHelp() {
-  var isBrave = !!(navigator.brave && typeof navigator.brave.isBrave === "function");
-  var braveHtml = '<div style="font-size:22px;margin-bottom:12px;">&#x1F981; Brave Shields Fix</div>'
-    + '<div style="font-size:13px;color:#9ca3af;margin-bottom:18px;">Brave Shields is blocking Firebase. Follow these steps:</div>'
-    + '<div style="display:flex;flex-direction:column;gap:12px;text-align:left;">'
-    + '<div style="background:#1a2a1a;border:1px solid #2a4a2a;border-radius:10px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;">'
-    + '<span style="font-size:20px;min-width:28px;">1&#xFE0F;&#x20E3;</span>'
-    + '<div><div style="font-weight:800;color:#4ade80;font-size:13px;">Click the Brave Lion icon</div>'
-    + '<div style="font-size:12px;color:#6a7a6a;margin-top:3px;">It is in the top-right of your browser address bar</div></div></div>'
-    + '<div style="background:#1a2a1a;border:1px solid #2a4a2a;border-radius:10px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;">'
-    + '<span style="font-size:20px;min-width:28px;">2&#xFE0F;&#x20E3;</span>'
-    + '<div><div style="font-weight:800;color:#4ade80;font-size:13px;">Toggle Shields to OFF</div>'
-    + '<div style="font-size:12px;color:#6a7a6a;margin-top:3px;">For this site only - your other sites stay protected</div></div></div>'
-    + '<div style="background:#1a2a1a;border:1px solid #2a4a2a;border-radius:10px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;">'
-    + '<span style="font-size:20px;min-width:28px;">3&#xFE0F;&#x20E3;</span>'
-    + '<div><div style="font-weight:800;color:#4ade80;font-size:13px;">Reload the page</div>'
-    + '<div style="font-size:12px;color:#6a7a6a;margin-top:3px;">Cloud sync will start working immediately</div></div></div>'
-    + '</div>'
-    + '<div style="margin-top:18px;padding:10px 14px;background:#0a1a2a;border:1px solid #1e3a5a;border-radius:8px;font-size:11px;color:#4a6a8a;">'
-    + '&#x1F4A1; ShopChampion only uses Firebase for your shop data - no ads, no tracking.</div>';
-  var otherHtml = '<div style="font-size:22px;margin-bottom:12px;">&#x1F512; Browser Blocking Fix</div>'
-    + '<div style="font-size:13px;color:#9ca3af;margin-bottom:18px;">An extension is blocking Firebase. Try these steps:</div>'
-    + '<div style="display:flex;flex-direction:column;gap:10px;text-align:left;">'
-    + '<div style="background:#1a1a2a;border:1px solid #2a2a4a;border-radius:10px;padding:12px 14px;">'
-    + '<div style="font-weight:800;color:#a78bfa;font-size:13px;">Option A - Disable extensions temporarily</div>'
-    + '<div style="font-size:12px;color:#6a6a8a;margin-top:3px;">Go to browser Extensions menu and disable ad-blockers or VPNs for this site</div></div>'
-    + '<div style="background:#1a1a2a;border:1px solid #2a2a4a;border-radius:10px;padding:12px 14px;">'
-    + '<div style="font-weight:800;color:#a78bfa;font-size:13px;">Option B - Use Chrome browser</div>'
-    + '<div style="font-size:12px;color:#6a6a8a;margin-top:3px;">Open ShopChampion in Chrome without extensions - works perfectly</div></div>'
-    + '<div style="background:#1a1a2a;border:1px solid #2a2a4a;border-radius:10px;padding:12px 14px;">'
-    + '<div style="font-weight:800;color:#a78bfa;font-size:13px;">Option C - Whitelist this site</div>'
-    + '<div style="font-size:12px;color:#6a6a8a;margin-top:3px;">In your ad-blocker settings, add rayalsaw09.github.io to the whitelist</div></div>'
-    + '</div>';
-  showModal('<div style="text-align:center;max-width:420px;margin:0 auto;">'
-    + (isBrave ? braveHtml : otherHtml)
-    + '<button onclick="closeModal()" style="margin-top:20px;background:linear-gradient(135deg,#f97316,#ea580c);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;padding:12px 28px;width:100%;">Got it</button>'
-    + '</div>');
+function _showNetworkErrorBanner() {
+  _scBlockerShown = true;
+  const banner = document.getElementById("sc-blocker-banner");
+  if (!banner) return;
+  banner.style.display = "flex";
 }
 
 // Probe Firebase reachability silently on login (not on every error — just once)
